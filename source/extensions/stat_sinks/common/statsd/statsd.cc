@@ -188,12 +188,12 @@ TcpStatsdSink::TlsSink::~TlsSink() {
 void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
   ASSERT(!expect_empty_buffer || buffer_.length() == 0);
   ASSERT(current_slice_mem_ == nullptr);
+  ASSERT(!current_buffer_reservation_.has_value());
 
-  uint64_t num_iovecs = buffer_.reserve(FLUSH_SLICE_SIZE_BYTES, &current_buffer_slice_, 1);
-  ASSERT(num_iovecs == 1);
+  current_buffer_reservation_.emplace(buffer_.reserveSingleSlice(FLUSH_SLICE_SIZE_BYTES));
 
-  ASSERT(current_buffer_slice_.len_ >= FLUSH_SLICE_SIZE_BYTES);
-  current_slice_mem_ = reinterpret_cast<char*>(current_buffer_slice_.mem_);
+  ASSERT(current_buffer_reservation_->slice().len_ >= FLUSH_SLICE_SIZE_BYTES);
+  current_slice_mem_ = reinterpret_cast<char*>(current_buffer_reservation_->slice().mem_);
 }
 
 void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value, char stat_type) {
@@ -201,7 +201,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // 36 > 1 ("." after prefix) + 1 (":" after name) + 4 (postfix chars, e.g., "|ms\n") + 30 for
   // number (bigger than it will ever be)
   const uint32_t max_size = name.size() + parent_.getPrefix().size() + 36;
-  if (current_buffer_slice_.len_ - usedBuffer() < max_size) {
+  if (current_buffer_reservation_->slice().len_ - usedBuffer() < max_size) {
     endFlush(false);
     beginFlush(false);
   }
@@ -234,8 +234,9 @@ void TcpStatsdSink::TlsSink::flushGauge(const std::string& name, uint64_t value)
 
 void TcpStatsdSink::TlsSink::endFlush(bool do_write) {
   ASSERT(current_slice_mem_ != nullptr);
-  current_buffer_slice_.len_ = usedBuffer();
-  buffer_.commit(&current_buffer_slice_, 1);
+  ASSERT(current_buffer_reservation_.has_value());
+  current_buffer_reservation_->commit(usedBuffer());
+  current_buffer_reservation_.reset();
   current_slice_mem_ = nullptr;
   if (do_write) {
     write(buffer_);
@@ -309,7 +310,8 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
 uint64_t TcpStatsdSink::TlsSink::usedBuffer() const {
   ASSERT(current_slice_mem_ != nullptr);
-  return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_slice_.mem_);
+  ASSERT(current_buffer_reservation_.has_value());
+  return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_reservation_->slice().mem_);
 }
 
 } // namespace Statsd

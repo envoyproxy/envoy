@@ -76,7 +76,7 @@ protected:
 
 private:
   struct ReadResult {
-    bool commit_slice_{};
+    uint64_t bytes_read_{0};
     absl::optional<int> error_;
   };
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);

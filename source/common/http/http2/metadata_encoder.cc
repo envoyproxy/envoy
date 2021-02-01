@@ -62,18 +62,16 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
     return false;
   }
-  Buffer::RawSlice iovec;
-  payload_.reserve(buflen, &iovec, 1);
-  ASSERT(iovec.len_ >= buflen);
+  auto reservation = payload_.reserveSingleSlice(buflen);
+  ASSERT(reservation.slice().len_ >= buflen);
 
   // Creates payload using nghttp2.
-  uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   const ssize_t result = nghttp2_hd_deflate_hd(deflater_.get(), buf, buflen, nva.begin(), nvlen);
   RELEASE_ASSERT(result > 0,
                  fmt::format("Failed to deflate metadata payload, with result {}.", result));
-  iovec.len_ = result;
 
-  payload_.commit(&iovec, 1);
+  reservation.commit(result);
 
   return true;
 }

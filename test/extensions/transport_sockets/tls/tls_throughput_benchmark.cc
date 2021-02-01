@@ -33,36 +33,30 @@ static void handleSslError(SSL* ssl, int err, bool is_server) {
 }
 
 static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
-  Buffer::RawSlice slice;
   std::string data(size, 'a');
   RELEASE_ASSERT(data.size() <= 16384, "short_slice_size can't be larger than full slice");
 
   // A 16kb request currently has inline metadata, which makes it 16384+8. This gets rounded up
   // to the next page size. Request enough that there is no extra space, to ensure that this results
   // in a new slice.
-  buffer.reserve(16384, &slice, 1);
+  auto reservation = buffer.reserveSingleSlice(16384);
 
-  memcpy(slice.mem_, data.data(), data.size());
-  slice.len_ = data.size();
-  buffer.commit(&slice, 1);
+  memcpy(reservation.slice().mem_, data.data(), data.size());
+  reservation.commit(data.size());
 }
 
 // If move_slices is true, add full-sized slices using move similar to how HTTP codecs move data
 // from the filter chain buffer to the output buffer. Else, append full-sized slices directly to the
 // output buffer like socket read would do.
-static void addFullSlices(Buffer::Instance& output_buffer, int num_slices, bool move_slices) {
+static void addFullSlices(Buffer::Instance& output_buffer, unsigned num_slices, bool move_slices) {
   Buffer::OwnedImpl tmp_buf;
   Buffer::Instance* buffer = move_slices ? &tmp_buf : &output_buffer;
 
-  for (int i = 0; i < num_slices; i++) {
-    auto start_size = buffer->length();
-    Buffer::RawSlice slices[2];
-    auto num_slices = buffer->reserve(16384, slices, 2);
-    for (unsigned i = 0; i < num_slices; i++) {
-      memset(slices[i].mem_, 'a', slices[i].len_);
-    }
-    buffer->commit(slices, num_slices);
-    RELEASE_ASSERT(buffer->length() - start_size == 16384, "correct reserve/commit");
+  const auto initial_slices = buffer->getRawSlices().size();
+  while ((buffer->getRawSlices().size() - initial_slices) < num_slices) {
+    Buffer::Reservation reservation = buffer->reserveForRead();
+    memset(reservation.slices()[0].mem_, 'a', reservation.slices()[0].len_);
+    reservation.commit(reservation.slices()[0].len_);
   }
 
   if (move_slices) {

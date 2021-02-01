@@ -33,6 +33,16 @@ namespace Buffer {
 class Slice {
 public:
   using Reservation = RawSlice;
+  using StoragePtr = std::unique_ptr<uint8_t[]>;
+
+  static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
+  using FreeListType = absl::InlinedVector<StoragePtr, free_list_max_>;
+  class FreeListReference {
+  private:
+    FreeListReference(FreeListType& free_list) : free_list_(free_list) {}
+    FreeListType& free_list_;
+    friend class Slice;
+  };
 
   /**
    * Create an empty Slice with 0 capacity.
@@ -44,9 +54,9 @@ public:
    * @param min_capacity number of bytes of space the slice should have. Actual capacity is rounded
    * up to the next multiple of 4kb.
    */
-  Slice(uint64_t min_capacity)
-      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]), base_(storage_.get()),
-        data_(0), reservable_(0) {}
+  Slice(uint64_t min_capacity, absl::optional<FreeListReference> free_list = absl::nullopt)
+      : capacity_(sliceSize(min_capacity)), storage_(newStorage(capacity_, free_list)),
+        base_(storage_.get()), data_(0), reservable_(0) {}
 
   /**
    * Create an immutable Slice that refers to an external buffer fragment.
@@ -77,6 +87,7 @@ public:
     if (this != &rhs) {
       callAndClearDrainTrackers();
 
+      freeStorage(std::move(storage_), capacity_);
       storage_ = std::move(rhs.storage_);
       drain_trackers_ = std::move(rhs.drain_trackers_);
       base_ = rhs.base_;
@@ -93,7 +104,15 @@ public:
     return *this;
   }
 
-  ~Slice() { callAndClearDrainTrackers(); }
+  ~Slice() {
+    callAndClearDrainTrackers();
+    freeStorage(std::move(storage_), capacity_);
+  }
+
+  void freeStorage(FreeListReference free_list) {
+    callAndClearDrainTrackers();
+    freeStorage(std::move(storage_), capacity_, free_list);
+  }
 
   /**
    * @return true if the data in the slice is mutable
@@ -285,6 +304,10 @@ public:
     drain_trackers_.clear();
   }
 
+  static constexpr uint32_t default_slice_size_ = 16384;
+
+  static FreeListReference freeList() { return FreeListReference(free_list_); }
+
 protected:
   /**
    * Compute a slice size big enough to hold a specified amount of data.
@@ -297,13 +320,56 @@ protected:
     return num_pages * PageSize;
   }
 
+  static StoragePtr newStorage(uint64_t capacity, absl::optional<FreeListReference> free_list_opt) {
+    ASSERT(sliceSize(default_slice_size_) == default_slice_size_,
+           "default_slice_size_ incompatible with sliceSize()");
+    ASSERT(sliceSize(capacity) == capacity,
+           "newStorage should only be called on values returned from sliceSize()");
+    ASSERT(!free_list_opt.has_value() || &free_list_opt->free_list_ == &free_list_);
+
+    StoragePtr storage;
+    if (capacity == default_slice_size_ && free_list_opt.has_value()) {
+      FreeListType& free_list = free_list_opt->free_list_;
+      if (!free_list.empty()) {
+        storage = std::move(free_list.back());
+        ASSERT(storage != nullptr);
+        ASSERT(free_list.back() == nullptr);
+        free_list.pop_back();
+        return storage;
+      }
+    }
+
+    storage.reset(new uint8_t[capacity]);
+    return storage;
+  }
+
+  static void freeStorage(StoragePtr storage, uint64_t capacity,
+                          absl::optional<FreeListReference> free_list_opt = absl::nullopt) {
+    if (storage == nullptr) {
+      return;
+    }
+
+    if (capacity == default_slice_size_ && free_list_opt.has_value()) {
+      FreeListType& free_list = free_list_opt->free_list_;
+      if (free_list.size() < free_list_max_) {
+        free_list.emplace_back(std::move(storage));
+        ASSERT(storage == nullptr);
+        return;
+      }
+    }
+
+    storage.reset();
+  }
+
+  static thread_local FreeListType free_list_;
+
   /** Length of the byte array that base_ points to. This is also the offset in bytes from the start
    * of the slice to the end of the Reservable section. */
   uint64_t capacity_;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
-  std::unique_ptr<uint8_t[]> storage_;
+  StoragePtr storage_;
 
   /** Start of the slice. Points to storage_ iff the slice owns its own storage. */
   uint8_t* base_{nullptr};
@@ -319,6 +385,8 @@ protected:
   std::list<std::function<void()>> drain_trackers_;
 };
 
+class OwnedImpl;
+
 class SliceDataImpl : public SliceData {
 public:
   explicit SliceDataImpl(Slice&& slice) : slice_(std::move(slice)) {}
@@ -330,6 +398,7 @@ public:
   }
 
 private:
+  friend OwnedImpl;
   Slice slice_;
 };
 
@@ -573,7 +642,6 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
-  void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
@@ -583,7 +651,8 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
+  Reservation reserveForRead() override;
+  ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;
@@ -618,6 +687,25 @@ public:
    */
   std::vector<Slice::SliceRepresentation> describeSlicesForTest() const;
 
+  /**
+   * Create a reservation for reading with a non-default length. Used in benchmark tests.
+   */
+  Reservation reserveForReadWithLengthForTest(uint64_t length) {
+    return reserveWithMaxLength(length);
+  }
+
+protected:
+  static constexpr uint64_t default_read_reservation_size_ =
+      Reservation::MAX_SLICES_ * Slice::default_slice_size_;
+
+  /**
+   * Create a reservation with a maximum length.
+   */
+  Reservation reserveWithMaxLength(uint64_t max_length);
+
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              ReservationSlicesOwnerPtr slices_owner) override;
+
 private:
   /**
    * @param rhs another buffer
@@ -641,6 +729,32 @@ private:
 
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
+
+  struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
+    virtual absl::Span<Slice> ownedSlices() PURE;
+  };
+
+  struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
+    // Optimization: get the thread_local freeList() once per Reservation, outside the loop.
+    OwnedImplReservationSlicesOwnerMultiple() : free_list_(Slice::freeList()) {}
+
+    ~OwnedImplReservationSlicesOwnerMultiple() override {
+      while (!owned_slices_.empty()) {
+        owned_slices_.back().freeStorage(free_list_);
+        owned_slices_.pop_back();
+      }
+    }
+    absl::Span<Slice> ownedSlices() override { return absl::MakeSpan(owned_slices_); }
+
+    Slice::FreeListReference free_list_;
+    absl::InlinedVector<Slice, Buffer::Reservation::MAX_SLICES_> owned_slices_;
+  };
+
+  struct OwnedImplReservationSlicesOwnerSingle : public OwnedImplReservationSlicesOwner {
+    absl::Span<Slice> ownedSlices() override { return absl::MakeSpan(&owned_slice_, 1); }
+
+    Slice owned_slice_;
+  };
 };
 
 using BufferFragmentPtr = std::unique_ptr<BufferFragment>;

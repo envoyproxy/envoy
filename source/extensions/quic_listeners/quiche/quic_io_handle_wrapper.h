@@ -29,7 +29,8 @@ public:
     }
     return io_handle_.readv(max_length, slices, num_slice);
   }
-  Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) override {
+  Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                               absl::optional<uint64_t> max_length) override {
     if (closed_) {
       return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
                                                         Network::IoSocketError::deleteIoError));

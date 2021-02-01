@@ -70,11 +70,13 @@ public:
   /**
    * Read from a io handle directly into buffer.
    * @param buffer supplies the buffer to read into.
-   * @param max_length supplies the maximum length to read.
+   * @param max_length supplies the maximum length to read. A value of absl::nullopt means to read
+   *   as much data as possible, within the constraints of available buffer size.
    * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
    * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
    */
-  virtual Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) PURE;
+  virtual Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                                       absl::optional<uint64_t> max_length) PURE;
 
   /**
    * Write the data in slices out.
