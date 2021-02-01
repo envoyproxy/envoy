@@ -224,6 +224,27 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
+TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatusTrailersOnlyResponse) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+
+  // gRPC responses may optimize and put would-be-trailers in the headers frame if there are no data
+  // frames. The gRPC spec refers to this a a "Trailers-Only" response.
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"grpc-status", "1"}, {"grpc-message", "foo"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("503", response_headers.get_(":status"));
+  EXPECT_EQ("0", response_headers.get_("content-length"));
+  EXPECT_EQ("1", response_headers.get_("grpc-status"));
+  EXPECT_EQ("foo", response_headers.get_("grpc-message"));
+}
+
 } // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
