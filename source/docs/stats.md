@@ -25,7 +25,7 @@ https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310 for details. This
 requires lock-free access to stats on the fast path -- when proxying requests.
 
 For stats, this is implemented in
-[ThreadLocalStore](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/thread_local_store.h), supporting the following features:
+[ThreadLocalStore](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/thread_local_store.h), supporting the following features:
 
  * Thread local per scope stat caching.
  * Overlapping scopes with proper reference counting (2 scopes with the same name will point to
@@ -94,12 +94,12 @@ maintain data continuity as scopes are re-created during operation.
 Stat names are replicated in several places in various forms.
 
  * Held with the stat values, in `CounterImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
-   [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/allocator_impl.cc)
- * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
+   [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator_impl.cc)
+ * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
  * In a [set of
-   regexes](https://github.com/envoyproxy/envoy/blob/master/source/common/config/well_known_names.cc)
+   regexes](https://github.com/envoyproxy/envoy/blob/main/source/common/config/well_known_names.cc)
    used to perform tag extraction.
 
 There are stat maps in `ThreadLocalStore` for capturing all stats in a scope,
@@ -127,7 +127,7 @@ The transformation between flattened string and symbolized form is CPU-intensive
 at scale. It requires parsing, encoding, and lookups in a shared map, which must
 be mutex-protected. To avoid adding latency and CPU overhead while serving
 requests, the tokens can be symbolized and saved in context classes, such as
-[Http::CodeStatsImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/http/codes.h).
+[Http::CodeStatsImpl](https://github.com/envoyproxy/envoy/blob/main/source/common/http/codes.h).
 Symbolization can occur on startup or when new hosts or clusters are configured
 dynamically. Users of stats that are allocated dynamically per cluster, host,
 etc, must explicitly store partial stat-names their class instances, which later
@@ -184,7 +184,7 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
- * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/main/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
    scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
    in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path and during
    control-plane updates, so that we do not need to take symbol-table locks. As an example, see
@@ -210,7 +210,7 @@ SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings in
 StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
 StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
-StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 
+StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free().
 StatNameDynamicStorage | StatNameStorageBase | Holds StatName storage for a dynamic (not symbolized) StatName.
 StatNamePool | | Holds backing store for any number of symbolized StatNames.
 StatNameDynamicPool | | Holds backing store for any number of dynamic StatNames.
@@ -251,7 +251,7 @@ deployments with O(10k) clusters or hosts.
 
 To improve visibility for this memory growth, there are [memory-usage
 integration
-tests](https://github.com/envoyproxy/envoy/blob/master/test/integration/stats_integration_test.cc).
+tests](https://github.com/envoyproxy/envoy/blob/main/test/integration/stats_integration_test.cc).
 
 If a PR fails the tests in that file due to unexpected memory consumption, it
 gives the author and reviewer an opportunity to consider the cost/value of the
@@ -275,8 +275,8 @@ If you are visiting this section because you saw a message like:
 
 ```bash
 [...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
-decode_search != decode_map_.end(). Details: Please see 
-https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#debugging-symbol-table-asserts
+decode_search != decode_map_.end(). Details: Please see
+https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#debugging-symbol-table-assertions
 ```
 then you have come to the right place.
 

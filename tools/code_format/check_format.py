@@ -75,6 +75,7 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/common/expr/context_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
     "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
 )
@@ -522,8 +523,9 @@ class FormatChecker:
         match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
         if not match:
           reportError("Version history line malformed. "
-                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" %
-                      line)
+                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s\n"
+                      "Please use messages in the form 'category: feature explanation.', "
+                      "starting with a lower-cased letter and ending with a period." % line)
         else:
           first_word = match.groups()[0]
           next_word = match.groups()[1]
@@ -545,6 +547,7 @@ class FormatChecker:
         # If we hit the end of this release note block block, check the prior line.
         if not endsWithPeriod(prior_line):
           reportError("The following release note does not end with a '.'\n %s" % prior_line)
+        prior_line = ''
       elif prior_line:
         prior_line += line
 

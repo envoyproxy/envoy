@@ -136,7 +136,7 @@ TEST(WatchMapTest, Basic) {
   }
   {
     // The watch is interested in Alice and Bob...
-    std::set<std::string> update_to({"alice", "bob"});
+    absl::flat_hash_set<std::string> update_to({"alice", "bob"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch, update_to);
     EXPECT_EQ(update_to, added_removed.added_);
     EXPECT_TRUE(added_removed.removed_.empty());
@@ -159,10 +159,10 @@ TEST(WatchMapTest, Basic) {
   }
   {
     // The watch is now interested in Bob, Carol, Dave, Eve...
-    std::set<std::string> update_to({"bob", "carol", "dave", "eve"});
+    absl::flat_hash_set<std::string> update_to({"bob", "carol", "dave", "eve"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch, update_to);
-    EXPECT_EQ(std::set<std::string>({"carol", "dave", "eve"}), added_removed.added_);
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_);
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"carol", "dave", "eve"}), added_removed.added_);
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}), added_removed.removed_);
 
     // ...the update is going to contain Alice, Carol, Dave...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
@@ -209,7 +209,7 @@ TEST(WatchMapTest, Overlap) {
 
   // First watch becomes interested.
   {
-    std::set<std::string> update_to({"alice", "dummy"});
+    absl::flat_hash_set<std::string> update_to({"alice", "dummy"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch1, update_to);
     EXPECT_EQ(update_to, added_removed.added_); // add to subscription
     EXPECT_TRUE(added_removed.removed_.empty());
@@ -222,7 +222,7 @@ TEST(WatchMapTest, Overlap) {
   }
   // Second watch becomes interested.
   {
-    std::set<std::string> update_to({"alice", "dummy"});
+    absl::flat_hash_set<std::string> update_to({"alice", "dummy"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch2, update_to);
     EXPECT_TRUE(added_removed.added_.empty()); // nothing happens
     EXPECT_TRUE(added_removed.removed_.empty());
@@ -251,7 +251,8 @@ TEST(WatchMapTest, Overlap) {
   {
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch2, {"dummy"});
     EXPECT_TRUE(added_removed.added_.empty());
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_); // remove from subscription
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}),
+              added_removed.removed_); // remove from subscription
   }
 }
 
@@ -348,7 +349,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
 
   // First watch becomes interested.
   {
-    std::set<std::string> update_to({"alice", "dummy"});
+    absl::flat_hash_set<std::string> update_to({"alice", "dummy"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch1, update_to);
     EXPECT_EQ(update_to, added_removed.added_); // add to subscription
     EXPECT_TRUE(added_removed.removed_.empty());
@@ -363,7 +364,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   {
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch1, {"dummy"});
     EXPECT_TRUE(added_removed.added_.empty());
-    EXPECT_EQ(std::set<std::string>({"alice"}),
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}),
               added_removed.removed_); // remove from subscription
 
     // (The xDS client should have responded to updateWatchInterest()'s return value by removing
@@ -371,9 +372,10 @@ TEST(WatchMapTest, AddRemoveAdd) {
   }
   // Second watch becomes interested.
   {
-    std::set<std::string> update_to({"alice", "dummy"});
+    absl::flat_hash_set<std::string> update_to({"alice", "dummy"});
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch2, update_to);
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.added_); // add to subscription
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}),
+              added_removed.added_); // add to subscription
     EXPECT_TRUE(added_removed.removed_.empty());
 
     // Both watches receive the update. For watch2, this is obviously desired.
@@ -519,6 +521,50 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   EXPECT_CALL(callbacks1, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   EXPECT_CALL(callbacks2, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
+}
+
+// Validate watch behavior when subscribed to xdstp:// glob collections.
+TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  WatchMap watch_map(true);
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz/*?some=thing&thing=some"});
+
+  // verify update
+  {
+    // Verify that we pay attention to all matching resources, no matter the order of context
+    // params.
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    envoy::config::endpoint::v3::ClusterLoadAssignment resource1;
+    resource1.set_cluster_name("xdstp://foo/bar/baz/a?some=thing&thing=some");
+    update.Add()->PackFrom(resource1);
+    envoy::config::endpoint::v3::ClusterLoadAssignment resource2;
+    resource2.set_cluster_name("xdstp://foo/bar/baz/b?thing=some&some=thing");
+    update.Add()->PackFrom(resource2);
+    // Ignore non-matching resources.
+    envoy::config::endpoint::v3::ClusterLoadAssignment ignored_resource;
+    ignored_resource.set_cluster_name("xdstp://foo/bar/baz/c?thing=some");
+    update.Add()->PackFrom(ignored_resource);
+    ignored_resource.set_cluster_name("xdstp://foo/bar/baz/d");
+    update.Add()->PackFrom(ignored_resource);
+    ignored_resource.set_cluster_name("xdstp://blah/bar/baz/e");
+    update.Add()->PackFrom(ignored_resource);
+    ignored_resource.set_cluster_name("whatevs");
+    update.Add()->PackFrom(ignored_resource);
+    expectDeltaUpdate(callbacks, {resource1, resource2}, {}, "version0");
+    doDeltaUpdate(watch_map, update, {}, "version0");
+  }
+  // verify removal
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    expectDeltaUpdate(callbacks, {}, {"xdstp://foo/bar/baz/a?thing=some&some=thing"}, "version1");
+    doDeltaUpdate(
+        watch_map, update,
+        {"xdstp://foo/bar/baz/*", "xdstp://foo/bar/baz/a?thing=some&some=thing", "whatevs"},
+        "version1");
+  }
 }
 
 TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {

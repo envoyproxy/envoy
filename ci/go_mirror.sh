@@ -2,7 +2,7 @@
 
 set -e
 
-MAIN_BRANCH="refs/heads/master"
+MAIN_BRANCH="refs/heads/main"
 
 # shellcheck source=ci/setup_cache.sh
 . "$(dirname "$0")"/setup_cache.sh

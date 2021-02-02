@@ -7,14 +7,17 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/libevent_scheduler.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
@@ -39,16 +42,31 @@ namespace Event {
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
+    : DispatcherImpl(name, api, time_system, {}) {}
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
-                               Api::Api& api, Event::TimeSystem& time_system)
-    : name_(name), api_(api), buffer_factory_(std::move(factory)),
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+    : DispatcherImpl(
+          name, api, time_system,
+          [](Dispatcher& dispatcher) {
+            return std::make_unique<ScaledRangeTimerManagerImpl>(dispatcher);
+          },
+          watermark_factory) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system,
+                               const ScaledRangeTimerManagerFactory& scaled_timer_factory,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+    : name_(name), api_(api),
+      buffer_factory_(watermark_factory != nullptr
+                          ? watermark_factory
+                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {
+      current_to_delete_(&to_delete_1_), scaled_timer_manager_(scaled_timer_factory(*this)) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
@@ -191,6 +209,16 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   return createTimerInternal(cb);
 }
 
+TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerType timer_type, TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scaled_timer_manager_->createTimer(timer_type, std::move(cb));
+}
+
+TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scaled_timer_manager_->createTimer(minimum, std::move(cb));
+}
+
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
   return base_scheduler_.createSchedulableCallback([this, cb]() {
@@ -288,6 +316,16 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+void DispatcherImpl::onFatalError(std::ostream& os) const {
+  // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
+  // results in dumping the active state only for the thread which caused the fatal error.
+  if (isThreadSafe()) {
+    for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
+      (*iter)->dumpState(os);
+    }
+  }
+}
+
 void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
   // Only run if this is the dispatcher of the current thread and
@@ -297,7 +335,7 @@ void DispatcherImpl::runFatalActionsOnTrackedObject(
   }
 
   for (const auto& action : actions) {
-    action->run(current_object_);
+    action->run(tracked_object_stack_);
   }
 }
 
@@ -305,6 +343,24 @@ void DispatcherImpl::touchWatchdog() {
   if (watchdog_registration_) {
     watchdog_registration_->touchWatchdog();
   }
+}
+
+void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
+  ASSERT(isThreadSafe());
+  ASSERT(object != nullptr);
+  tracked_object_stack_.push_back(object);
+  ASSERT(tracked_object_stack_.size() <= ExpectedMaxTrackedObjectStackDepth);
+}
+
+void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
+  ASSERT(isThreadSafe());
+  ASSERT(expected_object != nullptr);
+  RELEASE_ASSERT(!tracked_object_stack_.empty(), "Tracked Object Stack is empty, nothing to pop!");
+
+  const ScopeTrackedObject* top = tracked_object_stack_.back();
+  tracked_object_stack_.pop_back();
+  ASSERT(top == expected_object,
+         "Popped the top of the tracked object stack, but it wasn't the expected object!");
 }
 
 } // namespace Event

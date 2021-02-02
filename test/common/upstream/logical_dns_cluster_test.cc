@@ -7,6 +7,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
@@ -137,7 +138,8 @@ protected:
     EXPECT_TRUE(TestUtility::protoEqual(envoy::config::core::v3::Metadata::default_instance(),
                                         *data.host_description_->metadata()));
     data.host_description_->outlierDetector().putHttpResponseCode(200);
-    data.host_description_->healthChecker().setUnhealthy();
+    data.host_description_->healthChecker().setUnhealthy(
+        HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
@@ -290,7 +292,8 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo.bar.com",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy();
+  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy(
+      HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
   tls_.shutdownThread();
 }
 
@@ -399,7 +402,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
                 address:
                   socket_address:
                     address: foo.bar.com
-                    port_value: 443                     
+                    port_value: 443
             - endpoint:
                 address:
                   socket_address:

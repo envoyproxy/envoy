@@ -65,7 +65,8 @@ InstanceImpl::InstanceImpl(
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
     ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+    Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
@@ -75,7 +76,8 @@ InstanceImpl::InstanceImpl(
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt)),
+                                         : absl::nullopt,
+                         watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
@@ -87,7 +89,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      main_thread_id_(std::this_thread::get_id()), hooks_(hooks), server_contexts_(*this) {
+      hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -139,7 +141,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroyed listener manager");
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -351,10 +356,17 @@ void InstanceImpl::initialize(const Options& options,
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
+  const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
+  server_compilation_settings_stats_ =
+      std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
+          CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(
+              POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
@@ -383,6 +395,9 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
+  if (VersionInfo::sslFipsCompliant()) {
+    server_compilation_settings_stats_->fips_mode_.set(1);
+  }
 
   bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");
@@ -401,8 +416,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
@@ -564,6 +579,11 @@ void InstanceImpl::initialize(const Options& options,
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
+
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized();
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
@@ -817,7 +837,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

@@ -236,6 +236,17 @@ EXTENSIONS = {
     "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
 
+    #
+    # Rate limit descriptors
+    #
+
+    "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
+    
+    #
+    # IO socket
+    #
+
+    "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
