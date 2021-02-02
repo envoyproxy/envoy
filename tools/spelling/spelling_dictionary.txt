@@ -27,6 +27,9 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
 OWS
@@ -886,6 +889,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix

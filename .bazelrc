@@ -277,18 +277,41 @@ build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
+
+# Shared fuzzing configuration.
+build:fuzzing --define=ENVOY_CONFIG_ASAN=1
+build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+build:fuzzing --config=libc++
+
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
+build:plain-fuzzer --config=fuzzing
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
+# The fuzzing rules provide their own instrumentation, but it is currently
+# disabled due to bazelbuild/bazel#12888. Instead, we provide instrumentation at
+# the top level through these options.
 build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
-build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
 build:asan-fuzzer --config=plain-fuzzer
 build:asan-fuzzer --config=asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+
+build:oss-fuzz --config=fuzzing
+build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
+build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=oss-fuzz
+build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
+build:oss-fuzz --dynamic_mode=off
+build:oss-fuzz --strip=never
+build:oss-fuzz --copt=-fno-sanitize=vptr
+build:oss-fuzz --linkopt=-fno-sanitize=vptr
+build:oss-fuzz --define=tcmalloc=disabled
+build:oss-fuzz --define=signal_trace=disabled
+build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
+build:oss-fuzz --define=force_libcpp=enabled
+build:oss-fuzz --linkopt=-lc++
+build:oss-fuzz --linkopt=-pthread
 
 # Compile database generation config
 build:compdb --build_tag_filters=-nocompdb
