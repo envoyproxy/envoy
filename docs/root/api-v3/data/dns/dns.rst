@@ -1,5 +1,5 @@
-Extensions objects
-==================
+扩展对象
+============
 
 .. toctree::
   :glob:
