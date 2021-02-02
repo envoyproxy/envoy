@@ -88,7 +88,11 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
 }
 
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
-                                                         uint64_t max_length) {
+                                                         absl::optional<uint64_t> max_length_opt) {
+  const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
+  if (max_length == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
@@ -101,7 +105,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
                                  Network::IoSocketError::deleteIoError)};
     }
   }
-  // TODO(lambdai): Move at slice boundary to move to reduce the copy.
+  // TODO(lambdai): Move slice by slice until high watermark.
   uint64_t max_bytes_to_read = std::min(max_length, pending_received_data_.length());
   buffer.move(pending_received_data_, max_bytes_to_read);
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};

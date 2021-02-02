@@ -46,7 +46,7 @@ public:
   bool isOpen() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
-  Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) override;
+  Api::IoCallUint64Result read(Buffer::Instance& buffer, absl::optional<uint64_t> max_length_opt) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
