@@ -157,6 +157,60 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileScalingMax) {
   simTime().advanceTimeAndRun(std::chrono::seconds(100), dispatcher_, Dispatcher::RunType::Block);
 }
 
+TEST_F(ScaledRangeTimerManagerTest, InCallbackDisableLastTimerInSameQueue) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  MockFunction<TimerCb> callback1;
+  auto timer1 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(0)), callback1.AsStdFunction());
+  MockFunction<TimerCb> callback2;
+  auto timer2 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback2.AsStdFunction());
+
+  timer1->enableTimer(std::chrono::seconds(95));
+  timer2->enableTimer(std::chrono::seconds(100));
+
+  simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+
+  EXPECT_CALL(callback1, Call).WillOnce(Invoke([&]() {
+    timer2->disableTimer();
+    timer2.reset();
+  }));
+
+  // Run the dispatcher to make sure nothing happens when it's not supposed to.
+  simTime().advanceTimeAndRun(std::chrono::seconds(100), dispatcher_, Dispatcher::RunType::Block);
+}
+
+TEST_F(ScaledRangeTimerManagerTest, InCallbackDisableTimerInOtherQueue) {
+  ScaledRangeTimerManagerImpl manager(dispatcher_);
+
+  MockFunction<TimerCb> callback1;
+  auto timer1 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback1.AsStdFunction());
+  MockFunction<TimerCb> callback2;
+  auto timer2 =
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback2.AsStdFunction());
+
+  timer1->enableTimer(std::chrono::seconds(95));
+  timer2->enableTimer(std::chrono::seconds(100));
+
+  simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
+
+  EXPECT_TRUE(timer1->enabled());
+  EXPECT_TRUE(timer2->enabled());
+
+  EXPECT_CALL(callback1, Call).WillOnce(Invoke([&]() {
+    timer2->disableTimer();
+    timer2.reset();
+  }));
+
+  // Run the dispatcher to make sure nothing happens when it's not supposed to.
+  simTime().advanceTimeAndRun(std::chrono::seconds(100), dispatcher_, Dispatcher::RunType::Block);
+}
+
 TEST_F(ScaledRangeTimerManagerTest, DisableWithZeroMinTime) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
