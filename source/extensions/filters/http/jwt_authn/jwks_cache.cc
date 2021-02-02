@@ -26,6 +26,9 @@ namespace {
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
 
+// Default token_cache_size is 100.
+constexpr int kJwtCacheSize = 100;
+
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api)
@@ -46,9 +49,6 @@ public:
                   inline_jwks);
         jwks_obj_.reset(nullptr);
       }
-      if (jwt_provider_.token_cache_size() > 0) {
-        token_cache_ = std::make_unique<TokenCache>(jwt_provider_.token_cache_size());
-      }
     }
   }
 
@@ -66,7 +66,16 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
-  const std::unique_ptr<TokenCache>& getTokenCache() override { return token_cache_; }
+  const std::unique_ptr<TokenCache>& getTokenCache() override {
+    if (token_cache_ == nullptr) {
+      if (jwt_provider_.token_cache_size() > 0) {
+        token_cache_ = std::make_unique<TokenCache>(jwt_provider_.token_cache_size());
+      } else {
+        token_cache_ = std::make_unique<TokenCache>(kJwtCacheSize);
+      }
+    }
+    return token_cache_;
+  }
 
 private:
   // Get the expiration time for a remote Jwks
@@ -98,7 +107,7 @@ private:
   // The pubkey expiration time.
   MonotonicTime expiration_time_;
   // The TokenCache object
-  std::unique_ptr<TokenCache> token_cache_{std::make_unique<TokenCache>()};
+  std::unique_ptr<TokenCache> token_cache_;
 };
 
 class JwksCacheImpl : public JwksCache {

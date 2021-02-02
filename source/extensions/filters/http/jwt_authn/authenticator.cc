@@ -129,14 +129,6 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
     return;
   }
 
-  // If token found in cache skip startVerify()
-  if (jwks_data_->getTokenCache()->lookupTokenCache(tokens_.back()->token(), *jwt_)) {
-    ENVOY_LOG(debug, "{}: verified token with cache hit: tokens size {}", name(), tokens_.size());
-    doneWithStatus(Status::Ok);
-    tokens_.pop_back();
-    return;
-  }
-
   startVerify();
 }
 
@@ -176,6 +168,12 @@ void AuthenticatorImpl::startVerify() {
                          : jwks_cache_.findByIssuer(jwt_->iss_);
   // isIssuerSpecified() check already make sure the issuer is in the cache.
   ASSERT(jwks_data_ != nullptr);
+
+  if (jwks_data_->getTokenCache()->lookupTokenCache(curr_token_->token())) {
+    ENVOY_LOG(debug, "{}: verified token with cache hit: tokens size {}", name(), tokens_.size());
+    doneWithStatus(Status::Ok);
+    return;
+  }
 
   // Default is 60 seconds
   uint64_t clock_skew_seconds = ::google::jwt_verify::kClockSkewInSecond;
@@ -275,13 +273,10 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
-  if (status == Status::Ok) {
-    auto token_exp = absl::ToUnixSeconds(absl::Now());
-    if (jwks_data_->getJwtProvider().has_token_cache_duration()) {
-      token_exp +=
-          DurationUtil::durationToSeconds(jwks_data_->getJwtProvider().token_cache_duration());
-    }
-    jwks_data_->getTokenCache()->addTokenCache(curr_token_->token(), *jwt_, token_exp);
+  if (status == Status::Ok &&
+      !jwks_data_->getTokenCache()->lookupTokenCache(curr_token_->token())) {
+    ENVOY_LOG(debug, "JWT token: {} added in cache", curr_token_->token());
+    jwks_data_->getTokenCache()->insert(curr_token_->token(), jwt_.release(), 1);
   }
 
   // If a request has multiple tokens, all of them must be valid. Otherwise it may have

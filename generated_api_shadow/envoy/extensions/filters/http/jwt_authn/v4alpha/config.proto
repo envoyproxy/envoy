@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 14]
+// [#next-free-field: 13]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -198,14 +198,13 @@ message JwtProvider {
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
 
-  // Enable cache.
+  // Cache is a LRU cache, its size is specified by token_cache_size.
+  // Only cache good JWT.
+  // Cache JWT only removed when it is expired or removed by LRU purge.
   bool enable_token_cache = 11;
 
-  // Specify token cache duration, default to 5 minutes.
-  google.protobuf.Duration token_cache_duration = 12;
-
-  // Specify token cache size, default to 100.
-  uint32 token_cache_size = 13;
+  // The unit is number of JWT tokens, default to 100.
+  uint32 token_cache_size = 12;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

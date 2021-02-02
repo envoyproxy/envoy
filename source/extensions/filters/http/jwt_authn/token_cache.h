@@ -24,10 +24,9 @@ namespace JwtAuthn {
 // The default number of entries in JWT cache is 100.
 class TokenCache : public SimpleLRUCache<std::string, ::google::jwt_verify::Jwt> {
 public:
-  TokenCache(int cache_size = 100);
+  TokenCache(int cache_size);
   ~TokenCache();
-  void addTokenCache(const std::string& token, ::google::jwt_verify::Jwt& jwt, uint64_t token_exp);
-  bool lookupTokenCache(const std::string& token, ::google::jwt_verify::Jwt& jwt);
+  bool lookupTokenCache(const std::string& token);
 };
 
 } // namespace JwtAuthn
