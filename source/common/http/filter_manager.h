@@ -111,9 +111,9 @@ public:
 
   Matcher::DataInputPtr<HttpMatchingData>
   createDataInput(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config =
-        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
+                  Server::Configuration::FactoryContext& factory_context) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<const ProtoType&>(
+        config, factory_context.messageValidationVisitor());
 
     return std::make_unique<DataInputType>(typed_config.header_name());
   };
@@ -186,7 +186,8 @@ using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 class SkipActionFactory : public Matcher::ActionFactory {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&) override {
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
+                                                 Server::Configuration::FactoryContext&) override {
     return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

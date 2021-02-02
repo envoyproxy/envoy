@@ -31,7 +31,7 @@ public:
       : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
 
   DataInputPtr<TestData> createDataInput(const Protobuf::Message&,
-                                         ProtobufMessage::ValidationVisitor&) override {
+                                         Server::Configuration::FactoryContext&) override {
     return std::make_unique<TestInput>(
         DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, value_});
   }
@@ -78,7 +78,8 @@ struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
 // Factory for StringAction.
 class StringActionFactory : public ActionFactory {
 public:
-  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config) override {
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
+                                        Server::Configuration::FactoryContext&) override {
     const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
     return [string]() { return std::make_unique<StringAction>(string.value()); };
   }
@@ -102,7 +103,8 @@ class NeverMatchFactory : public InputMatcherFactory {
 public:
   NeverMatchFactory() : inject_factory_(*this) {}
 
-  InputMatcherPtr createInputMatcher(const Protobuf::Message&) override {
+  InputMatcherPtr createInputMatcher(const Protobuf::Message&,
+                                     Server::Configuration::FactoryContext&) override {
     return std::make_unique<NeverMatch>();
   }
 
