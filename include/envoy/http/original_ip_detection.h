@@ -4,7 +4,9 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Http {

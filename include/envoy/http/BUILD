@@ -147,5 +147,6 @@ envoy_cc_library(
     deps = [
         ":header_map_interface",
         "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:address_interface",
     ],
 )
