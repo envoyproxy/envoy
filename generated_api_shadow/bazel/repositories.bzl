@@ -40,6 +40,7 @@ def api_dependencies():
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
+
     external_http_archive(
         name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_LOGS_BUILD_CONTENT,
