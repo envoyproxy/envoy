@@ -15,7 +15,9 @@ namespace Envoy {
 
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
-using Extensions::HttpFilters::ExternalProcessing::ExtProcTestUtility;
+using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
+using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
+using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
 using Http::LowerCaseString;
 
@@ -61,9 +63,35 @@ protected:
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_proc_filter));
+      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
     });
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  }
+
+  IntegrationStreamDecoderPtr
+  sendDownstreamRequest(std::function<void(Http::HeaderMap& headers)> modify_headers) {
+    auto conn = makeClientConnection(lookupPort("http"));
+    codec_client_ = makeHttpConnection(std::move(conn));
+    Http::TestRequestHeaderMapImpl headers;
+    if (modify_headers != nullptr) {
+      modify_headers(headers);
+    }
+    HttpTestUtility::addDefaultHeaders(headers);
+    return codec_client_->makeHeaderOnlyRequest(headers);
+  }
+
+  void verifyDownstreamResponse(IntegrationStreamDecoder& response, int status_code) {
+    response.waitForEndStream();
+    EXPECT_TRUE(response.complete());
+    EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
+  }
+
+  void handleUpstreamRequest() {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
   }
 
   void waitForFirstMessage(ProcessingRequest& request) {
@@ -86,12 +114,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
 TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-
-  auto conn = makeClientConnection(lookupPort("http"));
-  codec_client_ = makeHttpConnection(std::move(conn));
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  auto response = sendDownstreamRequest(nullptr);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
@@ -99,21 +122,8 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
 
-  // Now expect a message to the real upstream
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  // Respond from the upstream with a simple 200
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(100, true);
-
-  // Now expect a response to the original request
-  response->waitForEndStream();
-
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
 }
 
 // Test the filter using the default configuration by connecting to
@@ -122,21 +132,103 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-
-  auto conn = makeClientConnection(lookupPort("http"));
-  codec_client_ = makeHttpConnection(std::move(conn));
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  auto response = sendDownstreamRequest(nullptr);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
+  verifyDownstreamResponse(*response, 500);
+}
 
-  response->waitForEndStream();
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("500", response->headers().getStatusValue());
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// successfully, but then sends a gRPC error.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLine) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  // Fail the stream in between messages
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// successfully, but then sends a gRPC error.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLineLater) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  // Fail the stream in between messages
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// successfully but closes the stream after response_headers.
+TEST_P(ExtProcIntegrationTest, GetAndCloseStreamOnResponse) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  handleUpstreamRequest();
+
+  ProcessingRequest response_headers_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// successfully but then fails on the response_headers message.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  handleUpstreamRequest();
+
+  ProcessingRequest response_headers_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter using the default configuration by connecting to
@@ -145,34 +237,27 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-
-  auto conn = makeClientConnection(lookupPort("http"));
-  codec_client_ = makeHttpConnection(std::move(conn));
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.addCopy(LowerCaseString("x-remove-this"), "yes");
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
 
-  EXPECT_TRUE(request_headers_msg.has_request_headers());
+  ASSERT_TRUE(request_headers_msg.has_request_headers());
   const auto request_headers = request_headers_msg.request_headers();
   Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                           {":method", "GET"},
                                                           {"host", "host"},
                                                           {":path", "/"},
                                                           {"x-remove-this", "yes"}};
-  EXPECT_TRUE(ExtProcTestUtility::headerProtosEqualIgnoreOrder(expected_request_headers,
-                                                               request_headers.headers()));
+  EXPECT_THAT(request_headers.headers(), HeaderProtosEqual(expected_request_headers));
 
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   // Ask to change the headers
   ProcessingResponse response_msg;
-  auto response_headers_msg = response_msg.mutable_request_headers();
   auto response_header_mutation =
-      response_headers_msg->mutable_response()->mutable_header_mutation();
+      response_msg.mutable_request_headers()->mutable_response()->mutable_header_mutation();
   auto mut1 = response_header_mutation->add_set_headers();
   mut1->mutable_header()->set_key("x-new-header");
   mut1->mutable_header()->set_value("new");
@@ -183,20 +268,60 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  auto has_hdr1 = upstream_request_->headers().get(LowerCaseString("x-remove-this"));
-  EXPECT_TRUE(has_hdr1.empty());
-  auto has_hdr2 = upstream_request_->headers().get(LowerCaseString("x-new-header"));
-  EXPECT_EQ(has_hdr2.size(), 1);
-  EXPECT_EQ(has_hdr2[0]->value(), "new");
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
-  response->waitForEndStream();
+  // Now expect a message for the response path
+  ProcessingRequest response_headers_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
+  ASSERT_TRUE(response_headers_msg.has_response_headers());
+  const auto response_headers = response_headers_msg.response_headers();
+  Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+  EXPECT_THAT(response_headers.headers(), HeaderProtosEqual(expected_response_headers));
 
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Send back a response but don't do anything
+  ProcessingResponse response_2;
+  response_2.mutable_response_headers();
+  processor_stream_->sendGrpcMessage(response_2);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the response_headers message
+// by requesting to modify the request headers.
+TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+
+  ASSERT_TRUE(request_headers_msg.has_request_headers());
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  handleUpstreamRequest();
+
+  ProcessingRequest response_headers_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
+  ASSERT_TRUE(response_headers_msg.has_response_headers());
+  ProcessingResponse resp2;
+  auto* headers2 = resp2.mutable_response_headers();
+  auto* response_mutation = headers2->mutable_response()->mutable_header_mutation();
+  auto* add1 = response_mutation->add_set_headers();
+  add1->mutable_header()->set_key("x-response-processed");
+  add1->mutable_header()->set_value("1");
+  processor_stream_->sendGrpcMessage(resp2);
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
 }
 
 // Test the filter using the default configuration by connecting to
@@ -204,14 +329,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 // by sending back an immediate_response message, which should be
 // returned directly to the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
+  // Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
+
   initializeConfig();
   HttpIntegrationTest::initialize();
-
-  auto conn = makeClientConnection(lookupPort("http"));
-  codec_client_ = makeHttpConnection(std::move(conn));
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  auto response = sendDownstreamRequest(nullptr);
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
@@ -233,13 +355,48 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   hdr2->mutable_header()->set_value("application/json");
   processor_stream_->sendGrpcMessage(response_msg);
 
-  response->waitForEndStream();
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().getStatusValue());
-  EXPECT_EQ(
-      "testing",
-      response->headers().get(LowerCaseString("x-failure-reason"))[0]->value().getStringView());
-  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// by sending back an immediate_response message after the
+// request_headers message
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponse) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  // request_headers message to processor
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  EXPECT_TRUE(request_headers_msg.has_request_headers());
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  // Response to request_headers
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  handleUpstreamRequest();
+
+  // response_headers message to processor
+  ProcessingRequest response_headers_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
+  ASSERT_TRUE(response_headers_msg.has_response_headers());
+
+  // Response to response_headers
+  ProcessingResponse resp2;
+  auto* immediate_response = resp2.mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+  immediate_response->set_body("{\"reason\": \"Not authorized\"}");
+  immediate_response->set_details("Failed because you are not authorized");
+  processor_stream_->sendGrpcMessage(resp2);
+
+  verifyDownstreamResponse(*response, 401);
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 

@@ -48,34 +48,25 @@ public:
 
     envoy::config::trace::v3::ClientConfig proto_client_config;
     TestUtility::loadFromYaml(yaml_string, proto_client_config);
-    client_config_ = std::make_unique<SkyWalkingClientConfig>(context_, proto_client_config);
 
-    reporter_ = std::make_unique<TraceSegmentReporter>(std::move(mock_client_factory),
-                                                       mock_dispatcher_, mock_random_generator_,
-                                                       tracing_stats_, *client_config_);
+    reporter_ = std::make_unique<TraceSegmentReporter>(
+        std::move(mock_client_factory), mock_dispatcher_, mock_random_generator_, tracing_stats_,
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_client_config, max_cache_size, 1024),
+        proto_client_config.backend_token());
   }
 
 protected:
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
-
   NiceMock<Event::MockDispatcher>& mock_dispatcher_ = context_.server_factory_context_.dispatcher_;
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
   Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
-
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
-
   NiceMock<Grpc::MockAsyncClient>* mock_client_ptr_{nullptr};
-
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
-
   NiceMock<Event::MockTimer>* timer_;
   Event::TimerCb timer_cb_;
-
   std::string test_string = "ABCDEFGHIJKLMN";
-
-  SkyWalkingClientConfigPtr client_config_;
-
   SkyWalkingTracerStats tracing_stats_{
       SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TraceSegmentReporterPtr reporter_;
@@ -106,24 +97,21 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   setupTraceSegmentReporter("{}");
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
 
-  SegmentContextSharedPtr segment_context =
-      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
-  SpanStore* parent_store =
-      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
-  // Parent span store has peer address.
-  parent_store->setPeerAddress("0.0.0.0");
+  SegmentContextPtr segment_context =
+      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
+  CurrentSegmentSpanPtr parent_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "PARENT");
 
-  SpanStore* first_child_sptore =
-      SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
   // Skip reporting the first child span.
-  first_child_sptore->setSampled(0);
+  CurrentSegmentSpanPtr first_child_sptore =
+      SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD", false);
 
   // Create second child span.
-  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
+  SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
 
-  reporter_->report(*segment_context);
+  reporter_->report(segment_context);
 
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
@@ -131,12 +119,12 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Create a segment context with no previous span context.
-  SegmentContextSharedPtr second_segment_context = SkyWalkingTestHelper::createSegmentContext(
-      true, "SECOND_SEGMENT", "", mock_random_generator_);
-  SkyWalkingTestHelper::createSpanStore(second_segment_context.get(), nullptr, "PARENT");
+  SegmentContextPtr second_segment_context =
+      SkyWalkingTestHelper::createSegmentContext(true, "SECOND_SEGMENT", "");
+  SkyWalkingTestHelper::createSpanStore(second_segment_context, nullptr, "PARENT");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-  reporter_->report(*second_segment_context);
+  reporter_->report(second_segment_context);
 
   EXPECT_EQ(2U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
@@ -148,15 +136,15 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
   setupTraceSegmentReporter("{}");
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
 
-  SegmentContextSharedPtr segment_context =
-      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
-  SpanStore* parent_store =
-      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
-  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
+  SegmentContextPtr segment_context =
+      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
+  CurrentSegmentSpanPtr parent_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "PARENT");
+  SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(1025);
 
-  reporter_->report(*segment_context);
+  reporter_->report(segment_context);
 
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
@@ -170,7 +158,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
   // Try to report 10 segments. Due to the disconnection, the cache size is only 3. So 7 of the
   // segments will be discarded.
   for (int i = 0; i < 2048; i++) {
-    reporter_->report(*segment_context);
+    reporter_->report(segment_context);
   }
 
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
@@ -198,15 +186,15 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
 
   ON_CALL(mock_random_generator_, random()).WillByDefault(Return(23333));
 
-  SegmentContextSharedPtr segment_context =
-      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE", mock_random_generator_);
-  SpanStore* parent_store =
-      SkyWalkingTestHelper::createSpanStore(segment_context.get(), nullptr, "PARENT");
-  SkyWalkingTestHelper::createSpanStore(segment_context.get(), parent_store, "CHILD");
+  SegmentContextPtr segment_context =
+      SkyWalkingTestHelper::createSegmentContext(true, "NEW", "PRE");
+  CurrentSegmentSpanPtr parent_store =
+      SkyWalkingTestHelper::createSpanStore(segment_context, nullptr, "PARENT");
+  SkyWalkingTestHelper::createSpanStore(segment_context, parent_store, "CHILD");
 
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(4);
 
-  reporter_->report(*segment_context);
+  reporter_->report(segment_context);
 
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
@@ -220,7 +208,7 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
   // Try to report 10 segments. Due to the disconnection, the cache size is only 3. So 7 of the
   // segments will be discarded.
   for (int i = 0; i < 10; i++) {
-    reporter_->report(*segment_context);
+    reporter_->report(segment_context);
   }
 
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
@@ -237,6 +225,13 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
   EXPECT_EQ(7U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
   EXPECT_EQ(3U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+}
+
+TEST_F(TraceSegmentReporterTest, CallAsyncCallbackAndNothingTodo) {
+  setupTraceSegmentReporter("{}");
+  reporter_->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
+  reporter_->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
+  reporter_->onReceiveMessage(std::make_unique<Commands>());
 }
 
 } // namespace
