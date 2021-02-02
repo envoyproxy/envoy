@@ -62,10 +62,7 @@ FIPS 创建的正确性可以通过检查 `--version` 选项的输出中是否�
 
 .. attention::
 
-  If only :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` is
-  specified, Envoy will verify the certificate chain of the presented certificate, but not its
-  subject name, hash, etc. Other validation context configuration is typically required depending
-  on the deployment.
+  如果只指定了 :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`, 则 Envoy 将会验证所提供证书的证书链, 而不验证其主题名称、哈希等。根据部署，通常需要其他验证上下文配置。
 
 .. _arch_overview_ssl_cert_select:
 
@@ -86,7 +83,6 @@ FIPS 创建的正确性可以通过检查 `--version` 选项的输出中是否�
 目前只提供单个 TLS 证书 :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` 。
 
-Secret discovery service (SDS)
 安全发现服务（SDS）
 ------------------------------
 
@@ -109,8 +105,8 @@ OCSP 响应将从来不会被绑定到那些通过 ``status_request`` 扩展来�
 * ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs`` ：禁用此标志可允许操作者在配置中忽略 must-staple 证书的 OCSP 响应。
 * ``envoy.reloadable_features.check_ocsp_policy`` ：禁用此标志可以禁用 OCSP 的策略检查功能。如果客户端支持 OCSP 响应，可在 OCSP 响应可用时进行绑定，即使 OCSP 响应已过期。如果没有响应存在，绑定会被跳过。
 
-OCSP responses are ignored for :ref:`UpstreamTlsContexts
-<envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
+OCSP 响应会被 :ref:`UpstreamTlsContexts
+<envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` 所忽略。
 
 .. _arch_overview_ssl_auth_filter:
 
