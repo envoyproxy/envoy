@@ -1,5 +1,5 @@
-Retry Predicates
-================
+重试谓词
+===========
 
 .. toctree::
   :glob:
