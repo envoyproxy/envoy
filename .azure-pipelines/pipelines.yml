@@ -354,7 +354,7 @@ stages:
               itemPattern: "docker/envoy-docker-images.tar.xz"
               downloadType: single
               targetPath: $(Build.StagingDirectory)
-          - bash: ./ci/do_ci.sh verify_examples
+          - bash: ./ci/do_ci.sh verify_build_examples
             env:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               NO_BUILD_SETUP: 1
