@@ -1,40 +1,32 @@
 .. _config_network_filters_postgres_proxy:
 
-Postgres proxy
+Postgres 代理
 ================
 
-The Postgres proxy filter decodes the wire protocol between a Postgres client (downstream) and a Postgres server
-(upstream). The decoded information is used to produce Postgres level statistics like sessions,
-statements or transactions executed, among others. The Postgres proxy filter parses SQL queries carried in ``Query`` and ``Parse`` messages.
-When SQL query has been parsed successfully, the :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is created, 
-which may be used by other filters like :ref:`RBAC <config_network_filters_rbac>`.
-When the Postgres filter detects that a session is encrypted, the messages are ignored and no decoding takes
-place. More information:
+Postgres 代理过滤器解码 Postgres 客户端（下游）和 Postgres 服务端（上游）之间的连接协议。解码后的信息会被用于生成 Postgres 级别的统计信息，例如其中的会话、语句和已执行的事务等。Postgres 代理过滤器还会解析 ``Query`` 和 ``Parse`` 消息中携带的 SQL 查询。
+当成功解析 SQL 查询后, 元数据:ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` 会被创建, 这个元数据可能会被其他过滤器使用，比如 :ref:`RBAC <config_network_filters_rbac>` 。
+当 Postgres 过滤器检测到会话已加密的时候，消息会被忽略并且不会进行解码。更多信息： 
 
-* Postgres :ref:`architecture overview <arch_overview_postgres>`
+* Postgres :ref:`架构概述 <arch_overview_postgres>`
 
 .. attention::
 
-   The `postgres_proxy` filter is experimental and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
+   `postgres_proxy` 过滤器是实验性的，目前正在积极开发中。
+   功能会随着时间的推移而扩展，并且配置结构也可能会发生变化。
 
 
 .. warning::
 
-   The `postgreql_proxy` filter was tested only with
-   `Postgres frontend/backend protocol version 3.0`_, which was introduced in
-   Postgres 7.4. Earlier versions are thus not supported. Testing is limited
-   anyway to not EOL-ed versions.
+   `postgreql_proxy` 过滤器仅使用 `Postgres frontend/backend protocol version 3.0`_ 测试过, 这个版本在 Postgres 7.4 被引入。因此不支持早期版本。无论如何，测试只限于非最终（EOL-ed）版本。
 
    .. _Postgres frontend/backend protocol version 3.0: https://www.postgresql.org/docs/current/protocol.html
 
 
 
-Configuration
+配置
 -------------
 
-The Postgres proxy filter should be chained with the TCP proxy as shown in the configuration
-example below:
+Postgres 代理过滤器应该与 TCP 代理串联在一起使用，如以下配置示例所示：
 
 .. code-block:: yaml
 
@@ -53,66 +45,64 @@ example below:
 
 .. _config_network_filters_postgres_proxy_stats:
 
-Statistics
+统计
 ----------
 
-Every configured Postgres proxy filter has statistics rooted at postgres.<stat_prefix> with the following statistics:
+每个配置的 Postgres 代理过滤器都有如下基于 postgres.<stat_prefix> 的统计信息：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 2, 1, 2
 
-  errors, Counter, Number of times the server replied with ERROR message
-  errors_error, Counter, Number of times the server replied with ERROR message with ERROR severity
-  errors_fatal, Counter, Number of times the server replied with ERROR message with FATAL severity
-  errors_panic, Counter, Number of times the server replied with ERROR message with PANIC severity
-  errors_unknown, Counter, Number of times the server replied with ERROR message but the decoder could not parse it
-  messages, Counter, Total number of messages processed by the filter
-  messages_backend, Counter, Total number of backend messages detected by the filter
-  messages_frontend, Counter, Number of frontend messages detected by the filter
-  messages_unknown, Counter, Number of times the filter successfully decoded a message but did not know what to do with it
-  sessions, Counter, Total number of successful logins
-  sessions_encrypted, Counter, Number of times the filter detected encrypted sessions
-  sessions_unencrypted, Counter, Number of messages indicating unencrypted successful login
-  statements, Counter, Total number of SQL statements
-  statements_delete, Counter, Number of DELETE statements
-  statements_insert, Counter, Number of INSERT statements
-  statements_select, Counter, Number of SELECT statements
-  statements_update, Counter, Number of UPDATE statements
-  statements_other, Counter, "Number of statements other than DELETE, INSERT, SELECT or UPDATE"
-  statements_parsed, Counter, Number of SQL queries parsed successfully
-  statements_parse_error, Counter, Number of SQL queries not parsed successfully
-  transactions, Counter, Total number of SQL transactions
-  transactions_commit, Counter, Number of COMMIT transactions
-  transactions_rollback, Counter, Number of ROLLBACK transactions
-  notices, Counter, Total number of NOTICE messages
-  notices_notice, Counter, Number of NOTICE messages with NOTICE subtype
-  notices_log, Counter, Number of NOTICE messages with LOG subtype
-  notices_warning, Counter, Number ofr NOTICE messags with WARNING severity
-  notices_debug, Counter, Number of NOTICE messages with DEBUG severity
-  notices_info, Counter, Number of NOTICE messages with INFO severity
-  notices_unknown, Counter, Number of NOTICE messages which could not be recognized
+  errors, Counter, 服务器回复 ERROR message 的次数
+  errors_error, Counter, 服务器回复 ERROR message 和 ERROR severity 的次数
+  errors_fatal, Counter, 服务器回复 ERROR message 和 FATAL severity 的次数
+  errors_panic, Counter, 服务器回复 ERROR message 和 PANIC severity 的次数
+  errors_unknown, Counter, 服务器回复 ERROR message 但解码器无法解析它的次数
+  messages, Counter, 过滤器处理的消息总数
+  messages_backend, Counter, 过滤器检测到的后端消息总数
+  messages_frontend, Counter, 过滤器检测到的前端消息数
+  messages_unknown, Counter, 过滤器成功解码但不知道如何处理消息的次数
+  sessions, Counter, 成功登陆总数
+  sessions_encrypted, Counter, 过滤器检测到加密会话的次数
+  sessions_unencrypted, Counter, 表示未加密成功登录的消息数
+  statements, Counter, SQL语句总数
+  statements_delete, Counter, DELETE 语句数
+  statements_insert, Counter, INSERT 语句数
+  statements_select, Counter, SELECT 语句数
+  statements_update, Counter, UPDATE 语句数
+  statements_other, Counter, “除 DELETE，INSERT，SELECT 或 UPDATE 以外的语句数”
+  statements_parsed, Counter, 成功解析的 SQL 查询数
+  statements_parse_error, Counter, 未成功解析的 SQL 查询数
+  transactions, Counter, SQL事务总数
+  transactions_commit, Counter, COMMIT 事务数
+  transactions_rollback, Counter, ROLLBACK 事务数
+  notices, Counter, NOTICE 消息总数
+  notices_notice, Counter, 带有 NOTICE subtype 的 NOTICE 消息数
+  notices_log, Counter, 带有 LOG subtype 的 NOTICE 消息数
+  notices_warning, Counter, 带有 WARNING severity 的 NOTICE 消息数
+  notices_debug, Counter, 带有 DEBUG severity 的 NOTICE 消息数
+  notices_info, Counter, 带有 INFO severity 的 NOTICE 消息数
+  notices_unknown, Counter, 无法识别的 NOTICE 消息数
 
 
 .. _config_network_filters_postgres_proxy_dynamic_metadata:
 
-Dynamic Metadata
+动态元数据
 ----------------
 
-The Postgres filter emits Dynamic Metadata based on SQL statements carried in ``Query`` and ``Parse`` messages. ``statements_parsed`` statistics Counter tracks how many times
-SQL statement was parsed successfully and metadata was created. The metadata is emitted in the following format:
+Postgres 过滤器根据 ``Query`` 和 ``Parse`` 消息中携带的 SQL 语句发出动态元数据。``statements_parsed`` 统计计数器追踪有多少次 SQL 语句被成功解析，并创建元数据。这个元数据会以以下的格式发出：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  <table.db>, string, The resource name in *table.db* format.
-  [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
+  <table.db>, string, *table.db* 格式的资源名称。
+  [], list, 表示在资源上执行的操作的字符串列表。操作可以是 insert/update/select/drop/delete/create/alter/show 操作之一。
 
 .. attention::
 
-   Currently used parser does not successfully parse all SQL statements and it cannot be assumed that all SQL queries will successfully produce Dynamic Metadata.
-   Creating Dynamic Metadata from SQL queries is on best-effort basis at the moment. If parsing of an SQL query fails, ``statements_parse_error`` counter is increased, log message is created, Dynamic Metadata is not
-   produced, but the Postgres message is still forwarded to upstream Postgres server.
+   当前使用的解析器无法成功解析所有的 SQL 语句，并且不能假定所有的 SQL 查询都会成功生成动态元数据。
+   目前基于 SQL 查询创建动态元数据是在尽力而为的基础上。如果解析 SQL 查询失败，``statements_parse_error`` 计数值会增加，并且创建日志消息，动态元数据不会生成，但是 Postgres 消息会继续转发到上游 Postgres 服务器。
 
-Parsing SQL statements and emitting Dynamic Metadata can be disabled by setting :ref:`enable_sql_parsing<envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.enable_sql_parsing>` to false.
+可以通过设置 :ref:`enable_sql_parsing<envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.enable_sql_parsing>` 为 false 来禁用 解析 SQL 语句和发出动态元数据。
