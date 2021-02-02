@@ -306,6 +306,7 @@ STL
 STRLEN
 STS
 SVG
+SVID
 Symbolizer
 TBD
 TCLAP
@@ -511,6 +512,7 @@ coverity
 cplusplus
 cpuset
 creds
+cRLSign
 crypto
 cryptographic
 cryptographically
