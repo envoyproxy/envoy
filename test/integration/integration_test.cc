@@ -1119,7 +1119,7 @@ TEST_P(IntegrationTest, UpstreamProtocolError) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ("502", response->headers().getStatusValue());
 }
 
 TEST_P(IntegrationTest, TestHead) {

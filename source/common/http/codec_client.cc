@@ -133,6 +133,7 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
+  protocol_error_ = false;
   const Status status = codec_->dispatch(data);
 
   if (!status.ok()) {
@@ -144,7 +145,10 @@ void CodecClient::onData(Buffer::Instance& data) {
         (!active_requests_.empty() ||
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
       host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      protocol_error_ = true;
     }
+    ENVOY_CONN_LOG(debug, "premature response", *connection_);
+    close();
   }
 
   // All data should be consumed at this point if the connection remains open.
