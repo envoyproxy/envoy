@@ -1,17 +1,13 @@
 .. _api_supported_versions:
 
-Supported API versions
-======================
+支持的 API 版本
+=================
 
-Envoy's APIs follow a :repo:`versioning scheme <api/API_VERSIONING.md>` in which Envoy supports
-multiple major API versions at any point in time. The following versions are currently supported:
+Envoy 的 API 遵循 :repo:`版本方案 <api/API_VERSIONING.md>`，其中 Envoy 在任何时候都支持多个主要的 API 版本。下面就是目前为止支持的版本：
 
-* :ref:`v2 xDS API <envoy_api_reference>` (*deprecated*, end-of-life EOY 2020). This API will not
-  accept new features after the end of Q1 2020.
-* :ref:`v3 xDS API <envoy_v3_api_reference>` (*active*, end-of-life unknown). Envoy developers and
-  operators are encouraged to be actively adopting and working with v3 xDS.
+* :ref:`v2 xDS API <envoy_api_reference>` （*弃用的*, 在 2020 年废弃）。此 API 在 2020 年第一季度后，将不再接受新的功能特性。
+* :ref:`v3 xDS API <envoy_v3_api_reference>` （*正在使用的*, 废弃时间未知）。Envoy 鼓励开发人员和维护人员积极采用 v3 xDS 并积极使用。
 
-The following API versions are no longer supported by Envoy:
+Envoy 不再支持下述的 API 版本：
 
-* v1 xDS API. This was the legacy REST-JSON API that preceded the current Protobuf and dual
-  REST/gRPC xDS APIs.
+* 这是在当前 Protobuf 和双 REST/gRPC xDS API 之前的老旧 REST-JSON API。
