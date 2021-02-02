@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"
@@ -14,7 +15,6 @@
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
 
-#include "envoy/stream_info/stream_info.h"
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
