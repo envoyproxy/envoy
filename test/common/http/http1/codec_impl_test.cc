@@ -2874,7 +2874,7 @@ TEST_P(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _));
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "headers count exceeds limit");
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeRequestHeadersAccepted) {
@@ -3019,7 +3019,7 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersRejected) {
 
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ(status.message(), "headers count exceeds limit");
 }
 
 // Tests that the number of response headers is configurable.

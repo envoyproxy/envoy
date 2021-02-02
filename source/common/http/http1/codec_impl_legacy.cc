@@ -488,7 +488,7 @@ void ConnectionImpl::completeLastHeader() {
     sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
     const absl::string_view header_type =
         processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
-    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
+    throw CodecProtocolException(absl::StrCat(header_type, " count exceeds limit"));
   }
 
   header_parsing_state_ = HeaderParsingState::Field;
