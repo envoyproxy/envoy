@@ -163,6 +163,15 @@ TEST_F(BufferedIoSocketHandleTest, ReadEmpty) {
   EXPECT_EQ(0, result.rc_);
 }
 
+// Read allows max_length value 0 and returns no error.
+TEST_F(BufferedIoSocketHandleTest, ReadWhileProvidingNoCapacity) {
+  Buffer::OwnedImpl buf;
+  absl::optional<uint64_t> max_length_opt{0};
+  auto result = io_handle_->read(buf, max_length_opt);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.rc_);
+}
+
 // Test read side effects.
 TEST_F(BufferedIoSocketHandleTest, ReadContent) {
   Buffer::OwnedImpl buf;
