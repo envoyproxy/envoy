@@ -589,6 +589,25 @@ message HttpConnectionManager {
   // The configuration of the original IP detection extension.
   //
   // If not set, Envoy uses the default remote IP detection mechanism.
+  //
+  // When the remote address of the downstream connection is not used as
+  // the detection mechanism for the request's original address, Envoy
+  // will rely on the :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP
+  // header to detect the address.
+  //
+  // However, relying on the :ref:`config_http_conn_man_headers_x-forwarded-for`
+  // header doesn't necessarily work for all network configurations. For instance,
+  // if the number of trusted hops isn't consistent for requests flowing into
+  // Envoy the header cannot be used reliably. For such cases, the following
+  // option allows for a custom extension to be provided.
+  //
+  // If configured, the custom extension will be called along with the
+  // request headers when the HCM needs to populate the remote address.
+  // The extension will then rely on the available headers to decide the
+  // value of the request's remote address.
+  //
+  // An example extension could lookup at a configured header name to figure out the
+  // remote address as detected by a CDN or some other preceding network.
   config.core.v3.TypedExtensionConfig original_ip_detection = 43;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
