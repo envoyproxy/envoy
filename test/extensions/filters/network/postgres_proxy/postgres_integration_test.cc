@@ -106,6 +106,7 @@ TEST_P(BasicPostgresIntegrationTest, Login) {
   // Make sure that the successful login bumped up the number of sessions.
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions", 1);
 }
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, BasicPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
@@ -144,6 +145,7 @@ TEST_P(SSLPostgresIntegrationTest, TerminateSSL) {
   // Make sure that the successful login bumped up the number of sessions.
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
 }
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, SSLPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
@@ -181,6 +183,7 @@ TEST_P(SSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTransportSoc
   // Make sure that the successful login bumped up the number of sessions.
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 0);
 }
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, SSLWrongConfigPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
