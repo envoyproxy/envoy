@@ -610,20 +610,36 @@ each :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` corresponds to:
 .. figure:: diagrams/update-race.svg
    :alt: EDS update race motivates nonces
 
-The management server should not send a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` for any
-:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` that has a stale nonce. A nonce becomes stale
-following a newer nonce being presented to Envoy in a
-:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`. A management server does not need to send an
-update until it determines a new version is available. Earlier requests
-at a version then also become stale. It may process multiple
-:ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>` at a version until a new version is ready.
+Minimizing Redundant Responses
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In order to minimize redundant responses (especially for LDS and CDS in the SotW protocol variants),
+management servers may choose to have only one outstanding response to a client at any given time.
+In other words, when the server sends a response to a client with a given
+:ref:`nonce<envoy_api_field_DiscoveryResponse.nonce>`, it will not send another response until it
+receives the ACK or NACK from the client for that nonce. If the client sends another request with
+an earlier nonce (e.g., to change the set of resources that it is subscribing to), that request
+will be ignored by the server. Note that if the client did intend to change the set of resources
+that it is subscribing to, that same updated list of resources will be present in the subsequent
+request that has the updated nonce, and the server will see it at that point.
+
+Note that the management server does not need to send an update unless either a new version of the
+subscribed resources is available or the client has changed the set of resources that it is
+subscribed to.
 
 .. figure:: diagrams/stale-requests.svg
    :alt: Requests become stale
 
-An implication of the above resource update sequencing is that Envoy
+An implication of the above resource update sequencing is that the client
 does not expect a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` for every :ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>`
 it issues.
+
+Note that servers that do not choose to have only one outstanding response to a client at any given
+time should *not* ignore requests with stale nonces, because there are some edge cases where this
+can cause the server to never see updates from a client. For example, if the server is sending
+updates at a fixed interval that happens to exactly match the RTT to the client, then every time
+the client sends an ACK, it will be considered stale by the time it arrives at the server, in which
+case the server would never see an updated list of resources that the client is subscribing to.
 
 .. _xds_protocol_resource_warming:
 
