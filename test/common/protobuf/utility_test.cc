@@ -37,6 +37,10 @@ using namespace std::chrono_literals;
 
 namespace Envoy {
 
+using testing::AllOf;
+using testing::HasSubstr;
+using testing::Property;
+
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
   RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
@@ -248,6 +252,36 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
                             "Protobuf message (type envoy.config.cluster.v3.Cluster with "
                             "unknown field set {1}) has unknown fields");
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessage(source_any, true).status(),
+              AllOf(Property(&ProtobufUtil::Status::ok, false),
+                    Property(&ProtobufUtil::Status::ToString, testing::HasSubstr("bad.type.url"))));
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrDie(source_any, true),
+              testing::HasSubstr("@type"));
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertOrErrorAnyWithUnknownMessageType) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any), HasSubstr("unknown type"));
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertOrDieAnyWithUnknownMessageType) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_DEATH(MessageUtil::getJsonStringFromMessageOrDie(source_any), "bad.type.url");
 }
 
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
@@ -1418,7 +1452,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   ProtobufWkt::Struct json;
   TestUtility::jsonConvert(bootstrap, json);
   // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
-  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
+  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessageOrDie(json, false), bootstrap);
   // Verify we don't do a camel case conversion.
   EXPECT_EQ("foo", json.fields()
                        .at("cluster_manager")
@@ -1497,6 +1531,13 @@ static_resources:
     - name: http
 flags_path: foo)EOF";
   EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetYamlStringFromProtoInvalidAny) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_THROW(MessageUtil::getYamlStringFromMessage(source_any, true), EnvoyException);
 }
 
 TEST(DurationUtilTest, OutOfRange) {

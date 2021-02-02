@@ -334,11 +334,20 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
-  uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
+  const uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
   if (!parent_.http_status_checker_.inRange(response_code)) {
+    // If the HTTP response code would indicate failure AND the immediate health check
+    // failure header is set, exclude the host from LB.
+    // TODO(mattklein123): We could consider doing this check for any HTTP response code, but this
+    // seems like the least surprising behavior and we could consider relaxing this in the future.
+    // TODO(mattklein123): This will not force a host set rebuild of the host was already failed.
+    // This is something we could do in the future but seems unnecessary right now.
+    if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
+      host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+    }
     return HealthCheckResult::Failed;
   }
 
@@ -372,7 +381,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleSuccess(true);
     break;
   case HealthCheckResult::Failed:
-    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
     handleFailure(envoy::data::core::v3::ACTIVE);
     break;
   }
@@ -401,7 +409,6 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   request_in_flight_ = false;
   if (client_) {
-    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
     ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                    HostUtility::healthFlagsToString(*host_));
 
@@ -489,6 +496,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
+  // TODO(lilika): The TCP health checker does generic pattern matching so we can't differentiate
+  // between wrong data and not enough data. We could likely do better here and figure out cases in
+  // which a match is not possible but that is not done now.
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
     ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     data.drain(data.length());
@@ -497,8 +507,6 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
       expect_close_ = true;
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
-  } else {
-    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
   }
 }
 
@@ -563,7 +571,6 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
   expect_close_ = true;
-  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 
