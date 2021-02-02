@@ -50,6 +50,7 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
 
   Upstream::Host::CreateConnectionData data{std::move(tcp_client->connection_),
                                             client.real_host_description_};
+  data.connection_->readDisable(false);
   data.connection_->removeConnectionCallbacks(*tcp_client);
   data.connection_->removeReadFilter(tcp_client->read_filter_handle_);
   dispatcher_.deferredDelete(client.removeFromList(owningList(client.state_)));
