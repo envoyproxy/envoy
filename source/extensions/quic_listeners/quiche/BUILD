@@ -129,6 +129,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":quic_filter_manager_connection_lib",
+        ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
@@ -160,6 +161,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_connection_lib",
         ":envoy_quic_simulated_watermark_buffer_lib",
+        ":send_buffer_monitor_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
@@ -439,5 +441,15 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/api:os_sys_calls_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "send_buffer_monitor_lib",
+    srcs = ["send_buffer_monitor.cc"],
+    hdrs = ["send_buffer_monitor.h"],
+    tags = ["nofips"],
+    deps = [
+        "@com_googlesource_quiche//:quic_core_session_lib",
     ],
 )

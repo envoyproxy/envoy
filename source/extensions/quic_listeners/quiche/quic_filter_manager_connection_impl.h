@@ -10,15 +10,18 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
+#include "extensions/quic_listeners/quiche/send_buffer_monitor.h"
 
 namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
-class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase {
+class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
+                                        public SendBufferMonitor {
 public:
   QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
                                   uint32_t send_buffer_limit);
+  ~QuicFilterManagerConnectionImpl() override {}
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -100,9 +103,10 @@ public:
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
+  // SendBufferMonitor
   // Update the book keeping of the aggregated buffered bytes cross all the
   // streams, and run watermark check.
-  void adjustBytesToSend(int64_t delta);
+  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override;
 
   // Called after each write when a previous connection close call is postponed.
   void maybeApplyDelayClosePolicy();

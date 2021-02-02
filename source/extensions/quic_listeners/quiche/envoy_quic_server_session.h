@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "extensions/quic_listeners/quiche/send_buffer_monitor.h"
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
@@ -58,6 +59,10 @@ public:
   void OnTlsHandshakeComplete() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  size_t WriteHeadersOnHeadersStream(
+      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
+      const spdy::SpdyStreamPrecedence& precedence,
+      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
 
   using quic::QuicSession::stream_map;
 

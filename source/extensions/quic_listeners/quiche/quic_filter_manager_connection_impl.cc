@@ -119,12 +119,16 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
+void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_bytes,
+                                                          size_t new_buffered_bytes) {
+  int64_t delta = new_buffered_bytes - old_buffered_bytes;
   const size_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
     ASSERT(bytes_to_send_old > bytes_to_send_);
   } else {
+    std::cerr << "bytes_to_send_old " << bytes_to_send_old << " bytes_to_send_ " << bytes_to_send_
+              << "\n";
     ASSERT(bytes_to_send_old <= bytes_to_send_);
   }
   write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);

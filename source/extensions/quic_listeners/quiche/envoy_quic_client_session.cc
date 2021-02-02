@@ -46,14 +46,12 @@ void EnvoyQuicClientSession::Initialize() {
 }
 
 void EnvoyQuicClientSession::OnCanWrite() {
-  const uint64_t headers_to_send_old =
-      quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
-  setUpdatingWatermarkByHeadersStream(true);
-  quic::QuicSpdyClientSession::OnCanWrite();
-  const uint64_t headers_to_send_new =
-      quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
-  setUpdatingWatermarkByHeadersStream(false);
-  adjustBytesToSend(headers_to_send_new - headers_to_send_old);
+  if (quic::VersionUsesHttp3(transport_version())) {
+    quic::QuicSpdyClientSession::OnCanWrite();
+  } else {
+    SendBufferMonitor::ScopedWatermarkBufferUpdater updator(headers_stream(), this);
+    quic::QuicSpdyClientSession::OnCanWrite();
+  }
   maybeApplyDelayClosePolicy();
 }
 
@@ -103,6 +101,22 @@ bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
+
+size_t EnvoyQuicClientSession::WriteHeadersOnHeadersStream(
+    quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
+    const spdy::SpdyStreamPrecedence& precedence,
+    quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) {
+  ASSERT(!quic::VersionUsesHttp3(transport_version()));
+  // gQUIC headers are sent on a dedicated stream. Only count the bytes sent against
+  // connectin level watermark buffer. Do not count them into stream level
+  // watermark buffer, because it is impossible to identify which byte belongs
+  // to which stream when the bufferred bytes are drained in headers stream.
+  // This updater may be in the scope of another one in OnCanWrite(), in such
+  // case, this one doesn't udpate the watermark.
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
+  return quic::QuicSpdyClientSession::WriteHeadersOnHeadersStream(id, std::move(headers), fin,
+                                                                  precedence, ack_listener);
 }
 
 } // namespace Quic

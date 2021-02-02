@@ -39,7 +39,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSp
           // the stream to buffer all the data.
           // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
-          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          16 * 1024, *filterManagerConnection(), [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
@@ -49,7 +49,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
           // This should be larger than 8k to fully utilize congestion control
           // window. And no larger than the max stream flow control window for
           // the stream to buffer all the data.
-          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          16 * 1024, *filterManagerConnection(), [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
@@ -68,15 +68,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // if handshake implementation goes wrong.
   // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
   // This is counting not serialized bytes in the send buffer.
-  quic::QuicStream* writing_stream =
-      quic::VersionUsesHttp3(transport_version())
-          ? static_cast<quic::QuicStream*>(this)
-          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
   local_end_stream_ = end_stream;
-  {
-    ScopedWatermarkBufferUpdater updater(writing_stream, this, filterManagerConnection());
-    WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
-  }
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -88,7 +82,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   {
-    ScopedWatermarkBufferUpdater updater(this, this, filterManagerConnection());
+    SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
     // QUIC stream must take all.
     WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
   }
@@ -103,14 +97,8 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  quic::QuicStream* writing_stream =
-      quic::VersionUsesHttp3(transport_version())
-          ? static_cast<quic::QuicStream*>(this)
-          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  {
-    ScopedWatermarkBufferUpdater updater(writing_stream, this, filterManagerConnection());
-    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
-  }
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
@@ -277,12 +265,12 @@ void EnvoyQuicServerStream::clearWatermarkBuffer() {
   if (BufferedDataBytes() > 0) {
     // If the stream is closed without sending out all buffered data, regard
     // them as sent now and adjust connection buffer book keeping.
-    maybeCheckWatermark(BufferedDataBytes(), 0, *filterManagerConnection());
+    updateBytesBuffered(BufferedDataBytes(), 0);
   }
 }
 
 void EnvoyQuicServerStream::OnCanWrite() {
-  ScopedWatermarkBufferUpdater updater(this, this, filterManagerConnection());
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyServerStreamBase::OnCanWrite();
 }
 

@@ -5,20 +5,9 @@
 
 #include "common/http/codec_helper.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
+#include "extensions/quic_listeners/quiche/send_buffer_monitor.h"
 
 namespace Envoy {
 namespace Quic {
@@ -27,14 +16,19 @@ namespace Quic {
 class EnvoyQuicStream : public virtual Http::StreamEncoder,
                         public Http::Stream,
                         public Http::StreamCallbackHelper,
+                        public SendBufferMonitor,
                         protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
-  EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
+  EnvoyQuicStream(uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
+                  std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
       : send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
-                                std::move(above_high_watermark), ENVOY_LOGGER()) {}
+                                std::move(above_high_watermark), ENVOY_LOGGER()),
+        filter_manager_connection_(filter_manager_connection) {}
+
+  ~EnvoyQuicStream() override {}
 
   // Http::StreamEncoder
   Stream& getStream() override { return *this; }
@@ -96,8 +90,8 @@ public:
     return connection()->addressProvider().localAddress();
   }
 
-  void maybeCheckWatermark(uint64_t buffered_data_old, uint64_t buffered_data_new,
-                           QuicFilterManagerConnectionImpl& connection) {
+  // SendBufferMonitor
+  void updateBytesBuffered(uint64_t buffered_data_old, uint64_t buffered_data_new) override {
     if (buffered_data_new == buffered_data_old) {
       return;
     }
@@ -108,13 +102,8 @@ public:
     } else {
       send_buffer_simulation_.checkLowWatermark(buffered_data_new);
     }
-    connection.adjustBytesToSend(buffered_data_new - buffered_data_old);
+    filter_manager_connection_.updateBytesBuffered(buffered_data_old, buffered_data_new);
   }
-
-  void setDoingWatermarkAccouting(bool doing_watermark_accounting) {
-    doing_watermark_accounting_ = doing_watermark_accounting;
-  }
-  bool isDoingWatermarkAccounting() const { return doing_watermark_accounting_; }
 
   virtual uint32_t streamId() PURE;
 
@@ -156,40 +145,7 @@ private:
 
   absl::string_view details_;
 
-  bool doing_watermark_accounting_{false};
-};
-
-class ScopedWatermarkBufferUpdater {
-public:
-  ScopedWatermarkBufferUpdater(quic::QuicStream* quic_stream, EnvoyQuicStream* count_to_stream,
-                               QuicFilterManagerConnectionImpl* filter_manager_connection)
-      : quic_stream_(quic_stream), old_buffered_bytes_(quic_stream_->BufferedDataBytes()),
-        count_to_stream_(count_to_stream), filter_manager_connection_(filter_manager_connection) {
-    ASSERT(!count_to_stream->isDoingWatermarkAccounting());
-    count_to_stream->setDoingWatermarkAccouting(true);
-  }
-  ~ScopedWatermarkBufferUpdater() {
-    uint64_t new_buffered_bytes = quic_stream_->BufferedDataBytes();
-    count_to_stream_->setDoingWatermarkAccouting(false);
-    if (quic_stream_->id() == count_to_stream_->streamId()) {
-      count_to_stream_->maybeCheckWatermark(old_buffered_bytes_, new_buffered_bytes,
-                                            *filter_manager_connection_);
-    } else {
-      // Skip stream watermark buffer book keeping if this header is buffered on
-      // the header stream.
-      if (!filter_manager_connection_->isUpdatingWatermarkByHeadersStream()) {
-        // Only update connection level watermark if it's not in the middle of
-        // another updating caused by header stream send buffer change.
-        filter_manager_connection_->adjustBytesToSend(new_buffered_bytes - old_buffered_bytes_);
-      }
-    }
-  }
-
-private:
-  quic::QuicStream* quic_stream_;
-  uint64_t old_buffered_bytes_{0};
-  EnvoyQuicStream* count_to_stream_{nullptr};
-  QuicFilterManagerConnectionImpl* filter_manager_connection_{nullptr};
+  QuicFilterManagerConnectionImpl& filter_manager_connection_;
 };
 
 } // namespace Quic
