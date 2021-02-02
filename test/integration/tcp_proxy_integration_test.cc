@@ -1297,4 +1297,58 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
+// Integration test a Mysql upstream, where the upstream sends data immediately
+// after a connection is established.
+class FakeMysqlConnection : public FakeRawConnection {
+  using FakeRawConnection::FakeRawConnection;
+
+  void initialize() {
+    FakeRawConnection::initialize();
+    // FIXME move after handshake.
+    ASSERT_TRUE(write("P", false));
+  }
+};
+
+class FakeMysqlUpstream : public FakeUpstream {
+  using FakeUpstream::FakeUpstream;
+
+  std::unique_ptr<FakeRawConnection> makeRawConnection(
+      SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system) override {
+    return std::make_unique<FakeMysqlConnection>(shared_connection, time_system);
+  }
+};
+
+class MysqlIntegrationTest : public TcpProxyIntegrationTest {
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      Network::TransportSocketFactoryPtr factory =
+          upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
+      auto endpoint = upstream_address_fn_(i);
+        fake_upstreams_.emplace_back(
+            new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));
+    }
+  }
+};
+
+TEST_P(MysqlIntegrationTest, UpstreamWritesFirst) {
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  tcp_client->waitForData("P", false);
+
+  ASSERT_TRUE(tcp_client->write("F"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(1));
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+
 } // namespace Envoy
