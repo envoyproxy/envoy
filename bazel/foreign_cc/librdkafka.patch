@@ -1,13 +1,13 @@
 diff --git a/mklove/Makefile.base b/mklove/Makefile.base
-index f5084cf5..ab80c3f7 100755
+index 0f8259b2..7d7707fd 100755
 --- a/mklove/Makefile.base
 +++ b/mklove/Makefile.base
-@@ -97,7 +97,7 @@ $(LIBFILENAME): $(OBJS) $(LIBNAME).lds
+@@ -115,7 +115,7 @@ endif
  
  $(LIBNAME).a:	$(OBJS)
  	@printf "$(MKL_YELLOW)Creating static library $@$(MKL_CLR_RESET)\n"
 -	$(AR) rcs$(ARFLAGS) $@ $(OBJS)
 +	$(AR) rcs $@ $(OBJS)
- 
- ifeq ($(MKL_NO_SELFCONTAINED_STATIC_LIB),y)
- $(LIBNAME)-static.a:
+ ifeq ($(WITH_STRIP),y)
+ 	cp $@ $(LIBNAME)-dbg.a
+ 	$(STRIP) -S $@
