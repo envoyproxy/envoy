@@ -54,7 +54,6 @@ public:
 
   void clearWatermarkBuffer();
 
-  // EnvoyQuicStream
   uint32_t streamId() override;
 
 protected:

@@ -127,8 +127,6 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
   if (delta < 0) {
     ASSERT(bytes_to_send_old > bytes_to_send_);
   } else {
-    std::cerr << "bytes_to_send_old " << bytes_to_send_old << " bytes_to_send_ " << bytes_to_send_
-              << "\n";
     ASSERT(bytes_to_send_old <= bytes_to_send_);
   }
   write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);

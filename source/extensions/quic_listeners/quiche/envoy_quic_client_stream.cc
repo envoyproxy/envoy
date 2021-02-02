@@ -75,11 +75,11 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
     // QUIC stream must take all.
     WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
-  }
-  if (data.length() > 0) {
-    // Send buffer didn't take all the data, threshold needs to be adjusted.
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-    return;
+    if (data.length() > 0) {
+      // Send buffer didn't take all the data, threshold needs to be adjusted.
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
   }
 }
 
@@ -248,9 +248,6 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
     runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
-  if (!end_stream_decoded_) {
-    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
-  }
 }
 
 void EnvoyQuicClientStream::OnClose() {

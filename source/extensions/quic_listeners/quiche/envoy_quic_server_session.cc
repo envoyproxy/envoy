@@ -86,7 +86,7 @@ void EnvoyQuicServerSession::OnCanWrite() {
   if (quic::VersionUsesHttp3(transport_version())) {
     quic::QuicServerSessionBase::OnCanWrite();
   } else {
-    SendBufferMonitor::ScopedWatermarkBufferUpdater updator(headers_stream(), this);
+    SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
     quic::QuicServerSessionBase::OnCanWrite();
   }
   // Do not update delay close state according to connection level packet egress because that is
