@@ -19,8 +19,11 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
+#include "common/http/utility.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -132,18 +135,39 @@ void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
 
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
-  if (rst_sent()) {
+  if (read_side_closed()) {
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
 
-  response_decoder_->decodeHeaders(
-      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list),
-      /*end_stream=*/fin);
+  ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
+  std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
+  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+  if (Http::CodeUtility::is1xx(status)) {
+    if (status == enumToInt(Http::Code::SwitchingProtocols)) {
+      // HTTP3 doesn't support the HTTP Upgrade mechanism or 101 (Switching Protocols) status code.
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
+    }
+
+    // These are Informational 1xx headers, not the actual response headers.
+    set_headers_decompressed(false);
+  }
+
+  if (status == enumToInt(Http::Code::Continue) && !decoded_100_continue_) {
+    // This is 100 Continue, only decode it once to support Expect:100-Continue header.
+    decoded_100_continue_ = true;
+    response_decoder_->decode100ContinueHeaders(std::move(headers));
+  } else if (status != enumToInt(Http::Code::Continue)) {
+    response_decoder_->decodeHeaders(std::move(headers),
+                                     /*end_stream=*/fin);
+  }
+
   ConsumeHeaderList();
 }
 
@@ -151,6 +175,9 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   ASSERT(read_disable_counter_ == 0);
   ASSERT(!in_decode_data_callstack_);
+  if (read_side_closed()) {
+    return;
+  }
   in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -161,12 +188,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     int num_regions = GetReadableRegions(&iov, 1);
     ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;
-    Buffer::RawSlice slice;
-    buffer->reserve(bytes_read, &slice, 1);
-    ASSERT(slice.len_ >= bytes_read);
-    slice.len_ = bytes_read;
-    memcpy(slice.mem_, iov.iov_base, iov.iov_len);
-    buffer->commit(&slice, 1);
+    buffer->add(iov.iov_base, bytes_read);
     MarkConsumed(bytes_read);
   }
   ASSERT(buffer->length() == 0 || !end_stream_decoded_);
@@ -178,13 +200,13 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = (buffer->length() == 0 && !fin_read_and_no_trailers) || end_stream_decoded_;
   if (!skip_decoding) {
-    response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
     if (fin_read_and_no_trailers) {
       end_stream_decoded_ = true;
     }
+    response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
   }
 
-  if (!sequencer()->IsClosed()) {
+  if (!sequencer()->IsClosed() || read_side_closed()) {
     in_decode_data_callstack_ = false;
     if (read_disable_counter_ > 0) {
       // If readDisable() was ever called during decodeData() and it meant to disable
@@ -204,6 +226,10 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  if (read_side_closed()) {
+    return;
+  }
+  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, header_list.DebugString());
   quic::QuicSpdyStream::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
@@ -215,9 +241,9 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     ASSERT(!received_trailers().empty());
     // Only decode trailers after finishing decoding body.
+    end_stream_decoded_ = true;
     response_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
-    end_stream_decoded_ = true;
     MarkTrailersConsumed();
   }
 }
@@ -236,7 +262,9 @@ void EnvoyQuicClientStream::Reset(quic::QuicRstStreamErrorCode error) {
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
-  runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  if (!end_stream_decoded_) {
+    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  }
 }
 
 void EnvoyQuicClientStream::OnClose() {

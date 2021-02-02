@@ -301,7 +301,7 @@ void ConnectionManager::onGetConsumerListByGroup(RemotingCommandPtr request) {
   RemotingCommandPtr response = std::make_unique<RemotingCommand>(
       enumToSignedInt(ResponseCode::Success), request->version(), request->opaque());
   response->markAsResponse();
-  std::string json = MessageUtil::getJsonStringFromMessage(body_struct);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(body_struct);
   response->body().add(json);
   ENVOY_LOG(trace, "GetConsumerListByGroup respond with body: {}", json);
 
