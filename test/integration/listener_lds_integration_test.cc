@@ -315,8 +315,8 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     // Make a new connection to the new listener.
     codec_client_ = makeHttpConnection(lookupPort(listener_name_));
-    int response_size = 800;
-    int request_size = 10;
+    const uint32_t response_size = 800;
+    const uint32_t request_size = 10;
     Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                      {"server_id", "cluster_0, backend_0"}};
     auto response = sendRequestAndWaitForResponse(
