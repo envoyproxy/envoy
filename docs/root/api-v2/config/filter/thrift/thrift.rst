@@ -1,5 +1,5 @@
-Thrift filters
-==============
+Thrift 过滤器
+================
 
 .. toctree::
   :glob:
