@@ -911,7 +911,9 @@ void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_leve
                        active_request_.has_value() &&
                                !active_request_.value().request_url_.getStringView().empty()
                            ? active_request_.value().request_url_.getStringView()
-                           : "null\n");
+                           : "null");
+  os << '\n';
+
   // Dump header map, it may be null if it was moved to the request, and
   // request_url.
   if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
