@@ -913,8 +913,6 @@ filegroup(
     # Kafka clusters.
     external_http_archive(
         name = "edenhill_librdkafka",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         build_file_content = BUILD_ALL_CONTENT,
     )
     native.bind(

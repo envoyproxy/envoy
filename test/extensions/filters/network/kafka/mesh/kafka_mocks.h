@@ -57,7 +57,7 @@ public:
   MOCK_METHOD(const std::string, clusterid, (int), ());
   MOCK_METHOD(struct rd_kafka_s*, c_ptr, (), ());
   MOCK_METHOD(int32_t, controllerid, (int), ());
-  MOCK_METHOD(RdKafka::ErrorCode, fatal_error, (std::string&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, fatal_error, (std::string&), (const));
   MOCK_METHOD(RdKafka::ErrorCode, oauthbearer_set_token,
               (const std::string&, int64_t, const std::string&, const std::list<std::string>&,
                std::string&),
@@ -85,6 +85,7 @@ public:
   MOCK_METHOD(RdKafka::Message::Status, status, (), (const));
   MOCK_METHOD(RdKafka::Headers*, headers, ());
   MOCK_METHOD(RdKafka::Headers*, headers, (RdKafka::ErrorCode*));
+  MOCK_METHOD(int32_t, broker_id, (), (const));
 };
 
 } // namespace Mesh
