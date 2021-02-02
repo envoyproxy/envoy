@@ -38,7 +38,7 @@ using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertVa
 
 SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config) {
   if (config == nullptr) {
-    throw EnvoyException("SPIFFE validator connot be initialized from null configuration");
+    throw EnvoyException("SPIFFE cert validator connot be initialized from null configuration");
   }
 
   SPIFFEConfig message;
@@ -46,7 +46,12 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
                                          ProtobufWkt::Struct(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
-  trust_bundle_stores_.reserve(message.trust_bundles().size());
+  auto size = message.trust_bundles().size();
+  if (size == 0) {
+    throw EnvoyException("SPIFFE cert validator requires at least one trusted CA");
+  }
+
+  trust_bundle_stores_.reserve(size);
   for (auto& it : message.trust_bundles()) {
     auto cert = Config::DataSource::read(it.second, true, config->api());
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
@@ -84,7 +89,8 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX&, uint8_t[
 
 int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) { return SSL_VERIFY_PEER; }
 
-int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo*,
+int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
+                                       Ssl::SslExtendedSocketInfo* ssl_extended_info,
                                        X509& leaf_cert, const Network::TransportSocketOptions*) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     return 0;
@@ -94,8 +100,17 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtend
   if (!trust_bundle) {
     return 0;
   }
+
+  // set the trust bundle's certificate store on the context, and do the verification
   store_ctx->ctx = trust_bundle;
-  return X509_verify_cert(store_ctx);
+  auto ret = X509_verify_cert(store_ctx);
+  if (ssl_extended_info) {
+    ssl_extended_info->setCertificateValidationStatus(
+        ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
+                 : Envoy::Ssl::ClientValidationStatus::Failed);
+  }
+
+  return ret;
 }
 
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
@@ -140,6 +155,7 @@ int SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
 std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   static const std::regex reg = Envoy::Regex::Utility::parseStdRegex("spiffe:\\/\\/([^\\/]+)\\/");
   std::smatch m;
+
   if (!std::regex_search(san, m, reg) || m.size() < 2) {
     return "";
   }

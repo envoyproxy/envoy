@@ -37,8 +37,7 @@ public:
     }
     return configs;
   }
-  const Envoy::Ssl::CertificateValidationContextConfig*
-  certificateValidationContext() const override {
+  Envoy::Ssl::CertificateValidationContextConfig* certificateValidationContext() const override {
     return validation_context_config_.get();
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };

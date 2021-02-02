@@ -2,6 +2,8 @@
 
 #include "envoy/ssl/context_config.h"
 
+#include "common/common/macros.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -17,38 +19,26 @@ public:
   TestCertificateValidationContextConfig()
       : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt){};
 
-  const std::string& caCert() const override {
-    static std::string ret = "";
-    return ret;
-  }
-  const std::string& caCertPath() const override {
-    static std::string ret = "";
-    return ret;
-  }
+  const std::string& caCert() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::string& caCertPath() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
   const std::string& certificateRevocationList() const override {
-    static std::string ret = "";
-    return ret;
+    CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
   const std::string& certificateRevocationListPath() const final {
-    static std::string ret = "";
-    return ret;
+    CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
-    static std::vector<std::string> ret = {};
-    return ret;
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
   }
   const std::vector<envoy::type::matcher::v3::StringMatcher>&
   subjectAltNameMatchers() const override {
-    static std::vector<envoy::type::matcher::v3::StringMatcher> ret = {};
-    return ret;
+    CONSTRUCT_ON_FIRST_USE(std::vector<envoy::type::matcher::v3::StringMatcher>, {});
   }
   const std::vector<std::string>& verifyCertificateHashList() const override {
-    static std::vector<std::string> ret = {};
-    return ret;
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
   }
   const std::vector<std::string>& verifyCertificateSpkiList() const override {
-    static std::vector<std::string> ret = {};
-    return ret;
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
   }
   bool allowExpiredCertificate() const override { return false; }
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
