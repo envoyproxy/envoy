@@ -3,13 +3,16 @@
 Matching API
 ============
 
-Envoy makes use of a matching API to allow the various subsystems to express actions that should be performed based on incoming data.
+Envoy makes use of a matching API to allow the various subsystems to express actions that should
+be performed based on incoming data.
 
-The matching API is designed as a tree structure to allow for sublinear matching algorithms, and make heavy use of extension points to make it
-easy to extend to different inputs based on protocol or environment data, sublinear matchers and direct matchers. 
+The matching API is designed as a tree structure to allow for sublinear matching algorithms for
+performance better than the linear list matching as seen in Envoy's HTTP routing. It makes heavy
+use of extension points to make it easy to extend to different inputs based on protocol or
+environment data as well as custom sublinear matchers and direct matchers.
 
-Within supported environments (currently only HTTP filters), a wrapper proto can be used to instantiate a matching filter associated with the
-wrapped structure:
+Within supported environments (currently only HTTP filters), a wrapper proto can be used to
+instantiate a matching filter associated with the wrapped structure:
 
 .. code-block:: yaml
 
