@@ -17,6 +17,11 @@ namespace RBACFilter {
 
 enum EngineResult { Unknown, None, Allow, Deny };
 
+struct Result {
+  EngineResult engine_result_;
+  std::string connection_termination_details_;
+};
+
 /**
  * Configuration for the RBAC network filter.
  */
@@ -74,7 +79,7 @@ private:
   EngineResult engine_result_{Unknown};
   EngineResult shadow_engine_result_{Unknown};
 
-  EngineResult checkEngine(Filters::Common::RBAC::EnforcementMode mode);
+  Result checkEngine(Filters::Common::RBAC::EnforcementMode mode);
 };
 
 } // namespace RBACFilter

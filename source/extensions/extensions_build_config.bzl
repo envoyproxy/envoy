@@ -7,6 +7,7 @@ EXTENSIONS = {
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
+    "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
     # Clusters
@@ -31,6 +32,11 @@ EXTENSIONS = {
     "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
+    # WASM
+    #
+    "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+
+    #
     # Health checkers
     #
 
@@ -46,6 +52,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
@@ -53,6 +60,7 @@ EXTENSIONS = {
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
+    "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
@@ -64,8 +72,11 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    # Disabled by default
+    "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
+    "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
-    "envoy.filters.http.oauth2":                         "//source/extensions/filters/http/oauth2:config",
+    "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
@@ -73,6 +84,7 @@ EXTENSIONS = {
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
     "envoy.filters.http.squash":                        "//source/extensions/filters/http/squash:config",
     "envoy.filters.http.tap":                           "//source/extensions/filters/http/tap:config",
+    "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
 
     #
     # Listener filters
@@ -112,6 +124,7 @@ EXTENSIONS = {
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
     "envoy.filters.network.sni_dynamic_forward_proxy":  "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
+    "envoy.filters.network.wasm":                       "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
@@ -136,6 +149,7 @@ EXTENSIONS = {
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
+    "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
 
     #
     # Thrift filters
@@ -155,16 +169,18 @@ EXTENSIONS = {
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
     # WiP
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
+    "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
 
     #
     # Transport sockets
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
-    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+    "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
 
     #
     # Retry host predicates
@@ -202,8 +218,29 @@ EXTENSIONS = {
     #
     # Watchdog actions
     #
+
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
 
+    #
+    # WebAssembly runtimes
+    #
+
+    "envoy.wasm.runtime.null":                          "//source/extensions/wasm_runtime/null:config",
+    "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
+    "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
+    "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
+
+    #
+    # Rate limit descriptors
+    #
+
+    "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
+    
+    #
+    # IO socket
+    #
+
+    "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

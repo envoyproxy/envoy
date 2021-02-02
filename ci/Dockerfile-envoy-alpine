@@ -1,7 +1,7 @@
 FROM frolvlad/alpine-glibc:alpine-3.12_glibc-2.31
 RUN mkdir -p /etc/envoy
 
-ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
+ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 RUN apk add --no-cache shadow su-exec \
         && addgroup -S envoy && adduser --no-create-home -S envoy -G envoy
 

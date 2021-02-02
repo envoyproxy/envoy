@@ -21,18 +21,18 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-              absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx) {
+  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+              const Router::RouteEntry& route_entry, absl::optional<Envoy::Http::Protocol>,
+              Upstream::LoadBalancerContext* ctx) {
     ASSERT(is_connect);
-    conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
-                                          Upstream::ResourcePriority::Default, ctx);
+    conn_pool_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
     upstream_handle_ = conn_pool_->newConnection(*this);
   }
 
-  bool cancelAnyPendingRequest() override {
+  bool cancelAnyPendingStream() override {
     if (upstream_handle_) {
       upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
       upstream_handle_ = nullptr;
@@ -40,7 +40,6 @@ public:
     }
     return false;
   }
-  absl::optional<Envoy::Http::Protocol> protocol() const override { return absl::nullopt; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }
@@ -70,7 +69,7 @@ public:
   // GenericUpstream
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
-  void encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
+  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void readDisable(bool disable) override;
   void resetStream() override;

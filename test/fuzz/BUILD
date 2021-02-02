@@ -1,8 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+)
+load(
+    "@rules_fuzzing//fuzzing:cc_deps.bzl",
+    "cc_fuzzing_engine",
 )
 
 licenses(["notice"])  # Apache 2
@@ -67,4 +72,30 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test_library(
+    name = "random_lib",
+    hdrs = ["random.h"],
+    deps = [
+        "//include/envoy/common:random_generator_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "random_test",
+    srcs = ["random_test.cc"],
+    deps = [
+        "//test/fuzz:random_lib",
+    ],
+)
+
+cc_fuzzing_engine(
+    name = "fuzz_runner_engine",
+    testonly = True,
+    display_name = "Fuzz Test Runner",
+    launcher = "fuzz_runner_launcher.sh",
+    library = ":main",
 )

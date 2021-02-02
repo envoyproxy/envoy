@@ -35,6 +35,7 @@ public:
 
 private:
   std::vector<spdlog::level::level_enum> previous_levels_;
+  FancyLogLevelMap previous_fancy_levels_;
 };
 
 /**

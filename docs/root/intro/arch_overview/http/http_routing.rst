@@ -59,6 +59,7 @@ Route Scope
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
 A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
+RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>`
@@ -185,10 +186,13 @@ upon configuration load and cache the contents.
 
 .. attention::
 
-   If a response body is specified, it must be no more than 4KB in size, regardless of
+   If a response body is specified, by default it is limited to 4KB in size, regardless of
    whether it is provided inline or in a file. Envoy currently holds the entirety of the
-   body in memory, so the 4KB limit is intended to keep the proxy's memory footprint
-   from growing too large.
+   body in memory, so the 4KB default is intended to keep the proxy's memory footprint
+   from growing too large. However, if required, this limit can be changed through setting
+   the :ref:`max_direct_response_body_size_bytes
+   <envoy_v3_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes>`
+   field.
 
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
 Envoy will include the specified headers in the direct HTTP response.

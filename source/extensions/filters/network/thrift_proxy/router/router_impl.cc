@@ -63,9 +63,11 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
   const auto& cluster_header = clusterHeader();
   if (!cluster_header.get().empty()) {
     const auto& headers = metadata.headers();
-    const auto* entry = headers.get(cluster_header);
-    if (entry != nullptr) {
-      return std::make_shared<DynamicRouteEntry>(*this, entry->value().getStringView());
+    const auto entry = headers.get(cluster_header);
+    if (!entry.empty()) {
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
+      return std::make_shared<DynamicRouteEntry>(*this, entry[0]->value().getStringView());
     }
 
     return nullptr;
@@ -224,7 +226,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   route_entry_ = route_->routeEntry();
   const std::string& cluster_name = route_entry_->clusterName();
 
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
     stats_.unknown_cluster_.inc();
@@ -260,8 +262,14 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                                         : callbacks_->downstreamProtocolType();
   ASSERT(protocol != ProtocolType::Auto);
 
-  Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
+  if (callbacks_->downstreamTransportType() == TransportType::Framed &&
+      transport == TransportType::Framed && callbacks_->downstreamProtocolType() == protocol &&
+      protocol != ProtocolType::Twitter) {
+    passthrough_supported_ = true;
+  }
+
+  Tcp::ConnectionPool::Instance* conn_pool =
+      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
@@ -410,6 +418,10 @@ FilterStatus Router::UpstreamRequest::start() {
     return FilterStatus::StopIteration;
   }
 
+  if (upstream_host_ == nullptr) {
+    return FilterStatus::StopIteration;
+  }
+
   return FilterStatus::Continue;
 }
 
@@ -502,9 +514,8 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
-        AppException(
-            AppExceptionType::InternalError,
-            fmt::format("too many connections to '{}'", upstream_host_->address()->asString())),
+        AppException(AppExceptionType::InternalError,
+                     "thrift upstream request: too many connections"),
         true);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
@@ -519,7 +530,9 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
       parent_.callbacks_->sendLocalReply(
           AppException(
               AppExceptionType::InternalError,
-              fmt::format("connection failure '{}'", upstream_host_->address()->asString())),
+              fmt::format("connection failure '{}'", (upstream_host_ != nullptr)
+                                                         ? upstream_host_->address()->asString()
+                                                         : "to upstream")),
           true);
       return;
     }

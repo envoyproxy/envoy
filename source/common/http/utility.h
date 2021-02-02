@@ -15,7 +15,6 @@
 
 #include "common/http/exception.h"
 #include "common/http/status.h"
-#include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -125,6 +124,23 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http {
 namespace Utility {
+
+/**
+ * Given a fully qualified URL, splits the string_view provided into scheme,
+ * host and path with query parameters components.
+ */
+class Url {
+public:
+  bool initialize(absl::string_view absolute_url, bool is_connect_request);
+  absl::string_view scheme() { return scheme_; }
+  absl::string_view hostAndPort() { return host_and_port_; }
+  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
+
+private:
+  absl::string_view scheme_;
+  absl::string_view host_and_port_;
+  absl::string_view path_and_query_params_;
+};
 
 class PercentEncoding {
 public:
@@ -365,6 +381,14 @@ const std::string& getProtocolString(const Protocol p);
  */
 void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
                             absl::string_view& path);
+
+/**
+ * Takes a the path component from a file:/// URI and returns a local path for file access.
+ * @param file_path if we have file:///foo/bar, the file_path is foo/bar. For file:///c:/foo/bar
+ *                  it is c:/foo/bar. This is not prefixed with /.
+ * @return std::string with absolute path for local access, e.g. /foo/bar, c:/foo/bar.
+ */
+std::string localPathFromFilePath(const absl::string_view& file_path);
 
 /**
  * Prepare headers for a HttpUri.

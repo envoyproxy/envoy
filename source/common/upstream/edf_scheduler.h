@@ -1,6 +1,6 @@
 #pragma once
-
 #include <cstdint>
+#include <iostream>
 #include <queue>
 
 #include "common/common/assert.h"
@@ -25,32 +25,47 @@ namespace Upstream {
 // weights and an O(log n) pick time.
 template <class C> class EdfScheduler {
 public:
-  /**
-   * Pick queue entry with closest deadline.
-   * @return std::shared_ptr<C> to the queue entry if a valid entry exists in the queue, nullptr
-   *         otherwise. The entry is removed from the queue.
-   */
-  std::shared_ptr<C> pick() {
-    EDF_TRACE("Queue pick: queue_.size()={}, current_time_={}.", queue_.size(), current_time_);
-    while (true) {
-      if (queue_.empty()) {
-        EDF_TRACE("Queue is empty.");
-        return nullptr;
-      }
-      const EdfEntry& edf_entry = queue_.top();
-      // Entry has been removed, let's see if there's another one.
-      if (edf_entry.entry_.expired()) {
-        EDF_TRACE("Entry has expired, repick.");
-        queue_.pop();
-        continue;
-      }
-      std::shared_ptr<C> ret{edf_entry.entry_};
-      ASSERT(edf_entry.deadline_ >= current_time_);
-      current_time_ = edf_entry.deadline_;
+  // Each time peekAgain is called, it will return the best-effort subsequent
+  // pick, popping and reinserting the entry as if it had been picked, and
+  // inserting it into the pre-picked queue.
+  // The first time peekAgain is called, it will return the
+  // first item which will be picked, the second time it is called it will
+  // return the second item which will be picked. As picks occur, that window
+  // will shrink.
+  std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) {
+    if (hasEntry()) {
+      prepick_list_.push_back(std::move(queue_.top().entry_));
+      std::shared_ptr<C> ret{prepick_list_.back()};
+      add(calculate_weight(*ret), ret);
       queue_.pop();
-      EDF_TRACE("Picked {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
       return ret;
     }
+    return nullptr;
+  }
+
+  /**
+   * Pick queue entry with closest deadline and adds it back using the weight
+   *   from calculate_weight.
+   * @return std::shared_ptr<C> to next valid the queue entry if or nullptr if none exists.
+   */
+  std::shared_ptr<C> pickAndAdd(std::function<double(const C&)> calculate_weight) {
+    while (!prepick_list_.empty()) {
+      // In this case the entry was added back during peekAgain so don't re-add.
+      if (prepick_list_.front().expired()) {
+        prepick_list_.pop_front();
+        continue;
+      }
+      std::shared_ptr<C> ret{prepick_list_.front()};
+      prepick_list_.pop_front();
+      return ret;
+    }
+    if (hasEntry()) {
+      std::shared_ptr<C> ret{queue_.top().entry_};
+      queue_.pop();
+      add(calculate_weight(*ret), ret);
+      return ret;
+    }
+    return nullptr;
   }
 
   /**
@@ -74,6 +89,31 @@ public:
   bool empty() const { return queue_.empty(); }
 
 private:
+  /**
+   * Clears expired entries, and returns true if there's still entries in the queue.
+   */
+  bool hasEntry() {
+    EDF_TRACE("Queue pick: queue_.size()={}, current_time_={}.", queue_.size(), current_time_);
+    while (true) {
+      if (queue_.empty()) {
+        EDF_TRACE("Queue is empty.");
+        return false;
+      }
+      const EdfEntry& edf_entry = queue_.top();
+      // Entry has been removed, let's see if there's another one.
+      if (edf_entry.entry_.expired()) {
+        EDF_TRACE("Entry has expired, repick.");
+        queue_.pop();
+        continue;
+      }
+      std::shared_ptr<C> ret{edf_entry.entry_};
+      ASSERT(edf_entry.deadline_ >= current_time_);
+      current_time_ = edf_entry.deadline_;
+      EDF_TRACE("Picked {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
+      return true;
+    }
+  }
+
   struct EdfEntry {
     double deadline_;
     // Tie breaker for entries with the same deadline. This is used to provide FIFO behavior.
@@ -98,6 +138,7 @@ private:
   uint64_t order_offset_{};
   // Min priority queue for EDF.
   std::priority_queue<EdfEntry> queue_;
+  std::list<std::weak_ptr<C>> prepick_list_;
 };
 
 #undef EDF_DEBUG

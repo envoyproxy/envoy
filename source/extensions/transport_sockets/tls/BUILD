@@ -29,6 +29,30 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
+    name = "ssl_handshaker_lib",
+    srcs = ["ssl_handshaker.cc"],
+    hdrs = ["ssl_handshaker.h"],
+    external_deps = ["ssl"],
+    deps = [
+        ":context_lib",
+        ":utility_lib",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:handshaker_interface",
+        "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//include/envoy/ssl:ssl_socket_state",
+        "//include/envoy/ssl/private_key:private_key_callbacks_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_annotations",
+        "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "io_handle_bio_lib",
     srcs = ["io_handle_bio.cc"],
     hdrs = ["io_handle_bio.h"],
@@ -56,6 +80,7 @@ envoy_cc_library(
         ":context_config_lib",
         ":context_lib",
         ":io_handle_bio_lib",
+        ":ssl_handshaker_lib",
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
@@ -83,6 +108,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":ssl_handshaker_lib",
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -118,6 +144,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":stats_lib",
         ":utility_lib",
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
@@ -135,9 +162,26 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "//source/extensions/transport_sockets/tls/ocsp:ocsp_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_lib",
+    srcs = ["stats.cc"],
+    hdrs = ["stats.h"],
+    external_deps = [
+        "ssl",
+    ],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -150,6 +194,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
     ],

@@ -1,7 +1,7 @@
 # C++ coding style
 
 * The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
-  issues are taken care of automatically. The CircleCI tests will automatically check
+  issues are taken care of automatically. The Azure Pipelines will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format). Errors in
   .clang-tidy are enforced while other warnings are suggestions. Note that code and
@@ -19,7 +19,7 @@
 # Documentation
 
 * If you are modifying the data plane structually, please keep the [Life of a
-  Request](docs/root/intro/life_of_a_request.md) documentation up-to-date.
+  Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation up-to-date.
 
 # Deviations from Google C++ style guidelines
 
@@ -105,24 +105,36 @@
 A few general notes on our error handling philosophy:
 
 * All error code returns should be checked.
-* At a very high level, our philosophy is that errors that are *likely* to happen should be
-  gracefully handled. Examples of likely errors include any type of network error, disk IO error,
-  bad data returned by an API call, bad data read from runtime files, etc. Errors that are
-  *unlikely* to happen should lead to process death, under the assumption that the additional burden
-  of defensive coding and testing is not an effective use of time for an error that should not happen
-  given proper system setup. Examples of these types of errors include not being able to open the shared
-  memory region, an invalid initial JSON config read from disk, system calls that should not fail
-  assuming correct parameters (which should be validated via tests), etc. Examples of system calls
-  that should not fail when passed valid parameters include most usages of `setsockopt()`,
-  `getsockopt()`, the kernel returning a valid `sockaddr` after a successful call to `accept()`,
-  `pthread_create()`, `pthread_join()`, etc.
-* OOM events (both memory and FDs) are considered fatal crashing errors. An OOM error should never
-  silently be ignored and should crash the process either via the C++ allocation error exception, an
-  explicit `RELEASE_ASSERT` following a third party library call, or an obvious crash on a subsequent
-  line via null pointer dereference. This rule is again based on the philosophy that the engineering
-  costs of properly handling these cases are not worth it. Time is better spent designing proper system
-  controls that shed load if resource usage becomes too high, etc.
-* The "less is more" error handling philosophy described in the previous two points is primarily
+* At a very high level, our philosophy is that errors should be handled gracefully when caused by:
+  - Untrusted network traffic (from downstream, upstream, or extensions like filters)
+  - Raised by the Envoy process environment and are *likely* to happen
+  - Third party dependency return codes
+* Examples of likely environnmental errors include any type of network error, disk IO error, bad
+  data returned by an API call, bad data read from runtime files, etc. This includes loading
+  configuration at runtime.
+* Third party dependency return codes should be checked and gracefully handled. Examples include
+  HTTP/2 or JSON parsers. Some return codes may be handled by continuing, for example, in case of an
+  out of process RPC failure.
+* Testing should cover any serious cases that may result in infinite loops, crashes, or serious
+  errors. Non-trivial invariants are also encouraged to have testing. Internal, localized invariants
+  may not need testing.
+* Errors in the Envoy environment that are *unlikely* to happen after process initialization, should
+  lead to process death, under the assumption that the additional burden of defensive coding and
+  testing is not an effective use of time for an error that should not happen given proper system
+  setup. Examples of these types of errors include not being able to open the shared memory region,
+  system calls that should not fail assuming correct parameters (which should be validated via
+  tests), etc. Examples of system calls that should not fail when passed valid parameters include
+  the kernel returning a valid `sockaddr` after a successful call to `accept()`, `pthread_create()`,
+  `pthread_join()`, etc. However, system calls that require permissions may cause likely errors in
+  some deployments and need graceful error handling.
+* OOM events (both memory and FDs) or ENOMEM errors are considered fatal crashing errors. An OOM
+  error should never silently be ignored and should crash the process either via the C++ allocation
+  error exception, an explicit `RELEASE_ASSERT` following a third party library call, or an obvious
+  crash on a subsequent line via null pointer dereference. This rule is again based on the
+  philosophy that the engineering costs of properly handling these cases are not worth it. Time is
+  better spent designing proper system controls that shed load if resource usage becomes too high,
+  etc.
+* The "less is more" error handling philosophy described in the previous points is primarily
   based on the fact that restarts are designed to be fast, reliable and cheap.
 * Although we strongly recommend that any type of startup error leads to a fatal error, since this
   is almost always a result of faulty configuration which should be caught during a canary process,
@@ -147,20 +159,67 @@ A few general notes on our error handling philosophy:
   continue seems ridiculous because *"this should never happen"*, it's a very good indication that
   the appropriate behavior is to terminate the process and not handle the error. When in doubt,
   please discuss.
-* Per above it's acceptable to turn failures into crash semantics
-  via `RELEASE_ASSERT(condition)` or `PANIC(message)` if there is no other sensible behavior, e.g.
-  in OOM (memory/FD) scenarios. Only `RELEASE_ASSERT(condition)` should be used to validate
-  conditions that might be imposed by the external environment. `ASSERT(condition)` should be used
-  to document (and check in debug-only builds) program invariants. Use `ASSERT` liberally, but do
-  not use it for things that will crash in an obvious way in a subsequent line. E.g., do not do
-  `ASSERT(foo != nullptr); foo->doSomething();`. Note that there is a gray line between external
-  environment failures and program invariant violations. For example, memory corruption due to a
-  security issue (a bug, deliberate buffer overflow etc.) might manifest as a violation of program
-  invariants or as a detectable condition in the external environment (e.g. some library returning a
-  highly unexpected error code or buffer contents). Unfortunately no rule can cleanly cover when to
-  use `RELEASE_ASSERT` vs. `ASSERT`. In general we view `ASSERT` as the common case and
-  `RELEASE_ASSERT` as the uncommon case, but experience and judgment may dictate a particular approach
-  depending on the situation.
+  
+# Macro Usage
+
+* The following macros are available:
+  - `RELEASE_ASSERT`: fatal check.
+  - `ASSERT`: fatal check in debug-only builds. These should be used to document (and check in
+    debug-only builds) program invariants.
+  - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
+    should be used where it may be useful to detect if an efficient condition is violated in
+    production (and fatal check in debug-only builds).
+
+* Sub-macros alias the macros above and can be used to annotate specific situations:
+  - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
+  detectability on probable conditions or invariants.
+
+* Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
+  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios. 
+* Do not `ASSERT` on conditions imposed by the external environment. Either add error handling
+  (potentially with an `ENVOY_BUG` for detectability) or `RELEASE_ASSERT` if the condition indicates
+  that the process is unrecoverable.
+* Use `ASSERT` and `ENVOY_BUG` liberally, but do not use them for things that will crash in an obvious
+  way in a subsequent line. E.g., do not do `ASSERT(foo != nullptr); foo->doSomething();`.
+* Use `ASSERT`s for true invariants and well-defined conditions that are useful for tests,
+  debug-only checks and documentation. They may be `ENVOY_BUG`s if performance allows, see point
+  below.
+* `ENVOY_BUG`s provide detectability and more confidence than an `ASSERT`. They are useful for
+  non-trivial conditions, those with complex control flow, and rapidly changing protocols. Testing
+  should be added to ensure that Envoy can continue to operate even if an `ENVOY_BUG` condition is
+  violated.
+* Annotate conditions with comments on belief or reasoning, for example `Condition is guaranteed by
+  caller foo` or `Condition is likely to hold after processing through external library foo`.
+* Macro usage should be understandable to a reader. Add comments if not. They should be robust to
+  future changes.
+* Note that there is a gray line between external environment failures and program invariant
+  violations. For example, memory corruption due to a security issue (a bug, deliberate buffer
+  overflow etc.) might manifest as a violation of program invariants or as a detectable condition in
+  the external environment (e.g. some library returning a highly unexpected error code or buffer
+  contents). Unfortunately no rule can cleanly cover when to use `RELEASE_ASSERT` vs. `ASSERT`. In
+  general we view `ASSERT` as the common case and `RELEASE_ASSERT` as the uncommon case, but
+  experience and judgment may dictate a particular approach depending on the situation. The risk of
+  process death from `RELEASE_ASSERT` should be justified with the severity and possibility of the
+  condition to avoid unintentional crashes. You may use the following guide:
+    * If a violation is high risk (will cause a crash in subsequent data processing or indicates a
+      failure state beyond recovery), use `RELEASE_ASSERT`.
+    * If a violation is medium or low risk (Envoy can continue safely) and is not expensive,
+      consider `ENVOY_BUG`.
+    * Otherwise (if a condition is expensive or test-only), use `ASSERT`.
+
+Below is a guideline for macro usage. The left side of the table has invariants and the right side
+has error conditions that can be triggered and should be gracefully handled. `ENVOY_BUG` represents
+a middle ground that can be used for uncertain conditions that need detectability. `ENVOY_BUG`s can
+also be added for errors if they warrant detection.
+
+| `ASSERT`/`RELEASE_ASSERT` | `ENVOY_BUG` | Error handling and Testing |
+| --- | --- | --- |
+| Low level invariants in data structures | | |
+| Simple, provable internal class invariants | Complex, uncertain internal class invariants (e.g. need detectability if violated) | |
+| Provable (pre/post)-conditions | Complicated but likely (pre-/post-) conditions that are low-risk (Envoy can continue safely) | Triggerable or uncertain conditions, may be based on untrusted data plane traffic or an extensions’ contract. |
+|                                                                                     | Conditions in alpha or changing extensions that need detectability. (`ENVOY_BUG_ALPHA`) | |
+| Unlikely environment errors after process initialization that would otherwise crash | | Likely environment errors, e.g. return codes from untrusted extensions, dependencies or system calls, network error, bad data read, permission based errors, etc. |
+| Fatal crashing events. e.g. OOMs, deadlocks, no process recovery possible | | |
 
 # Hermetic and deterministic tests
 

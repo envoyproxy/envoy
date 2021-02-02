@@ -21,17 +21,14 @@ namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 
-static Buffer::InstancePtr serializeGrpcMessage(const lightstep::BufferChain& buffer_chain) {
-  Buffer::InstancePtr body(new Buffer::OwnedImpl());
+static void serializeGrpcMessage(const lightstep::BufferChain& buffer_chain,
+                                 Buffer::Instance& body) {
   auto size = buffer_chain.num_bytes();
-  Buffer::RawSlice iovec;
-  body->reserve(size, &iovec, 1);
-  ASSERT(iovec.len_ >= size);
-  iovec.len_ = size;
-  buffer_chain.CopyOut(static_cast<char*>(iovec.mem_), size);
-  body->commit(&iovec, 1);
-  Grpc::Common::prependGrpcFrameHeader(*body);
-  return body;
+  auto reservation = body.reserveSingleSlice(size);
+  ASSERT(reservation.slice().len_ >= size);
+  buffer_chain.CopyOut(static_cast<char*>(reservation.slice().mem_), size);
+  reservation.commit(size);
+  Grpc::Common::prependGrpcFrameHeader(body);
 }
 
 static std::vector<lightstep::PropagationMode>
@@ -127,17 +124,15 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
   Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster(), lightstep::CollectorServiceFullName(), lightstep::CollectorMethodName(),
       absl::optional<std::chrono::milliseconds>(timeout));
-  message->body() = serializeGrpcMessage(*report);
+  serializeGrpcMessage(*report, message->body());
 
-  if (collector_cluster_.exists()) {
+  if (collector_cluster_.threadLocalCluster().has_value()) {
     active_report_ = std::move(report);
     active_callback_ = &callback;
-    active_cluster_ = collector_cluster_.info();
-    active_request_ = driver_.clusterManager()
-                          .httpAsyncClientForCluster(collector_cluster_.info()->name())
-                          .send(std::move(message), *this,
-                                Http::AsyncClient::RequestOptions().setTimeout(
-                                    std::chrono::milliseconds(timeout)));
+    active_cluster_ = collector_cluster_.threadLocalCluster()->get().info();
+    active_request_ = collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
   } else {
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
     driver_.tracerStats().reports_skipped_no_cluster_.inc();
@@ -200,7 +195,8 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
                                 cm_, /* allow_added_via_api */ true);
   cluster_ = lightstep_config.collector_cluster();
 
-  if (!(cm_.get(cluster_)->info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
+  if (!(cm_.clusters().getCluster(cluster_)->get().info()->features() &
+        Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_));
   }

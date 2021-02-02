@@ -56,15 +56,18 @@ Watchdog
 --------
 
 In addition to event loop statistics, Envoy also include a configurable
-:ref:`watchdog <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdog>`
+:ref:`watchdog <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.watchdogs>`
 system that can increment statistics when Envoy is not responsive and
-optionally kill the server. The system also has an extension point allowing for
-custom actions to be taken based on watchdog events. The statistics are
-useful for understanding at a high level whether Envoy's event loop is not
-responsive either because it is doing too much work, blocking, or not being
-scheduled by the OS.
+optionally kill the server. The system has two separate watchdog configs, one
+for the main thread and one for worker threads; this is helpful as the different
+threads have different workloads. The system also has an extension point
+allowing for custom actions to be taken based on watchdog events. The
+statistics are useful for understanding at a high level whether Envoy's event
+loop is not responsive either because it is doing too much work, blocking, or
+not being scheduled by the OS.
 
-The watchdog emits statistics in both the *server.* and *server.<thread_name>.* trees.
+The watchdog emits aggregated statistics in both *main_thread* and *workers*.
+In addition, it emits individual statistics under  *server.<thread_name>.* trees.
 *<thread_name>* is equal to *main_thread*, *worker_0*, *worker_1*, etc.
 
 .. csv-table::

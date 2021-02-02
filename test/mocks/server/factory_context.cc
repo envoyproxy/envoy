@@ -15,7 +15,8 @@ using ::testing::ReturnRef;
 
 MockFactoryContext::MockFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()) {
+      grpc_context_(scope_.symbolTable()), http_context_(scope_.symbolTable()),
+      router_context_(scope_.symbolTable()) {
   ON_CALL(*this, getServerFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -26,7 +27,6 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
-  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));

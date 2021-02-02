@@ -18,7 +18,7 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
     const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), require_type_urls_(require_type_urls),
-      tls_(factory_context.threadLocal().allocateSlot()),
+      tls_(factory_context.threadLocal()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
         // This init target is used to activate the subscription but not wait
@@ -27,9 +27,7 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
         init_target_.ready();
       }) {
   subscription_->filter_config_providers_.insert(this);
-  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalConfig>();
-  });
+  tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
 }
 
 DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
@@ -39,7 +37,7 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
 
 absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
-  return tls_->getTyped<ThreadLocalConfig>().config_;
+  return tls_->config_;
 }
 
 void DynamicFilterConfigProviderImpl::validateConfig(
@@ -54,15 +52,12 @@ void DynamicFilterConfigProviderImpl::validateConfig(
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
                                                      const std::string&,
                                                      Config::ConfigAppliedCb cb) {
-  tls_->runOnAllThreads(
-      [config, cb](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-          -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-        prev_config->config_ = config;
+  tls_.runOnAllThreads(
+      [config, cb](OptRef<ThreadLocalConfig> tls) {
+        tls->config_ = config;
         if (cb) {
           cb();
         }
-        return previous;
       },
       [this, config]() {
         // This happens after all workers have discarded the previous config so it can be safely
@@ -92,7 +87,8 @@ FilterConfigSubscription::FilterConfigSubscription(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
+          false);
 }
 
 void FilterConfigSubscription::start() {

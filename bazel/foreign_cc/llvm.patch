@@ -1,0 +1,25 @@
+# Workaround for Envoy's CMAKE_BUILD_TYPE=Bazel.
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -247,7 +247,7 @@
+ string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+ 
+ if (CMAKE_BUILD_TYPE AND
+-    NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
++    NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL|BAZEL)$")
+   message(FATAL_ERROR "Invalid value for CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+ endif()
+ 
+# Workaround for a missing -fuse-ld flag in CXXFLAGS, which results in
+# different linkers being used during configure and compilation phases.
+--- a/cmake/modules/HandleLLVMOptions.cmake
++++ b/cmake/modules/HandleLLVMOptions.cmake
+@@ -718,8 +718,6 @@ endif()
+ if (UNIX AND CMAKE_GENERATOR STREQUAL "Ninja")
+   include(CheckLinkerFlag)
+   check_linker_flag("-Wl,--color-diagnostics" LINKER_SUPPORTS_COLOR_DIAGNOSTICS)
+-  append_if(LINKER_SUPPORTS_COLOR_DIAGNOSTICS "-Wl,--color-diagnostics"
+-    CMAKE_EXE_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
+ endif()
+ 
+ # Add flags for add_dead_strip().

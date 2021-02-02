@@ -22,7 +22,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
     : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
-      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.random()) {
+      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
   using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
@@ -82,16 +82,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
         const std::chrono::seconds ttl = std::chrono::seconds(dns_service.ttl().seconds());
 
-        // Generate the full name for the DNS service.
+        // Generate the full name for the DNS service. All input parameters are populated
+        // strings enforced by the message definition
         const std::string full_service_name =
             Utils::buildServiceName(dns_service.service_name(), proto, virtual_domain.name());
-        if (full_service_name.empty()) {
-          ENVOY_LOG(
-              trace,
-              "Unable to construct the full service name using name [{}], protocol[{}], domain[{}]",
-              dns_service.service_name(), proto, virtual_domain.name());
-          continue;
-        }
 
         DnsSrvRecordPtr service_record_ptr =
             std::make_unique<DnsSrvRecord>(full_service_name, proto, ttl);
@@ -389,7 +383,6 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
   // Get the service_list config for the domain
   const auto* service_config = getServiceConfigForDomain(query.name_);
   if (service_config != nullptr) {
-
     // We can redirect to more than one cluster, but only one is supported
     const auto& cluster_target = service_config->targets_.begin();
     const auto& target_name = cluster_target->first;
@@ -401,7 +394,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
     }
 
     // Determine if there is a cluster
-    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(target_name);
+    Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(target_name);
     if (cluster == nullptr) {
       ENVOY_LOG(trace, "No cluster found for service target: {}", target_name);
       return false;
@@ -459,7 +452,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   // Return an address for all discovered endpoints. The address and query type must match
   // for the host to be included in the response
   size_t cluster_endpoints = 0;
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(lookup_name);
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
     // TODO(abaptiste): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);

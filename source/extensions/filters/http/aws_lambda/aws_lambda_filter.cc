@@ -198,7 +198,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   // Just the existence of this header means we have an error, so skip.
-  if (headers.get(LambdaFilterNames::get().FunctionErrorHeader)) {
+  if (!headers.get(LambdaFilterNames::get().FunctionErrorHeader).empty()) {
     skip_ = true;
     return Http::FilterHeadersStatus::Continue;
   }
@@ -310,7 +310,7 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
   }
 
   MessageUtil::validate(json_req, ProtobufMessage::getStrictValidationVisitor());
-  const std::string json_data = MessageUtil::getJsonStringFromMessage(
+  const std::string json_data = MessageUtil::getJsonStringFromMessageOrError(
       json_req, false /* pretty_print  */, true /* always_print_primitive_fields */);
   out.add(json_data);
 }

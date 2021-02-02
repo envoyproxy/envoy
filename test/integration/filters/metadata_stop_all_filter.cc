@@ -22,10 +22,9 @@ public:
   constexpr static char name[] = "metadata-stop-all-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
-    const Http::HeaderEntry* entry_content =
-        header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    ASSERT(entry_content != nullptr);
-    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
+    const auto entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    ASSERT(!entry_content.empty());
+    content_size_ = std::stoul(std::string(entry_content[0]->value().getStringView()));
 
     createTimerForContinue();
 

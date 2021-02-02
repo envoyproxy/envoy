@@ -31,6 +31,8 @@ public:
     config_helper_.addConfigModifier([this, max_hosts, max_pending_requests](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
 
@@ -82,9 +84,9 @@ typed_config:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(
+    addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+        FakeHttpConnection::Type::HTTP1);
   }
 
   Network::ClientConnectionPtr

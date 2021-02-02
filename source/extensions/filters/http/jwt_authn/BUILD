@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["extractor.cc"],
     hdrs = ["extractor.h"],
     deps = [
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],

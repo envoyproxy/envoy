@@ -61,9 +61,19 @@ class HdsTest : public testing::Test {
 protected:
   HdsTest()
       : retry_timer_(new Event::MockTimer()), server_response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()), api_(Api::createApiForTest(stats_store_)),
+        async_client_(new Grpc::MockAsyncClient()),
+        api_(Api::createApiForTest(stats_store_, random_)),
         ssl_context_manager_(api_->timeSource()) {
     node_.set_id("hds-node");
+  }
+
+  // Checks if the cluster counters are correct
+  void checkHdsCounters(int requests, int responses, int errors, int updates) {
+    auto stats = hds_delegate_friend_.getStats(*hds_delegate_);
+    EXPECT_EQ(requests, stats.requests_.value());
+    EXPECT_LE(responses, stats.responses_.value());
+    EXPECT_EQ(errors, stats.errors_.value());
+    EXPECT_EQ(updates, stats.updates_.value());
   }
 
   // Creates an HdsDelegate
@@ -86,8 +96,25 @@ protected:
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::RawAsyncClientPtr(async_client_),
         envoy::config::core::v3::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
-        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
+        ssl_context_manager_, test_factory_, log_manager_, cm_, local_info_, admin_,
         singleton_manager_, tls_, validation_visitor_, *api_);
+  }
+
+  void expectCreateClientConnection() {
+    // Create a new mock connection for each call to createClientConnection.
+    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+        .WillRepeatedly(Invoke(
+            [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+               Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+              Network::MockClientConnection* connection =
+                  new NiceMock<Network::MockClientConnection>();
+
+              // pretend our endpoint was connected to.
+              connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+              // return this new, connected endpoint.
+              return connection;
+            }));
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -172,6 +199,34 @@ protected:
     }
 
     return msg;
+  }
+
+  void
+  addTransportSocketMatches(envoy::service::health::v3::ClusterHealthCheck* cluster_health_check,
+                            std::string match, std::string criteria) {
+    // Add transport socket matches to specified cluster and its first health check.
+    const std::string match_yaml = absl::StrFormat(
+        R"EOF(
+transport_socket_matches:
+- name: "test_socket"
+  match:
+    %s: "true"
+  transport_socket:
+    name: "envoy.transport_sockets.raw_buffer"
+)EOF",
+        match);
+    cluster_health_check->MergeFrom(
+        TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
+
+    // Add transport socket match criteria to our health check, for filtering matches.
+    const std::string criteria_yaml = absl::StrFormat(
+        R"EOF(
+transport_socket_match_criteria:
+  %s: "true"
+)EOF",
+        criteria);
+    cluster_health_check->mutable_health_checks(0)->MergeFrom(
+        TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -401,19 +456,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke(
-          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
-             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
-            Network::MockClientConnection* connection =
-                new NiceMock<Network::MockClientConnection>();
-
-            // pretend our endpoint was connected to.
-            connection->raiseEvent(Network::ConnectionEvent::Connected);
-
-            // return this new, connected endpoint.
-            return connection;
-          }));
+  expectCreateClientConnection();
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
@@ -493,31 +536,9 @@ TEST_F(HdsTest, TestSocketContext) {
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
-  // Create Message.
+  // Create Message with transport sockets.
   message.reset(createSimpleMessage());
-
-  // Add transport socket matches to message.
-  const std::string match_yaml = absl::StrFormat(
-      R"EOF(
-transport_socket_matches:
-- name: "test_socket"
-  match:
-    test_match: "true"
-  transport_socket:
-    name: "envoy.transport_sockets.raw_buffer"
-)EOF");
-  auto* cluster_health_check = message->mutable_cluster_health_checks(0);
-  cluster_health_check->MergeFrom(
-      TestUtility::parseYaml<envoy::service::health::v3::ClusterHealthCheck>(match_yaml));
-
-  // Add transport socket match criteria to our health check, for filtering matches.
-  const std::string criteria_yaml = absl::StrFormat(
-      R"EOF(
-transport_socket_match_criteria:
-  test_match: "true"
-)EOF");
-  cluster_health_check->mutable_health_checks(0)->MergeFrom(
-      TestUtility::parseYaml<envoy::config::core::v3::HealthCheck>(criteria_yaml));
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match", "test_match");
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
@@ -532,8 +553,8 @@ transport_socket_match_criteria:
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
-            params.dispatcher_, params.random_, params.stats_, params.singleton_manager_,
-            params.tls_, params.validation_visitor_, params.api_);
+            params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
+            params.validation_visitor_, params.api_);
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
@@ -676,6 +697,402 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
                 .socket_address()
                 .port_value(),
             1234);
+}
+
+// Check to see if two of the same specifier does not get parsed twice in a row.
+TEST_F(HdsTest, TestSameSpecifier) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Try to change the specifier, but it is the same.
+  message.reset(createSimpleMessage());
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check to see that HDS got two requests, but only used the specifier one time.
+  checkHdsCounters(2, 0, 0, 1);
+
+  // Try to change the specifier, but use a new specifier this time.
+  message = createComplexSpecifier(1, 1, 2);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check that both requests and updates increased, meaning we did an update.
+  checkHdsCounters(3, 0, 0, 2);
+}
+
+// Test to see that if a cluster is added or removed, the ones that did not change are reused.
+TEST_F(HdsTest, TestClusterChange) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = createComplexSpecifier(2, 1, 1);
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Get cluster shared pointers to make sure they are the same memory addresses, that we reused
+  // them.
+  auto original_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(original_clusters.size(), 2);
+
+  // Add a third cluster to the specifier. The first two should reuse pointers.
+  message = createComplexSpecifier(3, 1, 1);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new clusters list from HDS.
+  auto new_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(new_clusters.size(), 3);
+
+  // Make sure our first two clusters are at the same address in memory as before.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(new_clusters[i], original_clusters[i]);
+  }
+
+  message = createComplexSpecifier(3, 1, 1);
+
+  // Remove the first element, change the order of the last two elements.
+  message->mutable_cluster_health_checks()->SwapElements(0, 2);
+  message->mutable_cluster_health_checks()->RemoveLast();
+  // Sanity check.
+  ASSERT_EQ(message->cluster_health_checks_size(), 2);
+
+  // Send this new specifier.
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check to see that even if we changed the order, we get the expected pointers.
+  auto final_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(final_clusters.size(), 2);
+
+  // Compare first cluster in the new list is the same as the last in the previous list,
+  // and that the second cluster in the new list is the same as the second in the previous.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(final_clusters[i], new_clusters[2 - i]);
+  }
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
+}
+
+// Edit one of two cluster's endpoints by adding and removing.
+TEST_F(HdsTest, TestUpdateEndpoints) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message, and later add/remove endpoints from the second cluster.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2));
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Save list of hosts/endpoints for comparison later.
+  auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(original_hosts.size(), 2);
+
+  // Add 3 endpoints to the specifier's second cluster. The first in the list should reuse pointers.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 5));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new clusters list from HDS.
+  auto new_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(new_hosts.size(), 5);
+
+  // Make sure our first two endpoints are at the same address in memory as before.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(original_hosts[i], new_hosts[i]);
+  }
+  EXPECT_TRUE(original_hosts[0] != new_hosts[2]);
+
+  // This time, have 4 endpoints, 2 each under 2 localities.
+  // The first locality will be reused, so its 2 endpoints will be as well.
+  // The second locality is new so we should be getting 2 new endpoints.
+  // Since the first locality had 5 but now has 2, we are removing 3.
+  // 2 ADDED, 3 REMOVED, 2 REUSED.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 2, 2));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get this new list of hosts.
+  auto final_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(final_hosts.size(), 4);
+
+  // Ensure the first two elements in the new list are reused.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_EQ(new_hosts[i], final_hosts[i]);
+  }
+
+  // Ensure the first last two elements in the new list are different then the previous list.
+  for (int i = 2; i < 4; i++) {
+    EXPECT_TRUE(new_hosts[i] != final_hosts[i]);
+  }
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
+}
+
+// Test adding, reusing, and removing health checks.
+TEST_F(HdsTest, TestUpdateHealthCheckers) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message with two different health checkers.
+  message.reset(createSimpleMessage());
+  auto new_hc = message->mutable_cluster_health_checks(0)->add_health_checks();
+  new_hc->MergeFrom(message->mutable_cluster_health_checks(0)->health_checks(0));
+  new_hc->mutable_http_health_check()->set_path("/different_path");
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Save list of health checkers for use later.
+  auto original_hcs = hds_delegate_->hdsClusters()[0]->healthCheckers();
+  ASSERT_EQ(original_hcs.size(), 2);
+
+  // Create a new specifier, but make the second health checker different and add a third.
+  // Then reverse the order so the first one is at the end, testing the hashing works as expected.
+  message.reset(createSimpleMessage());
+  auto new_hc0 = message->mutable_cluster_health_checks(0)->add_health_checks();
+  new_hc0->MergeFrom(message->mutable_cluster_health_checks(0)->health_checks(0));
+  new_hc0->mutable_http_health_check()->set_path("/path0");
+  auto new_hc1 = message->mutable_cluster_health_checks(0)->add_health_checks();
+  new_hc1->MergeFrom(message->mutable_cluster_health_checks(0)->health_checks(0));
+  new_hc1->mutable_http_health_check()->set_path("/path1");
+  message->mutable_cluster_health_checks(0)->mutable_health_checks()->SwapElements(0, 2);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new health check list from HDS.
+  auto new_hcs = hds_delegate_->hdsClusters()[0]->healthCheckers();
+  ASSERT_EQ(new_hcs.size(), 3);
+
+  // Make sure our first hc from the original list is the same as the third in the new list.
+  EXPECT_EQ(original_hcs[0], new_hcs[2]);
+  EXPECT_TRUE(original_hcs[1] != new_hcs[1]);
+
+  // Check to see that HDS got two requests, and updated two times with it.
+  checkHdsCounters(2, 0, 0, 2);
+}
+
+// Test to see that if clusters with an empty name get used, there are two clusters.
+// Also test to see that if two clusters with the same non-empty name are used, only have
+// One cluster.
+TEST_F(HdsTest, TestClusterSameName) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = createComplexSpecifier(2, 1, 1);
+  // Set both clusters to have an empty name.
+  message->mutable_cluster_health_checks(0)->set_cluster_name("");
+  message->mutable_cluster_health_checks(1)->set_cluster_name("");
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Get the clusters from HDS
+  auto original_clusters = hds_delegate_->hdsClusters();
+
+  // Make sure that even though they have the same name, since they are empty there are two and they
+  // do not point to the same thing.
+  ASSERT_EQ(original_clusters.size(), 2);
+  ASSERT_TRUE(original_clusters[0] != original_clusters[1]);
+
+  // Create message with 3 clusters this time so we force an update.
+  message = createComplexSpecifier(3, 1, 1);
+  // Set both clusters to have empty names empty name.
+  message->mutable_cluster_health_checks(0)->set_cluster_name("");
+  message->mutable_cluster_health_checks(1)->set_cluster_name("");
+
+  // Test that we still get requested number of clusters, even with repeated names on update since
+  // they are empty.
+  hds_delegate_->onReceiveMessage(std::move(message));
+  auto new_clusters = hds_delegate_->hdsClusters();
+
+  // Check that since the names are empty, we do not reuse and just reconstruct.
+  ASSERT_EQ(new_clusters.size(), 3);
+  ASSERT_TRUE(original_clusters[0] != new_clusters[0]);
+  ASSERT_TRUE(original_clusters[1] != new_clusters[1]);
+
+  // Create a new message.
+  message = createComplexSpecifier(2, 1, 1);
+  // Set both clusters to have the same, non-empty name.
+  message->mutable_cluster_health_checks(0)->set_cluster_name("anna");
+  message->mutable_cluster_health_checks(1)->set_cluster_name("anna");
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check that since they both have the same name, only one of them gets used.
+  auto final_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(final_clusters.size(), 1);
+
+  // Check to see that HDS got three requests, and updated three times with it.
+  checkHdsCounters(3, 0, 0, 3);
+}
+
+// Test that a transport_socket_matches and transport_socket_match_criteria filter fail when not
+// matching, and then after an update the same cluster is used but now matches.
+TEST_F(HdsTest, TestUpdateSocketContext) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
+  // would match the expected socket.
+  std::vector<std::unique_ptr<TransportSocketMatcherImpl>> socket_matchers;
+  EXPECT_CALL(test_factory_, createClusterInfo(_))
+      .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
+        // Build scope, factory_context as does ProdClusterInfoFactory.
+        Envoy::Stats::ScopePtr scope =
+            params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
+        Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+            params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
+            params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
+            params.validation_visitor_, params.api_);
+
+        // Create a mock socket_factory for the scope of this unit test.
+        std::unique_ptr<Envoy::Network::TransportSocketFactory> socket_factory =
+            std::make_unique<Network::MockTransportSocketFactory>();
+
+        // set socket_matcher object in test scope.
+        socket_matchers.push_back(std::make_unique<Envoy::Upstream::TransportSocketMatcherImpl>(
+            params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope));
+
+        // But still use the fake cluster_info_.
+        return cluster_info_;
+      }));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+
+  // Create Message, with a non-valid match and process.
+  message.reset(createSimpleMessage());
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "bad_match", "test_match");
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get our health checker to match against.
+  const auto first_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(first_clusters.size(), 1);
+  const auto first_hcs = first_clusters[0]->healthCheckers();
+  ASSERT_EQ(first_hcs.size(), 1);
+
+  // Check that our fails so it uses default.
+  HealthCheckerImplBase* first_health_checker_base =
+      dynamic_cast<HealthCheckerImplBase*>(first_hcs[0].get());
+  const auto first_match =
+      socket_matchers[0]->resolve(first_health_checker_base->transportSocketMatchMetadata().get());
+  EXPECT_EQ(first_match.name_, "default");
+
+  // Create a new Message, this time with a good match.
+  message.reset(createSimpleMessage());
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match", "test_match");
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get our new health checker to match against.
+  const auto second_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(second_clusters.size(), 1);
+  // Check that this new pointer is actually the same pointer to the first cluster.
+  ASSERT_EQ(second_clusters[0], first_clusters[0]);
+  const auto second_hcs = second_clusters[0]->healthCheckers();
+  ASSERT_EQ(second_hcs.size(), 1);
+
+  // Check that since we made no change to our health checkers, the pointer was reused.
+  EXPECT_EQ(first_hcs[0], second_hcs[0]);
+
+  // Check that our match hits.
+  HealthCheckerImplBase* second_health_checker_base =
+      dynamic_cast<HealthCheckerImplBase*>(second_hcs[0].get());
+  ASSERT_EQ(socket_matchers.size(), 2);
+  const auto second_match =
+      socket_matchers[1]->resolve(second_health_checker_base->transportSocketMatchMetadata().get());
+  EXPECT_EQ(second_match.name_, "test_socket");
+
+  // Create a new Message, this we leave the transport socket the same but change the health check's
+  // filter. This means that the health checker changes but the transport_socket_matches in the
+  // ClusterHealthCheck does not.
+  message.reset(createSimpleMessage());
+  addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match",
+                            "something_new");
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+  // Get our new health checker to match against.
+  const auto third_clusters = hds_delegate_->hdsClusters();
+  ASSERT_EQ(third_clusters.size(), 1);
+  // Check that this new pointer is actually the same pointer to the first cluster.
+  ASSERT_EQ(third_clusters[0], first_clusters[0]);
+  const auto third_hcs = third_clusters[0]->healthCheckers();
+  ASSERT_EQ(third_hcs.size(), 1);
+
+  // Check that since we made a change to our HC, it is a new pointer.
+  EXPECT_TRUE(first_hcs[0] != third_hcs[0]);
+
+  HealthCheckerImplBase* third_health_checker_base =
+      dynamic_cast<HealthCheckerImplBase*>(third_hcs[0].get());
+
+  // Check that our socket matchers is still a size 2. This is because createClusterInfo(_) is never
+  // called again since there was no update to transportSocketMatches.
+  ASSERT_EQ(socket_matchers.size(), 2);
+  const auto third_match =
+      socket_matchers[1]->resolve(third_health_checker_base->transportSocketMatchMetadata().get());
+  // Since this again does not match, it uses default.
+  EXPECT_EQ(third_match.name_, "default");
 }
 
 } // namespace Upstream

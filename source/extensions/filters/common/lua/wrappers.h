@@ -13,14 +13,16 @@ namespace Common {
 namespace Lua {
 
 /**
- * A wrapper for a constant buffer which cannot be modified by Lua.
+ * A wrapper for a buffer.
  */
 class BufferWrapper : public BaseLuaObject<BufferWrapper> {
 public:
-  BufferWrapper(const Buffer::Instance& data) : data_(data) {}
+  BufferWrapper(Buffer::Instance& data) : data_(data) {}
 
   static ExportedFunctions exportedFunctions() {
-    return {{"length", static_luaLength}, {"getBytes", static_luaGetBytes}};
+    return {{"length", static_luaLength},
+            {"getBytes", static_luaGetBytes},
+            {"setBytes", static_luaSetBytes}};
   }
 
 private:
@@ -37,7 +39,14 @@ private:
    */
   DECLARE_LUA_FUNCTION(BufferWrapper, luaGetBytes);
 
-  const Buffer::Instance& data_;
+  /**
+   * Set the wrapped data with the input string.
+   * @param 1 (string) input string.
+   * @return int the length of the input string.
+   */
+  DECLARE_LUA_FUNCTION(BufferWrapper, luaSetBytes);
+
+  Buffer::Instance& data_;
 };
 
 class MetadataMapWrapper;

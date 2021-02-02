@@ -9,6 +9,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/random_generator.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -51,8 +52,9 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-const std::string toString(const Envoy::Http::HeaderEntry* entry) {
-  return entry == nullptr ? "NULL" : std::string(entry->value().getStringView());
+const std::string toString(const Envoy::Http::HeaderMap::GetResult& entry) {
+  // TODO(mattklein123): Print multiple header values.
+  return entry.empty() ? "NULL" : std::string(entry[0]->value().getStringView());
 }
 
 } // namespace
@@ -201,7 +203,7 @@ RouterCheckTool::RouterCheckTool(
 Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
   std::string contents = api.fileSystem().fileReadToEnd(file_path);
   if (absl::EndsWith(file_path, ".yaml")) {
-    contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
+    contents = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::loadFromYaml(contents));
   }
   return Json::Factory::loadFromString(contents);
 }
@@ -219,9 +221,11 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
        validation_config.tests()) {
     active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
+    auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+        nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource());
-    stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
+                                                  factory_context_->dispatcher().timeSource(),
+                                                  address_provider);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);

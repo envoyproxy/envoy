@@ -44,25 +44,18 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Server::MockAdmin> admin;
   Http::ContextImpl http_context(stats_store.symbolTable());
   Grpc::ContextImpl grpc_context(stats_store.symbolTable());
+  Router::ContextImpl router_context(stats_store.symbolTable());
   AccessLog::MockAccessLogManager log_manager;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
 
   ValidationClusterManagerFactory factory(
-      admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
-      local_info, secret_manager, validation_context, *api, http_context, grpc_context, log_manager,
-      singleton_manager, time_system);
+      admin, runtime, stats_store, tls, dns_resolver, ssl_context_manager, dispatcher, local_info,
+      secret_manager, validation_context, *api, http_context, grpc_context, router_context,
+      log_manager, singleton_manager);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
-  EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
-                                                             Http::Protocol::Http11, nullptr));
-  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr);
-  EXPECT_EQ(nullptr, data.connection_);
-  EXPECT_EQ(nullptr, data.host_description_);
-
-  Http::AsyncClient& client = cluster_manager->httpAsyncClientForCluster("cluster");
-  Http::MockAsyncClientStreamCallbacks stream_callbacks;
-  EXPECT_EQ(nullptr, client.start(stream_callbacks, Http::AsyncClient::StreamOptions()));
+  EXPECT_EQ(nullptr, cluster_manager->getThreadLocalCluster("cluster"));
 }
 
 } // namespace

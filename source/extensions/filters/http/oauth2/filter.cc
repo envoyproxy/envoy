@@ -17,7 +17,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -49,13 +48,19 @@ constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
 const char* AuthorizationEndpointFormat =
-    "{}?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
+    "{}?client_id={}&scope={}&response_type=code&redirect_uri={}&state={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+
+constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
+constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
+constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
+constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
+constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
@@ -67,6 +72,25 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
   }
 
   return matchers;
+}
+
+// Transforms the proto list of 'auth_scopes' into a vector of std::string, also
+// handling the default value logic.
+std::vector<std::string>
+authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos) {
+  std::vector<std::string> scopes;
+
+  // If 'auth_scopes' is empty it must return a list with the default value.
+  if (auth_scopes_protos.empty()) {
+    scopes.emplace_back(DEFAULT_AUTH_SCOPE);
+  } else {
+    scopes.reserve(auth_scopes_protos.size());
+
+    for (const auto& scope : auth_scopes_protos) {
+      scopes.emplace_back(scope);
+    }
+  }
+  return scopes;
 }
 
 // Sets the auth token as the Bearer token in the authorization header.
@@ -86,9 +110,11 @@ FilterConfig::FilterConfig(
       redirect_matcher_(proto_config.redirect_path_matcher()),
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      encoded_auth_scopes_(Http::Utility::PercentEncoding::encode(
+          absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
-  if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
+  if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));
@@ -208,22 +234,27 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
         sendUnauthorizedResponse();
-        return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+        return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
       if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
         sendUnauthorizedResponse();
-        return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+        return Http::FilterHeadersStatus::StopIteration;
       }
       Http::ResponseHeaderMapPtr response_headers{
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
                {Http::Headers::get().Location, state}})};
-      decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+      decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
     }
 
     // Continue on with the filter stack.
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Save the request headers for later modification if needed.
+  if (config_->forwardBearerToken()) {
+    request_headers_ = &headers;
   }
 
   // If a bearer token is supplied as a header or param, we ingest it here and kick off the
@@ -232,9 +263,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   access_token_ = extractAccessToken(headers);
   if (!access_token_.empty()) {
     found_bearer_token_ = true;
-    request_headers_ = &headers;
     finishFlow();
-
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -268,15 +297,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    const std::string new_url =
-        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
-                    config_->clientId(), escaped_redirect_uri, escaped_state);
+    const std::string new_url = fmt::format(
+        AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
+        config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
-    decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+    decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
     config_->stats().oauth_unauthorized_rq_.inc();
 
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
@@ -285,14 +314,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const auto query_parameters = Http::Utility::parseQueryString(path_str);
   if (query_parameters.find(queryParamsError()) != query_parameters.end()) {
     sendUnauthorizedResponse();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // if the data we need is not present on the URL, stop execution
   if (query_parameters.find(queryParamsCode()) == query_parameters.end() ||
       query_parameters.find(queryParamsState()) == query_parameters.end()) {
     sendUnauthorizedResponse();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   auth_code_ = query_parameters.at(queryParamsCode());
@@ -301,7 +330,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   Http::Utility::Url state_url;
   if (!state_url.initialize(state_, false)) {
     sendUnauthorizedResponse();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
@@ -323,7 +352,9 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   validator_->setParams(headers, config_->tokenSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
-    setBearerToken(headers, validator_->token());
+    if (config_->forwardBearerToken() && !validator_->token().empty()) {
+      setBearerToken(headers, validator_->token());
+    }
     return true;
   }
 
@@ -348,9 +379,9 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->setLocation(new_path);
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
-  return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
@@ -369,7 +400,9 @@ void OAuth2Filter::finishFlow() {
   // We have fully completed the entire OAuth flow, whether through Authorization header or from
   // user redirection to the auth server.
   if (found_bearer_token_) {
-    setBearerToken(*request_headers_, access_token_);
+    if (config_->forwardBearerToken()) {
+      setBearerToken(*request_headers_, access_token_);
+    }
     config_->stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
@@ -419,7 +452,7 @@ void OAuth2Filter::finishFlow() {
 
   response_headers->setLocation(state_);
 
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
   decoder_callbacks_->continueDecoding();
 }

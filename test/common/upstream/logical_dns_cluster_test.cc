@@ -7,6 +7,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
@@ -39,9 +40,9 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LogicalDnsClusterTest : public testing::Test {
+class LogicalDnsClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
-  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
+  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
 
   void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
@@ -52,7 +53,7 @@ protected:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
     cluster_ = std::make_shared<LogicalDnsCluster>(cluster_config, runtime_, dns_resolver_,
                                                    factory_context, std::move(scope), false);
@@ -137,7 +138,8 @@ protected:
     EXPECT_TRUE(TestUtility::protoEqual(envoy::config::core::v3::Metadata::default_instance(),
                                         *data.host_description_->metadata()));
     data.host_description_->outlierDetector().putHttpResponseCode(200);
-    data.host_description_->healthChecker().setUnhealthy();
+    data.host_description_->healthChecker().setUnhealthy(
+        HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
@@ -193,7 +195,7 @@ protected:
     tls_.shutdownThread();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
@@ -290,7 +292,8 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo.bar.com",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy();
+  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy(
+      HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
   tls_.shutdownThread();
 }
 
@@ -399,7 +402,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
                 address:
                   socket_address:
                     address: foo.bar.com
-                    port_value: 443                     
+                    port_value: 443
             - endpoint:
                 address:
                   socket_address:

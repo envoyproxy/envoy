@@ -14,12 +14,27 @@ namespace Envoy {
 // the content of the filter buffer.
 class BackpressureFilter : public Http::PassThroughFilter {
 public:
-  void onDestroy() override { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); }
+  void onDestroy() override {
+    if (!below_write_buffer_low_watermark_called_) {
+      decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+  }
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     return Http::FilterHeadersStatus::Continue;
   }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) override {
+    if (end_stream) {
+      below_write_buffer_low_watermark_called_ = true;
+      decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+    return Http::FilterDataStatus::Continue;
+  }
+
+private:
+  bool below_write_buffer_low_watermark_called_{false};
 };
 
 class BackpressureConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {

@@ -15,7 +15,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/collection_entry.proto";
+import "xds/core/v3/collection_entry.proto";
 
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -36,10 +36,10 @@ message ListenerCollection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.ListenerCollection";
 
-  udpa.core.v1.CollectionEntry entries = 1;
+  repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 25]
+// [#next-free-field: 27]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Listener";
 
@@ -63,12 +63,8 @@ message Listener {
     // bind can only receive connections redirected from other listeners that
     // set use_original_dst parameter to true. Default is true.
     //
-    // This is deprecated in v2, all Listeners will bind to their port. An
-    // additional filter chain must be created for every original destination
-    // port this listener may redirect to in v2, with the original port
-    // specified in the FilterChainMatch destination_port field.
-    //
-    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
+    // This is deprecated. Use :ref:`Listener.bind_to_port
+    // <envoy_api_field_config.listener.v4alpha.Listener.bind_to_port>`
     google.protobuf.BoolValue bind_to_port = 1;
   }
 
@@ -96,9 +92,9 @@ message Listener {
     }
   }
 
-  reserved 14, 4;
+  reserved 14, 7;
 
-  reserved "use_original_dst";
+  reserved "deprecated_v1";
 
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -119,6 +115,17 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
+  // If a connection is redirected using *iptables*, the port on which the proxy
+  // receives it might be different from the original destination address. When this flag is set to
+  // true, the listener hands off redirected connections to the listener associated with the
+  // original destination address. If there is no listener associated with the original destination
+  // address, the connection is handled by the listener that receives it. Defaults to false.
+  google.protobuf.BoolValue use_original_dst = 4;
+
+  // The default filter chain if none of the filter chain matches. If no default filter chain is supplied,
+  // the connection will be closed. The filter chain match is ignored in this field.
+  FilterChain default_filter_chain = 25;
+
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).
   google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
@@ -126,9 +133,6 @@ message Listener {
 
   // Listener metadata.
   core.v4alpha.Metadata metadata = 6;
-
-  // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 7;
 
   // The type of draining to perform at a listener-wide level.
   DrainType drain_type = 8;
@@ -266,4 +270,10 @@ message Listener {
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
+
+  // Whether the listener should bind to the port. A listener that doesn't
+  // bind can only receive connections redirected from other listeners that set
+  // :ref:`use_original_dst <envoy_api_field_config.listener.v4alpha.Listener.use_original_dst>`
+  // to true. Default is true.
+  google.protobuf.BoolValue bind_to_port = 26;
 }

@@ -1,4 +1,4 @@
-![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
+![Envoy Logo](https://github.com/envoyproxy/artwork/blob/main/PNG/Envoy_Logo_Final_PANTONE.png)
 
 [Cloud-native high-performance edge/middle/service proxy](https://www.envoyproxy.io/)
 
@@ -9,16 +9,15 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=master)
-[![CircleCI](https://circleci.com/gh/envoyproxy/envoy/tree/master.svg?style=shield)](https://circleci.com/gh/envoyproxy/envoy/tree/master)
+[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
-[![Jenkins](https://img.shields.io/jenkins/s/https/powerci.osuosl.org/job/build-envoy-master/badge/icon/.svg?label=ppc64le%20build)](http://powerci.osuosl.org/job/build-envoy-master/)
+[![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
 
 ## Documentation
 
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
-* [Unofficial Chinese documentation](https://github.com/servicemesher/envoy/)
+* [Unofficial Chinese documentation](https://www.servicemesher.com/envoy/)
 * Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
 ([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
 to find out more about the origin story and design philosophy of Envoy
@@ -66,7 +65,7 @@ have prior experience. To get started:
 * [Beginner issues](https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner)
 * [Build/test quick start using docker](ci#building-and-running-tests-as-a-developer)
 * [Developer guide](DEVELOPER.md)
-* Consider installing the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/master/support/README.md), which helps automate parts of the development process, particularly those involving code review.
+* Consider installing the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/main/support/README.md), which helps automate parts of the development process, particularly those involving code review.
 * Please make sure that you let us know if you are working on an issue so we don't duplicate work!
 
 ## Community Meeting

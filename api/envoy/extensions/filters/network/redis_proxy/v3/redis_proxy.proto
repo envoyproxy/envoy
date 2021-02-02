@@ -140,7 +140,7 @@ message RedisProxy {
 
         // Specifies the cluster that requests will be mirrored to. The cluster must
         // exist in the cluster manager configuration.
-        string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+        string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
         // If not specified or the runtime key is not present, all requests to the target cluster
         // will be mirrored.
@@ -162,7 +162,7 @@ message RedisProxy {
       bool remove_prefix = 2;
 
       // Upstream cluster to forward the command to.
-      string cluster = 3 [(validate.rules).string = {min_bytes: 1}];
+      string cluster = 3 [(validate.rules).string = {min_len: 1}];
 
       // Indicates that the route has a request mirroring policy.
       repeated RequestMirrorPolicy request_mirror_policy = 4;
@@ -213,7 +213,7 @@ message RedisProxy {
   reserved "cluster";
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];

@@ -13,6 +13,8 @@ This task is needed to run everytime after:
 - Changing a BUILD file that add/remove files from a target, changes dependencies
 - Changing API proto files
 
+There are additional tools for VS Code located in [`tools/vscode`](../tools/vscode) directory.
+
 ## Advanced Usages
 
 ### Using Remote Build Execution

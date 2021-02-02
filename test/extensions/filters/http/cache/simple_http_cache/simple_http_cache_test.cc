@@ -20,9 +20,17 @@ namespace {
 
 const std::string EpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 
+envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+  // Allows 'accept' to be varied in the tests.
+  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
+  add_accept->set_exact("accept");
+  return config;
+}
+
 class SimpleHttpCacheTest : public testing::Test {
 protected:
-  SimpleHttpCacheTest() {
+  SimpleHttpCacheTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
     request_headers_.setForwardedProto("https");
@@ -41,7 +49,8 @@ protected:
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body) {
     InsertContextPtr inserter = cache_.makeInsertContext(move(lookup));
-    inserter->insertHeaders(response_headers, false);
+    const ResponseMetadata metadata = {current_time_};
+    inserter->insertHeaders(response_headers, metadata, false);
     inserter->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
   }
 
@@ -65,9 +74,7 @@ protected:
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
-    // Using 'accept' as an allowed header to be varied for testing-purpose.
-    absl::flat_hash_set<std::string> allowed_vary_headers{"accept"};
-    return LookupRequest(request_headers_, current_time_, allowed_vary_headers);
+    return LookupRequest(request_headers_, current_time_, vary_allow_list_);
   }
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
@@ -96,6 +103,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
+  VaryHeader vary_allow_list_;
 };
 
 // Simple flow of putting in an item, getting it, deleting it.
@@ -148,7 +156,7 @@ TEST_F(SimpleHttpCacheTest, Fresh) {
       {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
-  time_source_.advanceTimeWait(std::chrono::seconds(3600));
+  time_source_.advanceTimeWait(Seconds(3600));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
@@ -158,7 +166,7 @@ TEST_F(SimpleHttpCacheTest, Stale) {
       {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
-  time_source_.advanceTimeWait(std::chrono::seconds(3601));
+  time_source_.advanceTimeWait(Seconds(3601));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
@@ -198,7 +206,8 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
                                                    {"age", "2"},
                                                    {"cache-control", "public, max-age=3600"}};
   InsertContextPtr inserter = cache_.makeInsertContext(lookup("request_path"));
-  inserter->insertHeaders(response_headers, false);
+  const ResponseMetadata metadata = {current_time_};
+  inserter->insertHeaders(response_headers, metadata, false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);

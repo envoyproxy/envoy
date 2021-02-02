@@ -1,3 +1,4 @@
+#include <chrono>
 #include <memory>
 
 #include "test/common/config/delta_subscription_test_harness.h"
@@ -19,10 +20,32 @@ enum class SubscriptionType {
   Filesystem,
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const SubscriptionType sub, std::ostream* os) {
+  (*os) << ([sub]() -> absl::string_view {
+    switch (sub) {
+    case SubscriptionType::Grpc:
+      return "Grpc";
+    case SubscriptionType::DeltaGrpc:
+      return "DeltaGrpc";
+    case SubscriptionType::Http:
+      return "Http";
+    case SubscriptionType::Filesystem:
+      return "Filesystem";
+    default:
+      return "unknown";
+    }
+  })();
+}
+
 class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
 public:
   SubscriptionImplTest() : SubscriptionImplTest(std::chrono::milliseconds(0)) {}
   SubscriptionImplTest(std::chrono::milliseconds init_fetch_timeout) {
+    initialize(init_fetch_timeout);
+  }
+
+  void initialize(std::chrono::milliseconds init_fetch_timeout = std::chrono::milliseconds(0)) {
     switch (GetParam()) {
     case SubscriptionType::Grpc:
       test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);

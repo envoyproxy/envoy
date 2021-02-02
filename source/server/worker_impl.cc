@@ -14,13 +14,13 @@
 namespace Envoy {
 namespace Server {
 
-WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager,
+WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(worker_name));
-  return WorkerPtr{
-      new WorkerImpl(tls_, hooks_, std::move(dispatcher),
-                     Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(*dispatcher)},
-                     overload_manager, api_)};
+  Event::DispatcherPtr dispatcher(
+      api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
+  return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher),
+                                      std::make_unique<ConnectionHandlerImpl>(*dispatcher, index),
+                                      overload_manager, api_);
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
@@ -32,14 +32,17 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
       [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
+      [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                              Network::ListenerConfig& listener, AddListenerCompletion completion) {
   // All listener additions happen via post. However, we must deal with the case where the listener
   // can not be created on the worker. There is a race condition where 2 processes can successfully
-  // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
-  // to surface this.
+  // bind to an address, but then fail to listen() with `EADDRINUSE`. During initial startup, we
+  // want to surface this.
   dispatcher_->post([this, overridden_listener, &listener, completion]() -> void {
     try {
       handler_->addListener(overridden_listener, listener);
@@ -126,9 +129,8 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.
   dispatcher_->post([this, &guard_dog]() {
-    watch_dog_ =
-        guard_dog.createWatchDog(api_.threadFactory().currentThreadId(), dispatcher_->name());
-    watch_dog_->startWatchdog(*dispatcher_);
+    watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(),
+                                          dispatcher_->name(), *dispatcher_);
   });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");
@@ -148,6 +150,10 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
   } else {
     handler_->enableListeners();
   }
+}
+
+void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
+  handler_->setListenerRejectFraction(state.value());
 }
 
 } // namespace Server

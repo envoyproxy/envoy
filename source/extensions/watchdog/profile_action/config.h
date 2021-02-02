@@ -12,7 +12,7 @@ namespace ProfileAction {
 
 class ProfileActionFactory : public Server::Configuration::GuardDogActionFactory {
 public:
-  ProfileActionFactory() : name_("envoy.watchdog.profile_action"){};
+  ProfileActionFactory() = default;
 
   Server::Configuration::GuardDogActionPtr createGuardDogActionFromProto(
       const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
@@ -22,13 +22,11 @@ public:
     return std::make_unique<ProfileActionConfig>();
   }
 
-  std::string name() const override { return name_; }
+  std::string name() const override { return "envoy.watchdog.profile_action"; }
 
 private:
   using ProfileActionConfig =
       envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig;
-
-  const std::string name_;
 };
 
 } // namespace ProfileAction

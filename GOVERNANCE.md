@@ -38,7 +38,7 @@
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
 * Triage build issues - file issues for known flaky builds or bugs, and either fix or find someone
-  to fix any master build breakages.
+  to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -77,7 +77,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   "is:open is:issue milestone:[current milestone]" and either hold off until
   they are fixed or bump them to the next milestone.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we aim for master to be
+  particularly risky PRs until after the release is tagged. This is because we aim for main to be
   at release candidate quality at all times.
 * Do a final check of the [release notes](docs/root/version_history/current.rst):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
@@ -87,8 +87,11 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
   * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
+  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
+    release, please also make sure there's a stable maintainer signed up for next quarter,
+    and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Wait for tests to pass on [master](https://dev.azure.com/cncf/envoy/_build).
+* Wait for tests to pass on [main](https://dev.azure.com/cncf/envoy/_build).
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
@@ -103,9 +106,10 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
 * Do a new PR to setup the next version
-  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
+  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
-    release version number in the filename, and add an entry for the new file in the `toctree` in 
+    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
+    Add an entry for the new file in the `toctree` in
     [version_history.rst](docs/root/version_history/version_history.rst).
   * Create a new "current" version history file at the [release
   notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
@@ -137,10 +141,7 @@ Deprecated
 ----------
 ```
 * Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
-  to file tracking issues for code which can be removed.
-* Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
-  to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
-  an email to envoy-announce.
+  to file tracking issues for runtime guarded code which can be removed.
 * Check source/common/runtime/runtime_features.cc and see if any runtime guards in
   disabled_runtime_features should be reassessed, and ping on the relevant issues.
 
@@ -185,6 +186,11 @@ build confidence in consistent application of the API guidelines to PRs.
 
 Adding new [extensions](REPO_LAYOUT.md#sourceextensions-layout) has a dedicated policy. Please
 see [this](./EXTENSION_POLICY.md) document for more information.
+
+# External dependency policy
+
+Adding new external dependencies has a dedicated policy. Please see [this](DEPENDENCY_POLICY.md)
+document for more information.
 
 # Conflict resolution and voting
 

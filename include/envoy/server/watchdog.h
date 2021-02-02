@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
@@ -20,24 +19,14 @@ public:
   virtual ~WatchDog() = default;
 
   /**
-   * Start a recurring touch timer in the dispatcher passed as argument.
-   *
-   * This will automatically call the touch() method at the interval specified
-   * during construction.
-   *
-   * The timer object is stored within the WatchDog object. It will go away if
-   * the object goes out of scope and stop the timer.
-   */
-  virtual void startWatchdog(Event::Dispatcher& dispatcher) PURE;
-
-  /**
    * Manually indicate that you are still alive by calling this.
    *
-   * This can be used if this is later used on a thread where there is no dispatcher.
+   * When the watchdog is registered with a dispatcher, the dispatcher will periodically call this
+   * method to indicate the thread is still alive. It should be called directly by the application
+   * code in cases where the watchdog is not registered with a dispatcher.
    */
   virtual void touch() PURE;
   virtual Thread::ThreadId threadId() const PURE;
-  virtual MonotonicTime lastTouchTime() const PURE;
 };
 
 using WatchDogSharedPtr = std::shared_ptr<WatchDog>;

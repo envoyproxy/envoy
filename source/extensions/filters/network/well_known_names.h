@@ -52,6 +52,8 @@ public:
   const std::string SniDynamicForwardProxy = "envoy.filters.network.sni_dynamic_forward_proxy";
   // ZooKeeper proxy filter
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
+  // WebAssembly filter
+  const std::string Wasm = "envoy.filters.network.wasm";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

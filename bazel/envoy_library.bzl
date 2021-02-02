@@ -20,6 +20,16 @@ load(
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": [],
+        repository + "//bazel:disable_tcmalloc_on_linux_aarch64": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:linux_x86_64": [envoy_external_dep_path("tcmalloc")],
+        repository + "//bazel:linux_aarch64": [envoy_external_dep_path("tcmalloc")],
         "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
@@ -83,7 +93,22 @@ def envoy_cc_extension(
         fail("Unknown extension status: " + status)
     if "//visibility:public" not in visibility:
         visibility = visibility + extra_visibility
-    envoy_cc_library(name, tags = tags, visibility = visibility, **kwargs)
+
+    ext_name = name + "_envoy_extension"
+    envoy_cc_library(
+        name = name,
+        tags = tags,
+        visibility = visibility,
+        **kwargs
+    )
+    cc_library(
+        name = ext_name,
+        deps = select({
+            ":is_enabled": [":" + name],
+            "//conditions:default": [],
+        }),
+        visibility = visibility,
+    )
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
@@ -98,7 +123,8 @@ def envoy_cc_library(
         tags = [],
         deps = [],
         strip_include_prefix = None,
-        textual_hdrs = None):
+        textual_hdrs = None,
+        defines = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
@@ -123,6 +149,7 @@ def envoy_cc_library(
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
+        defines = defines,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
@@ -132,7 +159,7 @@ def envoy_cc_library(
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
         visibility = visibility,
-        tags = ["nocompdb"],
+        tags = ["nocompdb"] + tags,
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
     )

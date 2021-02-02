@@ -22,21 +22,18 @@ public:
                 Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
-           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+           const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
            MonotonicTime now) override;
 
 private:
-  // Helper to determine if we should run the profiler.
-  absl::optional<Thread::ThreadId> getTidTriggeringProfile(
-      const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs);
-
   const std::string path_;
   const std::chrono::milliseconds duration_;
-  const uint64_t max_profiles_per_tid_;
-  bool running_profile_;
+  const uint64_t max_profiles_;
+  bool running_profile_ = false;
   std::string profile_filename_;
-  uint64_t profiles_started_;
-  absl::flat_hash_map<Thread::ThreadId, uint64_t> tid_to_profile_count_;
+  Stats::Counter& profiles_attempted_;
+  Stats::Counter& profiles_successfully_captured_;
+  uint64_t profiles_started_ = 0;
   Server::Configuration::GuardDogActionFactoryContext& context_;
   Event::TimerPtr timer_cb_;
 };

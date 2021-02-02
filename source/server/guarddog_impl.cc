@@ -13,6 +13,7 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -30,7 +31,8 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-                           Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock)
+                           Api::Api& api, absl::string_view name,
+                           std::unique_ptr<TestInterlockHook>&& test_interlock)
     : test_interlock_hook_(std::move(test_interlock)), stats_scope_(stats_scope),
       time_source_(api.timeSource()), miss_timeout_(config.missTimeout()),
       megamiss_timeout_(config.megaMissTimeout()), kill_timeout_(config.killTimeout()),
@@ -46,21 +48,40 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
                          min_of_nonfatal});
       }()),
       watchdog_miss_counter_(stats_scope.counterFromStatName(
-          Stats::StatNameManagedStorage("server.watchdog_miss", stats_scope.symbolTable())
+          Stats::StatNameManagedStorage(absl::StrCat(name, ".watchdog_miss"),
+                                        stats_scope.symbolTable())
               .statName())),
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
-          Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
+          Stats::StatNameManagedStorage(absl::StrCat(name, ".watchdog_mega_miss"),
+                                        stats_scope.symbolTable())
               .statName())),
-      dispatcher_(api.allocateDispatcher("guarddog_thread")),
+      dispatcher_(api.allocateDispatcher(absl::StrCat(name, "_guarddog_thread"))),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })),
       events_to_actions_([&](const Server::Configuration::Watchdog& config) -> EventToActionsMap {
         EventToActionsMap map;
 
         // We should be able to share the dispatcher since guard dog's lifetime
         // should eclipse those of actions.
-        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
+        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_, stats_scope,
+                                                               name};
 
-        const auto& actions = config.actions();
+        auto actions = config.actions();
+
+        // Add default abort_action if kill and/or multi-kill is enabled.
+        if (config.killTimeout().count() > 0) {
+          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
+          WatchDogAction* abort_action_config = actions.Add();
+          abort_action_config->set_event(WatchDogAction::KILL);
+          abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
+        }
+
+        if (config.multiKillTimeout().count() > 0) {
+          envoy::watchdog::v3alpha::AbortActionConfig abort_config;
+          WatchDogAction* abort_action_config = actions.Add();
+          abort_action_config->set_event(WatchDogAction::MULTIKILL);
+          abort_action_config->mutable_config()->mutable_typed_config()->PackFrom(abort_config);
+        }
+
         for (const auto& action : actions) {
           // Get factory and add the created cb
           auto& factory = Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
@@ -75,17 +96,19 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 }
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
-                           Api::Api& api)
-    : GuardDogImpl(stats_scope, config, api, std::make_unique<TestInterlockHook>()) {}
+                           Api::Api& api, absl::string_view name)
+    : GuardDogImpl(stats_scope, config, api, name, std::make_unique<TestInterlockHook>()) {}
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::step() {
-  {
-    Thread::LockGuard guard(mutex_);
-    if (!run_thread_) {
-      return;
-    }
+  // Hold mutex_ for the duration of the step() function to ensure that watchdog still alive checks
+  // and test interlocks happen in the expected order. Calls to forceCheckForTest() should result in
+  // a full iteration of the step() function to process recent watchdog touches and monotonic time
+  // changes.
+  Thread::LockGuard guard(mutex_);
+  if (!run_thread_) {
+    return;
   }
 
   const auto now = time_source_.monotonicTime();
@@ -102,10 +125,16 @@ void GuardDogImpl::step() {
                  static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
 
     for (auto& watched_dog : watched_dogs_) {
-      const auto ltt = watched_dog->dog_->lastTouchTime();
+      if (watched_dog->dog_->getTouchedAndReset()) {
+        // Watchdog was touched since the guard dog last checked; update last check-in time.
+        watched_dog->last_checkin_ = now;
+        continue;
+      }
+
+      const auto last_checkin = watched_dog->last_checkin_;
       const auto tid = watched_dog->dog_->threadId();
-      const auto delta = now - ltt;
-      if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < ltt) {
+      const auto delta = now - last_checkin;
+      if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < last_checkin) {
         watched_dog->miss_alerted_ = false;
         watched_dog->megamiss_alerted_ = false;
       }
@@ -113,35 +142,28 @@ void GuardDogImpl::step() {
         if (!watched_dog->miss_alerted_) {
           watchdog_miss_counter_.inc();
           watched_dog->miss_counter_.inc();
-          watched_dog->last_alert_time_ = ltt;
+          watched_dog->last_alert_time_ = last_checkin;
           watched_dog->miss_alerted_ = true;
-          miss_threads.emplace_back(tid, ltt);
+          miss_threads.emplace_back(tid, last_checkin);
         }
       }
       if (delta > megamiss_timeout_) {
         if (!watched_dog->megamiss_alerted_) {
           watchdog_megamiss_counter_.inc();
           watched_dog->megamiss_counter_.inc();
-          watched_dog->last_alert_time_ = ltt;
+          watched_dog->last_alert_time_ = last_checkin;
           watched_dog->megamiss_alerted_ = true;
-          mega_miss_threads.emplace_back(tid, ltt);
+          mega_miss_threads.emplace_back(tid, last_checkin);
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
-        invokeGuardDogActions(WatchDogAction::KILL, {{tid, ltt}}, now);
-
-        PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
-                          watched_dog->dog_->threadId().debugString()));
+        invokeGuardDogActions(WatchDogAction::KILL, {{tid, last_checkin}}, now);
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
-        multi_kill_threads.emplace_back(tid, ltt);
+        multi_kill_threads.emplace_back(tid, last_checkin);
 
         if (multi_kill_threads.size() >= required_for_multi_kill) {
           invokeGuardDogActions(WatchDogAction::MULTIKILL, multi_kill_threads, now);
-
-          PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
-                            "watchdog_multikill_timeout",
-                            multi_kill_threads.size(), tid.debugString()));
         }
       }
     }
@@ -156,29 +178,28 @@ void GuardDogImpl::step() {
     invokeGuardDogActions(WatchDogAction::MISS, miss_threads, now);
   }
 
-  {
-    Thread::LockGuard guard(mutex_);
-    test_interlock_hook_->signalFromImpl(now);
-    if (run_thread_) {
-      loop_timer_->enableTimer(loop_interval_);
-    }
+  test_interlock_hook_->signalFromImpl();
+  if (run_thread_) {
+    loop_timer_->enableTimer(loop_interval_);
   }
 }
 
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id,
-                                               const std::string& thread_name) {
+                                               const std::string& thread_name,
+                                               Event::Dispatcher& dispatcher) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_source_ has no
   // state).
   const auto wd_interval = loop_interval_ / 2;
-  WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(std::move(thread_id), time_source_, wd_interval);
+  auto new_watchdog = std::make_shared<WatchDogImpl>(std::move(thread_id));
   WatchedDogPtr watched_dog = std::make_unique<WatchedDog>(stats_scope_, thread_name, new_watchdog);
+  new_watchdog->touch();
   {
     Thread::LockGuard guard(wd_lock_);
     watched_dogs_.push_back(std::move(watched_dog));
   }
+  dispatcher.registerWatchdog(new_watchdog, wd_interval);
   new_watchdog->touch();
   return new_watchdog;
 }
@@ -199,8 +220,11 @@ void GuardDogImpl::start(Api::Api& api) {
   // See comments in WorkerImpl::start for the naming convention.
   Thread::Options options{absl::StrCat("dog:", dispatcher_->name())};
   thread_ = api.threadFactory().createThread(
-      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); }, options);
-  loop_timer_->enableTimer(std::chrono::milliseconds(0));
+      [this]() -> void {
+        loop_timer_->enableTimer(std::chrono::milliseconds(0));
+        dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      },
+      options);
 }
 
 void GuardDogImpl::stop() {
@@ -217,17 +241,18 @@ void GuardDogImpl::stop() {
 
 void GuardDogImpl::invokeGuardDogActions(
     WatchDogAction::WatchdogEvent event,
-    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs, MonotonicTime now) {
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
+    MonotonicTime now) {
   const auto& registered_actions = events_to_actions_.find(event);
   if (registered_actions != events_to_actions_.end()) {
     for (auto& action : registered_actions->second) {
-      action->run(event, thread_ltt_pairs, now);
+      action->run(event, thread_last_checkin_pairs, now);
     }
   }
 }
 
 GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-                                     const WatchDogSharedPtr& watch_dog)
+                                     const WatchDogImplSharedPtr& watch_dog)
     : dog_(watch_dog),
       miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),

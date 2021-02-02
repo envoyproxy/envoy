@@ -40,14 +40,15 @@ public:
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
     xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
-    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        xds_context_, callbacks_, resource_decoder_, stats_,
-        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
+    subscription_ =
+        std::make_unique<GrpcSubscriptionImpl>(xds_context_, callbacks_, resource_decoder_, stats_,
+                                               Config::TypeUrl::get().ClusterLoadAssignment,
+                                               dispatcher_, init_fetch_timeout, false, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -77,7 +78,7 @@ public:
     subscription_started_ = true;
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -144,7 +145,7 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(*load_assignment));
+        resource->mutable_resource()->PackFrom(*load_assignment);
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -172,7 +173,7 @@ public:
                         std::inserter(unsub, unsub.begin()));
 
     expectSendMessage(sub, unsub, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-    subscription_->updateResourceInterest(cluster_names);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     last_cluster_names_ = cluster_names;
   }
 

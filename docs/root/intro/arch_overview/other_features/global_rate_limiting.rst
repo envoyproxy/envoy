@@ -14,7 +14,7 @@ normally during typical request patterns but still prevent cascading failure whe
 to fail. Global rate limiting is a good solution for this case.
 
 Envoy integrates directly with a global gRPC rate limiting service. Although any service that
-implements the defined RPC/IDL protocol can be used, Lyft provides a `reference implementation <https://github.com/lyft/ratelimit>`_
+implements the defined RPC/IDL protocol can be used, Envoy provides a `reference implementation <https://github.com/envoyproxy/ratelimit>`_
 written in Go which uses a Redis backend. Envoy’s rate limit integration has the following features:
 
 * **Network level rate limit filter**: Envoy will call the rate limit service for every new

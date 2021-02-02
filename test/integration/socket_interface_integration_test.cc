@@ -1,3 +1,5 @@
+#include "common/buffer/buffer_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/socket_interface.h"
 
 #include "test/integration/integration.h"
@@ -87,5 +89,60 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
+// Test that connecting to internal address will crash.
+// TODO(lambdai): Add internal connection implementation to enable the connection creation.
+TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
+  BaseIntegrationTest::initialize();
+
+  ConnectionStatusCallbacks connect_callbacks_;
+  Network::ClientConnectionPtr client_;
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+
+  ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
+                   address, Network::Address::InstanceConstSharedPtr(),
+                   Network::Test::createRawBufferSocket(), nullptr),
+               "panic: not implemented");
+}
+
+// Test that recv from internal address will crash.
+// TODO(lambdai): Add internal socket implementation to enable the io path.
+TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
+  BaseIntegrationTest::initialize();
+
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+
+  ASSERT_DEATH(
+      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address, nullptr), "");
+}
+
+// Test that send to internal address will return io error.
+TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterface) {
+  BaseIntegrationTest::initialize();
+
+  const Network::SocketInterface* sock_interface = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  Network::Address::InstanceConstSharedPtr peer_internal_address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+  Network::Address::InstanceConstSharedPtr local_valid_address =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+
+  auto socket = std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
+                                                      local_valid_address, nullptr);
+
+  Buffer::OwnedImpl buffer;
+  auto reservation = buffer.reserveSingleSlice(100);
+
+  auto slice = reservation.slice();
+  auto result =
+      socket->ioHandle().sendmsg(&slice, 1, 0, local_valid_address->ip(), *peer_internal_address);
+  ASSERT_FALSE(result.ok());
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
+}
 } // namespace
 } // namespace Envoy

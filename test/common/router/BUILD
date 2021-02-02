@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
@@ -38,6 +40,21 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "config_impl_headermap_benchmark_test",
+    srcs = ["config_impl_headermap_benchmark_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/router:config_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -263,8 +280,13 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "router_test",
-    srcs = ["router_test.cc"],
+    srcs = [
+        # Split to avoid compiler OOM, especially on ASAN.
+        "router_test.cc",
+        "router_2_test.cc",
+    ],
     deps = [
+        ":router_test_base_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
         "//source/common/network:application_protocol_lib",
@@ -293,7 +315,40 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "router_test_base_lib",
+    srcs = ["router_test_base.cc"],
+    hdrs = ["router_test_base.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:context_lib",
+        "//source/common/network:application_protocol_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/router:router_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/upstreams/http/generic:config",
+        "//source/extensions/upstreams/http/http:config",
+        "//source/extensions/upstreams/http/tcp:config",
+        "//test/common/http:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -385,4 +440,26 @@ envoy_proto_library(
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "config_impl_speed_test",
+    srcs = ["config_impl_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/router:config_lib",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "config_impl_benchmark_test",
+    benchmark_binary = "config_impl_speed_test",
 )

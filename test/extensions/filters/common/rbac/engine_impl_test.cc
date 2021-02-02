@@ -177,11 +177,11 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedAllowlist) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
@@ -200,11 +200,11 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedDenylist) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, LogResult::Undecided, info, conn, headers);
 }
 
@@ -258,6 +258,26 @@ TEST(RoleBasedAccessControlEngineImpl, MistypedCondition) {
       TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
     const_expr:
       int64_value: 13
+  )EOF"));
+
+  envoy::config::rbac::v3::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
+  checkEngine(engine, false, LogResult::Undecided);
+}
+
+TEST(RoleBasedAccessControlEngineImpl, EvaluationFailure) {
+  envoy::config::rbac::v3::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
+    select_expr:
+      operand:
+        const_expr:
+          string_value: request
+      field: undefined
   )EOF"));
 
   envoy::config::rbac::v3::RBAC rbac;
@@ -393,7 +413,7 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(1).WillRepeatedly(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
@@ -425,11 +445,11 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
 
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, RBAC::LogResult::Yes, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 

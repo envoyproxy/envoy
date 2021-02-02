@@ -41,9 +41,8 @@ public:
     MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
     return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}};
   }
-  Upstream::ResourceAutoIncDecPtr
-  canCreateDnsRequest(ResourceLimitOptRef pending_requests) override {
-    Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_(pending_requests);
+  Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override {
+    Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_();
     return std::unique_ptr<Upstream::ResourceAutoIncDec>(raii_ptr);
   }
   MOCK_METHOD(MockLoadDnsCacheEntryResult, loadDnsCacheEntry_,
@@ -56,8 +55,9 @@ public:
   MOCK_METHOD(DnsCache::AddUpdateCallbacksHandle*, addUpdateCallbacks_,
               (UpdateCallbacks & callbacks));
 
-  MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
-  MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, (ResourceLimitOptRef));
+  MOCK_METHOD((void), iterateHostMap, (IterateHostMapCb));
+  MOCK_METHOD((absl::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view));
+  MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, ());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
@@ -84,7 +84,7 @@ public:
   MockDnsHostInfo();
   ~MockDnsHostInfo() override;
 
-  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, ());
+  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
   MOCK_METHOD(const std::string&, resolvedHost, (), (const));
   MOCK_METHOD(bool, isIpAddress, (), (const));
   MOCK_METHOD(void, touch, ());

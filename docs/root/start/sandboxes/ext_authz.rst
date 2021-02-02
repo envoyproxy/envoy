@@ -1,7 +1,14 @@
 .. _install_sandboxes_ext_authz:
 
-External Authorization Filter
-=============================
+External authorization (``ext_authz``) filter
+=============================================
+
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
 The External Authorization sandbox demonstrates Envoy's :ref:`ext_authz filter <config_http_filters_ext_authz>`
 capability to delegate authorization of incoming requests through Envoy to an external services.
@@ -14,26 +21,10 @@ service behind the proxy will be checked by an external HTTP or gRPC service. In
 for every authorized call, the external authorization service adds additional ``x-current-user``
 header entry to the original request headers to be forwarded to the upstream service.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
+Step 1: Start all of our containers
+***********************************
 
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Start all of our containers**
+Change to the ``examples/ext_authz`` directory.
 
 To build this sandbox example and start the example services, run the following commands:
 
@@ -45,11 +36,11 @@ To build this sandbox example and start the example services, run the following 
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                   Name                             Command               State                             Ports
-    ---------------------------------------------------------------------------------------------------------------------------------------
+                   Name                             Command               State             Ports
+    ---------------------------------------------------------------------------------------------------------------
     ext_authz_ext_authz-grpc-service_1   /app/server -users /etc/us       Up
     ext_authz_ext_authz-http-service_1   docker-entrypoint.sh node        Up
-    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    ext_authz_front-envoy_1              /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     ext_authz_upstream-service_1         python3 /app/service/server.py   Up
 
 .. note::
@@ -57,11 +48,16 @@ To build this sandbox example and start the example services, run the following 
     This sandbox has multiple setup controlled by ``FRONT_ENVOY_YAML`` environment variable which
     points to the effective Envoy configuration to be used. The default value of ``FRONT_ENVOY_YAML``
     can be defined in the ``.env`` file or provided inline when running the ``docker-compose up``
-    command. For more information, pease take a look at `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+    command.
 
-By default, ``FRONT_ENVOY_YAML`` points to ``config/grpc-service/v3.yaml`` file which bootstraps
-front-envoy with ext_authz HTTP filter with gRPC service ``V3`` (this is specified by :ref:`transport_api_version field<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`).
-The possible values of ``FRONT_ENVOY_YAML`` can be found inside the ``envoy/examples/ext_authz/config``
+    For more information, please take a look at
+    `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+
+By default, ``FRONT_ENVOY_YAML`` points to :download:`config/grpc-service/v3.yaml <_include/ext_authz/config/grpc-service/v3.yaml>`
+file which bootstraps front-envoy with ext_authz HTTP filter with gRPC service ``V3`` (this is specified by
+:ref:`transport_api_version field<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`).
+
+The possible values of ``FRONT_ENVOY_YAML`` can be found inside the ``config``
 directory.
 
 For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
@@ -76,7 +72,8 @@ For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
     $ FRONT_ENVOY_YAML=config/http-service.yaml docker-compose up --build -d
     $ # Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don't have to specify it when running the "up" command.
 
-**Step 4: Access the upstream-service behind the Front Envoy**
+Step 4: Access the upstream-service behind the Front Envoy
+**********************************************************
 
 You can now try to send a request to upstream-service via the front-envoy as follows:
 
@@ -102,8 +99,8 @@ to provide a ``Bearer`` token via the ``Authorization`` header.
 
 .. note::
 
-    A complete list of users is defined in ``envoy/examples/ext_authz/auth/users.json`` file. For
-    example, the ``token1`` used in the below example is corresponding to ``user1``.
+    A complete list of users is defined in :download:`auth/users.json <_include/ext_authz/auth/users.json>`
+    file. For example, the ``token1`` used in the below example is corresponding to ``user1``.
 
 An example of successful requests can be observed as follows:
 
@@ -130,7 +127,7 @@ An example of successful requests can be observed as follows:
     Hello user1 from behind Envoy!
 
 We can also employ `Open Policy Agent <https://www.openpolicyagent.org/>`_ server
-(with `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-istio-plugin>`_ plugin enabled)
+(with `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-envoy-plugin>`_ plugin enabled)
 as the authorization server. To run this example:
 
 .. code-block:: console
@@ -140,7 +137,7 @@ as the authorization server. To run this example:
     $ docker-compose pull
     $ # Tearing down the currently running setup
     $ docker-compose down
-    $ FRONT_ENVOY_YAML=config/opa-service/v2.yaml docker-compose up --build -d
+    $ FRONT_ENVOY_YAML=config/opa-service/v3.yaml docker-compose up --build -d
 
 And sending a request to the upstream service (via the Front Envoy) gives:
 
@@ -166,7 +163,8 @@ And sending a request to the upstream service (via the Front Envoy) gives:
     Hello OPA from behind Envoy!
 
 From the logs, we can observe the policy decision message from the Open Policy Agent server (for
-the above request against the defined policy in ``config/opa-service/policy.rego``):
+the above request against the defined policy in
+:download:`config/opa-service/policy.rego <_include/ext_authz/config/opa-service/policy.rego>`):
 
 .. code-block:: console
 
@@ -220,3 +218,17 @@ Trying to send a request with method other than ``GET`` gives a rejection:
     < date: Thu, 02 Jul 2020 06:46:13 GMT
     < server: envoy
     < content-length: 0
+
+.. seealso::
+
+   :ref:`ext_authz filter <config_http_filters_ext_authz>`
+      Learn more about using Envoy's ``ext_authz`` filter.
+
+   `Open Policy Agent <https://www.openpolicyagent.org/>`_
+      Policy-based control for cloud native environments.
+
+   `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-envoy-plugin>`_
+      Open Policy Agent Envoy plugin.
+
+   `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+      Further information about using env variables with Docker Compose.

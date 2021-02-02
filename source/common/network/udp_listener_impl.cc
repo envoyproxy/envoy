@@ -31,31 +31,27 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
-  file_event_ = socket_->ioHandle().createFileEvent(
+  socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
-  ASSERT(file_event_);
-
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
-    throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                              socket_->localAddress()->asString()));
+    throw CreateListenerException(
+        fmt::format("cannot set post-bound socket option on socket: {}",
+                    socket_->addressProvider().localAddress()->asString()));
   }
 }
 
-UdpListenerImpl::~UdpListenerImpl() {
-  disableEvent();
-  file_event_.reset();
-}
+UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
-  file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+  socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-void UdpListenerImpl::disableEvent() { file_event_->setEnabled(0); }
+void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
@@ -74,7 +70,8 @@ void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
-      socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
+      socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
+      packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level
@@ -93,7 +90,7 @@ void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_addres
   ASSERT(local_address != nullptr);
   UdpRecvData recvData{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
-  cb_.onData(recvData);
+  cb_.onData(std::move(recvData));
 }
 
 void UdpListenerImpl::handleWriteCallback() {
@@ -104,7 +101,7 @@ void UdpListenerImpl::handleWriteCallback() {
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_->localAddress();
+  return socket_->addressProvider().localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
@@ -123,6 +120,42 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
 Api::IoCallUint64Result UdpListenerImpl::flush() {
   ENVOY_UDP_LOG(trace, "flush");
   return cb_.udpPacketWriter().flush();
+}
+
+void UdpListenerImpl::activateRead() {
+  socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+}
+
+UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
+    : workers_(concurrency) {}
+
+void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks& listener) {
+  absl::WriterMutexLock lock(&mutex_);
+
+  ASSERT(listener.workerIndex() < workers_.size());
+  ASSERT(workers_.at(listener.workerIndex()) == nullptr);
+  workers_.at(listener.workerIndex()) = &listener;
+}
+
+void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbacks& listener) {
+  absl::WriterMutexLock lock(&mutex_);
+
+  ASSERT(workers_.at(listener.workerIndex()) == &listener);
+  workers_.at(listener.workerIndex()) = nullptr;
+}
+
+void UdpListenerWorkerRouterImpl::deliver(uint32_t dest_worker_index, UdpRecvData&& data) {
+  absl::ReaderMutexLock lock(&mutex_);
+
+  ASSERT(dest_worker_index < workers_.size(),
+         "UdpListenerCallbacks::destination returned out-of-range value");
+  auto* worker = workers_[dest_worker_index];
+
+  // When a listener is being removed, packets could be processed on some workers after the
+  // listener is removed from other workers, which could result in a nullptr for that worker.
+  if (worker != nullptr) {
+    worker->post(std::move(data));
+  }
 }
 
 } // namespace Network

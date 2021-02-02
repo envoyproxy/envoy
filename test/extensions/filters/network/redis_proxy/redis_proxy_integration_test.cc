@@ -151,7 +151,7 @@ static_resources:
       filters:
         name: redis
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
@@ -210,7 +210,7 @@ static_resources:
       type: STATIC
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_password: {{ inline_string: cluster_0_password }}
       lb_policy: RANDOM
       load_assignment:
@@ -227,7 +227,7 @@ static_resources:
       lb_policy: RANDOM
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_password: {{ inline_string: cluster_1_password }}
       load_assignment:
         cluster_name: cluster_1
@@ -242,7 +242,7 @@ static_resources:
       type: STATIC
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_password: {{ inline_string: cluster_2_password }}
       lb_policy: RANDOM
       load_assignment:
@@ -264,7 +264,7 @@ static_resources:
       filters:
         name: redis
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
@@ -748,8 +748,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
 
   auto endpoint =
       Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version_), 0);
-  FakeUpstreamPtr target_server{
-      new FakeUpstream(endpoint, upstreamProtocol(), timeSystem(), enable_half_close_)};
+  FakeUpstreamPtr target_server{createFakeUpstream(endpoint, upstreamProtocol())};
 
   std::stringstream redirection_error;
   redirection_error << "-MOVED 1111 " << redisAddressAndPort(target_server) << "\r\n";

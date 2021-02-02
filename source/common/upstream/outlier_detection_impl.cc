@@ -73,18 +73,17 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       return;
     }
     if (Http::CodeUtility::isGatewayError(response_code)) {
-      if (++consecutive_gateway_failure_ == detector->runtime().snapshot().getInteger(
-                                                "outlier_detection.consecutive_gateway_failure",
-                                                detector->config().consecutiveGatewayFailure())) {
+      if (++consecutive_gateway_failure_ ==
+          detector->runtime().snapshot().getInteger(
+              ConsecutiveGatewayFailureRuntime, detector->config().consecutiveGatewayFailure())) {
         detector->onConsecutiveGatewayFailure(host_.lock());
       }
     } else {
       consecutive_gateway_failure_ = 0;
     }
 
-    if (++consecutive_5xx_ ==
-        detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
-                                                  detector->config().consecutive5xx())) {
+    if (++consecutive_5xx_ == detector->runtime().snapshot().getInteger(
+                                  Consecutive5xxRuntime, detector->config().consecutive5xx())) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
@@ -188,7 +187,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
   local_origin_sr_monitor_.incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
-          "outlier_detection.consecutive_local_origin_failure",
+          ConsecutiveLocalOriginFailureRuntime,
           detector->config().consecutiveLocalOriginFailure())) {
     detector->onConsecutiveLocalOriginFailure(host_.lock());
   }
@@ -250,7 +249,9 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
                                           DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE))),
       enforcing_local_origin_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_local_origin_success_rate,
-                                          DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))) {}
+                                          DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))),
+      max_ejection_time_ms_(static_cast<uint64_t>(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, max_ejection_time, DEFAULT_MAX_EJECTION_TIME_MS))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -281,6 +282,12 @@ DetectorImpl::create(const Cluster& cluster,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
+
+  if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
+    throw EnvoyException(
+        "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
+  }
+
   detector->initialize(cluster);
 
   return detector;
@@ -321,20 +328,26 @@ void DetectorImpl::addHostMonitor(HostSharedPtr host) {
 
 void DetectorImpl::armIntervalTimer() {
   interval_timer_->enableTimer(std::chrono::milliseconds(
-      runtime_.snapshot().getInteger("outlier_detection.interval_ms", config_.intervalMs())));
+      runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())));
 }
 
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+    // Node seems to be healthy and was not ejected since the last check.
+    if (monitor->ejectTimeBackoff() != 0) {
+      monitor->ejectTimeBackoff()--;
+    }
     return;
   }
 
-  std::chrono::milliseconds base_eject_time =
-      std::chrono::milliseconds(runtime_.snapshot().getInteger(
-          "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
+  const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+      runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+  const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+      runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
   ASSERT(monitor->numEjections() > 0);
-  if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
+  if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time)) <=
+      (now - monitor->lastEjectionTime().value())) {
     ejections_active_helper_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
@@ -353,30 +366,26 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
 bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   switch (type) {
   case envoy::data::cluster::v2alpha::CONSECUTIVE_5XX:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutive5xxRuntime,
                                               config_.enforcingConsecutive5xx());
   case envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_consecutive_gateway_failure",
-        config_.enforcingConsecutiveGatewayFailure());
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutiveGatewayFailureRuntime,
+                                              config_.enforcingConsecutiveGatewayFailure());
   case envoy::data::cluster::v2alpha::SUCCESS_RATE:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
+    return runtime_.snapshot().featureEnabled(EnforcingSuccessRateRuntime,
                                               config_.enforcingSuccessRate());
   case envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_consecutive_local_origin_failure",
-        config_.enforcingConsecutiveLocalOriginFailure());
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime,
+                                              config_.enforcingConsecutiveLocalOriginFailure());
   case envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_local_origin_success_rate",
-        config_.enforcingLocalOriginSuccessRate());
+    return runtime_.snapshot().featureEnabled(EnforcingLocalOriginSuccessRateRuntime,
+                                              config_.enforcingLocalOriginSuccessRate());
   case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_failure_percentage",
+    return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageRuntime,
                                               config_.enforcingFailurePercentage());
   case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_failure_percentage_local_origin",
-        config_.enforcingFailurePercentageLocalOrigin());
+    return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
+                                              config_.enforcingFailurePercentageLocalOrigin());
   default:
     // Checked by schema.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -449,8 +458,7 @@ void DetectorImpl::updateDetectedEjectionStats(
 void DetectorImpl::ejectHost(HostSharedPtr host,
                              envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
-      100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
-                                          config_.maxEjectionPercent()));
+      100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * ejections_active_helper_.value() / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
@@ -464,6 +472,15 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
+      const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+      const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
+      if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time) <
+          (max_eject_time + base_eject_time)) {
+        host_monitors_[host]->ejectTimeBackoff()++;
+      }
+
       runCallbacks(host);
       if (event_logger_) {
         event_logger_->logEject(host, *this, type, true);
@@ -586,15 +603,13 @@ DetectorImpl::EjectionPair DetectorImpl::successRateEjectionThreshold(
 void DetectorImpl::processSuccessRateEjections(
     DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
-      "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
+      SuccessRateMinimumHostsRuntime, config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
-      "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
-  uint64_t failure_percentage_minimum_hosts =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_minimum_hosts",
-                                     config_.failurePercentageMinimumHosts());
-  uint64_t failure_percentage_request_volume =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_request_volume",
-                                     config_.failurePercentageRequestVolume());
+      SuccessRateRequestVolumeRuntime, config_.successRateRequestVolume());
+  uint64_t failure_percentage_minimum_hosts = runtime_.snapshot().getInteger(
+      FailurePercentageMinimumHostsRuntime, config_.failurePercentageMinimumHosts());
+  uint64_t failure_percentage_request_volume = runtime_.snapshot().getInteger(
+      FailurePercentageRequestVolumeRuntime, config_.failurePercentageRequestVolume());
 
   std::vector<HostSuccessRatePair> valid_success_rate_hosts;
   std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
@@ -645,7 +660,7 @@ void DetectorImpl::processSuccessRateEjections(
   if (!valid_success_rate_hosts.empty() &&
       valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     const double success_rate_stdev_factor =
-        runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
+        runtime_.snapshot().getInteger(SuccessRateStdevFactorRuntime,
                                        config_.successRateStdevFactor()) /
         1000.0;
     getSRNums(monitor_type) = successRateEjectionThreshold(
@@ -667,7 +682,7 @@ void DetectorImpl::processSuccessRateEjections(
   if (!valid_failure_percentage_hosts.empty() &&
       valid_failure_percentage_hosts.size() >= failure_percentage_minimum_hosts) {
     const double failure_percentage_threshold = runtime_.snapshot().getInteger(
-        "outlier_detection.failure_percentage_threshold", config_.failurePercentageThreshold());
+        FailurePercentageThresholdRuntime, config_.failurePercentageThreshold());
 
     for (const auto& host_success_rate_pair : valid_failure_percentage_hosts) {
       if ((100.0 - host_success_rate_pair.success_rate_) >= failure_percentage_threshold) {
@@ -749,8 +764,9 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_consecutive_event();
   }
 
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
+  const auto json =
+      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -762,8 +778,9 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
   event.set_action(envoy::data::cluster::v2alpha::UNEJECT);
 
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
+  const auto json =
+      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 

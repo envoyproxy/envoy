@@ -17,22 +17,20 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
+   downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    global_cx_overflow, Counter, Total connections rejected due to enforecement of the global connection limit
    no_filter_chain_match, Counter, Total connections that didn't match any filter chain
-   ssl.connection_error, Counter, Total TLS connection errors not including failed certificate verifications
-   ssl.handshake, Counter, Total successful TLS connection handshakes
-   ssl.session_reused, Counter, Total successful TLS session resumptions
-   ssl.no_certificate, Counter, Total successful TLS connections with no client certificate
-   ssl.fail_verify_no_cert, Counter, Total TLS connections that failed because of missing client certificate
-   ssl.fail_verify_error, Counter, Total TLS connections that failed CA verification
-   ssl.fail_verify_san, Counter, Total TLS connections that failed SAN verification
-   ssl.fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
-   ssl.ciphers.<cipher>, Counter, Total successful TLS connections that used cipher <cipher>
-   ssl.curves.<curve>, Counter, Total successful TLS connections that used ECDHE curve <curve>
-   ssl.sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
-   ssl.versions.<version>, Counter, Total successful TLS connections that used protocol version <version>
+
+.. _config_listener_stats_tls:
+
+TLS statistics
+--------------
+
+The following TLS statistics are rooted at *listener.<address>.ssl.*:
+
+.. include:: ../../_include/ssl_stats.rst
 
 .. _config_listener_stats_per_handler:
 

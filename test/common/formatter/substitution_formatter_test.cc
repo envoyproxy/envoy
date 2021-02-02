@@ -5,13 +5,16 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
+#include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -273,6 +276,30 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
+    absl::optional<std::string> details;
+    EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
+    EXPECT_EQ(absl::nullopt,
+              termination_details_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(termination_details_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
+    absl::optional<std::string> details{"access_denied"};
+    EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
+    EXPECT_EQ("access_denied",
+              termination_details_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(termination_details_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::stringValue("access_denied")));
+  }
+
+  {
     StreamInfoFormatter bytes_sent_format("BYTES_SENT");
     EXPECT_CALL(stream_info, bytesSent()).WillRepeatedly(Return(1));
     EXPECT_EQ("1", bytes_sent_format.format(request_headers, response_headers, response_trailers,
@@ -402,7 +429,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     // Validate for IPv4 address
     auto address = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("8443", upstream_format.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -412,7 +439,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("9443", upstream_format.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -421,7 +448,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("", upstream_format.format(request_headers, response_headers, response_trailers,
                                          stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -463,6 +490,17 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::stringValue("127.0.0.1:0")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("CONNECTION_ID");
+    uint64_t id = 123;
+    EXPECT_CALL(stream_info, connectionID()).WillRepeatedly(Return(id));
+    EXPECT_EQ("123", upstream_format.format(request_headers, response_headers, response_trailers,
+                                            stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::numberValue(id)));
   }
 
   {
@@ -936,71 +974,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    absl::Time abslStartTime =
-        TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
-    SystemTime startTime = absl::ToChronoTime(abslStartTime);
-    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(startTime));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ("2018-12-18T01:50:34.000Z",
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
-  }
-  {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    absl::Time abslEndTime =
-        TestUtility::parseTime("Dec 17 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
-    SystemTime endTime = absl::ToChronoTime(abslEndTime);
-    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(endTime));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ("2020-12-17T01:50:34.000Z",
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
-  }
-  {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, expirationPeerCertificate())
-        .WillRepeatedly(Return(absl::nullopt));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";
     EXPECT_CALL(stream_info, upstreamTransportFailureReason())
@@ -1074,6 +1047,42 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
         ProtoEq(ValueUtil::stringValue("GE")));
+  }
+}
+
+TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "16");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(16)));
+  }
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "10");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(10)));
+  }
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "23");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(23)));
   }
 }
 
@@ -1419,6 +1428,119 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  // No downstreamSslConnection
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
+    EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
+                                                       response_trailers, stream_info, body));
+    EXPECT_THAT(cert_start_formart.formatValue(request_headers, response_headers, response_trailers,
+                                               stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // No validFromPeerCertificate
+  {
+    DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
+                                                       response_trailers, stream_info, body));
+    EXPECT_THAT(cert_start_formart.formatValue(request_headers, response_headers, response_trailers,
+                                               stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Default format string
+  {
+    DownstreamPeerCertVStartFormatter cert_start_format("DOWNSTREAM_PEER_CERT_V_START");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              cert_start_format.format(request_headers, response_headers, response_trailers,
+                                       stream_info, body));
+  }
+  // Custom format string
+  {
+    DownstreamPeerCertVStartFormatter cert_start_format(
+        "DOWNSTREAM_PEER_CERT_V_START(%b %e %H:%M:%S %Y %Z)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
+              cert_start_format.format(request_headers, response_headers, response_trailers,
+                                       stream_info, body));
+  }
+}
+
+TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  // No downstreamSslConnection
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // No expirationPeerCertificate
+  {
+    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, expirationPeerCertificate())
+        .WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Default format string
+  {
+    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              cert_end_format.format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
+  }
+  // Custom format string
+  {
+    DownstreamPeerCertVEndFormatter cert_end_format(
+        "DOWNSTREAM_PEER_CERT_V_END(%b %e %H:%M:%S %Y %Z)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
+              cert_end_format.format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
+  }
+}
+
 TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
@@ -1427,7 +1549,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   std::string body;
 
   {
-    StartTimeFormatter start_time_format("%Y/%m/%d");
+    StartTimeFormatter start_time_format("START_TIME(%Y/%m/%d)");
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
@@ -1439,7 +1561,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   }
 
   {
-    StartTimeFormatter start_time_format("");
+    StartTimeFormatter start_time_format("START_TIME");
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
@@ -1504,22 +1626,14 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   }
 }
 
-void verifyJsonOutput(std::string json_string,
-                      absl::node_hash_map<std::string, std::string> expected_map) {
-  const auto parsed = Json::Factory::loadFromString(json_string);
-
-  // Every json log line should have only one newline character, and it should be the last character
-  // in the string
-  const auto newline_pos = json_string.find('\n');
-  EXPECT_NE(newline_pos, std::string::npos);
-  EXPECT_EQ(newline_pos, json_string.length() - 1);
-
+void verifyStructOutput(ProtobufWkt::Struct output,
+                        absl::node_hash_map<std::string, std::string> expected_map) {
   for (const auto& pair : expected_map) {
-    EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
   }
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
+TEST(SubstitutionFormatterTest, StructFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1539,14 +1653,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
     plain_string: plain_string_value
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterNestedObject) {
+TEST(SubstitutionFormatterTest, StructFormatterTypesTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1560,31 +1674,158 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObject) {
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
-    level_one:
-      level_two:
-        level_three:
-          plain_string: plain_string_value
-          protocol: '%PROTOCOL%'
+    string_type: plain_string_value
+    struct_type:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+    list_type:
+      - plain_string_value
+      - '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  const std::string expected = R"EOF({
-    "level_one": {
-      "level_two": {
-        "level_three": {
-          "plain_string": "plain_string_value",
-          "protocol": "HTTP/1.1"
-        }
-      }
-    }
-  })EOF";
-  std::string out_json =
+  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
+    "string_type": "plain_string_value",
+    "struct_type": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    },
+    "list_type": [
+      "plain_string_value",
+      "HTTP/1.1"
+    ]
+  })EOF");
+  const ProtobufWkt::Struct out_struct =
       formatter.format(request_header, response_header, response_trailer, stream_info, body);
-  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+  EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
+// Test that nested values are formatted properly, including inter-type nesting.
+TEST(SubstitutionFormatterTest, StructFormatterNestedObjectsTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  ProtobufWkt::Struct key_mapping;
+  // For both struct and list, we test 3 nesting levels of all types (string, struct and list).
+  TestUtility::loadFromYaml(R"EOF(
+    struct:
+      struct_string: plain_string_value
+      struct_protocol: '%PROTOCOL%'
+      struct_struct:
+        struct_struct_string: plain_string_value
+        struct_struct_protocol: '%PROTOCOL%'
+        struct_struct_struct:
+          struct_struct_struct_string: plain_string_value
+          struct_struct_struct_protocol: '%PROTOCOL%'
+        struct_struct_list:
+          - struct_struct_list_string
+          - '%PROTOCOL%'
+      struct_list:
+        - struct_list_string
+        - '%PROTOCOL%'
+        # struct_list_struct
+        - struct_list_struct_string: plain_string_value
+          struct_list_struct_protocol: '%PROTOCOL%'
+        # struct_list_list
+        - - struct_list_list_string
+          - '%PROTOCOL%'
+    list:
+      - list_string
+      - '%PROTOCOL%'
+      # list_struct
+      - list_struct_string: plain_string_value
+        list_struct_protocol: '%PROTOCOL%'
+        list_struct_struct:
+          list_struct_struct_string: plain_string_value
+          list_struct_struct_protocol: '%PROTOCOL%'
+        list_struct_list:
+          - list_struct_list_string
+          - '%PROTOCOL%'
+      # list_list
+      - - list_list_string
+        - '%PROTOCOL%'
+        # list_list_struct
+        - list_list_struct_string: plain_string_value
+          list_list_struct_protocol: '%PROTOCOL%'
+        # list_list_list
+        - - list_list_list_string
+          - '%PROTOCOL%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
+    "struct": {
+      "struct_string": "plain_string_value",
+      "struct_protocol": "HTTP/1.1",
+      "struct_struct": {
+        "struct_struct_string": "plain_string_value",
+        "struct_struct_protocol": "HTTP/1.1",
+        "struct_struct_struct": {
+          "struct_struct_struct_string": "plain_string_value",
+          "struct_struct_struct_protocol": "HTTP/1.1",
+        },
+        "struct_struct_list": [
+          "struct_struct_list_string",
+          "HTTP/1.1",
+        ],
+      },
+      "struct_list": [
+        "struct_list_string",
+        "HTTP/1.1",
+        {
+          "struct_list_struct_string": "plain_string_value",
+          "struct_list_struct_protocol": "HTTP/1.1",
+        },
+        [
+          "struct_list_list_string",
+          "HTTP/1.1",
+        ],
+      ],
+    },
+    "list": [
+      "list_string",
+      "HTTP/1.1",
+      {
+        "list_struct_string": "plain_string_value",
+        "list_struct_protocol": "HTTP/1.1",
+        "list_struct_struct": {
+          "list_struct_struct_string": "plain_string_value",
+          "list_struct_struct_protocol": "HTTP/1.1",
+        },
+        "list_struct_list": [
+          "list_struct_list_string",
+          "HTTP/1.1",
+        ]
+      },
+      [
+        "list_list_string",
+        "HTTP/1.1",
+        {
+          "list_list_struct_string": "plain_string_value",
+          "list_list_struct_protocol": "HTTP/1.1",
+        },
+        [
+          "list_list_list_string",
+          "HTTP/1.1",
+        ],
+      ],
+    ],
+  })EOF");
+  const ProtobufWkt::Struct out_struct =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1603,14 +1844,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
     protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
+TEST(SubstitutionFormatterTest, StructFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
@@ -1631,17 +1872,17 @@ TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
     some_response_header: '%RESP(some_response_header)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
+TEST(SubstitutionFormatterTest, StructFormatterAlternateHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{
       {"request_present_header", "REQUEST_PRESENT_HEADER"}};
@@ -1658,23 +1899,27 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
-    request_present_header_or_request_absent_header: '%REQ(request_present_header?request_absent_header)%'
-    request_absent_header_or_request_present_header: '%REQ(request_absent_header?request_present_header)%'
-    response_absent_header_or_response_absent_header: '%RESP(response_absent_header?response_present_header)%'
-    response_present_header_or_response_absent_header: '%RESP(response_present_header?response_absent_header)%'
+    request_present_header_or_request_absent_header:
+    '%REQ(request_present_header?request_absent_header)%'
+    request_absent_header_or_request_present_header:
+    '%REQ(request_absent_header?request_present_header)%'
+    response_absent_header_or_response_absent_header:
+    '%RESP(response_absent_header?response_present_header)%'
+    response_present_header_or_response_absent_header:
+    '%RESP(response_present_header?response_absent_header)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
+TEST(SubstitutionFormatterTest, StructFormatterDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -1698,14 +1943,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
+TEST(SubstitutionFormatterTest, StructFormatterTypedDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -1724,12 +1969,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  const std::string json =
+  ProtobufWkt::Struct output =
       formatter.format(request_header, response_header, response_trailer, stream_info, body);
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   const auto& fields = output.fields();
   EXPECT_EQ("test_value", fields.at("test_key").string_value());
@@ -1738,7 +1981,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
+TEST(SubstitutionFormatterTest, StructFormatterFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1761,14 +2004,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
     test_obj: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterOmitEmptyTest) {
+TEST(SubstitutionFormatterTest, StructFormatterOmitEmptyTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1786,14 +2029,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterOmitEmptyTest) {
       test_key_dynamic_metadata: '%DYNAMIC_METADATA(nonexistent_key)%'
     )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, true);
+  StructFormatter formatter(key_mapping, false, true);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
       {});
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterTypedFilterStateTest) {
+TEST(SubstitutionFormatterTest, StructFormatterTypedFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1813,12 +2056,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedFilterStateTest) {
     test_obj: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  std::string json =
+  ProtobufWkt::Struct output =
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body);
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   const auto& fields = output.fields();
   EXPECT_EQ("test_value", fields.at("test_key").string_value());
@@ -1850,9 +2091,9 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
       expected_json_map);
 }
@@ -1876,13 +2117,10 @@ TEST(SubstitutionFormatterTest, TypedFilterStateSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  std::string json =
+  ProtobufWkt::Struct output =
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body);
-
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   const auto& fields = output.fields();
   EXPECT_EQ("test_value By PLAIN", fields.at("test_key_plain").string_value());
@@ -1907,11 +2145,11 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(JsonFormatterImpl formatter(key_mapping, false, false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StructFormatter formatter(key_mapping, false, false), EnvoyException,
                             "Invalid filter state serialize type, only support PLAIN/TYPED.");
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
+TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1938,14 +2176,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
+TEST(SubstitutionFormatterTest, StructFormatterMultiTokenTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
@@ -1959,25 +2197,24 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
 
     ProtobufWkt::Struct key_mapping;
     TestUtility::loadFromYaml(R"EOF(
-      multi_token_field: '%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%'
+      multi_token_field: '%PROTOCOL% plainstring %REQ(some_request_header)%
+      %RESP(some_response_header)%'
     )EOF",
                               key_mapping);
     for (const bool preserve_types : {false, true}) {
-      JsonFormatterImpl formatter(key_mapping, preserve_types, false);
+      StructFormatter formatter(key_mapping, preserve_types, false);
 
       absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
       EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-      const auto parsed = Json::Factory::loadFromString(
-          formatter.format(request_header, response_header, response_trailer, stream_info, body));
-      for (const auto& pair : expected_json_map) {
-        EXPECT_EQ(parsed->getString(pair.first), pair.second);
-      }
+      verifyStructOutput(
+          formatter.format(request_header, response_header, response_trailer, stream_info, body),
+          expected_json_map);
     }
   }
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
+TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -2006,12 +2243,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
     filter_state: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  const auto json =
+  ProtobufWkt::Struct output =
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body);
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   EXPECT_THAT(output.fields().at("request_duration"), ProtoEq(ValueUtil::numberValue(5.0)));
   EXPECT_THAT(output.fields().at("request_duration_multi"), ProtoEq(ValueUtil::stringValue("5ms")));
@@ -2019,6 +2254,43 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
   ProtobufWkt::Value expected;
   expected.mutable_struct_value()->CopyFrom(s);
   EXPECT_THAT(output.fields().at("filter_state"), ProtoEq(expected));
+}
+
+TEST(SubstitutionFormatterTest, JsonFormatterTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
+      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    request_duration: '%REQUEST_DURATION%'
+    nested_level:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+  )EOF",
+                            key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false, false);
+
+  const std::string expected = R"EOF({
+    "request_duration": "5",
+    "nested_level": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    }
+  })EOF";
+
+  const std::string out_json =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
@@ -2094,12 +2366,53 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    // Various START_TIME formats
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
     time_t expected_time_in_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                    expected_time_in_epoch),
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    // Various DOWNSTREAM_PEER_CERT_V_START formats (similar to START_TIME)
+    const std::string format =
+        "%DOWNSTREAM_PEER_CERT_V_START(%Y/%m/"
+        "%d)%|%DOWNSTREAM_PEER_CERT_V_START(%s)%|%DOWNSTREAM_PEER_CERT_V_START(bad_format)%|"
+        "%DOWNSTREAM_PEER_CERT_V_START%|%DOWNSTREAM_PEER_CERT_V_START(%f.%1f.%2f.%3f)%";
+
+    time_t expected_time_in_epoch = 1522280158;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                    expected_time_in_epoch),
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    // Various DOWNSTREAM_PEER_CERT_V_END formats (similar to START_TIME)
+    const std::string format =
+        "%DOWNSTREAM_PEER_CERT_V_END(%Y/%m/"
+        "%d)%|%DOWNSTREAM_PEER_CERT_V_END(%s)%|%DOWNSTREAM_PEER_CERT_V_END(bad_format)%|"
+        "%DOWNSTREAM_PEER_CERT_V_END%|%DOWNSTREAM_PEER_CERT_V_END(%f.%1f.%2f.%3f)%";
+
+    time_t expected_time_in_epoch = 1522280158;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     FormatterImpl formatter(format, false);
 
     EXPECT_EQ(
@@ -2158,6 +2471,22 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         "%%|%%123456000|1522796769%%123|1%%1522796769",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
+
+  // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms.
+  //
+  // See:
+  // https://github.com/abseil/abseil-cpp/issues/869
+  // https://github.com/google/cctz/issues/180
+#if !defined(WIN32) && !defined(__APPLE__)
+  {
+    const std::string format = "%START_TIME(%E4n)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("%E4n", formatter.format(request_header, response_header, response_trailer,
+                                       stream_info, body));
+  }
+#endif
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
@@ -2268,11 +2597,42 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%FILTER_STATE(TEST",
       "%FILTER_STATE()%",
       "%START_TIME(%85n)%",
-      "%START_TIME(%#__88n)%"};
+      "%START_TIME(%#__88n)%",
+      "%START_TIME(%En%)%",
+      "%START_TIME(%4En%)%",
+      "%START_TIME(%On%)%",
+      "%START_TIME(%4On%)%"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException) << test_case;
   }
+}
+
+TEST(SubstitutionFormatterTest, ParserSuccesses) {
+  SubstitutionFormatParser parser;
+
+  std::vector<std::string> test_cases = {"%START_TIME(%E4n%)%", "%START_TIME(%O4n%)%"};
+
+  for (const std::string& test_case : test_cases) {
+    EXPECT_NO_THROW(parser.parse(test_case));
+  }
+}
+
+TEST(SubstitutionFormatterTest, FormatterExtension) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  std::vector<CommandParserPtr> commands;
+  commands.push_back(std::make_unique<TestCommandParser>());
+
+  auto providers = SubstitutionFormatParser::parse("foo %COMMAND_EXTENSION(x)%", commands);
+
+  EXPECT_EQ(providers.size(), 2);
+  EXPECT_EQ("TestFormatter", providers[1]->format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
 }
 
 } // namespace

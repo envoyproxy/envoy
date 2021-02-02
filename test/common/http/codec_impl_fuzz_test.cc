@@ -15,6 +15,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
@@ -110,6 +111,7 @@ public:
     // TODO(mattklein123): Split this more clearly into request and response directional state.
     RequestEncoder* request_encoder_;
     ResponseEncoder* response_encoder_;
+    TestRequestHeaderMapImpl request_headers_;
     NiceMock<MockResponseDecoder> response_decoder_;
     NiceMock<MockRequestDecoder> request_decoder_;
     NiceMock<MockStreamCallbacks> stream_callbacks_;
@@ -136,8 +138,9 @@ public:
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
-             bool end_stream, StreamResetCallbackFn stream_reset_callback)
-      : stream_reset_callback_(stream_reset_callback) {
+             bool end_stream, StreamResetCallbackFn stream_reset_callback,
+             MockConnectionManagerConfig* config)
+      : stream_reset_callback_(stream_reset_callback), conn_manager_config_(config) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
@@ -181,8 +184,8 @@ public:
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
-
-    request_.request_encoder_->encodeHeaders(request_headers, end_stream);
+    request_.request_headers_ = request_headers;
+    request_.request_encoder_->encodeHeaders(request_headers, end_stream).IgnoreError();
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
   }
@@ -214,14 +217,18 @@ public:
         if (response) {
           auto headers =
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
+          ConnectionManagerUtility::mutateResponseHeaders(headers, &request_.request_headers_,
+                                                          *conn_manager_config_, "");
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
-          state.request_encoder_->encodeHeaders(
-              fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers()),
-              end_stream);
+          state.request_encoder_
+              ->encodeHeaders(
+                  fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers()),
+                  end_stream)
+              .IgnoreError();
         }
         if (end_stream) {
           state.closeLocal();
@@ -378,6 +385,7 @@ public:
 
   int32_t stream_index_{-1};
   StreamResetCallbackFn stream_reset_callback_;
+  MockConnectionManagerConfig* conn_manager_config_;
 };
 
 // Buffer between client and server H1/H2 codecs. This models each write operation
@@ -385,7 +393,8 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection) : connection_(connection) {}
+  ReorderBuffer(Connection& connection, const bool& should_close_connection)
+      : connection_(connection), should_close_connection_(should_close_connection) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -397,6 +406,10 @@ public:
     while (!bufs_.empty()) {
       Buffer::OwnedImpl& buf = bufs_.front();
       while (buf.length() > 0) {
+        if (should_close_connection_) {
+          ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
+          return codecClientError("preventing buffer drain due to connection closure");
+        }
         status = connection_.dispatch(buf);
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
@@ -439,6 +452,9 @@ public:
 
   Connection& connection_;
   std::deque<Buffer::OwnedImpl> bufs_;
+  // A reference to a flag indicating whether the reorder buffer is allowed to dispatch data to
+  // the connection (reference to should_close_connection).
+  const bool& should_close_connection_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
@@ -456,6 +472,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<MockConnectionCallbacks> client_callbacks;
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<MockConnectionManagerConfig> conn_manager_config;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
@@ -471,7 +489,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
-        client_http2_options, max_request_headers_kb, max_response_headers_count,
+        random, client_http2_options, max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
@@ -484,7 +502,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::ServerConnectionImpl>(
         server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
-        server_http2_options, max_request_headers_kb, max_request_headers_count,
+        random, server_http2_options, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
@@ -494,8 +512,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         headers_with_underscores_action);
   }
 
-  ReorderBuffer client_write_buf{*server};
-  ReorderBuffer server_write_buf{*client};
+  // We track whether the connection should be closed for HTTP/1, since stream resets imply
+  // connection closes.
+  bool should_close_connection = false;
+
+  // The buffers will be blocked from dispatching data if should_close_connection is set to true.
+  // This prevents sending data if a stream reset occurs during the test cleanup when using HTTP/1.
+  ReorderBuffer client_write_buf{*server, should_close_connection};
+  ReorderBuffer server_write_buf{*client, should_close_connection};
 
   ON_CALL(client_connection, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
@@ -545,10 +569,6 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     return status;
   };
 
-  // We track whether the connection should be closed for HTTP/1, since stream resets imply
-  // connection closes.
-  bool should_close_connection = false;
-
   constexpr auto max_actions = 1024;
   bool codec_error = false;
   for (int i = 0; i < std::min(max_actions, input.actions().size()) && !should_close_connection &&
@@ -574,12 +594,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       HttpStreamPtr stream = std::make_unique<HttpStream>(
           *client,
           fromSanitizedHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
-          action.new_stream().end_stream(), [&should_close_connection, http2]() {
+          action.new_stream().end_stream(),
+          [&should_close_connection, http2]() {
             // HTTP/1 codec has stream reset implying connection close.
             if (!http2) {
               should_close_connection = true;
             }
-          });
+          },
+          &conn_manager_config);
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }

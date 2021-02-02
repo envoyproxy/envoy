@@ -1,12 +1,20 @@
 .. _install_sandboxes_front_proxy:
 
-Front Proxy
+Front proxy
 ===========
 
-To get a flavor of what Envoy has to offer as a front proxy, we are releasing a `docker compose <https://docs.docker.com/compose/>`_
-sandbox that deploys a front Envoy and a couple of services (simple Flask apps) colocated with a
-running service Envoy. The three containers will be deployed inside a virtual network called
-``envoymesh``.
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
+`docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front Envoy and a
+couple of services (simple Flask apps) colocated with a running service Envoy.
+
+The three containers will be deployed inside a virtual network called ``envoymesh``.
 
 Below you can see a graphic showing the docker compose deployment:
 
@@ -15,40 +23,21 @@ Below you can see a graphic showing the docker compose deployment:
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy sitting on
 the edge of the ``envoymesh`` network. Port ``8080``, ``8443``, and ``8001`` are exposed by docker
-compose (see :repo:`/examples/front-proxy/docker-compose.yaml`) to handle ``HTTP``, ``HTTPS`` calls
-to the services and requests to ``/admin`` respectively.
+compose (see :download:`docker-compose.yaml <_include/front-proxy/docker-compose.yaml>`) to handle
+``HTTP``, ``HTTPS`` calls to the services and requests to ``/admin`` respectively.
 
 Moreover, notice that all traffic routed by the front Envoy to the service containers is actually
-routed to the service Envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`).
+routed to the service Envoys (routes setup in :download:`front-envoy.yaml <_include/front-proxy/front-envoy.yaml>`).
 
 In turn the service Envoys route the request to the Flask app via the loopback
-address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`). This
+address (routes setup in :download:`service-envoy.yaml <_include/front-proxy/service-envoy.yaml>`). This
 setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
 
-Running the Sandbox
-~~~~~~~~~~~~~~~~~~~
+Step 1: Start all of our containers
+***********************************
 
-The following documentation runs through the setup of an Envoy cluster organized
-as is described in the image above.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Start all of our containers**
+Change to the ``examples/front-proxy`` directory.
 
 .. code-block:: console
 
@@ -59,12 +48,13 @@ or
     $ docker-compose ps
 
               Name                         Command               State                                         Ports
-    ------------------------------------------------------------------------------------------------------------------------------------------------------
+    ----------------------------------------------------------------------------------------------------------------------------------------------------
     front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:8001->8001/tcp, 0.0.0.0:8443->8443/tcp
-    front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
-    front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
+    front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
+    front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp
 
-**Step 4: Test Envoy's routing capabilities**
+Step 2: Test Envoy's routing capabilities
+*****************************************
 
 You can now send a request to both services via the ``front-envoy``.
 
@@ -160,7 +150,8 @@ We can also use ``HTTPS`` to call services behind the front Envoy. For example, 
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-**Step 5: Test Envoy's load balancing capabilities**
+Step 3: Test Envoy's load balancing capabilities
+************************************************
 
 Now let's scale up our ``service1`` nodes to demonstrate the load balancing abilities of Envoy:
 
@@ -228,7 +219,8 @@ requests by doing a round robin of the three ``service1`` machines:
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-**Step 6: enter containers and curl services**
+Step 4: Enter containers and curl services
+******************************************
 
 In addition of using ``curl`` from your host machine, you can also enter the
 containers themselves and ``curl`` from inside them. To enter a container you
@@ -247,7 +239,8 @@ enter the ``front-envoy`` container, and ``curl`` for services locally:
     root@81288499f9d7:/# curl localhost:8080/service/2
     Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
-**Step 7: enter container and curl admin**
+Step 5: Enter container and curl admin
+**************************************
 
 When Envoy runs it also attaches an ``admin`` to your desired port.
 
@@ -255,10 +248,10 @@ In the example configs the admin is bound to port ``8001``.
 
 We can ``curl`` it to gain useful information:
 
-- ``/server_info`` provides information about the Envoy version you are running.
-- ``/stats`` provides statistics about the  Envoy server.
+- :ref:`/server_info <operations_admin_interface_server_info>` provides information about the Envoy version you are running.
+- :ref:`/stats <operations_admin_interface_stats>` provides statistics about the  Envoy server.
 
-In the example we can we can enter the ``front-envoy`` container to query admin:
+In the example we can enter the ``front-envoy`` container to query admin:
 
 .. code-block:: console
 
@@ -333,3 +326,8 @@ In the example we can we can enter the ``front-envoy`` container to query admin:
 
 Notice that we can get the number of members of upstream clusters, number of requests fulfilled by
 them, information about http ingress, and a plethora of other useful stats.
+
+.. seealso::
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.

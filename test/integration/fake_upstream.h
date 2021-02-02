@@ -29,10 +29,12 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/udp_default_writer_config.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/active_raw_udp_listener_config.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -207,7 +209,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  virtual void setEndStream(bool end) EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
+  virtual void setEndStream(bool end) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -220,9 +222,9 @@ protected:
   absl::Mutex lock_;
   Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  FakeHttpConnection& parent_;
 
 private:
-  FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
@@ -255,17 +257,6 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
 
-  Common::CallbackHandle* addDisconnectCallback(DisconnectCallback callback) {
-    absl::MutexLock lock(&lock_);
-    return disconnect_callback_manager_.add(callback);
-  }
-
-  // Avoid directly removing by caller, since CallbackManager is not thread safe.
-  void removeDisconnectCallback(Common::CallbackHandle* handle) {
-    absl::MutexLock lock(&lock_);
-    handle->remove();
-  }
-
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     // Throughout this entire function, we know that the connection_ cannot disappear, since this
@@ -276,7 +267,6 @@ public:
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
       disconnected_ = true;
-      disconnect_callback_manager_.runCallbacks();
     }
   }
 
@@ -313,6 +303,10 @@ public:
     if (disconnected_) {
       return testing::AssertionSuccess();
     }
+    // Sanity check: detect if the post and wait is attempted from the dispatcher thread; fail
+    // immediately instead of deadlocking.
+    ASSERT(!connection_.dispatcher().isThreadSafe(),
+           "deadlock: executeOnDispatcher called from dispatcher thread.");
     bool callback_ready_event = false;
     bool unexpected_disconnect = false;
     connection_.dispatcher().post(
@@ -343,13 +337,13 @@ public:
 
   void setParented() {
     absl::MutexLock lock(&lock_);
+    ASSERT(!parented_);
     parented_ = true;
   }
 
 private:
   Network::Connection& connection_;
   absl::Mutex lock_;
-  Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
 };
@@ -361,7 +355,10 @@ using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
  */
 class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
-  virtual ~FakeConnectionBase() { ASSERT(initialized_); }
+  virtual ~FakeConnectionBase() {
+    absl::MutexLock lock(&lock_);
+    ASSERT(initialized_);
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
@@ -378,14 +375,10 @@ public:
   testing::AssertionResult
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  ABSL_MUST_USE_RESULT
-  virtual testing::AssertionResult initialize() {
+  virtual void initialize() {
+    absl::MutexLock lock(&lock_);
     initialized_ = true;
-    return testing::AssertionSuccess();
   }
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  enableHalfClose(bool enabled, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -396,9 +389,9 @@ protected:
         time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
-  bool initialized_{};
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
                       // guarded by annotations.
+  bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
   Event::TestTimeSystem& time_system_;
 };
@@ -425,6 +418,12 @@ public:
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
   // Should only be called for HTTP2
   void onGoAway(Http::GoAwayErrorCode code) override;
+
+  // Should only be called for HTTP2, sends a GOAWAY frame with NO_ERROR.
+  void encodeGoAway();
+
+  // Should only be called for HTTP2, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
+  void encodeProtocolError();
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -456,6 +455,7 @@ private:
   const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
@@ -468,6 +468,7 @@ public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
   using ValidatorFunction = const std::function<bool(const std::string&)>;
+  ~FakeRawConnection() override;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -489,17 +490,7 @@ public:
   testing::AssertionResult write(const std::string& data, bool end_stream = false,
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult initialize() override {
-    testing::AssertionResult result =
-        shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
-        });
-    if (!result) {
-      return result;
-    }
-    return FakeConnectionBase::initialize();
-  }
+  void initialize() override;
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
@@ -508,6 +499,12 @@ public:
     return [data_to_wait_for](const std::string& data) -> bool {
       return data.find(data_to_wait_for) != std::string::npos;
     };
+  }
+
+  // Creates a ValidatorFunction which returns true when data_to_wait_for is
+  // contains at least bytes_read bytes.
+  static ValidatorFunction waitForAtLeastBytes(uint32_t bytes) {
+    return [bytes](const std::string& data) -> bool { return data.size() >= bytes; };
   }
 
 private:
@@ -521,9 +518,19 @@ private:
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
+  std::weak_ptr<Network::ReadFilter> read_filter_;
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
+
+struct FakeUpstreamConfig {
+  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {}
+
+  Event::TestTimeSystem& time_system_;
+  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  bool enable_half_close_{};
+  bool udp_fake_upstream_{};
+};
 
 /**
  * Provides a fake upstream server for integration testing.
@@ -533,19 +540,23 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainFactory {
 public:
   // Creates a fake upstream bound to the specified unix domain socket path.
-  FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system);
+  FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
+
+  // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               const Network::Address::InstanceConstSharedPtr& address,
+               const FakeUpstreamConfig& config);
+
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-               FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-               bool enable_half_close = false, bool udp_fake_upstream = false);
+               const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
-  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system, bool enable_half_close = false);
+  FakeUpstream(uint32_t port, Network::Address::IpVersion version,
+               const FakeUpstreamConfig& config);
+
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-               FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system);
+               Network::Address::IpVersion version, const FakeUpstreamConfig& config);
   ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }
@@ -564,7 +575,9 @@ public:
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
+  Network::Address::InstanceConstSharedPtr localAddress() const {
+    return socket_->addressProvider().localAddress();
+  }
 
   // Wait for one of the upstreams to receive a connection
   ABSL_MUST_USE_RESULT
@@ -611,14 +624,20 @@ public:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
 
+  // Write into the outbound buffer of the network connection at the specified index.
+  // Note: that this write bypasses any processing by the upstream codec.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-               Network::SocketPtr&& connection, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system, bool enable_half_close);
+               Network::SocketPtr&& connection, const FakeUpstreamConfig& config);
 
   class FakeListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -628,7 +647,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
@@ -655,8 +674,9 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
-          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()) {}
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>(1)),
+          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
+          udp_listener_worker_router_(1), init_manager_(nullptr) {}
 
   private:
     // Network::ListenerConfig
@@ -679,6 +699,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      return udp_listener_worker_router_;
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -688,6 +711,7 @@ private:
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);
@@ -699,13 +723,18 @@ private:
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
+    Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
 
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
+  AssertionResult
+  runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;

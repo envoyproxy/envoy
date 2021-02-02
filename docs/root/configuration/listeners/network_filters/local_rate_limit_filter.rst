@@ -9,6 +9,9 @@ Local rate limit
 * This filter should be configured with the name *envoy.filters.network.local_ratelimit*.
 
 .. note::
+  The token bucket is shared across all workers, thus the rate limits are applied per Envoy process.
+
+.. note::
   Global rate limiting is also supported via the :ref:`global rate limit filter
   <config_network_filters_rate_limit>`.
 

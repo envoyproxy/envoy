@@ -86,7 +86,8 @@ message DnsTable {
   // This message defines a service selection record returned for a service query in a domain
   message DnsService {
     // The name of the service without the protocol or domain name
-    string service_name = 1;
+    string service_name = 1
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
 
     // The service protocol. This can be specified as a string or the numeric value of the protocol
     DnsServiceProtocol protocol = 2;

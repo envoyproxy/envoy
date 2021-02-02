@@ -68,7 +68,12 @@ enum class StatusCode : int {
   /**
    * Indicates a client (local) side error which should not happen.
    */
-  CodecClientError = 4
+  CodecClientError = 4,
+
+  /**
+   * Indicates that peer sent too many consecutive DATA frames with empty payload.
+   */
+  InboundFramesWithEmptyPayload = 5,
 };
 
 using Status = absl::Status;
@@ -88,6 +93,7 @@ Status codecProtocolError(absl::string_view message);
 Status bufferFloodError(absl::string_view message);
 Status prematureResponseError(absl::string_view message, Http::Code http_code);
 Status codecClientError(absl::string_view message);
+Status inboundFramesWithEmptyPayloadError();
 
 /**
  * Returns Envoy::StatusCode of the given status object.
@@ -102,6 +108,7 @@ ABSL_MUST_USE_RESULT bool isCodecProtocolError(const Status& status);
 ABSL_MUST_USE_RESULT bool isBufferFloodError(const Status& status);
 ABSL_MUST_USE_RESULT bool isPrematureResponseError(const Status& status);
 ABSL_MUST_USE_RESULT bool isCodecClientError(const Status& status);
+ABSL_MUST_USE_RESULT bool isInboundFramesWithEmptyPayloadError(const Status& status);
 
 /**
  * Returns Http::Code value of the PrematureResponseError status.

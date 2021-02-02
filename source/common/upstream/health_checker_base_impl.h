@@ -38,6 +38,23 @@ struct HealthCheckerStats {
 };
 
 /**
+ * HealthCheckerHash and HealthCheckerEqualTo are used to allow the HealthCheck proto to be used as
+ * a flat_hash_map key.
+ */
+struct HealthCheckerHash {
+  size_t operator()(const envoy::config::core::v3::HealthCheck& health_check) const {
+    return MessageUtil::hash(health_check);
+  }
+};
+
+struct HealthCheckerEqualTo {
+  bool operator()(const envoy::config::core::v3::HealthCheck& lhs,
+                  const envoy::config::core::v3::HealthCheck& rhs) const {
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
+  }
+};
+
+/**
  * Base implementation for all health checkers.
  */
 class HealthCheckerImplBase : public HealthChecker,
@@ -120,7 +137,7 @@ private:
         : health_checker_(health_checker), host_(host) {}
 
     // Upstream::HealthCheckHostMonitor
-    void setUnhealthy() override;
+    void setUnhealthy(UnhealthyType type) override;
 
     std::weak_ptr<HealthCheckerImplBase> health_checker_;
     std::weak_ptr<Host> host_;
@@ -137,7 +154,8 @@ private:
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
-  void setUnhealthyCrossThread(const HostSharedPtr& host);
+  void setUnhealthyCrossThread(const HostSharedPtr& host,
+                               HealthCheckHostMonitor::UnhealthyType type);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>
   initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
   static MetadataConstSharedPtr
@@ -148,6 +166,7 @@ private:
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
+  const std::chrono::milliseconds no_traffic_healthy_interval_;
   const std::chrono::milliseconds initial_jitter_;
   const std::chrono::milliseconds interval_jitter_;
   const uint32_t interval_jitter_percent_;

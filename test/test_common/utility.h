@@ -25,7 +25,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
@@ -439,13 +439,6 @@ public:
   }
 
   /**
-   * Returns the closest thing to a sensible "name" field for the given xDS resource.
-   * @param resource the resource to extract the name of.
-   * @return the resource's name.
-   */
-  static std::string xdsResourceName(const ProtobufWkt::Any& resource);
-
-  /**
    * Returns a "novel" IPv4 loopback address, if available.
    * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
    * platforms such as macOS, only 127.0.0.1 is available for IPv4 loopback.
@@ -652,6 +645,19 @@ public:
   }
 
   template <class MessageType>
+  static Config::DecodedResourcesWrapper decodeResources(std::vector<MessageType> resources,
+                                                         const std::string& name_field = "name") {
+    Config::DecodedResourcesWrapper decoded_resources;
+    for (const auto& resource : resources) {
+      auto owned_resource = std::make_unique<MessageType>(resource);
+      decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
+          std::move(owned_resource), MessageUtil::getStringField(resource, name_field), {}, ""));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <class MessageType>
   static Config::DecodedResourcesWrapper
   decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
@@ -804,8 +810,21 @@ namespace Http {
  * All of the inline header functions that just pass through to the child header map.
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
-public:                                                                                            \
   const HeaderEntry* name() const override { return header_map_->name(); }                         \
+  size_t remove##name() override {                                                                 \
+    const size_t headers_removed = header_map_->remove##name();                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+    return headers_removed;                                                                        \
+  }                                                                                                \
+  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }  \
+  void set##name(absl::string_view value) override {                                               \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+  }
+
+#define DEFINE_TEST_INLINE_STRING_HEADER_FUNCS(name)                                               \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     header_map_->append##name(data, delimiter);                                                    \
     header_map_->verifyByteSizeInternalForTest();                                                  \
@@ -813,21 +832,15 @@ public:                                                                         
   void setReference##name(absl::string_view value) override {                                      \
     header_map_->setReference##name(value);                                                        \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  void set##name(absl::string_view value) override {                                               \
-    header_map_->set##name(value);                                                                 \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
+  }
+
+#define DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS(name)                                              \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void set##name(uint64_t value) override {                                                        \
     header_map_->set##name(value);                                                                 \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  size_t remove##name() override {                                                                 \
-    const size_t headers_removed = header_map_->remove##name();                                    \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-    return headers_removed;                                                                        \
-  }                                                                                                \
-  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }
+  }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -851,6 +864,11 @@ public:
     HeaderMapImpl::copyFrom(*header_map_, rhs);
     header_map_->verifyByteSizeInternalForTest();
   }
+  void copyFrom(const TestHeaderMapImplBase& rhs) { copyFrom(*rhs.header_map_); }
+  void copyFrom(const HeaderMap& rhs) {
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
+  }
   TestHeaderMapImplBase& operator=(const TestHeaderMapImplBase& rhs) {
     if (this == &rhs) {
       return *this;
@@ -867,15 +885,16 @@ public:
   }
   std::string get_(const std::string& key) const { return get_(LowerCaseString(key)); }
   std::string get_(const LowerCaseString& key) const {
-    const HeaderEntry* header = get(key);
-    if (!header) {
+    // TODO(mattklein123): Possibly allow getting additional headers beyond the first.
+    auto headers = get(key);
+    if (headers.empty()) {
       return EMPTY_STRING;
     } else {
-      return std::string(header->value().getStringView());
+      return std::string(headers[0]->value().getStringView());
     }
   }
-  bool has(const std::string& key) const { return get(LowerCaseString(key)) != nullptr; }
-  bool has(const LowerCaseString& key) const { return get(key) != nullptr; }
+  bool has(const std::string& key) const { return !get(LowerCaseString(key)).empty(); }
+  bool has(const LowerCaseString& key) const { return !get(key).empty(); }
   size_t remove(const std::string& key) { return remove(LowerCaseString(key)); }
 
   // HeaderMap
@@ -921,7 +940,7 @@ public:
     header_map_->verifyByteSizeInternalForTest();
   }
   uint64_t byteSize() const override { return header_map_->byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override {
+  HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
   void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
@@ -990,8 +1009,10 @@ class TestRequestHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_REQ_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_REQ_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;
@@ -1001,9 +1022,12 @@ class TestResponseHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 class TestResponseTrailerMapImpl
@@ -1011,7 +1035,8 @@ class TestResponseTrailerMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's
@@ -1027,7 +1052,10 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 namespace Api {
 ApiPtr createApiForTest();
+ApiPtr createApiForTest(Filesystem::Instance& filesystem);
+ApiPtr createApiForTest(Random::RandomGenerator& random);
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random);
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <array>
 #include <atomic>
@@ -28,8 +30,10 @@ protected:
   ~HotRestartingBase();
 
   void initDomainSocketAddress(sockaddr_un* address);
-  sockaddr_un createDomainSocketAddress(uint64_t id, const std::string& role);
-  void bindDomainSocket(uint64_t id, const std::string& role);
+  sockaddr_un createDomainSocketAddress(uint64_t id, const std::string& role,
+                                        const std::string& socket_path, mode_t socket_mode);
+  void bindDomainSocket(uint64_t id, const std::string& role, const std::string& socket_path,
+                        mode_t socket_mode);
   int myDomainSocket() const { return my_domain_socket_; }
 
   // Protocol description:

@@ -49,12 +49,18 @@ public:
       const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
 
 protected:
   HeaderParser() = default;
 
 private:
-  std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;
+  struct HeadersToAddEntry {
+    HeaderFormatterPtr formatter_;
+    const std::string original_value_;
+  };
+
+  std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> headers_to_add_;
   std::vector<Http::LowerCaseString> headers_to_remove_;
 };
 

@@ -36,12 +36,15 @@ Envoy::ConnectionPool::MockCancellable* MockInstance::newConnectionImpl(Callback
   return &handles_.back();
 }
 
-void MockInstance::poolFailure(PoolFailureReason reason) {
+void MockInstance::poolFailure(PoolFailureReason reason, bool host_null) {
   Callbacks* cb = callbacks_.front();
   callbacks_.pop_front();
   handles_.pop_front();
-
-  cb->onPoolFailure(reason, host_);
+  if (host_null) {
+    cb->onPoolFailure(reason, nullptr);
+  } else {
+    cb->onPoolFailure(reason, host_);
+  }
 }
 
 void MockInstance::poolReady(Network::MockClientConnection& conn) {

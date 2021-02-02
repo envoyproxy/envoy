@@ -43,7 +43,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
+void HttpSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
@@ -53,14 +53,18 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
 
   Protobuf::RepeatedPtrField<std::string> resources_vector(resource_names.begin(),
                                                            resource_names.end());
+  // Sort to provide stable wire ordering.
+  std::sort(resources_vector.begin(), resources_vector.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
   initialize();
 }
 
 void HttpSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
   Protobuf::RepeatedPtrField<std::string> resources_vector(update_to_these_names.begin(),
                                                            update_to_these_names.end());
+  // Sort to provide stable wire ordering.
+  std::sort(resources_vector.begin(), resources_vector.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 
@@ -70,10 +74,9 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body() = std::make_unique<Buffer::OwnedImpl>(
-      VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
+  request.body().add(VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  request.headers().setContentLength(request.body()->length());
+  request.headers().setContentLength(request.body().length());
 }
 
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {

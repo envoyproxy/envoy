@@ -16,6 +16,7 @@
 #include "common/common/random_generator.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/router/context_impl.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
@@ -85,7 +86,6 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Random::RandomGenerator& random() override { return random_generator_; }
   Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
@@ -99,18 +99,18 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
+  Router::Context& routerContext() override { return router_context_; }
   ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
-  }
   void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -120,9 +120,10 @@ public:
   }
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
-                                        listenerManager(),
+  LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
+    return std::make_unique<LdsApiImpl>(lds_config, lds_resources_locator, clusterManager(),
+                                        initManager(), stats(), listenerManager(),
                                         messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
@@ -155,7 +156,7 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
+  WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -205,6 +206,7 @@ private:
   MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
 };

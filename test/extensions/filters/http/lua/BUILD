@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "lua_filter_test",
     srcs = ["lua_filter_test.cc"],
     extension_name = "envoy.filters.http.lua",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
@@ -36,8 +35,8 @@ envoy_extension_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
     extension_name = "envoy.filters.http.lua",
-    tags = ["fails_on_windows"],
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:wrappers_lib",
         "//test/extensions/filters/common/lua:lua_wrappers_lib",

@@ -33,7 +33,7 @@ VhdsSubscription::VhdsSubscription(
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-                   [this]() { subscription_->start({}); }),
+                   [this]() { subscription_->start({config_update_info_->routeConfigName()}); }),
       route_config_providers_(route_config_providers) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
@@ -47,11 +47,11 @@ VhdsSubscription::VhdsSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, true);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
-  subscription_->updateResourceInterest({with_route_config_name_prefix});
+  subscription_->requestOnDemandUpdate({with_route_config_name_prefix});
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

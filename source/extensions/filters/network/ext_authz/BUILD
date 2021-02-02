@@ -23,6 +23,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
@@ -39,6 +40,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
+        "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

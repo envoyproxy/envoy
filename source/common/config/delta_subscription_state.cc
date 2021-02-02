@@ -1,21 +1,40 @@
 #include "common/config/delta_subscription_state.h"
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/config/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info)
-    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info) {}
+                                               const LocalInfo::LocalInfo& local_info,
+                                               Event::Dispatcher& dispatcher)
+    // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
+    // empty resources as updates.
+    : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
+      ttl_(
+          [this](const auto& expired) {
+            Protobuf::RepeatedPtrField<std::string> removed_resources;
+            for (const auto& resource : expired) {
+              setResourceWaitingForServer(resource);
+              removed_resources.Add(std::string(resource));
+            }
 
-void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                                        const std::set<std::string>& cur_removed) {
+            watch_map_.onConfigUpdate({}, removed_resources, "");
+          },
+          dispatcher, dispatcher.timeSource()),
+      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      dispatcher_(dispatcher) {}
+
+void DeltaSubscriptionState::updateSubscriptionInterest(
+    const absl::flat_hash_set<std::string>& cur_added,
+    const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
     setResourceWaitingForServer(a);
     // If interest in a resource is removed-then-added (all before a discovery request
@@ -25,7 +44,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::stri
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    setLostInterestInResource(r);
+    removeResourceState(r);
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -56,14 +75,34 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   return ack;
 }
 
+bool DeltaSubscriptionState::isHeartbeatResponse(
+    const envoy::service::discovery::v3::Resource& resource) const {
+  if (!supports_heartbeats_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_heartbeats")) {
+    return false;
+  }
+  const auto itr = resource_state_.find(resource.name());
+  if (itr == resource_state_.end()) {
+    return false;
+  }
+
+  return !resource.has_resource() && !itr->second.waitingForServer() &&
+         resource.version() == itr->second.version();
+}
+
 void DeltaSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
     }
+    if (isHeartbeatResponse(resource)) {
+      continue;
+    }
+    non_heartbeat_resources.Add()->CopyFrom(resource);
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
       continue;
@@ -81,11 +120,17 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-  watch_map_.onConfigUpdate(message.resources(), message.removed_resources(),
-                            message.system_version_info());
-  for (const auto& resource : message.resources()) {
-    setResourceVersion(resource.name(), resource.version());
+
+  {
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    for (const auto& resource : message.resources()) {
+      addResourceState(resource);
+    }
   }
+
+  watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
+                            message.system_version_info());
+
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which
   // case saying nothing is fine, or the server will bring back something new, which we should
@@ -124,12 +169,12 @@ DeltaSubscriptionState::getNextRequestAckless() {
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const& [resource_name, resource_version] : resource_versions_) {
+    for (auto const& [resource_name, resource_state] : resource_state_) {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource_version.waitingForServer()) {
-        (*request.mutable_initial_resource_versions())[resource_name] = resource_version.version();
+      if (!resource_state.waitingForServer()) {
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
       // As mentioned above, fill resource_names_subscribe with everything, including names we
       // have yet to receive any resource for.
@@ -160,19 +205,26 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   return request;
 }
 
-void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,
-                                                const std::string& resource_version) {
-  resource_versions_[resource_name] = ResourceVersion(resource_version);
-  resource_names_.insert(resource_name);
+void DeltaSubscriptionState::addResourceState(
+    const envoy::service::discovery::v3::Resource& resource) {
+  if (resource.has_ttl()) {
+    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
+             resource.name());
+  } else {
+    ttl_.clear(resource.name());
+  }
+
+  resource_state_[resource.name()] = ResourceState(resource);
+  resource_names_.insert(resource.name());
 }
 
 void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& resource_name) {
-  resource_versions_[resource_name] = ResourceVersion();
+  resource_state_[resource_name] = ResourceState();
   resource_names_.insert(resource_name);
 }
 
-void DeltaSubscriptionState::setLostInterestInResource(const std::string& resource_name) {
-  resource_versions_.erase(resource_name);
+void DeltaSubscriptionState::removeResourceState(const std::string& resource_name) {
+  resource_state_.erase(resource_name);
   resource_names_.erase(resource_name);
 }
 

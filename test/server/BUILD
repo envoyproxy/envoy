@@ -60,6 +60,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -100,6 +101,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "filter_config_test",
+    srcs = ["filter_config_test.cc"],
+    deps = [
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
@@ -128,8 +139,6 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/api:api_lib",
@@ -138,6 +147,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:watchdog_config_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
@@ -259,6 +269,7 @@ envoy_cc_test(
         "//source/server:active_raw_udp_listener_config",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -269,11 +280,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = [
-        "nofips",
-        # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
-        "skip_on_windows",
-    ],
+    tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
@@ -374,11 +381,13 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
+        "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:hot_restart_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",

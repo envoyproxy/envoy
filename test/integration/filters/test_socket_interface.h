@@ -24,12 +24,13 @@ public:
   using WritevOverrideProc = std::function<WritevOverrideType>;
 
   TestIoSocketHandle(WritevOverrideProc writev_override_proc, os_fd_t fd = INVALID_SOCKET,
-                     bool socket_v6only = false)
-      : IoSocketHandleImpl(fd, socket_v6only), writev_override_(writev_override_proc) {}
+                     bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
+      : IoSocketHandleImpl(fd, socket_v6only, domain), writev_override_(writev_override_proc) {}
 
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  IoHandlePtr duplicate() override;
 
   const WritevOverrideProc writev_override_;
 };
@@ -57,7 +58,8 @@ public:
 
 private:
   // SocketInterfaceImpl
-  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only) const override;
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
+                         absl::optional<int> domain) const override;
 
   const TestIoSocketHandle::WritevOverrideProc writev_override_proc_;
 };

@@ -7,11 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/server_info.pb.h"
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/route/v3/route.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
@@ -19,7 +14,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -28,6 +23,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
@@ -42,7 +38,9 @@
 
 #include "server/admin/admin_filter.h"
 #include "server/admin/clusters_handler.h"
+#include "server/admin/config_dump_handler.h"
 #include "server/admin/config_tracker_impl.h"
+#include "server/admin/init_dump_handler.h"
 #include "server/admin/listeners_handler.h"
 #include "server/admin/logs_handler.h"
 #include "server/admin/profiling_handler.h"
@@ -137,6 +135,7 @@ public:
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
+  std::chrono::milliseconds requestHeadersTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
@@ -175,7 +174,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
-  bool shouldStripMatchingPort() const override { return false; }
+  Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
@@ -255,8 +254,9 @@ private:
    */
   struct NullOverloadManager : public OverloadManager {
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
+      NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
-
+      Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
 
@@ -264,14 +264,16 @@ private:
         : tls_(slot_allocator.allocateSlot()) {}
 
     void start() override {
-      tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        return std::make_shared<NullThreadLocalOverloadState>();
+      tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<NullThreadLocalOverloadState>(dispatcher);
       });
     }
 
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<NullThreadLocalOverloadState>();
     }
+
+    Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
@@ -282,38 +284,16 @@ private:
     ThreadLocal::SlotPtr tls_;
   };
 
-  /**
-   * Helper methods for the /config_dump url handler.
-   */
-  void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask, bool include_eds) const;
-  /**
-   * Add the config matching the passed resource to the passed config dump.
-   * @return absl::nullopt on success, else the Http::Code and an error message that should be added
-   * to the admin response.
-   */
-  absl::optional<std::pair<Http::Code, std::string>>
-  addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource, bool include_eds) const;
-
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
 
-  /**
-   * Helper methods for the /config_dump url handler to add endpoints config
-   */
-  void addLbEndpoint(const Upstream::HostSharedPtr& host,
-                     envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
-  ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
   /**
    * URL handlers.
    */
   Http::Code handlerAdminHome(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
-  Http::Code handlerConfigDump(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream&) const;
+
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
@@ -326,7 +306,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override {
@@ -347,7 +327,8 @@ private:
   public:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
-          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
+          stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
+          init_manager_(nullptr) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -369,6 +350,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -378,6 +362,7 @@ private:
       return empty_access_logs_;
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -388,6 +373,7 @@ private:
 
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -400,6 +386,10 @@ private:
     // Network::FilterChain
     const Network::TransportSocketFactory& transportSocketFactory() const override {
       return transport_socket_factory_;
+    }
+
+    std::chrono::milliseconds transportSocketConnectTimeout() const override {
+      return std::chrono::milliseconds::zero();
     }
 
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
@@ -424,6 +414,8 @@ private:
   NullRouteConfigProvider route_config_provider_;
   NullScopedRouteConfigProvider scoped_route_config_provider_;
   Server::ClustersHandler clusters_handler_;
+  Server::ConfigDumpHandler config_dump_handler_;
+  Server::InitDumpHandler init_dump_handler_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;

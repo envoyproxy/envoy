@@ -53,6 +53,8 @@ public:
    */
   virtual const Protobuf::Message& resource() const PURE;
 
+  virtual absl::optional<std::chrono::milliseconds> ttl() const PURE;
+
   /**
    * @return bool does the xDS discovery response have a set resource payload?
    */
@@ -146,7 +148,10 @@ public:
    * @param removed_resources names of resources that this fetch instructed to be removed.
    * @param system_version_info aggregate response data "version", for debugging.
    * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
-   *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
+   * @param use_namespace_matching if the resources should me matched on their namespaces, rather
+   * than unique names. This is used when a collection of resources (e.g. virtual hosts in VHDS) is
+   * being updated. Accepted changes have their version_info reflected in subsequent
+   * requests.
    */
   virtual void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
@@ -175,14 +180,20 @@ public:
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
    */
-  virtual void start(const std::set<std::string>& resource_names) PURE;
+  virtual void start(const absl::flat_hash_set<std::string>& resource_names) PURE;
 
   /**
    * Update the resources to fetch.
-   * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
-   * be passed to std::set_difference, which must be given sorted collections.
+   * @param resources vector of resource names to fetch.
    */
-  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+  virtual void
+  updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) PURE;
+
+  /**
+   * Creates a discovery request for resources.
+   * @param add_these_names resource ids for inclusion in the discovery request.
+   */
+  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;
@@ -190,7 +201,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
 /**
  * Per subscription stats. @see stats_macros.h
  */
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT)                                       \
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT, HISTOGRAM)                            \
   COUNTER(init_fetch_timeout)                                                                      \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
@@ -198,6 +209,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)                                                                      \
+  HISTOGRAM(update_duration, Milliseconds)                                                         \
   TEXT_READOUT(version_text)
 
 /**
@@ -205,7 +217,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
  */
 struct SubscriptionStats {
   ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
-                         GENERATE_TEXT_READOUT_STRUCT)
+                         GENERATE_TEXT_READOUT_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 } // namespace Config

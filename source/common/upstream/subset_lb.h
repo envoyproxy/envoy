@@ -37,6 +37,8 @@ public:
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  // TODO(alyssawilk) implement for non-metadata match.
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
 
 private:
   using HostPredicate = std::function<bool(const Host&)>;

@@ -8,29 +8,29 @@ namespace Envoy {
 namespace ConnectionPool {
 
 /**
- * Controls the behavior of a canceled request.
+ * Controls the behavior of a canceled stream.
  */
 enum class CancelPolicy {
-  // By default, canceled requests allow a pending connection to complete and become
-  // available for a future request.
+  // By default, canceled streams allow a pending connection to complete and become
+  // available for a future stream.
   Default,
-  // When a request is canceled, closes a pending connection if there will still be sufficient
-  // connections to serve pending requests. CloseExcess is largely useful for callers that never
+  // When a stream is canceled, closes a pending connection if there will still be sufficient
+  // connections to serve pending streams. CloseExcess is largely useful for callers that never
   // re-use connections (e.g. by closing rather than releasing connections). Using CloseExcess in
   // this situation guarantees that no idle connections will be held open by the conn pool awaiting
-  // a connection request.
+  // a connection stream.
   CloseExcess,
 };
 
 /**
- * Handle that allows a pending connection or stream request to be canceled before it is completed.
+ * Handle that allows a pending connection or stream to be canceled before it is completed.
  */
 class Cancellable {
 public:
   virtual ~Cancellable() = default;
 
   /**
-   * Cancel the pending connection or stream request.
+   * Cancel the pending connection or stream.
    * @param cancel_policy a CancelPolicy that controls the behavior of this cancellation.
    */
   virtual void cancel(CancelPolicy cancel_policy) PURE;
@@ -44,14 +44,14 @@ public:
   virtual ~Instance() = default;
 
   /**
-   * Called when a connection pool has been drained of pending requests, busy connections, and
+   * Called when a connection pool has been drained of pending streams, busy connections, and
    * ready connections.
    */
   using DrainedCb = std::function<void()>;
 
   /**
-   * Register a callback that gets called when the connection pool is fully drained. No actual
-   * draining is done. The owner of the connection pool is responsible for not creating any
+   * Register a callback that gets called when the connection pool is fully drained and kicks
+   * off a drain. The owner of the connection pool is responsible for not creating any
    * new streams.
    */
   virtual void addDrainedCallback(DrainedCb cb) PURE;
@@ -68,6 +68,14 @@ public:
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+
+  /**
+   * Creates an upstream connection, if existing connections do not meet both current and
+   * anticipated load.
+   *
+   * @return true if a connection was preconnected, false otherwise.
+   */
+  virtual bool maybePreconnect(float preconnect_ratio) PURE;
 };
 
 enum class PoolFailureReason {

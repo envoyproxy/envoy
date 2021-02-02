@@ -117,6 +117,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "interval_value",
+    hdrs = ["interval_value.h"],
+)
+
+envoy_cc_library(
     name = "linked_object",
     hdrs = ["linked_object.h"],
     deps = [":assert_lib"],
@@ -315,6 +320,7 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
         ":non_copyable",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -405,6 +411,6 @@ envoy_cc_library(
     name = "statusor_lib",
     hdrs = ["statusor.h"],
     deps = [
-        "//third_party/statusor:statusor_lib",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

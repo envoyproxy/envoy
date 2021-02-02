@@ -58,7 +58,7 @@ enum ProtocolType {
   TWITTER = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy";
@@ -72,7 +72,7 @@ message ThriftProxy {
   ProtocolType protocol = 3 [(validate.rules).enum = {defined_only: true}];
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
   RouteConfiguration route_config = 4;
@@ -82,6 +82,12 @@ message ThriftProxy {
   // compatibility, if no thrift_filters are specified, a default Thrift router filter
   // (`envoy.filters.thrift.router`) is used.
   repeated ThriftFilter thrift_filters = 5;
+
+  // If set to true, Envoy will try to skip decode data after metadata in the Thrift message.
+  // This mode will only work if the upstream and downstream protocols are the same and the transport
+  // is the same, the transport type is framed and the protocol is not Twitter. Otherwise Envoy will
+  // fallback to decode the data.
+  bool payload_passthrough = 6;
 }
 
 // ThriftFilter configures a Thrift filter.
@@ -99,7 +105,7 @@ message ThriftFilter {
   // [#comment:TODO(zuercher): Auto generate the following list]
   // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
   // * :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit>`
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.

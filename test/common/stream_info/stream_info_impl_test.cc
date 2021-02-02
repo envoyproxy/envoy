@@ -39,7 +39,7 @@ protected:
 
 TEST_F(StreamInfoImplTest, TimingTest) {
   MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
-  StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   Envoy::StreamInfo::UpstreamTiming upstream_timing;
   MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
 
@@ -87,7 +87,7 @@ TEST_F(StreamInfoImplTest, TimingTest) {
 }
 
 TEST_F(StreamInfoImplTest, BytesTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
   const uint64_t bytes_sent = 7;
   const uint64_t bytes_received = 12;
@@ -113,7 +113,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
                                                    FaultInjected,
                                                    RateLimited};
 
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
   EXPECT_FALSE(stream_info.hasAnyResponseFlag());
   EXPECT_FALSE(stream_info.intersectResponseFlags(0));
@@ -128,7 +128,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
   EXPECT_EQ(0xFFF, stream_info.responseFlags());
 
-  StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   stream_info2.setResponseFlag(FailedLocalHealthCheck);
 
   EXPECT_TRUE(stream_info2.intersectResponseFlags(FailedLocalHealthCheck));
@@ -136,7 +136,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
-    StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+    StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
 
@@ -152,6 +152,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
     ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
     EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
+
+    EXPECT_FALSE(stream_info.connectionTerminationDetails().has_value());
+    stream_info.setConnectionTerminationDetails("access_denied");
+    ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+    EXPECT_EQ("access_denied", stream_info.connectionTerminationDetails().value());
 
     EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
@@ -190,7 +195,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   stream_info.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
@@ -219,7 +224,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 }
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   std::string prefix = "";
 
   for (int i = 0; i < 7; ++i) {
@@ -233,7 +238,7 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
 }
 
 TEST_F(StreamInfoImplTest, RequestHeadersTest) {
-  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
   Http::TestRequestHeaderMapImpl headers;
@@ -242,7 +247,7 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
 }
 
 TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
-  StreamInfoImpl stream_info(test_time_.timeSystem());
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   EXPECT_TRUE(stream_info.getRequestIDExtension());
 
   auto rid_extension = stream_info.getRequestIDExtension();
@@ -257,6 +262,22 @@ TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   EXPECT_EQ(out, 123);
   rid_extension->setTraceStatus(request_headers, Http::TraceStatus::Forced);
   EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
+}
+
+TEST_F(StreamInfoImplTest, ConnectionID) {
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  EXPECT_FALSE(stream_info.connectionID().has_value());
+  uint64_t id = 123;
+  stream_info.setConnectionID(id);
+  EXPECT_EQ(id, stream_info.connectionID());
+}
+
+TEST_F(StreamInfoImplTest, Details) {
+  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
+  EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
+  stream_info.setResponseCodeDetails("two words");
+  ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+  EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
 }
 
 } // namespace

@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -20,7 +21,7 @@ public:
       R"EOF(
 name: fault
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
   response_rate_limit:
     fixed_limit:
       limit_kbps: 1
@@ -32,7 +33,7 @@ typed_config:
       R"EOF(
 name: fault
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
   abort:
     header_abort: {}
     percentage:
@@ -72,7 +73,7 @@ TEST_P(FaultIntegrationTestAllProtocols, NoFault) {
       R"EOF(
 name: fault
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
 )EOF";
 
   initializeFilter(filter_config);

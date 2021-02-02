@@ -23,6 +23,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -44,7 +45,7 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
   return access_log;
 }
 
-class AccessLogImplTest : public testing::Test {
+class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AccessLogImplTest() : file_(new MockAccessLogFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
@@ -69,7 +70,7 @@ TEST_F(AccessLogImplTest, LogMoreData) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -92,7 +93,7 @@ TEST_F(AccessLogImplTest, DownstreamDisconnect) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -101,7 +102,8 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
 
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
+  stream_info_.upstream_host_ =
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime());
   stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -114,9 +116,11 @@ TEST_F(AccessLogImplTest, RouteName) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
-  format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+  log_format:
+    text_format_source:
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -137,11 +141,45 @@ typed_config:
       output_);
 }
 
+TEST_F(AccessLogImplTest, HeadersBytes) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "%REQUEST_HEADERS_BYTES% %RESPONSE_HEADERS_BYTES% %RESPONSE_TRAILERS_BYTES%"
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  request_headers_.addCopy("request_header_key", "request_header_val");
+  response_headers_.addCopy("response_header_key", "response_header_val");
+  response_trailers_.addCopy("response_trailer_key", "response_trailer_val");
+
+  // request headers:
+  // :method: GET
+  // :path: /
+  // request_header_key: request_header_val
+  //
+  // response headers:
+  // response_header_key: response_header_val
+  //
+  // response trailers:
+  // response_trailer_key: response_trailer_val
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+  EXPECT_EQ(output_, "52 38 40");
+}
+
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -160,7 +198,7 @@ TEST_F(AccessLogImplTest, NoFilter) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -175,12 +213,13 @@ typed_config:
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
+  stream_info_.upstream_host_ =
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime());
 
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -212,7 +251,7 @@ filter:
             default_value: 1000000
             runtime_key: key_b
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -250,7 +289,7 @@ filter:
               default_value: 1000000
               runtime_key: key_c
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -275,7 +314,7 @@ filter:
   runtime_filter:
     runtime_key: access_log.test_key
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -283,13 +322,13 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value is taken from random generator.
-  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 42, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 43, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
@@ -318,7 +357,7 @@ filter:
       numerator: 5
       denominator: TEN_THOUSAND
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -326,13 +365,13 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value is taken from random generator.
-  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 10000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
@@ -362,7 +401,7 @@ filter:
       denominator: MILLION
     use_independent_randomness: true
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -370,13 +409,13 @@ typed_config:
 
   // Value should not be taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
-  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 1000000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(43));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 1000000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
@@ -389,7 +428,7 @@ TEST_F(AccessLogImplTest, PathRewrite) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -408,7 +447,7 @@ name: accesslog
 filter:
   not_health_check_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -427,7 +466,7 @@ name: accesslog
 filter:
   not_health_check_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: "/dev/null"
   )EOF";
 
@@ -447,7 +486,7 @@ name: accesslog
 filter:
   traceable_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -484,7 +523,7 @@ name: accesslog
 filter:
   or_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
     )EOF";
 
@@ -498,7 +537,7 @@ name: accesslog
 filter:
   and_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
     )EOF";
 
@@ -521,7 +560,7 @@ filter:
               runtime_key: key
       - not_health_check_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -557,7 +596,7 @@ filter:
             runtime_key: key
     - not_health_check_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -600,7 +639,7 @@ filter:
                 runtime_key: key_b
     - not_health_check_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -700,7 +739,7 @@ filter:
         default_value: 499
         runtime_key: hello
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -725,7 +764,7 @@ filter:
     header:
       name: test-header
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -749,7 +788,7 @@ filter:
       exact_match: exact-match-value
 
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -779,7 +818,7 @@ filter:
         google_re2: {}
         regex: "\\d{3}"
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -814,7 +853,7 @@ filter:
         start: -10
         end: 0
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -854,7 +893,7 @@ name: accesslog
 filter:
   response_flag_filter: {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -876,7 +915,7 @@ filter:
     flags:
       - UO
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -903,7 +942,7 @@ filter:
       - UO
       - RL
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -949,12 +988,13 @@ filter:
       - UMSDR
       - RFCF
       - NFCF
+      - DT
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x200000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -979,7 +1019,8 @@ typed_config:
       StreamInfo::ResponseFlag::DownstreamProtocolError,
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
-      StreamInfo::ResponseFlag::NoFilterConfigFound};
+      StreamInfo::ResponseFlag::NoFilterConfigFound,
+      StreamInfo::ResponseFlag::DurationTimeout};
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
@@ -999,7 +1040,7 @@ filter:
     flags:
       - UnsupportedFlag
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1011,11 +1052,12 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
+      "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
+      "\"/dev/null\"\n  "
       "}\n}\n");
 }
 
@@ -1027,7 +1069,7 @@ filter:
     flags:
       - UnsupportedFlag
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1039,11 +1081,12 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
+      "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
+      "\"/dev/null\"\n  "
       "}\n}\n");
 }
 
@@ -1051,9 +1094,11 @@ TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
-  format: "%GRPC_STATUS%\n"
+  log_format:
+    text_format_source:
+      inline_string: "%GRPC_STATUS%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1090,7 +1135,7 @@ filter:
     statuses:
       - {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
 )EOF";
 
@@ -1121,12 +1166,12 @@ filter:
     statuses:
       - NOT_A_VALID_CODE
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-                          EnvoyException, ".*\"NOT_A_VALID_CODE\" for type TYPE_ENUM.*");
+                          EnvoyException, "NOT_A_VALID_CODE");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {
@@ -1137,7 +1182,7 @@ filter:
     statuses:
       - OK
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1158,7 +1203,7 @@ filter:
     statuses:
       - {}
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
 )EOF";
 
@@ -1190,7 +1235,7 @@ filter:
     statuses:
       - UNKNOWN
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1210,7 +1255,7 @@ filter:
     statuses:
       - OK
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1235,7 +1280,7 @@ filter:
     statuses:
       - OK
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1256,7 +1301,7 @@ filter:
     statuses:
       - OK
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1284,7 +1329,7 @@ filter:
         bool_match: true
 
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1302,7 +1347,7 @@ typed_config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
   fields_c["c"].set_bool_value(false);
@@ -1320,7 +1365,7 @@ filter:
   metadata_filter:
     match_if_key_not_found: false
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1349,7 +1394,7 @@ filter:
         bool_match: true
 
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1367,7 +1412,7 @@ filter:
       value: false
 
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1388,7 +1433,7 @@ typed_config:
 
   const InstanceSharedPtr default_true_log =
       AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_true_yaml), context_);
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
 
   default_true_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }
@@ -1424,11 +1469,11 @@ filter:
   extension_filter:
     name: test_header_filter
     typed_config:
-      "@type": type.googleapis.com/envoy.config.filter.accesslog.v2.HeaderFilter
+      "@type": type.googleapis.com/envoy.config.accesslog.v3.HeaderFilter
       header:
         name: test-header
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1505,7 +1550,7 @@ filter:
       value:
         rate: 5
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1533,7 +1578,7 @@ filter:
       value:
         foo: bar
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
@@ -1548,7 +1593,7 @@ filter:
   extension_filter:
     name: bar
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
     )EOF";
 

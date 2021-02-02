@@ -13,8 +13,7 @@ namespace PostgresProxy {
 
 PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
                                            Stats::Scope& scope)
-    : stat_prefix_{stat_prefix},
-      enable_sql_parsing_(enable_sql_parsing), scope_{scope}, stats_{generateStats(stat_prefix,
+    : enable_sql_parsing_(enable_sql_parsing), scope_{scope}, stats_{generateStats(stat_prefix,
                                                                                    scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
@@ -93,7 +92,7 @@ void PostgresFilter::incTransactionsCommit() {
 }
 
 void PostgresFilter::incTransactionsRollback() {
-  if (!decoder_->getSession().inTransaction()) {
+  if (decoder_->getSession().inTransaction()) {
     config_->stats_.transactions_rollback_.inc();
   }
 }

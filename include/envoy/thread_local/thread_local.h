@@ -4,21 +4,15 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/thread_local/thread_local_object.h"
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace ThreadLocal {
-
-/**
- * All objects that are stored via the ThreadLocal interface must derive from this type.
- */
-class ThreadLocalObject {
-public:
-  virtual ~ThreadLocalObject() = default;
-};
-
-using ThreadLocalObjectSharedPtr = std::shared_ptr<ThreadLocalObject>;
 
 /**
  * An individual allocated TLS slot. When the slot is destroyed the stored thread local will
@@ -55,40 +49,34 @@ public:
   }
 
   /**
-   * Run a callback on all registered threads.
-   * @param cb supplies the callback to run.
-   */
-  virtual void runOnAllThreads(Event::PostCb cb) PURE;
-
-  /**
-   * Run a callback on all registered threads with a barrier. A shutdown initiated during the
-   * running of the PostCBs may prevent all_threads_complete_cb from being called.
-   * @param cb supplies the callback to run on each thread.
-   * @param all_threads_complete_cb supplies the callback to run on main thread after cb has
-   * been run on all registered threads.
-   */
-  virtual void runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) PURE;
-
-  /**
    * Set thread local data on all threads previously registered via registerThread().
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
    *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
    *                     the same data across all threads or to share different data on each thread.
+   *
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner, as the owner
+   * may be destructed in main thread before the update_cb gets called in a worker thread.
    */
   using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
   virtual void set(InitializeCb cb) PURE;
 
+protected:
+  template <class T> friend class TypedSlot;
+
   /**
-   * UpdateCb takes the current stored data, and returns an updated/new version data.
-   * TLS will run the callback and replace the stored data with the returned value *in each thread*.
+   * UpdateCb takes is passed a shared point to the current stored data. Use of
+   * this API is deprecated; please use TypedSlot::runOnAllThreads instead.
    *
-   * NOTE: The update callback is not supposed to capture the Slot, or its owner. As the owner may
-   * be destructed in main thread before the update_cb gets called in a worker thread.
+   * NOTE: The update callback is not supposed to capture the Slot, or its
+   * owner, as the owner may be destructed in main thread before the update_cb
+   * gets called in a worker thread.
    **/
-  using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
+  using UpdateCb = std::function<void(ThreadLocalObjectSharedPtr)>;
+
+  // Callers must use the TypedSlot API, below.
   virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
-  virtual void runOnAllThreads(const UpdateCb& update_cb, Event::PostCb complete_cb) PURE;
+  virtual void runOnAllThreads(const UpdateCb& update_cb, const Event::PostCb& complete_cb) PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;
@@ -105,6 +93,106 @@ public:
    */
   virtual SlotPtr allocateSlot() PURE;
 };
+
+// Provides a typesafe API for slots. The slot data must be derived from
+// ThreadLocalObject. If there is no slot data, you can instantiated TypedSlot
+// with the default type param: TypedSlot<> tls_;
+//
+// TODO(jmarantz): Rename the Slot class to something like RawSlot, where the
+// only reference is from TypedSlot, which we can then rename to Slot.
+template <class T> class TypedSlot {
+public:
+  /**
+   * Helper method to create a unique_ptr for a typed slot. This helper
+   * reduces some verbose parameterization at call-sites.
+   *
+   * @param allocator factory to allocate untyped Slot objects.
+   * @return a TypedSlotPtr<T> (the type is defined below).
+   */
+  static std::unique_ptr<TypedSlot> makeUnique(SlotAllocator& allocator) {
+    return std::make_unique<TypedSlot>(allocator);
+  }
+
+  explicit TypedSlot(SlotAllocator& allocator) : slot_(allocator.allocateSlot()) {}
+
+  /**
+   * Returns if there is thread local data for this thread.
+   *
+   * This should return true for Envoy worker threads and false for threads which do not have thread
+   * local storage allocated.
+   *
+   * @return true if registerThread has been called for this thread, false otherwise.
+   */
+  bool currentThreadRegistered() { return slot_->currentThreadRegistered(); }
+
+  /**
+   * Set thread local data on all threads previously registered via registerThread().
+   * @param initializeCb supplies the functor that will be called *on each thread*. The functor
+   *                     returns the thread local object which is then stored. The storage is via
+   *                     a shared_ptr. Thus, this is a flexible mechanism that can be used to share
+   *                     the same data across all threads or to share different data on each thread.
+   *
+   * NOTE: The initialize callback is not supposed to capture the Slot, or its owner, as the owner
+   * may be destructed in main thread before the update_cb gets called in a worker thread.
+   */
+  using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher& dispatcher)>;
+  void set(InitializeCb cb) { slot_->set(cb); }
+
+  /**
+   * @return an optional reference to the thread local object.
+   */
+  OptRef<T> get() { return getOpt(slot_->get()); }
+  const OptRef<T> get() const { return getOpt(slot_->get()); }
+
+  /**
+   * Helper function to call methods on T. The caller is responsible
+   * for ensuring that get().has_value() is true.
+   *
+   * @return a pointer to the thread local object.
+   */
+  T* operator->() { return &(slot_->getTyped<T>()); }
+  const T* operator->() const { return &(slot_->getTyped<T>()); }
+
+  /**
+   * Helper function to get access to a T&. The caller is responsible for
+   * ensuring that get().has_value() is true.
+   *
+   * @return a reference to the thread local object.
+   */
+  T& operator*() { return slot_->getTyped<T>(); }
+  const T& operator*() const { return slot_->getTyped<T>(); }
+
+  /**
+   * UpdateCb is passed a mutable pointer to the current stored data. Callers
+   * can assume that the passed-in OptRef has a value if they have called set(),
+   * yielding a non-null shared_ptr, prior to runOnAllThreads().
+   *
+   * NOTE: The update callback is not supposed to capture the TypedSlot, or its
+   * owner, as the owner may be destructed in main thread before the update_cb
+   * gets called in a worker thread.
+   */
+  using UpdateCb = std::function<void(OptRef<T> obj)>;
+  void runOnAllThreads(const UpdateCb& cb) { slot_->runOnAllThreads(makeSlotUpdateCb(cb)); }
+  void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
+    slot_->runOnAllThreads(makeSlotUpdateCb(cb), complete_cb);
+  }
+
+private:
+  static OptRef<T> getOpt(ThreadLocalObjectSharedPtr obj) {
+    if (obj) {
+      return OptRef<T>(obj->asType<T>());
+    }
+    return OptRef<T>();
+  }
+
+  Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
+    return [cb](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
+  }
+
+  const SlotPtr slot_;
+};
+
+template <class T = ThreadLocalObject> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
 
 /**
  * Interface for getting and setting thread local data as well as registering a thread

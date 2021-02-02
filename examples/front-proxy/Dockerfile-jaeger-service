@@ -16,4 +16,4 @@ RUN echo "4a7d17d4724ee890490bcd6cfdedb12a02316a3d33214348d30979abd201f1ca  /usr
          && mv /usr/local/lib/libjaegertracing.so.0.4.2 /usr/local/lib/libjaegertracing_plugin.so \
          && sha256sum -c /tmp/checksum \
          && rm /tmp/checksum
-ENTRYPOINT /usr/local/bin/start_service.sh
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/start_service.sh"]

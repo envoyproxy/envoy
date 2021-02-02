@@ -1,0 +1,1 @@
+FROM envoyproxy/envoy-google-vrp-dev:latest

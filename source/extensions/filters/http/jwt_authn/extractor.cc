@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -22,6 +23,36 @@ namespace JwtAuthn {
 namespace {
 
 /**
+ * Check Issuer specified in Provider
+ */
+class JwtIssuerChecker {
+public:
+  // add a specified issuer from JwtProvider.
+  void add(const std::string& issuer) {
+    // If a specified issuer is empty, it means to allow all issuers.
+    if (issuer.empty()) {
+      allow_all_ = true;
+    } else {
+      specified_issuers_.insert(issuer);
+    }
+  }
+
+  // check if a jwt issuer is allowed
+  bool check(const std::string& jwt_issuer) const {
+    if (allow_all_) {
+      return true;
+    }
+    return specified_issuers_.find(jwt_issuer) != specified_issuers_.end();
+  }
+
+private:
+  // If true, all issuers are ok
+  bool allow_all_{false};
+  // Only these specified issuers are allowed.
+  absl::flat_hash_set<std::string> specified_issuers_;
+};
+
+/**
  * Constant values
  */
 struct JwtConstValueStruct {
@@ -36,30 +67,30 @@ using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
 public:
-  JwtLocationBase(const std::string& token, const absl::node_hash_set<std::string>& issuers)
-      : token_(token), specified_issuers_(issuers) {}
+  JwtLocationBase(const std::string& token, const JwtIssuerChecker& issuer_checker)
+      : token_(token), issuer_checker_(issuer_checker) {}
 
   // Get the token string
   const std::string& token() const override { return token_; }
 
   // Check if an issuer has specified the location.
-  bool isIssuerSpecified(const std::string& issuer) const override {
-    return specified_issuers_.find(issuer) != specified_issuers_.end();
+  bool isIssuerAllowed(const std::string& jwt_issuer) const override {
+    return issuer_checker_.check(jwt_issuer);
   }
 
 private:
   // Extracted token.
   const std::string token_;
-  // Stored issuers specified the location.
-  const absl::node_hash_set<std::string>& specified_issuers_;
+  // Issuer checker
+  const JwtIssuerChecker& issuer_checker_;
 };
 
 // The JwtLocation for header extraction.
 class JwtHeaderLocation : public JwtLocationBase {
 public:
-  JwtHeaderLocation(const std::string& token, const absl::node_hash_set<std::string>& issuers,
+  JwtHeaderLocation(const std::string& token, const JwtIssuerChecker& issuer_checker,
                     const LowerCaseString& header)
-      : JwtLocationBase(token, issuers), header_(header) {}
+      : JwtLocationBase(token, issuer_checker), header_(header) {}
 
   void removeJwt(Http::HeaderMap& headers) const override { headers.remove(header_); }
 
@@ -71,9 +102,9 @@ private:
 // The JwtLocation for param extraction.
 class JwtParamLocation : public JwtLocationBase {
 public:
-  JwtParamLocation(const std::string& token, const absl::node_hash_set<std::string>& issuers,
+  JwtParamLocation(const std::string& token, const JwtIssuerChecker& issuer_checker,
                    const std::string&)
-      : JwtLocationBase(token, issuers) {}
+      : JwtLocationBase(token, issuer_checker) {}
 
   void removeJwt(Http::HeaderMap&) const override {
     // TODO(qiwzhang): remove JWT from parameter.
@@ -119,7 +150,7 @@ private:
     // The value prefix. e.g. for "Bearer <token>", the value_prefix is "Bearer ".
     std::string value_prefix_;
     // Issuers that specified this header.
-    absl::node_hash_set<std::string> specified_issuers_;
+    JwtIssuerChecker issuer_checker_;
   };
   using HeaderLocationSpecPtr = std::unique_ptr<HeaderLocationSpec>;
   // The map of (header + value_prefix) to HeaderLocationSpecPtr
@@ -128,7 +159,7 @@ private:
   // ParamMap value type to store issuers that specified this header.
   struct ParamLocationSpec {
     // Issuers that specified this param.
-    absl::node_hash_set<std::string> specified_issuers_;
+    JwtIssuerChecker issuer_checker_;
   };
   // The map of a parameter key to set of issuers specified the parameter
   std::map<std::string, ParamLocationSpec> param_locations_;
@@ -171,12 +202,12 @@ void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseSt
   if (!header_location_spec) {
     header_location_spec = std::make_unique<HeaderLocationSpec>(header_name, value_prefix);
   }
-  header_location_spec->specified_issuers_.insert(issuer);
+  header_location_spec->issuer_checker_.add(issuer);
 }
 
 void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::string& param) {
   auto& param_location_spec = param_locations_[param];
-  param_location_spec.specified_issuers_.insert(issuer);
+  param_location_spec.issuer_checker_.add(issuer);
 }
 
 std::vector<JwtLocationConstPtr>
@@ -187,9 +218,10 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
     ENVOY_LOG(debug, "extract {}", location_it.first);
-    const Http::HeaderEntry* entry = headers.get(location_spec->header_);
-    if (entry) {
-      auto value_str = entry->value().getStringView();
+    const auto result =
+        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
+    if (result.result().has_value()) {
+      auto value_str = result.result().value();
       if (!location_spec->value_prefix_.empty()) {
         const auto pos = value_str.find(location_spec->value_prefix_);
         if (pos == absl::string_view::npos) {
@@ -199,7 +231,7 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
         value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
       }
       tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-          std::string(value_str), location_spec->specified_issuers_, location_spec->header_));
+          std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
     }
   }
 
@@ -216,7 +248,7 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
     const auto& it = params.find(param_key);
     if (it != params.end()) {
       tokens.push_back(std::make_unique<const JwtParamLocation>(
-          it->second, location_spec.specified_issuers_, param_key));
+          it->second, location_spec.issuer_checker_, param_key));
     }
   }
   return tokens;

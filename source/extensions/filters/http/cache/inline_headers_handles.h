@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/http/header_map.h"
+
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -7,6 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+// Request headers inline handles
 inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
@@ -40,6 +43,12 @@ inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::
 
 inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     etag_handle(Http::CustomHeaders::get().Etag);
+
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    age_handle(Http::Headers::get().Age);
+
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    expires_handle(Http::Headers::get().Expires);
 
 } // namespace Cache
 } // namespace HttpFilters

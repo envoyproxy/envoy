@@ -37,7 +37,7 @@ message DnsCacheConfig {
   // configurations with the same name *must* otherwise have the same settings when referenced
   // from different configuration components. Configuration will fail to load if this is not
   // the case.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The DNS lookup family to use during resolution.
   //
@@ -92,11 +92,13 @@ message DnsCacheConfig {
   config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 
   // The config of circuit breakers for resolver. It provides a configurable threshold.
-  // If `envoy.reloadable_features.enable_dns_cache_circuit_breakers` is enabled,
-  // envoy will use dns cache circuit breakers with default settings even if this value is not set.
+  // Envoy will use dns cache circuit breakers with default settings even if this value is not set.
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 
   // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
+  // Setting this value causes failure if the
+  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
+  // server startup. Apple' API only uses UDP for DNS resolution.
   bool use_tcp_for_dns_lookups = 8;
 }

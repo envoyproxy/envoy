@@ -40,8 +40,7 @@ public:
   void initialize(const std::string& yaml) {
     config_ = createConfig(yaml);
     client_ = std::make_unique<RawHttpClientImpl>(cm_, config_);
-    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
-        .WillByDefault(ReturnRef(async_client_));
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(async_client_));
   }
 
   ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING, uint32_t timeout = 250,
@@ -96,6 +95,7 @@ public:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
 
+    cm_.initializeThreadLocalClusters({"ext_authz"});
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
@@ -261,22 +261,22 @@ TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
                    {regexFood.get(), "food"},
                    {regexFool.get(), "fool"}});
 
-  EXPECT_EQ(message_ptr->headers().get(Http::Headers::get().ContentType), nullptr);
-  const auto* x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
-  ASSERT_NE(x_squash, nullptr);
-  EXPECT_EQ(x_squash->value().getStringView(), "foo");
+  EXPECT_TRUE(message_ptr->headers().get(Http::Headers::get().ContentType).empty());
+  const auto x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
+  ASSERT_FALSE(x_squash.empty());
+  EXPECT_EQ(x_squash[0]->value().getStringView(), "foo");
 
-  const auto* x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
-  ASSERT_NE(x_content_type, nullptr);
-  EXPECT_EQ(x_content_type->value().getStringView(), "foobar");
+  const auto x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
+  ASSERT_FALSE(x_content_type.empty());
+  EXPECT_EQ(x_content_type[0]->value().getStringView(), "foobar");
 
-  const auto* food = message_ptr->headers().get(regexFood);
-  ASSERT_NE(food, nullptr);
-  EXPECT_EQ(food->value().getStringView(), "food");
+  const auto food = message_ptr->headers().get(regexFood);
+  ASSERT_FALSE(food.empty());
+  EXPECT_EQ(food[0]->value().getStringView(), "food");
 
-  const auto* fool = message_ptr->headers().get(regexFool);
-  ASSERT_NE(fool, nullptr);
-  EXPECT_EQ(fool->value().getStringView(), "fool");
+  const auto fool = message_ptr->headers().get(regexFool);
+  ASSERT_FALSE(fool.empty());
+  EXPECT_EQ(fool[0]->value().getStringView(), "fool");
 }
 
 // Verify client response when authorization server returns a 200 OK.
@@ -387,6 +387,32 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   client_->onSuccess(async_request_, std::move(message_response));
 }
 
+// Verify headers present in x-envoy-auth-headers-to-remove make it into the
+// Response correctly.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // When we call onSuccess() at the bottom of the test we expect that all the
+  // headers-to-remove in that http response to have been correctly extracted
+  // and inserted into the authz Response just below.
+  Response authz_response;
+  authz_response.status = CheckStatus::OK;
+  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me"});
+  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-too"});
+  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-also"});
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+
+  const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
+      {":status", "200", false},
+      {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ", false},
+      {"x-envoy-auth-headers-to-remove", " remove-me-also ", false},
+  });
+  Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
+  client_->onSuccess(async_request_, std::move(http_response));
+}
+
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
@@ -484,8 +510,8 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   InSequence s;
 
-  EXPECT_CALL(cm_, get(Eq("ext_authz"))).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,

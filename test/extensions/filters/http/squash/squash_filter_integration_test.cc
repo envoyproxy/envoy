@@ -71,8 +71,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   /**
@@ -89,7 +88,7 @@ public:
       auto* squash_cluster = bootstrap.mutable_static_resources()->add_clusters();
       squash_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       squash_cluster->set_name("squash");
-      squash_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*squash_cluster);
     });
 
     HttpIntegrationTest::initialize();

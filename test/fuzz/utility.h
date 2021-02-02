@@ -4,6 +4,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/network/resolver_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "test/common/stream_info/test_util.h"
@@ -165,14 +166,30 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   test_stream_info->upstream_local_address_ = upstream_local_address;
-  test_stream_info->downstream_local_address_ = address;
-  test_stream_info->downstream_direct_remote_address_ = address;
-  test_stream_info->downstream_remote_address_ = address;
+  test_stream_info->downstream_address_provider_ =
+      std::make_shared<Network::SocketAddressSetterImpl>(address, address);
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));
   test_stream_info->setDownstreamSslConnection(connection_info);
   return test_stream_info;
+}
+
+// Parses http or proto body into chunks.
+inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) {
+  std::vector<std::string> data_chunks;
+
+  if (data.has_http_body()) {
+    data_chunks.reserve(data.http_body().data_size());
+    for (const std::string& http_data : data.http_body().data()) {
+      data_chunks.push_back(http_data);
+    }
+  } else if (data.has_proto_body()) {
+    const std::string serialized = data.proto_body().message().value();
+    data_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
+  }
+
+  return data_chunks;
 }
 
 } // namespace Fuzz

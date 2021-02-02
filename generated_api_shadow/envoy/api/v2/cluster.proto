@@ -352,6 +352,10 @@ message Cluster {
     //   This header isn't sanitized by default, so enabling this feature allows HTTP clients to
     //   route traffic to arbitrary hosts and/or ports, which may have serious security
     //   consequences.
+    //
+    // .. note::
+    //
+    //   If the header appears multiple times only the first value is used.
     bool use_http_header = 1;
   }
 
@@ -677,10 +681,16 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
+  // Setting this value causes failure if the
+  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
+  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   repeated core.Address dns_resolvers = 18;
 
   // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
+  // Setting this value causes failure if the
+  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
+  // server startup. Apple' API only uses UDP for DNS resolution.
   bool use_tcp_for_dns_lookups = 45;
 
   // If specified, outlier detection will be enabled for this upstream cluster.

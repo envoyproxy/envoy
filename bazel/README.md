@@ -29,10 +29,10 @@ to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` en
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
-dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements) are typically
+dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are typically
 independently sourced, the following steps should be followed:
 
-1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
+1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements).
 1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
@@ -40,13 +40,13 @@ independently sourced, the following steps should be followed:
 This section describes how to and what dependencies to install to get started building Envoy with Bazel.
 If you would rather use a pre-build Docker image with required tools installed, skip to [this section](#building-envoy-with-the-ci-docker-image).
 
-As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/WORKSPACE) and
+As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/main/WORKSPACE) and
 [rules for building a recent
-version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
+version](https://github.com/envoyproxy/envoy/blob/main/bazel/repositories.bzl) of the various Envoy
 dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
 up-to-date with the latest security patches. See
-[this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
+[this doc](https://github.com/envoyproxy/envoy/blob/main/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
 for how to update or override dependencies.
 
 1. Install external dependencies.
@@ -83,10 +83,15 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
-    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
-    available via a package manager, but may not be available in default repositories depending on
-    OS version. To build against `libc++` build with the `--config=libc++` instead of the
-    `--config=clang` flag.
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
+
+    #### Config Flag Choices
+    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:
+
+    - `--config=libc++` means using `clang` + `libc++`
+    - `--config=clang` means using `clang` + `libstdc++`
+    - no config flag means using `gcc` + `libstdc++`
+
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
@@ -116,16 +121,33 @@ for how to update or override dependencies.
 
     ### Windows
 
+    > Note: These instructions apply to **Windows 10 SDK, version 1803 (10.0.17134.12)**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than Windows 10 SDK, version 1903 (10.0.18362.1)**
+
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
-    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
-    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    lengths is to change the output base directory for bazel to a very short root path. An example Bazel configuration
+    to help with this is to use `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
     the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
     user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+
     ```
     startup --output_base=C:/_eb
     ```
+
+    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
+    is set.
+
+    Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
+    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
+    For other common issues, see the
+    [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
+
+    > The paths in this document are given as
+    examples, make sure to verify you are using the correct paths for your environment. Also note
+    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
+    to do the equivalent if using a different shell.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
     by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
@@ -145,7 +167,8 @@ for how to update or override dependencies.
     package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
     If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
     to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
-    the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2.
+    the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2,
+    which is determined by their relative ordering in your PATH.
     ```
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
@@ -160,14 +183,16 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Set the `BAZEL_SH` environment variable to the path
-    of the installed MSYS2 `bash.exe` executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment
-    variable to a value of `*` is often advisable to ensure argument parsing in the MSYS2 shell
-    behaves as expected.
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+
+    Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
+    executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
+    of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
+    set MSYS2_PATH_TYPE=inherit
     ```
 
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
@@ -181,7 +206,7 @@ for how to update or override dependencies.
     The TMPDIR path and MSYS2 `mktemp` command are used frequently by the `rules_foreign_cc`
     component of Bazel as well as Envoy's test scripts, causing problems if not set to a path
     accessible to both Windows and msys commands. [Note the `ci/windows_ci_steps.sh` script
-    which builds envoy and run tests in CI) creates this symlink automatically.]
+    which builds envoy and run tests in CI creates this symlink automatically.]
 
     In the MSYS2 shell, install additional packages via pacman:
     ```
@@ -194,17 +219,16 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
-    Lastly, persist environment variable changes. NOTE: The paths in this document are given as
-    examples, make sure to verify you are using the correct paths for your environment. Also note
-    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
-    to do the equivalent if using a different shell.
+    Lastly, persist environment variable changes.
     ```
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
     setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
     setx BAZEL_VC "%BAZEL_VC%"
     setx TMPDIR "%TMPDIR%"
+    setx MSYS2_PATH_TYPE "%MSYS2_PATH_TYPE%"
     ```
+    > On Windows the supported/recommended shell to interact with bazel is MSYS2. This means that all the bazel commands (i.e. build, test) should be executed from MSYS2.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -212,7 +236,8 @@ for how to update or override dependencies.
    in your shell for buildifier to work.
 1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
    in your shell for buildozer to work.
-1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+1. `bazel build //source/exe:envoy-static` from the Envoy source directory. Add `-c opt` for an optimized release build or
+   `-c dbg` for an unoptimized, fully instrumented debugging build.
 
 ## Building Envoy with the CI Docker image
 
@@ -228,10 +253,10 @@ From a Windows host with Docker installed, the Windows containers feature enable
 MSYS2 or Git bash), run:
 
 ```
-./ci/run_envoy_docker_windows.sh './ci/windows_ci_steps.sh'
+./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
-See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
+See also the [documentation](https://github.com/envoyproxy/envoy/tree/main/ci) for developer use of the
 CI Docker image.
 
 ## Building Envoy with Remote Execution
@@ -323,7 +348,7 @@ bazel test //test/...
 An individual test target can be run with a more specific Bazel
 [label](https://bazel.build/versions/master/docs/build-ref.html#Labels), e.g. to build and run only
 the units tests in
-[test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/master/test/common/http/async_client_impl_test.cc):
+[test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/main/test/common/http/async_client_impl_test.cc):
 
 ```
 bazel test //test/common/http:async_client_impl_test
@@ -599,7 +624,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
-* tcmalloc with `--define tcmalloc=disabled`
+* tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
+  tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 
 
@@ -618,7 +644,8 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
+  tcmalloc is built from the sources of Gperftools.
 * Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
   `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
 * Manual stamping via VersionInfo with `--define manual_stamp=manual_stamp`.
@@ -631,17 +658,30 @@ The following optional features can be enabled on the Bazel build command-line:
 * Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
   [`zlib`](https://zlib.net) with `--define zlib=ng`.
 
-## Disabling extensions
+## Enabling and disabling extensions
 
 Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
 Extensions that can be removed are contained in
-[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Use the following
-procedure to customize the extensions for your build:
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+
+The extensions disabled by default can be enabled by adding the following parameter to Bazel, for example to enable
+`envoy.filters.http.kill_request` extension, add `--//source/extensions/filters/http/kill_request:enabled`.
+The extensions enabled by default can be disabled by adding the following parameter to Bazel, for example to disable
+`envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
+Note not all extensions can be disabled.
+
+If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
+`--@envoy//source/extensions/filters/http/kill_request:enabled`.
+
+You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
+
+## Customize extension build config
+
+You can also use the following procedure to customize the extensions for your build:
 
 * The Envoy build assumes that a Bazel repository named `@envoy_build_config` exists which
   contains the file `@envoy_build_config//:extensions_build_config.bzl`. In the default build,
   a synthetic repository is created containing [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
-  Thus, the default build has all extensions.
 * Start by creating a new Bazel workspace somewhere in the filesystem that your build can access.
   This workspace should contain:
   * Empty WORKSPACE file.
@@ -656,7 +696,7 @@ To have your local build use your overridden configuration repository there are 
 2. Use the following snippet in your WORKSPACE before you load the Envoy repository. E.g.,
 
 ```
-workspace(name = "envoy")
+workspace(name = "envoy_filter_example")
 
 local_repository(
     name = "envoy_build_config",
@@ -699,12 +739,17 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 # Coverage builds
 
-To generate coverage results, make sure you are using a clang toolchain and have `llvm-cov` and
+To generate coverage results, make sure you are using a Clang toolchain and have `llvm-cov` and
 `llvm-profdata` in your `PATH`. Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh
 ```
+
+**Note** that it is important to ensure that the versions of `clang`, `llvm-cov` and `llvm-profdata`
+are consistent and that they match the most recent Clang/LLVM toolchain version in use by Envoy (see
+the [build container
+toolchain](https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh) for reference).
 
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
@@ -720,8 +765,8 @@ need to navigate down and open "coverage.html" but then you can navigate per nor
 have seen some issues with seeing the artifacts tab. If you can't see it, log out of Circle, and
 then log back in and it should start working.
 
-The latest coverage report for master is available
-[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html). The latest fuzz coverage report for master is available [here](https://storage.googleapis.com/envoy-postsubmit/master/fuzz_coverage/index.html).
+The latest coverage report for main is available
+[here](https://storage.googleapis.com/envoy-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-postsubmit/main/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by

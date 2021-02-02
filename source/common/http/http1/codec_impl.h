@@ -87,6 +87,7 @@ protected:
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
+  bool connect_request_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
 
@@ -156,13 +157,12 @@ public:
   bool connectRequest() const { return connect_request_; }
 
   // Http::RequestEncoder
-  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+  Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool upgrade_request_{};
   bool head_request_{};
-  bool connect_request_{};
 };
 
 /**
@@ -197,7 +197,7 @@ public:
   void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
-  Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
+  Buffer::Instance& buffer() { return *output_buffer_; }
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
@@ -209,7 +209,7 @@ public:
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supportsHttp10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
-  virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
+  virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
 
@@ -223,9 +223,6 @@ public:
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
   bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
-
-  int setAndCheckCallbackStatus(Status&& status);
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<int>&& statusor);
 
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
@@ -253,6 +250,8 @@ protected:
     // nor any further data on the connection.
     NoBodyData = 2,
   };
+  int setAndCheckCallbackStatus(Status&& status);
+  int setAndCheckCallbackStatusOr(Envoy::StatusOr<HttpParserCode>&& statusor);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   Status onMessageBeginBase();
@@ -275,6 +274,7 @@ protected:
   CodecStats& stats_;
   const Http1Settings codec_settings_;
   http_parser parser_;
+  Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
   HeaderString current_header_field_;
@@ -288,6 +288,7 @@ protected:
   bool deferred_end_stream_headers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
+  bool dispatching_slice_already_drained_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -376,10 +377,10 @@ private:
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked. Note that this only applies to headers and NOT trailers. End of
    * trailers are signaled via onMessageCompleteBase().
-   * @return An error status or an integer representing 0 if no error, 1 if there should be no body.
+   * @return An error status or a HttpParserCode.
    */
-  Envoy::StatusOr<int> onHeadersCompleteBase();
-  virtual Envoy::StatusOr<int> onHeadersComplete() PURE;
+  Envoy::StatusOr<HttpParserCode> onHeadersCompleteBase();
+  virtual Envoy::StatusOr<HttpParserCode> onHeadersComplete() PURE;
 
   /**
    * Called to see if upgrade transition is allowed.
@@ -446,7 +447,9 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
-  Buffer::WatermarkBuffer output_buffer_;
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -500,7 +503,7 @@ private:
   void onEncodeComplete() override;
   Status onMessageBegin() override;
   Status onUrl(const char* data, size_t length) override;
-  Envoy::StatusOr<int> onHeadersComplete() override;
+  Envoy::StatusOr<HttpParserCode> onHeadersComplete() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -530,10 +533,8 @@ private:
     }
   }
 
-  void sendProtocolErrorOld(absl::string_view details);
-
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
-  void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
+  void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
 
@@ -545,7 +546,6 @@ private:
   // of Envoy wish to enable pipelining (which is dangerous and ill supported)
   // we could make this configurable.
   uint32_t max_outbound_responses_{};
-  bool flood_protection_{};
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
@@ -581,10 +581,11 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   Status onMessageBegin() override { return okStatus(); }
   Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Envoy::StatusOr<int> onHeadersComplete() override;
+  Envoy::StatusOr<HttpParserCode> onHeadersComplete() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;

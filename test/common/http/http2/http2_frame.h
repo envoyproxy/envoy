@@ -14,6 +14,19 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
+
+// All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
+template <typename First, typename... Rest> struct FirstArgType {
+  using type = First; // NOLINT(readability-identifier-naming)
+};
+
+template <typename Flag, typename... Flags> constexpr uint8_t orFlags(Flag first, Flags... rest) {
+  static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
+                "All flag types must be the same!");
+  return static_cast<uint8_t>(first) | orFlags(rest...);
+}
+
 // Rudimentary facility for building and parsing of HTTP2 frames for unit tests
 class Http2Frame {
   using DataContainer = std::vector<uint8_t>;
@@ -69,7 +82,12 @@ public:
     MethodPost = 3,
     Path = 4,
     Status200 = 8,
+    Status204 = 9,
+    Status206 = 10,
+    Status304 = 11,
+    Status400 = 12,
     Status404 = 13,
+    Status500 = 14,
     SchemeHttps = 7,
     Host = 38,
   };
@@ -99,11 +117,26 @@ public:
     std::string value_;
   };
 
+  /**
+   * Make client stream ID out of the given ID in the host byte order, ensuring that the stream id
+   * is odd as required by https://tools.ietf.org/html/rfc7540#section-5.1.1
+   * Use this function to create client stream ids for methods creating HTTP/2 frames.
+   * @param stream_id some stream id that will be used to create the client stream id.
+   * @return an odd number client stream id.
+   */
+  static uint32_t makeClientStreamId(uint32_t stream_id) { return (stream_id << 1) | 1; }
+
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);
+  static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);
+  static Http2Frame makeHeadersFrameWithStatus(
+      std::string status, uint32_t stream_index,
+      HeadersFlags flags = static_cast<HeadersFlags>(orFlags(HeadersFlags::EndStream,
+                                                             HeadersFlags::EndHeaders)));
+  // TODO: MakeHeadersFrameWithStatusAndNonStaticHeaders
   static Http2Frame makeEmptyContinuationFrame(uint32_t stream_index,
                                                HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::None);
@@ -123,12 +156,19 @@ public:
   static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
                                                           absl::string_view host,
                                                           absl::string_view path);
+  static Http2Frame makeMalformedResponseWithZerolenHeader(uint32_t stream_index);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path, const std::vector<Header> extra_headers);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
                                     absl::string_view path);
+  static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
+                                    absl::string_view path,
+                                    const std::vector<Header> extra_headers);
+  static Http2Frame makeDataFrame(uint32_t stream_index, absl::string_view data,
+                                  DataFlags flags = DataFlags::None);
+
   /**
    * Creates a frame with the given contents. This frame can be
    * malformed/invalid depending on the given contents.

@@ -82,8 +82,8 @@ std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool si
     return SignatureConstants::get().HashedEmptyString;
   }
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto content_hash = message.body()
-                                ? Hex::encode(crypto_util.getSha256Digest(*message.body()))
+  const auto content_hash = message.body().length() > 0
+                                ? Hex::encode(crypto_util.getSha256Digest(message.body()))
                                 : SignatureConstants::get().HashedEmptyString;
   return content_hash;
 }

@@ -9,15 +9,11 @@
 #include "common/config/utility.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/status.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -36,8 +32,15 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  ENVOY_CONN_LOG(debug, "connecting", *connection_);
-  connection_->connect();
+  // In general, codecs are handed new not-yet-connected connections, but in the
+  // case of ALPN, the codec may be handed an already connected connection.
+  if (!connection_->connecting()) {
+    ASSERT(connection_->state() == Network::Connection::State::Open);
+    connected_ = true;
+  } else {
+    ENVOY_CONN_LOG(debug, "connecting", *connection_);
+    connection_->connect();
+  }
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
@@ -46,7 +49,9 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
-  connection_->noDelay(true);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    connection_->noDelay(true);
+  }
 }
 
 CodecClient::~CodecClient() = default;
@@ -105,8 +110,11 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void CodecClient::responseDecodeComplete(ActiveRequest& request) {
+void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
   ENVOY_CONN_LOG(debug, "response complete", *connection_);
+  if (codec_client_callbacks_) {
+    codec_client_callbacks_->onStreamPreDecodeComplete();
+  }
   deleteRequest(request);
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
@@ -125,58 +133,43 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
-  bool protocol_error = false;
   const Status status = codec_->dispatch(data);
 
-  if (isCodecProtocolError(status)) {
-    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
-    close();
-    protocol_error = true;
-  } else if (isPrematureResponseError(status)) {
-    ENVOY_CONN_LOG(debug, "premature response", *connection_);
+  if (!status.ok()) {
+    ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
-      protocol_error = true;
+    if (!isPrematureResponseError(status) ||
+        (!active_requests_.empty() ||
+         getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
+      host_->cluster().stats().upstream_cx_protocol_error_.inc();
     }
   }
 
-  if (protocol_error) {
-    host_->cluster().stats().upstream_cx_protocol_error_.inc();
-  }
+  // All data should be consumed at this point if the connection remains open.
+  ASSERT(data.length() == 0 || connection_->state() != Network::Connection::State::Open,
+         absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
-                                 Event::Dispatcher& dispatcher)
+                                 Event::Dispatcher& dispatcher,
+                                 Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
 
   switch (type) {
   case Type::HTTP1: {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-          *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-          host->cluster().maxResponseHeadersCount());
-    } else {
-      codec_ = std::make_unique<Legacy::Http1::ClientConnectionImpl>(
-          *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-          host->cluster().maxResponseHeadersCount());
-    }
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
+        host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP2: {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-          *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
-          Http2::ProdNghttp2SessionFactory::get());
-    } else {
-      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-          *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
-          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
-          Http2::ProdNghttp2SessionFactory::get());
-    }
+    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+        *connection_, *this, host->cluster().http2CodecStats(), random_generator,
+        host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
   case Type::HTTP3: {

@@ -11,6 +11,7 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/strings/str_split.h"
@@ -23,7 +24,7 @@ namespace HttpFilters {
 namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                             const absl::flat_hash_set<std::string>& allowed_vary_headers)
+                             const VaryHeader& vary_allow_list)
     : timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
@@ -53,7 +54,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_path(std::string(request_headers.getPathValue()));
   key_.set_clear_http(forwarded_proto == scheme_values.Http);
 
-  vary_headers_ = VaryHeader::possibleVariedHeaders(allowed_vary_headers, request_headers);
+  vary_headers_ = vary_allow_list.possibleVariedHeaders(request_headers);
 }
 
 // Unless this API is still alpha, calls to stableHashKey() must always return
@@ -77,21 +78,14 @@ void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& 
   }
 }
 
-bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
+bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers,
+                                       SystemTime::duration response_age) const {
   // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
   // lookup.
   const absl::string_view cache_control =
       response_headers.getInlineValue(response_cache_control_handle.handle());
   const ResponseCacheControl response_cache_control(cache_control);
 
-  const SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
-
-  if (timestamp_ < response_time) {
-    // Response time is in the future, validate response.
-    return true;
-  }
-
-  const SystemTime::duration response_age = timestamp_ - response_time;
   const bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
                                         request_cache_control_.max_age_.value() < response_age;
   if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||
@@ -102,40 +96,50 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   }
 
   // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this.
-  // When date metadata injection for responses with no date
-  // is implemented, this ASSERT will need to be updated.
-  ASSERT((response_headers.Date() && response_cache_control.max_age_.has_value()) ||
-             response_headers.get(Http::Headers::get().Expires),
+  ASSERT(response_cache_control.max_age_.has_value() ||
+             (response_headers.getInline(expires_handle.handle()) && response_headers.Date()),
          "Cache entry does not have valid expiration data.");
 
-  const SystemTime expiration_time =
-      response_cache_control.max_age_.has_value()
-          ? response_time + response_cache_control.max_age_.value()
-          : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
+  SystemTime::duration freshness_lifetime;
+  if (response_cache_control.max_age_.has_value()) {
+    freshness_lifetime = response_cache_control.max_age_.value();
+  } else {
+    const SystemTime expires_value =
+        CacheHeadersUtils::httpTime(response_headers.getInline(expires_handle.handle()));
+    const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+    freshness_lifetime = expires_value - date_value;
+  }
 
-  if (timestamp_ > expiration_time) {
+  if (response_age > freshness_lifetime) {
     // Response is stale, requires validation if
     // the response does not allow being served stale,
     // or the request max-stale directive does not allow it.
     const bool allowed_by_max_stale =
         request_cache_control_.max_stale_.has_value() &&
-        request_cache_control_.max_stale_.value() > timestamp_ - expiration_time;
+        request_cache_control_.max_stale_.value() > response_age - freshness_lifetime;
     return response_cache_control.no_stale_ || !allowed_by_max_stale;
   } else {
     // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement.
     const bool min_fresh_unsatisfied =
         request_cache_control_.min_fresh_.has_value() &&
-        request_cache_control_.min_fresh_.value() > expiration_time - timestamp_;
+        request_cache_control_.min_fresh_.value() > freshness_lifetime - response_age;
     return min_fresh_unsatisfied;
   }
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
+                                             ResponseMetadata&& metadata,
                                              uint64_t content_length) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
-  result.cache_entry_status_ = requiresValidation(*response_headers)
+
+  // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
+  const Seconds age =
+      CacheHeadersUtils::calculateAge(*response_headers, metadata.response_time_, timestamp_);
+  response_headers->setInline(age_handle.handle(), std::to_string(age.count()));
+
+  result.cache_entry_status_ = requiresValidation(*response_headers, age)
                                    ? CacheEntryStatus::RequiresValidation
                                    : CacheEntryStatus::Ok;
   result.headers_ = std::move(response_headers);
@@ -210,15 +214,13 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
 
   // Multiple instances of range headers are invalid.
   // https://tools.ietf.org/html/rfc7230#section-3.2.2
-  std::vector<absl::string_view> range_headers;
-  Http::HeaderUtility::getAllOfHeader(request_headers, Http::Headers::get().Range.get(),
-                                      range_headers);
+  const auto range_header = request_headers.get(Http::Headers::get().Range);
 
   absl::string_view header_value;
-  if (range_headers.size() == 1) {
-    header_value = range_headers.front();
+  if (range_header.size() == 1) {
+    header_value = range_header[0]->value().getStringView();
   } else {
-    if (range_headers.size() > 1) {
+    if (range_header.size() > 1) {
       ENVOY_LOG(debug, "Multiple range headers provided in request. Ignoring all range headers.");
     }
     return {};

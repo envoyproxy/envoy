@@ -40,6 +40,20 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
       datadog::opentracing::PropagationStyle::Datadog};
   tracer_options_.extract = std::set<datadog::opentracing::PropagationStyle>{
       datadog::opentracing::PropagationStyle::Datadog};
+  tracer_options_.log_func = [](datadog::opentracing::LogLevel level,
+                                opentracing::string_view message) {
+    switch (level) {
+    case datadog::opentracing::LogLevel::debug:
+      ENVOY_LOG(debug, "{}", message);
+      break;
+    case datadog::opentracing::LogLevel::info:
+      ENVOY_LOG(info, "{}", message);
+      break;
+    case datadog::opentracing::LogLevel::error:
+      ENVOY_LOG(error, "{}", message);
+      break;
+    }
+  };
 
   // Configuration overrides for tracer options.
   if (!datadog_config.service_name().empty()) {
@@ -95,19 +109,15 @@ void TraceReporter::flushTraces() {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
 
-    Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    body->add(encoder_->payload());
-    message->body() = std::move(body);
+    message->body().add(encoder_->payload());
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    if (collector_cluster_.exists()) {
+    if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          driver_.clusterManager()
-              .httpAsyncClientForCluster(collector_cluster_.info()->name())
-              .send(
-                  std::move(message), *this,
-                  Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
+          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+              std::move(message), *this,
+              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
       if (request) {
         active_requests_.add(*request);
       }
@@ -138,7 +148,7 @@ void TraceReporter::onSuccess(const Http::AsyncClient::Request& request,
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
     driver_.tracerStats().reports_sent_.inc();
-    encoder_->handleResponse(http_response->body()->toString());
+    encoder_->handleResponse(http_response->bodyAsString());
   }
 }
 

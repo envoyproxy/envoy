@@ -173,7 +173,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-    const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
+    const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();
@@ -322,8 +322,9 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   if (!ctx.request_headers) {
     return default_value_;
   }
-  const Http::HeaderEntry* entry = ctx.request_headers->get(name_);
-  return entry ? entry->value().getStringView() : default_value_;
+  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
+  const auto entry = ctx.request_headers->get(name_);
+  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
@@ -351,10 +352,10 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     span.setTag(tag(), value.string_value());
     return;
   case ProtobufWkt::Value::kListValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.list_value()));
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.list_value()));
     return;
   case ProtobufWkt::Value::kStructValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.struct_value()));
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.struct_value()));
     return;
   default:
     break;

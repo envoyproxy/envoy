@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["gzip_filter_test.cc"],
     extension_name = "envoy.filters.http.gzip",
     deps = [
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
         "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",

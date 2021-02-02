@@ -9,7 +9,7 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: auto
           route_config:
@@ -26,7 +26,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.lua
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
               inline_code: |
                 local mylibrary = require("lib.mylibrary")
 
@@ -54,9 +54,3 @@ static_resources:
               socket_address:
                 address: web_service
                 port_value: 80
-admin:
-  access_log_path: "/dev/null"
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 8001

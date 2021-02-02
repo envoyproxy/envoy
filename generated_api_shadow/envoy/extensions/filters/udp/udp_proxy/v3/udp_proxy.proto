@@ -35,13 +35,13 @@ message UdpProxyConfig {
   }
 
   // The stat prefix used when emitting UDP proxy filter stats.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof route_specifier {
     option (validate.required) = true;
 
     // The upstream cluster to connect to.
-    string cluster = 2 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by

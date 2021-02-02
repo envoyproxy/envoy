@@ -76,6 +76,8 @@ TEST_F(LuaBufferWrapperTest, Methods) {
       testPrint(object:length())
       testPrint(object:getBytes(0, 2))
       testPrint(object:getBytes(6, 5))
+      testPrint(object:setBytes("neverland"))
+      testPrint(object:getBytes(0, 5))
     end
   )EOF"};
 
@@ -85,6 +87,8 @@ TEST_F(LuaBufferWrapperTest, Methods) {
   EXPECT_CALL(printer_, testPrint("11"));
   EXPECT_CALL(printer_, testPrint("he"));
   EXPECT_CALL(printer_, testPrint("world"));
+  EXPECT_CALL(printer_, testPrint("9"));
+  EXPECT_CALL(printer_, testPrint("never"));
   start("callMe");
 }
 

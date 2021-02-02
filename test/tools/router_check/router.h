@@ -12,7 +12,7 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/server/instance.h"
@@ -50,7 +50,7 @@ struct ToolConfig {
 private:
   ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
              std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers, int random_value);
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
 };
 
 /**

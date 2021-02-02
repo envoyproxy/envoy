@@ -76,16 +76,6 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
   mutable_any->set_type_url(type_url);
 }
 
-void removeConnectMatcher(Protobuf::Message* message) {
-  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config =
-      dynamic_cast<envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication&>(*message);
-  for (auto& rules : *config.mutable_rules()) {
-    if (rules.match().has_connect_matcher()) {
-      rules.mutable_match()->set_path("/");
-    }
-  }
-}
-
 void cleanAttachmentTemplate(Protobuf::Message* message) {
   envoy::extensions::filters::http::squash::v3::Squash& config =
       dynamic_cast<envoy::extensions::filters::http::squash::v3::Squash&>(*message);
@@ -100,25 +90,16 @@ void cleanAttachmentTemplate(Protobuf::Message* message) {
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
       dynamic_cast<envoy::extensions::filters::http::tap::v3::Tap&>(*message);
-  if (config.common_config().config_type_case() ==
-      envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kTapdsConfig) {
-    config.mutable_common_config()->mutable_static_config()->mutable_match_config()->set_any_match(
-        true);
-  }
   // TODO(samflattery): remove once StreamingGrpcSink is implemented
   // a static config filter is required to have one sink, but since validation isn't performed on
   // the filter until after this function runs, we have to manually check that there are sinks
   // before checking that they are not StreamingGrpc
-  else if (config.common_config().config_type_case() ==
-               envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
-                   kStaticConfig &&
-           !config.common_config().static_config().output_config().sinks().empty() &&
-           config.common_config()
-                   .static_config()
-                   .output_config()
-                   .sinks(0)
-                   .output_sink_type_case() ==
-               envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+  if (config.common_config().config_type_case() ==
+          envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+              kStaticConfig &&
+      !config.common_config().static_config().output_config().sinks().empty() &&
+      config.common_config().static_config().output_config().sinks(0).output_sink_type_case() ==
+          envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
     // will be caught in UberFilterFuzzer::fuzz
     throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
   }
@@ -138,19 +119,16 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
   }
-  if (filter_name == HttpFilterNames::get().JwtAuthn) {
-    // Remove when connect matcher is implemented for Jwt Authentication filter.
-    removeConnectMatcher(message);
-  }
 }
 
 void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for the ext_authz filter.
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
-  ON_CALL(cluster_manager_.async_client_, send_(_, _, _)).WillByDefault(Return(&async_request_));
+  ON_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillByDefault(Return(&async_request_));
 
   ON_CALL(decoder_callbacks_, connection()).WillByDefault(testing::Return(&connection_));
   ON_CALL(decoder_callbacks_, activeSpan())
@@ -170,6 +148,10 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(factory_context_, admin()).WillByDefault(testing::ReturnRef(factory_context_.admin_));
   ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _)).WillByDefault(testing::Return(true));
   ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
+
+  // Prepare expectations for WASM filter.
+  ON_CALL(factory_context_, listenerMetadata())
+      .WillByDefault(testing::ReturnRef(listener_metadata_));
 }
 
 } // namespace HttpFilters

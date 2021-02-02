@@ -37,24 +37,31 @@ using ::testing::NiceMock;
 IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
     Network::Address::IpVersion version, bool enable_half_close,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::Address::InstanceConstSharedPtr source_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
+      .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
         client_write_buffer_ =
             new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         return client_write_buffer_;
+      }))
+      .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                                std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+  ;
 
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
+      source_address, Network::Test::createRawBufferSocket(), options);
 
   ON_CALL(*client_write_buffer_, drain(_))
-      .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
+      .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AnyNumber());
 
   connection_->enableHalfClose(enable_half_close);
@@ -116,26 +123,26 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
     if (!data.empty()) {
-      EXPECT_CALL(*client_write_buffer_, write(_)).Times(AtLeast(1));
+      EXPECT_CALL(*client_write_buffer_, drain(_)).Times(AtLeast(1));
     }
   }
 
-  int bytes_expected = client_write_buffer_->bytes_written() + data.size();
+  uint64_t bytes_expected = client_write_buffer_->bytesDrained() + data.size();
 
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-    if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
+    if (client_write_buffer_->bytesDrained() == bytes_expected || disconnected_) {
       break;
     }
   } while (bound.withinBound());
 
   if (!bound.withinBound()) {
     return AssertionFailure() << "Timed out completing write";
-  } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
+  } else if (verify && (disconnected_ || client_write_buffer_->bytesDrained() != bytes_expected)) {
     return AssertionFailure()
            << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
-           << " bytes_written: " << client_write_buffer_->bytes_written()
+           << " bytes_drained: " << client_write_buffer_->bytesDrained()
            << " bytes_expected: " << bytes_expected;
   }
 

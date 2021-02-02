@@ -11,8 +11,10 @@
 #include "common/upstream/subset_lb.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "benchmark/benchmark.h"
 
@@ -20,7 +22,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class BaseTester {
+class BaseTester : public Event::TestUsingSimulatedTime {
 public:
   static constexpr absl::string_view metadata_key = "key";
   // We weight the first weighted_subset_percent of hosts with weight.
@@ -40,9 +42,9 @@ public:
             (*metadata.mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB];
         (*map.mutable_fields())[std::string(metadata_key)] = value;
 
-        hosts.push_back(makeTestHost(info_, url, metadata, effective_weight));
+        hosts.push_back(makeTestHost(info_, url, metadata, simTime(), effective_weight));
       } else {
-        hosts.push_back(makeTestHost(info_, url, effective_weight));
+        hosts.push_back(makeTestHost(info_, url, simTime(), effective_weight));
       }
     }
 
@@ -64,7 +66,8 @@ public:
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
+  ClusterStatNames stat_names_{stats_store_.symbolTable()};
+  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_, stat_names_)};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -97,13 +100,18 @@ public:
   std::unique_ptr<LeastRequestLoadBalancer> lb_;
 };
 
-void benchmarkRoundRobinLoadBalancerBuild(benchmark::State& state) {
+void benchmarkRoundRobinLoadBalancerBuild(::benchmark::State& state) {
+  const uint64_t num_hosts = state.range(0);
+  const uint64_t weighted_subset_percent = state.range(1);
+  const uint64_t weight = state.range(2);
+
+  if (benchmark::skipExpensiveBenchmarks() && num_hosts > 10000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
-    const uint64_t num_hosts = state.range(0);
-    const uint64_t weighted_subset_percent = state.range(1);
-    const uint64_t weight = state.range(2);
-
     const size_t start_tester_mem = Memory::Stats::totalCurrentlyAllocated();
     RoundRobinTester tester(num_hosts, weighted_subset_percent, weight);
     const size_t end_tester_mem = Memory::Stats::totalCurrentlyAllocated();
@@ -137,7 +145,7 @@ BENCHMARK(benchmarkRoundRobinLoadBalancerBuild)
     ->Args({50000, 0, 1})
     ->Args({50000, 50, 50})
     ->Args({50000, 100, 50})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
 class RingHashTester : public BaseTester {
 public:
@@ -169,7 +177,7 @@ uint64_t hashInt(uint64_t i) {
   return HashUtil::xxHash64(absl::string_view(reinterpret_cast<const char*>(&i), sizeof(i)));
 }
 
-void benchmarkRingHashLoadBalancerBuildRing(benchmark::State& state) {
+void benchmarkRingHashLoadBalancerBuildRing(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -195,9 +203,9 @@ BENCHMARK(benchmarkRingHashLoadBalancerBuildRing)
     ->Args({100, 256000})
     ->Args({200, 256000})
     ->Args({500, 256000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkMaglevLoadBalancerBuildTable(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerBuildTable(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
@@ -219,7 +227,7 @@ BENCHMARK(benchmarkMaglevLoadBalancerBuildTable)
     ->Arg(100)
     ->Arg(200)
     ->Arg(500)
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -229,7 +237,7 @@ public:
   absl::optional<uint64_t> hash_key_;
 };
 
-void computeHitStats(benchmark::State& state,
+void computeHitStats(::benchmark::State& state,
                      const absl::node_hash_map<std::string, uint64_t>& hit_counter) {
   double mean = 0;
   for (const auto& pair : hit_counter) {
@@ -249,12 +257,18 @@ void computeHitStats(benchmark::State& state,
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
 
-void benchmarkLeastRequestLoadBalancerChooseHost(benchmark::State& state) {
+void benchmarkLeastRequestLoadBalancerChooseHost(::benchmark::State& state) {
+  const uint64_t num_hosts = state.range(0);
+  const uint64_t choice_count = state.range(1);
+  const uint64_t keys_to_simulate = state.range(2);
+
+  if (benchmark::skipExpensiveBenchmarks() && keys_to_simulate > 1000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     state.PauseTiming();
-    const uint64_t num_hosts = state.range(0);
-    const uint64_t choice_count = state.range(1);
-    const uint64_t keys_to_simulate = state.range(2);
     LeastRequestTester tester(num_hosts, choice_count);
     absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
@@ -271,15 +285,21 @@ void benchmarkLeastRequestLoadBalancerChooseHost(benchmark::State& state) {
   }
 }
 BENCHMARK(benchmarkLeastRequestLoadBalancerChooseHost)
+    ->Args({100, 1, 1000})
+    ->Args({100, 2, 1000})
+    ->Args({100, 3, 1000})
+    ->Args({100, 10, 1000})
+    ->Args({100, 50, 1000})
+    ->Args({100, 100, 1000})
     ->Args({100, 1, 1000000})
     ->Args({100, 2, 1000000})
     ->Args({100, 3, 1000000})
     ->Args({100, 10, 1000000})
     ->Args({100, 50, 1000000})
     ->Args({100, 100, 1000000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkRingHashLoadBalancerChooseHost(benchmark::State& state) {
+void benchmarkRingHashLoadBalancerChooseHost(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     // Do not time the creation of the ring.
     state.PauseTiming();
@@ -316,9 +336,9 @@ BENCHMARK(benchmarkRingHashLoadBalancerChooseHost)
     ->Args({100, 256000, 100000})
     ->Args({200, 256000, 100000})
     ->Args({500, 256000, 100000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkMaglevLoadBalancerChooseHost(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerChooseHost(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     // Do not time the creation of the table.
     state.PauseTiming();
@@ -349,15 +369,20 @@ BENCHMARK(benchmarkMaglevLoadBalancerChooseHost)
     ->Args({100, 100000})
     ->Args({200, 100000})
     ->Args({500, 100000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkRingHashLoadBalancerHostLoss(benchmark::State& state) {
+void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
+  const uint64_t num_hosts = state.range(0);
+  const uint64_t min_ring_size = state.range(1);
+  const uint64_t hosts_to_lose = state.range(2);
+  const uint64_t keys_to_simulate = state.range(3);
+
+  if (benchmark::skipExpensiveBenchmarks() && min_ring_size > 65536) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    const uint64_t num_hosts = state.range(0);
-    const uint64_t min_ring_size = state.range(1);
-    const uint64_t hosts_to_lose = state.range(2);
-    const uint64_t keys_to_simulate = state.range(3);
-
     RingHashTester tester(num_hosts, min_ring_size);
     tester.ring_hash_lb_->initialize();
     LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create();
@@ -392,12 +417,15 @@ void benchmarkRingHashLoadBalancerHostLoss(benchmark::State& state) {
   }
 }
 BENCHMARK(benchmarkRingHashLoadBalancerHostLoss)
+    ->Args({500, 65536, 1, 10000})
+    ->Args({500, 65536, 2, 10000})
+    ->Args({500, 65536, 3, 10000})
     ->Args({500, 256000, 1, 10000})
     ->Args({500, 256000, 2, 10000})
     ->Args({500, 256000, 3, 10000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkMaglevLoadBalancerHostLoss(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t hosts_to_lose = state.range(1);
@@ -440,9 +468,9 @@ BENCHMARK(benchmarkMaglevLoadBalancerHostLoss)
     ->Args({500, 1, 10000})
     ->Args({500, 2, 10000})
     ->Args({500, 3, 10000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkMaglevLoadBalancerWeighted(benchmark::State& state) {
+void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     const uint64_t num_hosts = state.range(0);
     const uint64_t weighted_subset_percent = state.range(1);
@@ -499,7 +527,7 @@ BENCHMARK(benchmarkMaglevLoadBalancerWeighted)
     ->Args({500, 95, 127, 1, 10000})
     ->Args({500, 95, 25, 75, 1000})
     ->Args({500, 95, 75, 25, 10000})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
 class SubsetLbTester : public BaseTester {
 public:
@@ -545,9 +573,15 @@ public:
   HostVector host_moved_;
 };
 
-void benchmarkSubsetLoadBalancerCreate(benchmark::State& state) {
+void benchmarkSubsetLoadBalancerCreate(::benchmark::State& state) {
   const bool single_host_per_subset = state.range(0);
   const uint64_t num_hosts = state.range(1);
+
+  if (benchmark::skipExpensiveBenchmarks() && num_hosts > 100) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     SubsetLbTester tester(num_hosts, single_host_per_subset);
   }
@@ -555,13 +589,17 @@ void benchmarkSubsetLoadBalancerCreate(benchmark::State& state) {
 
 BENCHMARK(benchmarkSubsetLoadBalancerCreate)
     ->Ranges({{false, true}, {50, 2500}})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
-void benchmarkSubsetLoadBalancerUpdate(benchmark::State& state) {
+void benchmarkSubsetLoadBalancerUpdate(::benchmark::State& state) {
   const bool single_host_per_subset = state.range(0);
   const uint64_t num_hosts = state.range(1);
-  SubsetLbTester tester(num_hosts, single_host_per_subset);
+  if (benchmark::skipExpensiveBenchmarks() && num_hosts > 100) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
 
+  SubsetLbTester tester(num_hosts, single_host_per_subset);
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     tester.update();
   }
@@ -569,7 +607,7 @@ void benchmarkSubsetLoadBalancerUpdate(benchmark::State& state) {
 
 BENCHMARK(benchmarkSubsetLoadBalancerUpdate)
     ->Ranges({{false, true}, {50, 2500}})
-    ->Unit(benchmark::kMillisecond);
+    ->Unit(::benchmark::kMillisecond);
 
 } // namespace
 } // namespace Upstream

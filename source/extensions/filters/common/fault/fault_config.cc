@@ -18,12 +18,14 @@ HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_heade
     return percentage_;
   }
   const auto header = request_headers->get(header_name_);
-  if (header == nullptr) {
+  if (header.empty()) {
     return percentage_;
   }
 
   uint32_t header_numerator;
-  if (!absl::SimpleAtoi(header->value().getStringView(), &header_numerator)) {
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  if (!absl::SimpleAtoi(header[0]->value().getStringView(), &header_numerator)) {
     return percentage_;
   }
 
@@ -58,12 +60,14 @@ absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode
     const Http::RequestHeaderMap* request_headers) const {
   absl::optional<Http::Code> ret = absl::nullopt;
   auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortRequest);
-  if (header == nullptr) {
+  if (header.empty()) {
     return ret;
   }
 
   uint64_t code;
-  if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  if (!absl::SimpleAtoi(header[0]->value().getStringView(), &code)) {
     return ret;
   }
 
@@ -77,12 +81,14 @@ absl::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode
 absl::optional<Grpc::Status::GrpcStatus> FaultAbortConfig::HeaderAbortProvider::grpcStatusCode(
     const Http::RequestHeaderMap* request_headers) const {
   auto header = request_headers->get(Filters::Common::Fault::HeaderNames::get().AbortGrpcRequest);
-  if (header == nullptr) {
+  if (header.empty()) {
     return absl::nullopt;
   }
 
   uint64_t code;
-  if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  if (!absl::SimpleAtoi(header[0]->value().getStringView(), &code)) {
     return absl::nullopt;
   }
 
@@ -111,12 +117,14 @@ FaultDelayConfig::FaultDelayConfig(
 absl::optional<std::chrono::milliseconds> FaultDelayConfig::HeaderDelayProvider::duration(
     const Http::RequestHeaderMap* request_headers) const {
   const auto header = request_headers->get(HeaderNames::get().DelayRequest);
-  if (header == nullptr) {
+  if (header.empty()) {
     return absl::nullopt;
   }
 
   uint64_t value;
-  if (!absl::SimpleAtoi(header->value().getStringView(), &value)) {
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  if (!absl::SimpleAtoi(header[0]->value().getStringView(), &value)) {
     return absl::nullopt;
   }
 
@@ -142,12 +150,14 @@ FaultRateLimitConfig::FaultRateLimitConfig(
 absl::optional<uint64_t> FaultRateLimitConfig::HeaderRateLimitProvider::rateKbps(
     const Http::RequestHeaderMap* request_headers) const {
   const auto header = request_headers->get(HeaderNames::get().ThroughputResponse);
-  if (header == nullptr) {
+  if (header.empty()) {
     return absl::nullopt;
   }
 
   uint64_t value;
-  if (!absl::SimpleAtoi(header->value().getStringView(), &value)) {
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  if (!absl::SimpleAtoi(header[0]->value().getStringView(), &value)) {
     return absl::nullopt;
   }
 

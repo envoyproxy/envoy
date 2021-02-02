@@ -25,13 +25,9 @@ namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
 class OcspFullResponseParsingTest : public testing::Test {
 public:
-  static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
-    TestEnvironment::exec({TestEnvironment::runfilesPath(
-        "test/extensions/transport_sockets/tls/ocsp/gen_unittest_ocsp_data.sh")});
-  }
-
   std::string fullPath(std::string filename) {
-    return TestEnvironment::substitute("{{ test_tmpdir }}/ocsp_test_data/" + filename);
+    return TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/" + filename);
   }
 
   std::vector<uint8_t> readFile(std::string filename) {
@@ -69,6 +65,7 @@ TEST_F(OcspFullResponseParsingTest, GoodCertTest) {
 
   // Contains nextUpdate that is in the future
   EXPECT_FALSE(response_->isExpired());
+  EXPECT_GT(response_->secondsUntilExpiration(), 0);
 }
 
 TEST_F(OcspFullResponseParsingTest, RevokedCertTest) {
@@ -76,6 +73,7 @@ TEST_F(OcspFullResponseParsingTest, RevokedCertTest) {
   expectSuccessful();
   expectCertificateMatches("revoked_cert.pem");
   EXPECT_TRUE(response_->isExpired());
+  EXPECT_EQ(response_->secondsUntilExpiration(), 0);
 }
 
 TEST_F(OcspFullResponseParsingTest, UnknownCertTest) {
@@ -86,11 +84,12 @@ TEST_F(OcspFullResponseParsingTest, UnknownCertTest) {
 }
 
 TEST_F(OcspFullResponseParsingTest, ExpiredResponseTest) {
-  auto next_week = time_system_.systemTime() + std::chrono::hours(8 * 24);
-  time_system_.setSystemTime(next_week);
+  auto ten_years_forward = time_system_.systemTime() + std::chrono::hours(24 * 365 * 10);
+  time_system_.setSystemTime(ten_years_forward);
   setup("good_ocsp_resp.der");
   // nextUpdate is present but in the past
   EXPECT_TRUE(response_->isExpired());
+  EXPECT_EQ(response_->secondsUntilExpiration(), 0);
 }
 
 TEST_F(OcspFullResponseParsingTest, ThisUpdateAfterNowTest) {
@@ -113,12 +112,24 @@ TEST_F(OcspFullResponseParsingTest, MultiCertResponseTest) {
                             "OCSP Response must be for one certificate only");
 }
 
-TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
+TEST_F(OcspFullResponseParsingTest, UnsuccessfulResponseTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
       0x30, 3,
       // OcspResponseStatus - InternalError
       0xau, 1, 2,
+      // no response bytes
+  };
+  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(data, time_system_), EnvoyException,
+                            "OCSP response was unsuccessful");
+}
+
+TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
+  std::vector<uint8_t> data = {
+      // SEQUENCE
+      0x30, 3,
+      // OcspResponseStatus - Success
+      0xau, 1, 0,
       // no response bytes
   };
   EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(data, time_system_), EnvoyException,

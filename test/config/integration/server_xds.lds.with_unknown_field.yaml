@@ -1,6 +1,6 @@
 version_info: "0"
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.Listener
+- "@type": type.googleapis.com/envoy.config.listener.v3.Listener
   name: listener_0
   address:
     socket_address:
@@ -10,12 +10,15 @@ resources:
   - filters:
     - name: http
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         codec_type: HTTP2
         drain_timeout: 5s
         stat_prefix: router
         rds:
           route_config_name: route_config_0
-          config_source: { path: {{ rds_json_path }} }
+          transport_api_version: V3
+          config_source:
+            resource_api_version: V3
+            path: {{ rds_json_path }}
         http_filters: [{ name: envoy.filters.http.router }]
         foo: bar

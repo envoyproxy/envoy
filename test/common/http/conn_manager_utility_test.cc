@@ -76,78 +76,6 @@ public:
   MOCK_METHOD(bool, isInternalAddress, (const Network::Address::Instance&), (const));
 };
 
-class MockConnectionManagerConfig : public ConnectionManagerConfig {
-public:
-  MockConnectionManagerConfig() {
-    ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
-    ON_CALL(*this, isRoutable()).WillByDefault(Return(true));
-    ON_CALL(*this, preserveExternalRequestId()).WillByDefault(Return(false));
-    ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(Return(false));
-  }
-
-  // Http::ConnectionManagerConfig
-  ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
-                                  ServerConnectionCallbacks& callbacks) override {
-    return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
-  }
-
-  MOCK_METHOD(RequestIDExtensionSharedPtr, requestIDExtension, ());
-  MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
-  MOCK_METHOD(ServerConnection*, createCodec_,
-              (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
-  MOCK_METHOD(DateProvider&, dateProvider, ());
-  MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
-  MOCK_METHOD(FilterChainFactory&, filterFactory, ());
-  MOCK_METHOD(bool, generateRequestId, (), (const));
-  MOCK_METHOD(bool, preserveExternalRequestId, (), (const));
-  MOCK_METHOD(bool, alwaysSetRequestIdInResponse, (), (const));
-  MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
-  MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
-  MOCK_METHOD(bool, isRoutable, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
-  MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
-  MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
-  MOCK_METHOD(const std::string&, serverName, (), (const));
-  MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
-              (), (const));
-  MOCK_METHOD(ConnectionManagerStats&, stats, ());
-  MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
-  MOCK_METHOD(bool, useRemoteAddress, (), (const));
-  const Http::InternalAddressConfig& internalAddressConfig() const override {
-    return *internal_address_config_;
-  }
-
-  MOCK_METHOD(bool, unixSocketInternal, ());
-  MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
-  MOCK_METHOD(bool, skipXffAppend, (), (const));
-  MOCK_METHOD(const std::string&, via, (), (const));
-  MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
-  MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),
-              (const));
-  MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
-  MOCK_METHOD(const absl::optional<std::string>&, userAgent, ());
-  MOCK_METHOD(const Http::TracingConnectionManagerConfig*, tracingConfig, ());
-  MOCK_METHOD(Tracing::HttpTracerSharedPtr, tracer, ());
-  MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
-  MOCK_METHOD(bool, proxy100Continue, (), (const));
-  MOCK_METHOD(bool, streamErrorOnInvalidHttpMessaging, (), (const));
-  MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
-  MOCK_METHOD(bool, shouldNormalizePath, (), (const));
-  MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
-  MOCK_METHOD(bool, shouldStripMatchingPort, (), (const));
-  MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
-              headersWithUnderscoresAction, (), (const));
-  MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));
-
-  std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
-      std::make_unique<DefaultInternalAddressConfig>();
-};
-
 const Http::LowerCaseString& traceStatusHeader() {
   static Http::LowerCaseString header("x-trace-status");
   return header;
@@ -269,13 +197,16 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
 // Verify external request and XFF is set when we are using remote address and the address is
 // external.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers;
 
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(connection_.remote_address_->ip()->addressAsString(),
+  EXPECT_EQ(connection_.stream_info_.downstream_address_provider_->remoteAddress()
+                ->ip()
+                ->addressAsString(),
             headers.get_(Headers::get().ForwardedFor));
 }
 
@@ -283,7 +214,8 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers;
 
@@ -296,7 +228,8 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
 
@@ -311,7 +244,8 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
 
@@ -322,7 +256,8 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
 TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
   Network::Address::Ipv4Instance local_address("10.3.2.1");
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
@@ -342,7 +277,8 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAdd
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
 
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
 
   TestRequestHeaderMapImpl headers;
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true}),
@@ -352,7 +288,8 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAdd
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   Network::Address::Ipv4Instance local_address("10.3.2.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
@@ -365,7 +302,8 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress)
 
 // Verify that we trust Nth address from XFF when using remote address with xff_num_trusted_hops.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("203.0.113.128");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("203.0.113.128"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
@@ -376,7 +314,8 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 
 // Verify that xff_num_trusted_hops works when not using remote address.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
@@ -387,7 +326,8 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
 
 // Verify that we don't set the via header on requests/responses when empty.
 TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   TestRequestHeaderMapImpl request_headers;
@@ -404,7 +344,8 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
 // Verify that we append a non-empty via header on requests/responses.
 TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
   via_ = "foo";
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   TestRequestHeaderMapImpl request_headers;
@@ -423,7 +364,8 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
 
 // Verify that we don't set user agent when it is already set.
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"user-agent", "foo"}};
 
@@ -436,7 +378,8 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 
 // Verify that we do set user agent when it is empty.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(canary_node_));
   user_agent_ = "bar";
@@ -494,7 +437,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 
 // Test generating request-id in various edge request scenarios.
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
                                              An<const envoy::type::v3::FractionalPercent&>(), _))
@@ -505,7 +449,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                      {"x-request-id", "will_be_regenerated"}};
     EXPECT_CALL(random_, uuid());
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", Matcher<uint64_t>(_)))
+    EXPECT_CALL(runtime_.snapshot_,
+                featureEnabled("tracing.client_enabled", testing::Matcher<uint64_t>(_)))
         .Times(0);
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
@@ -553,7 +498,6 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
 // does not overwrite x-request-id. This happens in the internal ingress case.
 TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstream) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
-  EXPECT_CALL(connection_, remoteAddress()).Times(0);
   TestRequestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},
                                    {"x-request-id", "id"},
                                    {"x-forwarded-for", "34.0.0.1"}};
@@ -570,7 +514,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
 // Verify that we don't overwrite user agent, but do set x-envoy-downstream-service-cluster
 // correctly.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   user_agent_ = "bar";
@@ -587,7 +532,8 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
 // Verify that we set both user agent and x-envoy-downstream-service-cluster.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   user_agent_ = "bar";
   TestRequestHeaderMapImpl headers;
@@ -624,7 +570,8 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
 
 // Make sure we do not overwrite x-request-id if the request is internal.
 TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternalRequest) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-request-id", "original_request_id"}};
   EXPECT_CALL(random_, uuid()).Times(0);
@@ -636,7 +583,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
 
 // Make sure that we do overwrite x-request-id for "edge" external requests.
 TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-request-id", "original"}};
   EXPECT_CALL(random_, uuid()).WillOnce(Return("override"));
@@ -649,7 +597,8 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
 // A request that uses remote address and is from an external address should be treated as an
 // external request with all internal only headers cleaned.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
   TestRequestHeaderMapImpl headers{{"x-envoy-decorator-operation", "foo"},
@@ -689,7 +638,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
 // A request that is from an external address, but does not use remote address, should pull the
 // address from XFF.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("60.0.0.2");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("60.0.0.2"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                                    {"x-forwarded-for", "60.0.0.1"}};
@@ -702,7 +652,8 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
 
 // Verify that if XFF is invalid we fall back to remote address, even if it is a pipe.
 TEST_F(ConnectionManagerUtilityTest, PipeAddressInvalidXFFtDontUseRemote) {
-  connection_.remote_address_ = std::make_shared<Network::Address::PipeInstance>("/blah");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::PipeInstance>("/blah"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "blah"}};
 
@@ -714,7 +665,8 @@ TEST_F(ConnectionManagerUtilityTest, PipeAddressInvalidXFFtDontUseRemote) {
 // includes only internal addresses. Note that this is legacy behavior. See the comments
 // in mutateRequestHeaders() for more info.
 TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.2"}};
 
@@ -726,7 +678,8 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
 // A request that is from an internal address and uses remote address should be an internal request.
 // It should also preserve x-envoy-external-address.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                                    {"x-envoy-expected-rq-timeout-ms", "10"}};
@@ -848,42 +801,6 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
   }
 }
 
-TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequestsLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_upgrade_response", "false"}});
-
-  // Test with the request headers not valid upgrade headers
-  {
-    TestRequestHeaderMapImpl request_headers{{"upgrade", "foo"}};
-    TestResponseHeaderMapImpl response_headers{{"connection", "upgrade"},
-                                               {"transfer-encoding", "eep"},
-                                               {"upgrade", "foo"},
-                                               {"custom_header", "custom_value"}};
-    EXPECT_FALSE(Utility::isUpgrade(request_headers));
-    EXPECT_TRUE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
-
-    EXPECT_EQ(2UL, response_headers.size()) << response_headers;
-    EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
-    EXPECT_EQ("foo", response_headers.get_("upgrade"));
-  }
-
-  // Test with the response headers not valid upgrade headers
-  {
-    TestRequestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
-    TestResponseHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
-    EXPECT_TRUE(Utility::isUpgrade(request_headers));
-    EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
-
-    EXPECT_EQ(1UL, response_headers.size()) << response_headers;
-    EXPECT_EQ("bar", response_headers.get_("upgrade"));
-  }
-}
-
 // Test that we correctly return x-request-id if we were requested to force a trace.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestResponseHeaderMapImpl response_headers;
@@ -891,8 +808,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
                                            {"x-envoy-force-trace", "true"}};
 
   EXPECT_CALL(*request_id_extension_,
-              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)))
-      .Times(1);
+              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)));
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
@@ -916,8 +832,7 @@ TEST_F(ConnectionManagerUtilityTest, AlwaysMutateResponseHeadersReturnXRequestId
   TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
   EXPECT_CALL(*request_id_extension_,
-              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)))
-      .Times(1);
+              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)));
   ON_CALL(config_, alwaysSetRequestIdInResponse()).WillByDefault(Return(true));
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
@@ -1221,8 +1136,7 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled))
-      .Times(1);
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(TraceStatus::Sampled, request_id_extension_->getTraceStatus(request_headers));
@@ -1241,8 +1155,7 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled))
-      .Times(1);
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(TraceStatus::Sampled, request_id_extension_->getTraceStatus(request_headers));
@@ -1268,8 +1181,7 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace))
-      .Times(1);
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
@@ -1309,11 +1221,9 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled))
-      .Times(1);
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled));
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace))
-      .Times(1);
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
@@ -1333,8 +1243,7 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Client))
-      .Times(1);
+              setTraceStatus(testing::Ref(request_headers), TraceStatus::Client));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(TraceStatus::Client, request_id_extension_->getTraceStatus(request_headers));
@@ -1375,8 +1284,7 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced))
-      .Times(1);
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1395,10 +1303,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(false));
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced))
-      .Times(1);
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::NoTrace))
-      .Times(1);
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced));
+  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::NoTrace));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1509,23 +1415,40 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
 
 // maybeNormalizeHost() removes port part from host header.
 TEST_F(ConnectionManagerUtilityTest, RemovePort) {
-  ON_CALL(config_, shouldStripMatchingPort()).WillByDefault(Return(true));
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setHost("host:443");
 
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 443);
   EXPECT_EQ(header_map.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::Any));
+  TestRequestHeaderMapImpl original_headers_any;
+  original_headers_any.setHost("host:9999");
+
+  TestRequestHeaderMapImpl header_map_any(original_headers_any);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_any, config_, 7777);
+  EXPECT_EQ(header_map_any.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
+  TestRequestHeaderMapImpl original_headers_none;
+  original_headers_none.setHost("host:9999");
+
+  TestRequestHeaderMapImpl header_map_none(original_headers_none);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
+  EXPECT_EQ(header_map_none.getHostValue(), "host:9999");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-request-id", "my-request-id"},
                                    {"x-forwarded-for", "198.51.100.1"}};
-  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1535,11 +1458,12 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
 
 // test preserve_external_request_id true but generates new request id when not passed
 TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
-  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1551,7 +1475,7 @@ TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
-  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
@@ -1562,7 +1486,7 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepR
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers;
-  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+  EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
@@ -1571,14 +1495,15 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGener
 // test preserve_external_request_id false edge request generates new request id
 TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
 
   // with request id
   {
     ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
     TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"},
                                      {"x-request-id", "my-request-id"}};
-    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true));
     EXPECT_CALL(*request_id_extension_, set(_, false)).Times(0);
     EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1588,7 +1513,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGener
   // with no request id
   {
     TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
-    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true));
     EXPECT_CALL(*request_id_extension_, set(_, false)).Times(0);
     EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
@@ -1603,7 +1528,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
   // with no request id
   {
     TestRequestHeaderMapImpl headers;
-    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
     EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
     callMutateRequestHeaders(headers, Protocol::Http2);
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
@@ -1612,7 +1537,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
   // with request id
   {
     TestRequestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
-    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false)).Times(1);
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
     EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
     callMutateRequestHeaders(headers, Protocol::Http2);
     EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));

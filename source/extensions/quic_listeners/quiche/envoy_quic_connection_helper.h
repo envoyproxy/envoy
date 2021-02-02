@@ -1,17 +1,19 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
 
 #include "quiche/quic/core/crypto/quic_random.h"
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/core/quic_simple_buffer_allocator.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 

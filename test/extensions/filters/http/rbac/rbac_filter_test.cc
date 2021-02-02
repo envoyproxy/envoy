@@ -64,7 +64,7 @@ public:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    ON_CALL(req_info_, downstreamLocalAddress()).WillByDefault(ReturnRef(address_));
+    req_info_.downstream_address_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {
@@ -186,7 +186,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
   EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
   EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
-  EXPECT_EQ("rbac_access_denied", callbacks_.details_);
+  EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
 

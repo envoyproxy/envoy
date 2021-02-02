@@ -185,7 +185,6 @@ private:
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     const Network::SocketPtr socket_;
-    const Event::FileEventPtr socket_event_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
@@ -260,7 +259,8 @@ private:
 
   virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address());
+    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
+                                                 nullptr);
   }
 
   // Upstream::ClusterUpdateCallbacks

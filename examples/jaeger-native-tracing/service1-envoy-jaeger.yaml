@@ -9,7 +9,7 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -37,12 +37,12 @@ static_resources:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           tracing:
             provider:
               name: envoy.tracers.dynamic_ot
               typed_config:
-                "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
+                "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
                 library: /usr/local/lib/libjaegertracing_plugin.so
                 config:
                   service_name: service1
@@ -104,9 +104,3 @@ static_resources:
               socket_address:
                 address: service2
                 port_value: 8000
-admin:
-  access_log_path: "/dev/null"
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 8001

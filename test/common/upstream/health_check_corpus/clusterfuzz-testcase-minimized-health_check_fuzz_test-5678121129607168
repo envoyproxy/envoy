@@ -1,0 +1,28 @@
+health_check_config {
+  timeout {
+    seconds: 8960
+  }
+  interval {
+    seconds: 26624
+  }
+  unhealthy_threshold {
+    value: 524288
+  }
+  healthy_threshold {
+    value: 2147483652
+  }
+  http_health_check {
+    path: "\003"
+  }
+  event_log_path: "("
+  interval_jitter_percent: 654311422
+}
+actions {
+  respond {
+    http_respond {
+      status: 11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+    }
+  }
+}
+http_verify_cluster: true
+start_failed: true

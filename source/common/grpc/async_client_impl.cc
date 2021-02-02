@@ -16,8 +16,9 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      host_name_(config.envoy_grpc().authority()), initial_metadata_(config.initial_metadata()),
-      time_source_(time_source) {}
+      host_name_(config.envoy_grpc().authority()), time_source_(time_source),
+      metadata_parser_(
+          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -66,13 +67,14 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
       callbacks_(callbacks), options_(options) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
-  if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
+  const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
+  if (thread_local_cluster == nullptr) {
     callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
   }
 
-  auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
+  auto& http_async_client = thread_local_cluster->httpAsyncClient();
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
 
@@ -88,10 +90,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
-  for (const auto& header_value : parent_.initial_metadata_) {
-    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                        header_value.value());
-  }
+  parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
+                                            options_.parent_context.stream_info);
+
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
@@ -116,11 +117,9 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
-    // Technically this should be
+    // Status is translated via Utility::httpToGrpcStatus per
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as WellKnownGrpcStatus::Canceled.
-    streamError(Status::WellKnownGrpcStatus::Canceled);
+    streamError(Utility::httpToGrpcStatus(http_response_status));
     return;
   }
   if (end_stream) {

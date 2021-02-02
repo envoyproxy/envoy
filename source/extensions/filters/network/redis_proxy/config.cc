@@ -88,7 +88,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
 
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
-      context.random(), context.runtime(), proto_config.faults());
+      context.api().randomGenerator(), context.runtime(), proto_config.faults());
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(

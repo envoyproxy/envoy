@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
@@ -133,11 +134,11 @@ protected:
     EXPECT_EQ(strategy, config_->compressionStrategy());
     EXPECT_EQ(level, config_->compressionLevel());
     EXPECT_EQ(5, config_->memoryLevel());
-    EXPECT_EQ(30, config_->minimumLength());
+    EXPECT_EQ(30, config_->responseDirectionConfig().minimumLength());
     EXPECT_EQ(28, config_->windowBits());
-    EXPECT_EQ(false, config_->disableOnEtagHeader());
-    EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
-    EXPECT_EQ(18, config_->contentTypeValues().size());
+    EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
+    EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
+    EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
   }
 
   void doResponseNoCompression(Http::TestResponseHeaderMapImpl&& headers) {
@@ -192,15 +193,15 @@ TEST_F(GzipFilterTest, RuntimeDisabled) {
 // Default config values.
 TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(5, config_->memoryLevel());
-  EXPECT_EQ(30, config_->minimumLength());
+  EXPECT_EQ(30, config_->responseDirectionConfig().minimumLength());
   EXPECT_EQ(28, config_->windowBits());
-  EXPECT_EQ(false, config_->disableOnEtagHeader());
-  EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
+  EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
+  EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
   EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
   EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
-  EXPECT_EQ(18, config_->contentTypeValues().size());
+  EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
 }
 
 TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
@@ -274,7 +275,7 @@ TEST_F(GzipFilterTest, ContentLengthNoCompression) {
 
 // Verifies that compression is NOT skipped when content-length header is allowed.
 TEST_F(GzipFilterTest, ContentLengthCompression) {
-  setUpFilter(R"EOF({"content_length": 500})EOF");
+  setUpFilter(R"EOF({"compressor": {"content_length": 500}})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseCompression({{":method", "get"}, {"content-length", "1000"}}, false);
 }
@@ -283,15 +284,17 @@ TEST_F(GzipFilterTest, ContentLengthCompression) {
 TEST_F(GzipFilterTest, ContentTypeNoCompression) {
   setUpFilter(R"EOF(
     {
-      "content_type": [
-        "text/html",
-        "text/css",
-        "text/plain",
-        "application/javascript",
-        "application/json",
-        "font/eot",
-        "image/svg+xml"
-      ]
+      "compressor": {
+        "content_type": [
+          "text/html",
+          "text/css",
+          "text/plain",
+          "application/javascript",
+          "application/json",
+          "font/eot",
+          "image/svg+xml"
+        ]
+      }
     }
   )EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
@@ -310,7 +313,7 @@ TEST_F(GzipFilterTest, ContentTypeCompression) {
 
 // Verifies that compression is skipped when etag header is NOT allowed.
 TEST_F(GzipFilterTest, EtagNoCompression) {
-  setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
+  setUpFilter(R"EOF({"compressor": { "disable_on_etag_header": true }})EOF");
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
@@ -401,7 +404,7 @@ TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
 TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
-    setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
+    setUpFilter(R"EOF({"compressor": {"remove_accept_encoding_header": true}})EOF");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }

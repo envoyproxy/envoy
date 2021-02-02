@@ -30,6 +30,16 @@ typical rollout sequence might look like:
 4. Support for v2 is removed in the management server. The management server moves to v3 exclusively
    internally and can support newer fields.
 
+Another approach for type url version migration will be to enable the support of mixed type url 
+protected by a runtime guard *envoy.reloadable_features.enable_type_url_downgrade_and_upgrade*.
+Client can send discovery request with v2 resource type url and process discovery response with 
+v3 resource type url. Client can also send discovery request with v3 resource type url and process 
+discovery response with v2 resource type url. The upgrade and downgrade of type url is performed automatically.
+If your management server does not support both v2/v3 at the same time, you can have clients 
+with type url upgrade and downgrade feature enabled. These clients can talk to a mix of management servers
+that support either v2 or v3 exclusively. Just like the first approach, no deprecated v2 fields or new v3 fields 
+can be used at this point.
+
 If you are operating a managed control plane as-a-service, you will likely need to support a wide
 range of client versions. In this scenario, you will require long term support for multiple major
 API transport and resource versions. Strategies for managing this support are described :ref:`here

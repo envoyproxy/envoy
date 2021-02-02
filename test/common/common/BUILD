@@ -188,9 +188,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "optref_test",
+    srcs = ["optref_test.cc"],
+)
+
+envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
     deps = [
+        "//source/common/common:interval_value",
         "//source/common/common:random_generator_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:environment_lib",
@@ -205,6 +211,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:utility_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
@@ -262,6 +269,17 @@ envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
+)
+
+envoy_cc_benchmark_binary(
+    name = "re_speed_test",
+    srcs = ["re_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "@com_googlesource_code_re2//:re2",
+    ],
 )
 
 envoy_cc_benchmark_binary(
@@ -336,5 +354,23 @@ envoy_cc_test(
     deps = [
         "//source/common/common:statusor_lib",
         "//source/common/http:status_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "interval_value_test",
+    srcs = ["interval_value_test.cc"],
+    deps = ["//source/common/common:interval_value"],
+)
+
+envoy_cc_test(
+    name = "scope_tracker_test",
+    srcs = ["scope_tracker_test.cc"],
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/common/common:scope_tracker",
+        "//source/common/event:dispatcher_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:utility_lib",
     ],
 )

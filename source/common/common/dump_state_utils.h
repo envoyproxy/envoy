@@ -14,13 +14,16 @@ namespace Envoy {
 #define DUMP_OPTIONAL_MEMBER(member)                                                               \
   ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
 
+#define DUMP_NULLABLE_MEMBER(member, value)                                                        \
+  ", " #member ": " << ((member) != nullptr ? value : "null")
+
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
 #define DUMP_DETAILS(member)                                                                       \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
-    if ((member) != nullptr) {                                                                     \
+    if (member) {                                                                                  \
       os << "\n";                                                                                  \
       (member)->dumpState(os, indent_level + 1);                                                   \
     } else {                                                                                       \

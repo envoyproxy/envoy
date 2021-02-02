@@ -6,14 +6,16 @@
 #include "envoy/api/api.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -52,6 +54,55 @@ private:
   Stats::Gauge& scale_percent_gauge_;
 };
 
+// Simple table that converts strings into Symbol instances. Symbols are guaranteed to start at 0
+// and be indexed sequentially.
+class NamedOverloadActionSymbolTable {
+public:
+  class Symbol {
+  public:
+    // Allow copy construction everywhere.
+    Symbol(const Symbol&) = default;
+
+    // Returns the index of the symbol in the table.
+    size_t index() const { return index_; }
+
+    // Support use as a map key.
+    bool operator==(const Symbol other) { return other.index_ == index_; }
+
+    // Support absl::Hash.
+    template <typename H>
+    friend H AbslHashValue(H h, const Symbol& s) { // NOLINT(readability-identifier-naming)
+      return H::combine(std::move(h), s.index_);
+    }
+
+  private:
+    friend class NamedOverloadActionSymbolTable;
+    // Only the symbol table class can create Symbol instances from indices.
+    explicit Symbol(size_t index) : index_(index) {}
+
+    size_t index_;
+  };
+
+  // Finds an existing or adds a new entry for the given name.
+  Symbol get(absl::string_view name);
+
+  // Returns the symbol for the name if there is one, otherwise nullopt.
+  absl::optional<Symbol> lookup(absl::string_view string) const;
+
+  // Translates a symbol back into a name.
+  const absl::string_view name(Symbol symbol) const;
+
+  // Returns the number of symbols in the table. All symbols are guaranteed to have an index less
+  // than size().
+  size_t size() const { return table_.size(); }
+
+private:
+  absl::flat_hash_map<std::string, size_t> table_;
+  std::vector<std::string> names_;
+};
+
+class ThreadLocalOverloadStateImpl;
+
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -64,11 +115,18 @@ public:
   bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
+  Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
 
   // Stop the overload manager timer and wait for any pending resource updates to complete.
   // After this returns, overload manager clients should not receive any more callbacks
   // about overload state changes.
   void stop();
+
+protected:
+  // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
+  virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
+      Event::Dispatcher& dispatcher,
+      const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const;
 
 private:
   using FlushEpochId = uint64_t;
@@ -108,21 +166,28 @@ private:
 
   bool started_;
   Event::Dispatcher& dispatcher_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalOverloadStateImpl> tls_;
+  NamedOverloadActionSymbolTable action_symbol_table_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
-  absl::node_hash_map<std::string, OverloadAction> actions_;
+  absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
-  absl::flat_hash_map<std::string, OverloadActionState> state_updates_to_flush_;
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
+
+  absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
+      state_updates_to_flush_;
   absl::flat_hash_map<ActionCallback*, OverloadActionState> callbacks_to_flush_;
   FlushEpochId flush_epoch_ = 0;
   uint64_t flush_awaiting_updates_ = 0;
 
-  using ResourceToActionMap = std::unordered_multimap<std::string, std::string>;
+  using ResourceToActionMap =
+      std::unordered_multimap<std::string, NamedOverloadActionSymbolTable::Symbol>;
   ResourceToActionMap resource_to_actions_;
 
-  using ActionToCallbackMap = std::unordered_multimap<std::string, ActionCallback>;
+  using ActionToCallbackMap =
+      std::unordered_multimap<NamedOverloadActionSymbolTable::Symbol, ActionCallback,
+                              absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
 };
 

@@ -1,5 +1,4 @@
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/header_map.h"
 
 #include "common/http/headers.h"
 
@@ -33,6 +32,10 @@ protected:
 
   void SetUp() override {
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
+    // Initialize the time source (otherwise it returns the real time)
+    time_source_.setSystemTime(std::chrono::hours(1));
+    // Use the initialized time source to set the response date header
+    response_headers_.setDate(formatter_.now(time_source_));
   }
 
   void testDecodeRequestMiss(CacheFilterSharedPtr filter) {
@@ -46,7 +49,7 @@ protected:
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // The filter should continue decoding when the cache lookup result (miss) is ready.
-    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(1);
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
 
     // The cache lookup callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
@@ -59,7 +62,7 @@ protected:
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                true));
 
     // The filter should not encode any data as the response has no body.
@@ -85,7 +88,7 @@ protected:
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                false));
 
     // The filter should encode cached data.
@@ -111,6 +114,8 @@ protected:
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
   }
 
+  void waitBeforeSecondRequest() { time_source_.advanceTimeWait(delay_); }
+
   SimpleHttpCache simple_cache_;
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -119,12 +124,13 @@ protected:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
-                                                    {"date", formatter_.now(time_source_)},
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
+  const Seconds delay_ = Seconds(10);
+  const std::string age = std::to_string(delay_.count());
 };
 
 TEST_F(CacheFilterTest, UncacheableRequest) {
@@ -199,6 +205,7 @@ TEST_F(CacheFilterTest, CacheHitNoBody) {
     EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2.
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -227,6 +234,7 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -240,7 +248,8 @@ TEST_F(CacheFilterTest, CacheHitWithBody) {
 TEST_F(CacheFilterTest, SuccessfulValidation) {
   request_headers_.setHost("SuccessfulValidation");
   const std::string body = "abc";
-
+  const std::string etag = "abc123";
+  const std::string last_modified_date = formatter_.now(time_source_);
   {
     // Create filter for request 1
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -249,9 +258,8 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     // Encode response
     // Add Etag & Last-Modified headers to the response for validation
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
-                                      formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -259,6 +267,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -273,12 +282,11 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 
     // Make sure validation conditional headers are added
     const Http::TestRequestHeaderMapImpl injected_headers = {
-        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+        {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
     // Encode 304 response
     // Advance time to make sure the cached date is updated with the 304 date
-    time_source_.advanceTimeWait(std::chrono::seconds(10));
     const std::string not_modified_date = formatter_.now(time_source_);
     Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                      {"date", not_modified_date}};
@@ -292,9 +300,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     // Check for the cached response headers with updated date
     Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
     updated_response_headers.setDate(not_modified_date);
-    EXPECT_THAT(not_modified_response_headers,
-                testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
-                               HeaderHasValueRef(Http::Headers::get().Age, "0")));
+    EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
 
     // A 304 response should not have a body, so encodeData should not be called
     // However, if a body is present by mistake, encodeData should stop iteration until
@@ -322,18 +328,18 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
 TEST_F(CacheFilterTest, UnsuccessfulValidation) {
   request_headers_.setHost("UnsuccessfulValidation");
   const std::string body = "abc";
-
+  const std::string etag = "abc123";
+  const std::string last_modified_date = formatter_.now(time_source_);
   {
     // Create filter for request 1
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     testDecodeRequestMiss(filter);
 
-    // Encode response.
+    // Encode response
     // Add Etag & Last-Modified headers to the response for validation.
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
-    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
-                                      formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, last_modified_date);
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -341,6 +347,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Create filter for request 2.
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
@@ -355,7 +362,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
 
     // Make sure validation conditional headers are added.
     const Http::TestRequestHeaderMapImpl injected_headers = {
-        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+        {"if-none-match", etag}, {"if-modified-since", last_modified_date}};
     EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
 
     // Encode new response.
@@ -368,7 +375,7 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     EXPECT_EQ(filter->encodeData(new_body, true), Http::FilterDataStatus::Continue);
 
     // The response headers should have the new status.
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(":status", "201"));
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
 
     // The filter should not encode any data.
     EXPECT_CALL(encoder_callbacks_, addEncodedData).Times(0);
@@ -400,6 +407,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Add range info to headers.
     request_headers_.addReference(Http::Headers::get().Range, "bytes=-2");
@@ -414,7 +422,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                false));
 
     EXPECT_CALL(
@@ -451,6 +459,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Add range info to headers
     // multi-part responses are not supported, 200 expected
@@ -462,7 +471,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                false));
 
     EXPECT_CALL(
@@ -499,6 +508,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
     filter->onDestroy();
   }
+  waitBeforeSecondRequest();
   {
     // Add range info to headers
     request_headers_.addReference(Http::Headers::get().Range, "bytes=123-");
@@ -513,7 +523,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
                                true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData

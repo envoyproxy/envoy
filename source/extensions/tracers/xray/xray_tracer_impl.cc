@@ -47,16 +47,16 @@ Driver::Driver(const XRayConfiguration& config,
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
   sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
-      xray_config_.sampling_rules_, context.serverFactoryContext().random(),
+      xray_config_.sampling_rules_, context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
 
   tls_slot_ptr_->set([this, daemon_endpoint,
                       &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
-    TracerPtr tracer = std::make_unique<Tracer>(xray_config_.segment_name_, xray_config_.origin_,
-                                                xray_config_.aws_metadata_, std::move(broker),
-                                                context.serverFactoryContext().timeSource(),
-                                                context.serverFactoryContext().random());
+    TracerPtr tracer = std::make_unique<Tracer>(
+        xray_config_.segment_name_, xray_config_.origin_, xray_config_.aws_metadata_,
+        std::move(broker), context.serverFactoryContext().timeSource(),
+        context.serverFactoryContext().api().randomGenerator());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
 }
@@ -77,11 +77,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   UNREFERENCED_PARAMETER(config);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto* header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
+  const auto header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
-  if (header) {
-    Http::LowerCaseString lowered_header_value{std::string(header->value().getStringView())};
+  if (!header.empty()) {
+    // This is an implicitly untrusted header, so only the first value is used.
+    Http::LowerCaseString lowered_header_value{std::string(header[0]->value().getStringView())};
     xray_header = parseXRayHeader(lowered_header_value);
     // if the sample_decision in the x-ray header is unknown then we try to make a decision based
     // on the sampling strategy
@@ -107,7 +108,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
     return tracer->startSpan(operation_name, start_time,
-                             header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
+                             !header.empty() ? absl::optional<XRayHeader>(xray_header)
+                                             : absl::nullopt);
   }
 
   // instead of returning nullptr, we return a Span that is marked as not-sampled.

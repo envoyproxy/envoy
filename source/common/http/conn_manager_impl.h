@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
@@ -26,7 +27,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -43,6 +44,7 @@
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
+#include "common/router/scoped_rds.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -112,34 +114,35 @@ public:
 private:
   struct ActiveStream;
 
-  // Used to abstract making of RouteConfig update request.
-  // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
-  // NullRouteConfigUpdateRequester is used in all other cases (specifically when
-  // ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
-  class RouteConfigUpdateRequester {
+  class RdsRouteConfigUpdateRequester {
   public:
-    virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
-                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    };
-  };
+    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider,
+                                  ActiveStream& parent)
+        : route_config_provider_(route_config_provider), parent_(parent) {}
 
-  class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
-  public:
-    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
-        : route_config_provider_(route_config_provider) {}
-    void requestRouteConfigUpdate(
-        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                  ActiveStream& parent)
+        // Expect the dynamic cast to succeed because only ScopedRdsConfigProvider is fully
+        // implemented. Inline provider will be cast to nullptr here but it is not full implemented
+        // and can't not be used at this point. Should change this implementation if we have a
+        // functional inline scope route provider in the future.
+        : scoped_route_config_provider_(
+              dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)),
+          parent_(parent) {}
+
+    void
+    requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    void requestVhdsUpdate(const std::string& host_header,
+                           Event::Dispatcher& thread_local_dispatcher,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    void requestSrdsUpdate(Router::ScopeKeyPtr scope_key,
+                           Event::Dispatcher& thread_local_dispatcher,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
-  };
-
-  class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
-  public:
-    NullRouteConfigUpdateRequester() = default;
+    Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
+    ActiveStream& parent_;
   };
 
   /**
@@ -156,7 +159,6 @@ private:
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
     void completeRequest();
 
-    void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -226,22 +228,22 @@ private:
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
       response_trailers_ = std::move(response_trailers);
     }
+    void chargeStats(const ResponseHeaderMap& headers) override;
 
-    // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
-      return request_headers_ ? std::make_optional(std::ref(*request_headers_)) : absl::nullopt;
+      return makeOptRefFromPtr(request_headers_.get());
     }
     Http::RequestTrailerMapOptRef requestTrailers() override {
-      return request_trailers_ ? std::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
+      return makeOptRefFromPtr(request_trailers_.get());
     }
     Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return continue_headers_ ? std::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+      return makeOptRefFromPtr(continue_headers_.get());
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
-      return response_headers_ ? std::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+      return makeOptRefFromPtr(response_headers_.get());
     }
     Http::ResponseTrailerMapOptRef responseTrailers() override {
-      return response_trailers_ ? std::make_optional(std::ref(*response_trailers_)) : absl::nullopt;
+      return makeOptRefFromPtr(response_trailers_.get());
     }
 
     void endStream() override {
@@ -267,9 +269,6 @@ private:
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
     absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
-    void requestRouteConfigUpdate(
-        Event::Dispatcher& thread_local_dispatcher,
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -286,8 +285,11 @@ private:
 
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     void refreshCachedTracingCustomTags();
+    void refreshDurationTimeout();
 
     // All state for the stream. Put here for readability.
     struct State {
@@ -311,6 +313,8 @@ private:
     void onIdleTimeout();
     // Per-stream request timeout callback.
     void onRequestTimeout();
+    // Per-stream request header timeout callback.
+    void onRequestHeaderTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
@@ -351,19 +355,28 @@ private:
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
-    // Per-stream idle timeout.
+    // Per-stream idle timeout. This timer gets reset whenever activity occurs on the stream, and,
+    // when triggered, will close the stream.
     Event::TimerPtr stream_idle_timer_;
-    // Per-stream request timeout.
+    // Per-stream request timeout. This timer is enabled when the stream is created and disabled
+    // when the stream ends. If triggered, it will close the stream.
     Event::TimerPtr request_timer_;
-    // Per-stream alive duration.
+    // Per-stream request header timeout. This timer is enabled when the stream is created and
+    // disabled when the downstream finishes sending headers. If triggered, it will close the
+    // stream.
+    Event::TimerPtr request_header_timer_;
+    // Per-stream alive duration. This timer is enabled once when the stream is created and, if
+    // triggered, will close the stream.
     Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
-    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
+    std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+
+    friend FilterManager;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -422,6 +435,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
+  Server::ThreadLocalOverloadState& overload_state_;
   // References into the overload manager thread local state map. Using these lets us avoid a
   // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;

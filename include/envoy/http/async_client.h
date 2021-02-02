@@ -6,6 +6,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
@@ -169,6 +170,13 @@ public:
   virtual ~AsyncClient() = default;
 
   /**
+   * A context from the caller of an async client.
+   */
+  struct ParentContext {
+    const StreamInfo::StreamInfo* stream_info;
+  };
+
+  /**
    * A structure to hold the options for AsyncStream object.
    */
   struct StreamOptions {
@@ -193,6 +201,10 @@ public:
       hash_policy = v;
       return *this;
     }
+    StreamOptions& setParentContext(const ParentContext& v) {
+      parent_context = v;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -215,6 +227,9 @@ public:
 
     // Provides the hash policy for hashing load balancing strategies.
     Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
+
+    // Provides parent context. Currently, this holds stream info from the caller.
+    ParentContext parent_context;
   };
 
   /**
@@ -240,6 +255,10 @@ public:
     RequestOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       StreamOptions::setHashPolicy(v);
+      return *this;
+    }
+    RequestOptions& setParentContext(const ParentContext& v) {
+      StreamOptions::setParentContext(v);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

@@ -37,7 +37,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x200000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -125,6 +125,9 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound)) {
     common_access_log.mutable_response_flags()->set_no_filter_config_found(true);
   }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DurationTimeout)) {
+    common_access_log.mutable_response_flags()->set_duration_timeout(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
@@ -132,19 +135,19 @@ void Utility::extractCommonAccessLogProperties(
     const StreamInfo::StreamInfo& stream_info,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
-  if (stream_info.downstreamRemoteAddress() != nullptr) {
+  if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *stream_info.downstreamRemoteAddress(),
+        *stream_info.downstreamAddressProvider().remoteAddress(),
         *common_access_log.mutable_downstream_remote_address());
   }
-  if (stream_info.downstreamDirectRemoteAddress() != nullptr) {
+  if (stream_info.downstreamAddressProvider().directRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *stream_info.downstreamDirectRemoteAddress(),
+        *stream_info.downstreamAddressProvider().directRemoteAddress(),
         *common_access_log.mutable_downstream_direct_remote_address());
   }
-  if (stream_info.downstreamLocalAddress() != nullptr) {
+  if (stream_info.downstreamAddressProvider().localAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *stream_info.downstreamLocalAddress(),
+        *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
   if (stream_info.downstreamSslConnection() != nullptr) {

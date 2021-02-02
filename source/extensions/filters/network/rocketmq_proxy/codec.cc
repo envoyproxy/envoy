@@ -391,7 +391,7 @@ void Encoder::encode(const RemotingCommandPtr& command, Buffer::Instance& data) 
     (*fields)["extFields"] = ext_fields_v;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessage(command_struct);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(command_struct);
 
   int32_t frame_length = 4;
   int32_t header_length = json.size();

@@ -64,13 +64,13 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2) circuit breaking and were failed
-  upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination 
+  upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
   upstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
-  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout
+  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout (except when request hedging is enabled)
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
@@ -87,13 +87,15 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_internal_redirect_succeed_total, Counter, Total number of times internal redirects resulted in a second upstream request.
   membership_change, Counter, Total cluster membership changes
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
-  membership_degraded, Gauge, Current cluster degraded total
+  membership_degraded, Gauge, Current cluster :ref:`degraded <arch_overview_load_balancing_degraded>` total
+  membership_excluded, Gauge, Current cluster :ref:`excluded <arch_overview_load_balancing_excluded>` total
   membership_total, Gauge, Current cluster membership total
   retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits
   config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
   update_attempt, Counter, Total attempted cluster membership updates by service discovery
   update_success, Counter, Total successful cluster membership updates by service discovery
   update_failure, Counter, Total failed cluster membership updates by service discovery
+  update_duration, Histogram, Amount of time spent updating configs
   update_empty, Counter, Total cluster membership updates ending with empty cluster load assignment and continuing with previous config
   update_no_rebuild, Counter, Total successful cluster membership updates that didn't result in any cluster load balancing structure rebuilds
   version, Gauge, Hash of the contents from the last successful API fetch
@@ -218,6 +220,15 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   external.upstream_rq_<\*xx>, Counter, External origin aggregate HTTP response codes
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
+
+.. _config_cluster_manager_cluster_stats_tls:
+
+TLS statistics
+--------------
+
+If TLS is used by the cluster the following statistics are rooted at *cluster.<name>.ssl.*:
+
+.. include:: ../../../_include/ssl_stats.rst
 
 .. _config_cluster_manager_cluster_stats_alt_tree:
 

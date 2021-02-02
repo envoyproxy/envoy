@@ -46,5 +46,15 @@ void IoSocketError::deleteIoError(Api::IoError* err) {
   }
 }
 
+inline IoSocketError* getIoSocketInvalidAddressInstance() {
+  static auto* instance = new IoSocketError(SOCKET_ERROR_NOT_SUP);
+  return instance;
+}
+
+Api::IoCallUint64Result IoSocketError::ioResultSocketInvalidAddress() {
+  return Api::IoCallUint64Result(
+      0, Api::IoErrorPtr(getIoSocketInvalidAddressInstance(), [](IoError*) {}));
+}
+
 } // namespace Network
 } // namespace Envoy

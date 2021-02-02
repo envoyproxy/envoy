@@ -1,7 +1,11 @@
 .. _install_sandboxes_csrf:
 
-CSRF Filter
+CSRF filter
 ===========
+
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
 
 Cross-Site Request Forgery (CSRF) is an attack that occurs when a malicious
 third-party website exploits a vulnerability that allows them to submit an
@@ -27,30 +31,10 @@ enforcement. The CSRF enforcement choices are:
   * Ignored: CSRF is enabled but the request type is a GET. This should bypass
     the CSRF filter and return successfully.
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+Step 1: Start all of our containers
+***********************************
 
-The following documentation runs through the setup of both services.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Start all of our containers**
-
-Switch to the ``samesite`` directory in the ``csrf`` example, and start the containers:
+Change to the ``examples/csrf/samesite`` directory, and start the containers:
 
 .. code-block:: console
 
@@ -61,7 +45,7 @@ Switch to the ``samesite`` directory in the ``csrf`` example, and start the cont
   $ docker-compose ps
 
             Name                        Command              State                            Ports
-  ----------------------------------------------------------------------------------------------------------------------
+  ----------------------------------------------------------------------------------------------------------------------------
   samesite_front-envoy_1      /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
   samesite_service_1          /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
@@ -74,12 +58,13 @@ Now, switch to the ``crosssite`` directory in the ``csrf`` example, and start th
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                       Command                State                            Ports
-  ----------------------------------------------------------------------------------------------------------------------
-  crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
-  crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp, 8000/tcp
+            Name                       Command                State              Ports
+  -----------------------------------------------------------------------------------------------------
+  crosssite_front-envoy_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp
+  crosssite_service_1          /docker-entrypoint.sh /bin ... Up      10000/tcp
 
-**Step 4: Test Envoy's CSRF capabilities**
+Step 2: Test Envoy's CSRF capabilities
+**************************************
 
 You can now open a browser at http://localhost:8002 to view your ``crosssite`` frontend service.
 
@@ -103,7 +88,8 @@ For example:
 If you change the destination to be the same as one displaying the website and
 set the ``CSRF`` enforcement to enabled the request will go through successfully.
 
-**Step 5: Check stats of backend via admin**
+Step 3: Check stats of backend via admin
+****************************************
 
 When Envoy runs, it can listen to ``admin`` requests if a port is configured. In
 the example configs, the backend admin is bound to port ``8001``.
@@ -117,3 +103,8 @@ invalid and valid origins increment as you make requests from the frontend clust
   http.ingress_http.csrf.missing_source_origin: 0
   http.ingress_http.csrf.request_invalid: 1
   http.ingress_http.csrf.request_valid: 0
+
+.. seealso::
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.

@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
 
+#include <http_parser.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -224,6 +226,74 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http {
 
+static const char kDefaultPath[] = "/";
+
+// If http_parser encounters an IP address [address] as the host it will set the offset and
+// length to point to 'address' rather than '[address]'. Fix this by adjusting the offset
+// and length to include the brackets.
+// @param absolute_url the absolute URL. This is usually of the form // http://host/path
+//        but may be host:port for CONNECT requests
+// @param offset the offset for the first character of the host. For IPv6 hosts
+//        this will point to the first character inside the brackets and will be
+//        adjusted to point at the brackets
+// @param len the length of the host-and-port field. For IPv6 hosts this will
+//        not include the brackets and will be adjusted to do so.
+bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64_t& len) {
+  // According to https://tools.ietf.org/html/rfc3986#section-3.2.2 the only way a hostname
+  // may begin with '[' is if it's an ipv6 address.
+  if (offset == 0 || *(absolute_url.data() + offset - 1) != '[') {
+    return false;
+  }
+  // Start one character sooner and end one character later.
+  offset--;
+  len += 2;
+  // HTTP parser ensures that any [ has a closing ]
+  ASSERT(absolute_url.length() >= offset + len);
+  return true;
+}
+
+bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
+  struct http_parser_url u;
+  http_parser_url_init(&u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+
+  if (result != 0) {
+    return false;
+  }
+  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
+      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
+    return false;
+  }
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
+
+  uint64_t authority_len = u.field_data[UF_HOST].len;
+  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+  }
+
+  uint64_t authority_beginning = u.field_data[UF_HOST].off;
+  const bool is_ipv6 = maybeAdjustForIpv6(absolute_url, authority_beginning, authority_len);
+  host_and_port_ = absl::string_view(absolute_url.data() + authority_beginning, authority_len);
+  if (is_ipv6 && !parseAuthority(host_and_port_).is_ip_address_) {
+    return false;
+  }
+
+  // RFC allows the absolute-uri to not end in /, but the absolute path form
+  // must start with. Determine if there's a non-zero path, and if so determine
+  // the length of the path, query params etc.
+  uint64_t path_etc_len = absolute_url.length() - (authority_beginning + hostAndPort().length());
+  if (path_etc_len > 0) {
+    uint64_t path_beginning = authority_beginning + hostAndPort().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_etc_len);
+  } else if (!is_connect) {
+    ASSERT((u.field_set & (1 << UF_PATH)) == 0);
+    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
+  }
+  return true;
+}
+
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -318,7 +388,7 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
     if (header.key() == Http::Headers::get().Cookie.get()) {
 
       // Split the cookie header into individual cookies.
-      for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
         // Find the key part of the cookie (i.e. the name of the cookie).
         size_t first_non_space = s.find_first_not_of(" ");
         size_t equals_index = s.find('=');
@@ -435,11 +505,16 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
+  absl::string_view details;
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
   sendLocalReply(
       is_reset,
       Utility::EncodeFunctions{nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream);
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
                                },
                                [&](Buffer::Instance& data, bool end_stream) -> void {
                                  callbacks.encodeData(data, end_stream);
@@ -479,7 +554,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
-      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
       if (body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
@@ -601,7 +676,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = nullptr;
+    HeaderMap::GetResult nominated_header;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -628,8 +703,10 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       nominated_header = headers.get(lcs_header_to_remove);
     }
 
-    if (nominated_header) {
-      auto nominated_header_value_sv = nominated_header->value().getStringView();
+    if (!nominated_header.empty()) {
+      // NOTE: The TE header is an inline header, so by definition if we operate on it there can
+      // only be a single value. In all other cases we remove the nominated header.
+      auto nominated_header_value_sv = nominated_header[0]->value().getStringView();
 
       const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
 
@@ -640,6 +717,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       }
 
       if (is_te_header) {
+        ASSERT(nominated_header.size() == 1);
         for (const auto& header_value :
              StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
@@ -725,6 +803,14 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
+std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
+  if (file_path.size() >= 3 && file_path[1] == ':' && file_path[2] == '/' &&
+      std::isalpha(file_path[0])) {
+    return std::string(file_path);
+  }
+  return absl::StrCat("/", file_path);
+}
+
 RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);
@@ -764,6 +850,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

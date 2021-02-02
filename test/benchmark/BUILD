@@ -18,6 +18,9 @@ envoy_cc_test_library(
     ],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )

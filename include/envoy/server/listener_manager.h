@@ -58,8 +58,10 @@ public:
   /**
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
+   * @param lds_resources_locator xds::core::v3::ResourceLocator for listener collection.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                                 const xds::core::v3::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * Creates a socket.
@@ -167,8 +169,10 @@ public:
    * during server initialization because the listener manager is created prior to several core
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
+   * @param lds_resources_locator xds::core::v3::ResourceLocator for listener collection.
    */
-  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
+  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                            const xds::core::v3::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * @param state the type of listener to be returned (defaults to ACTIVE), states can be OR'd
@@ -198,8 +202,9 @@ public:
   /**
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param callback supplies the callback to complete server initialization.
    */
-  virtual void startWorkers(GuardDog& guard_dog) PURE;
+  virtual void startWorkers(GuardDog& guard_dog, std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
@@ -235,6 +240,11 @@ public:
    * @return the server's API Listener if it exists, nullopt if it does not.
    */
   virtual ApiListenerOptRef apiListener() PURE;
+
+  /*
+   * @return TRUE if the worker has started or FALSE if not.
+   */
+  virtual bool isWorkerStarted() PURE;
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

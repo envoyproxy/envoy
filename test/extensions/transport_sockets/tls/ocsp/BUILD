@@ -14,17 +14,14 @@ envoy_cc_test(
         "ocsp_test.cc",
     ],
     data = [
-        "gen_unittest_ocsp_data.sh",
+        "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
     ],
     external_deps = ["ssl"],
-    # TODO: Diagnose intermittent failure on Windows; this script uses the
-    # locally deployed openssl for test cert creation and manipulation, rather
-    # than envoy's current build of the most current openssl tool
-    tags = ["flaky_on_windows"],
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
         "//source/extensions/transport_sockets/tls/ocsp:ocsp_lib",
+        "//test/extensions/transport_sockets/tls:ssl_socket_test",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",

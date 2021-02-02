@@ -24,7 +24,16 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
     to_delete_.clear();
   }));
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
+  ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
+  ON_CALL(*this, createScaledTypedTimer_(_, _))
+      .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
+
+  ON_CALL(buffer_factory_, create_(_, _, _))
+      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                               std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
+      }));
 }
 
 MockDispatcher::~MockDispatcher() = default;
@@ -49,7 +58,11 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
       .RetiresOnSaturation();
 }
 
-MockTimer::~MockTimer() = default;
+MockTimer::~MockTimer() {
+  if (timer_destroyed_) {
+    *timer_destroyed_ = true;
+  }
+}
 
 MockSchedulableCallback::~MockSchedulableCallback() = default;
 

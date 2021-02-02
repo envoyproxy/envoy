@@ -6,6 +6,7 @@
 #include "test/config_test/config_test.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -28,11 +29,14 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapTextProtoDepr
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
 
-  // Loading as previous version should work (after upgrade)
-  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
-  EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'envoy.api.v2.core.Node.build_version'",
-                      ConfigTest::loadVersionedBootstrapFile(filename, proto_v2_from_file, 2));
-  EXPECT_EQ("foo", proto_v2_from_file.node().hidden_envoy_deprecated_build_version());
+  {
+    TestDeprecatedV2Api _deprecated_v2_api;
+    // Loading as previous version should work (after upgrade)
+    API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
+    EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'envoy.api.v2.core.Node.build_version'",
+                        ConfigTest::loadVersionedBootstrapFile(filename, proto_v2_from_file, 2));
+    EXPECT_EQ("foo", proto_v2_from_file.node().hidden_envoy_deprecated_build_version());
+  }
 
   // Loading as current version should fail
   API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v3_from_file;
@@ -80,11 +84,14 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapBinaryProtoDe
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap_binary_str);
 
-  // Loading as previous version should work (after upgrade)
-  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
-  EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'envoy.api.v2.core.Node.build_version'",
-                      ConfigTest::loadVersionedBootstrapFile(filename, proto_v2_from_file, 2));
-  EXPECT_EQ("foo", proto_v2_from_file.node().hidden_envoy_deprecated_build_version());
+  {
+    TestDeprecatedV2Api _deprecated_v2_api;
+    // Loading as previous version should work (after upgrade)
+    API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
+    EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'envoy.api.v2.core.Node.build_version'",
+                        ConfigTest::loadVersionedBootstrapFile(filename, proto_v2_from_file, 2));
+    EXPECT_EQ("foo", proto_v2_from_file.node().hidden_envoy_deprecated_build_version());
+  }
 
   // Loading as current version should fail
   API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v3_from_file;
@@ -111,11 +118,14 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapBinaryProtoDe
       HasSubstr("Illegal use of hidden_envoy_deprecated_ V2 field "
                 "'envoy.config.core.v3.Node.hidden_envoy_deprecated_build_version'"));
 
-  // Loading binary proto v3 with hidden-deprecated field with boosting will
-  // succeed as it cannot differentiate between v2 with the deprecated field and
-  // v3 with hidden_envoy_deprecated field
-  ConfigTest::loadVersionedBootstrapFile(filename_v3, proto_v3_from_file);
-  EXPECT_EQ("foo", proto_v3_from_file.node().hidden_envoy_deprecated_build_version());
+  {
+    TestDeprecatedV2Api _deprecated_v2_api;
+    // Loading binary proto v3 with hidden-deprecated field with boosting will
+    // succeed as it cannot differentiate between v2 with the deprecated field and
+    // v3 with hidden_envoy_deprecated field
+    ConfigTest::loadVersionedBootstrapFile(filename_v3, proto_v3_from_file);
+    EXPECT_EQ("foo", proto_v3_from_file.node().hidden_envoy_deprecated_build_version());
+  }
 }
 
 // A deprecated field can be used in previous version yaml and upgraded.
@@ -131,11 +141,14 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapYamlDeprecate
   const std::string filename = TestEnvironment::writeStringToFileForTest(
       "proto.yaml", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
 
-  // Loading as previous version should work (after upgrade)
-  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
-  EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'envoy.api.v2.core.Node.build_version'",
-                      ConfigTest::loadVersionedBootstrapFile(filename, proto_v2_from_file, 2));
-  EXPECT_EQ("foo", proto_v2_from_file.node().hidden_envoy_deprecated_build_version());
+  {
+    TestDeprecatedV2Api _deprecated_v2_api;
+    // Loading as previous version should work (after upgrade)
+    API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
+    EXPECT_LOG_CONTAINS("warning", "Using deprecated option 'envoy.api.v2.core.Node.build_version'",
+                        ConfigTest::loadVersionedBootstrapFile(filename, proto_v2_from_file, 2));
+    EXPECT_EQ("foo", proto_v2_from_file.node().hidden_envoy_deprecated_build_version());
+  }
 
   // Loading as current version should fail
   API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v3_from_file;
@@ -171,6 +184,7 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapYamlDeprecate
 
 // A deprecated field can be used in previous version json and upgraded.
 TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapJsonDeprecatedField)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap)
   bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v2::Bootstrap>(R"EOF(
     node:
@@ -178,9 +192,9 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapJsonDeprecate
     )EOF");
 
   EXPECT_EQ("{\"node\":{\"build_version\":\"foo\"}}",
-            MessageUtil::getJsonStringFromMessage(bootstrap, false, false));
+            MessageUtil::getJsonStringFromMessageOrDie(bootstrap, false, false));
   const std::string filename = TestEnvironment::writeStringToFileForTest(
-      "proto.json", MessageUtil::getJsonStringFromMessage(bootstrap, false, false));
+      "proto.json", MessageUtil::getJsonStringFromMessageOrDie(bootstrap, false, false));
 
   // Loading as previous version should work (after upgrade)
   API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
@@ -202,7 +216,7 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapJsonDeprecate
     )EOF");
 
   EXPECT_EQ("{\"node\":{\"hidden_envoy_deprecated_build_version\":\"foo\"}}",
-            MessageUtil::getJsonStringFromMessage(bootstrap_v3, false, false));
+            MessageUtil::getJsonStringFromMessageOrDie(bootstrap_v3, false, false));
   const std::string filename_v3 = TestEnvironment::writeStringToFileForTest(
       "proto_v3.json", MessageUtil::getYamlStringFromMessage(bootstrap_v3, false, false));
 

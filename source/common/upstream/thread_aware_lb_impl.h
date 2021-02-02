@@ -73,6 +73,8 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  // Preconnect not implemented for hash based load balancing
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
 
 protected:
   ThreadAwareLoadBalancerBase(
@@ -95,6 +97,8 @@ private:
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    // Preconnect not implemented for hash based load balancing
+    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;

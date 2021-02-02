@@ -25,7 +25,7 @@ TEST_P(LocalRateLimitIntegrationTest, NoRateLimiting) {
   setup(R"EOF(
 name: ratelimit
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.local_rate_limit.v2alpha.LocalRateLimit
+  "@type": type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit
   stat_prefix: local_rate_limit_stats
   token_bucket:
     max_tokens: 1
