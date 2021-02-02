@@ -162,6 +162,7 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
+    _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
@@ -886,6 +887,14 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+
+def _rules_fuzzing():
+    external_http_archive(
+        name = "rules_fuzzing",
+        repo_mapping = {
+            "@fuzzing_py_deps": "@fuzzing_pip3",
+        },
     )
 
 def _kafka_deps():

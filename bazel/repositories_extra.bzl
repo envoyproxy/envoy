@@ -97,6 +97,23 @@ def _python_deps():
         # release_date = "2020-05-21"
         # use_category = ["test"],
     )
+    pip3_import(
+        name = "fuzzing_pip3",
+        requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+
+        # project_name = "Abseil Python Common Libraries",
+        # project_url = "https://github.com/abseil/abseil-py",
+        # version = "0.11.0",
+        # release_date = "2020-10-27",
+        # use_category = ["test"],
+
+        # project_name = "Six: Python 2 and 3 Compatibility Library",
+        # project_url = "https://six.readthedocs.io/",
+        # version = "1.15.0",
+        # release_date = "2020-05-21"
+        # use_category = ["test"],
+    )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
 def envoy_dependencies_extra():
