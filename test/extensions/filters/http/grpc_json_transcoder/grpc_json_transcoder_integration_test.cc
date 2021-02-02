@@ -1036,6 +1036,39 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
           {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "");
 }
+//
+// TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
+//  config_helper_.setBufferLimits(2 << 20, 8);
+//  HttpIntegrationTest::initialize();
+//
+//  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+//      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+//                                     {":path", "/shelf"},
+//                                     {":authority", "host"},
+//                                     {"content-type", "application/json"}},
+//      R"({ "theme" : "Children")", {}, {}, Status(),
+//      Http::TestResponseHeaderMapImpl{{":status", "413"}},
+//      "Request rejected because the transcoder's internal buffer size exceeds the configured
+//      limit.", true, false, "", false);
+//}
+//
+// TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
+//  config_helper_.setBufferLimits(4, 2 << 20);
+//  HttpIntegrationTest::initialize();
+//  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+//      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+//                                     {":path", "/shelf"},
+//                                     {":authority", "host"},
+//                                     {"content-type", "application/json"}},
+//      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
+//      {R"(id: 20 theme: "Children" )"}, Status(),
+//      Http::TestResponseHeaderMapImpl{{":status", "500"},
+//                                      {"content-type", "application/json"},
+//                                      {"content-length", "30"},
+//                                      {"grpc-status", "0"}},
+//      "Response not transcoded because the transcoder's internal buffer size exceeds the
+//      configured limit.");
+//}
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
   overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");

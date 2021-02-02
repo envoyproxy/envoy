@@ -521,6 +521,10 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
 
   if (method_->request_type_is_http_body_) {
     request_data_.move(data);
+    if (checkIfDecoderBufferLimitReached(request_data_.length())) {
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
     // TODO(euroelessar): Upper bound message size for streaming case.
     if (end_stream || method_->descriptor_->client_streaming()) {
       maybeSendHttpBodyRequestMessage();
@@ -530,6 +534,9 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     }
   } else {
     request_in_.move(data);
+    if (checkIfDecoderBufferLimitReached(request_in_.BytesStored())) {
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
 
     if (end_stream) {
       request_in_.finish();
@@ -627,6 +634,9 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   response_in_.move(data);
+  if (checkIfEncoderBufferLimitReached(response_in_.BytesStored())) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
 
   if (end_stream) {
     response_in_.finish();
@@ -869,6 +879,42 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   Buffer::OwnedImpl status_data(json_status);
   encoder_callbacks_->addEncodedData(status_data, false);
   return true;
+}
+
+bool JsonTranscoderFilter::checkIfDecoderBufferLimitReached(uint64_t buffer_length) {
+  if (buffer_length > decoder_callbacks_->decoderBufferLimit()) {
+    ENVOY_LOG(debug,
+              "Request rejected because the transcoder's internal buffer size exceeds the "
+              "configured limit: {} > {}",
+              buffer_length, decoder_callbacks_->decoderBufferLimit());
+    error_ = true;
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::PayloadTooLarge,
+        "Request rejected because the transcoder's internal buffer size exceeds the configured "
+        "limit.",
+        nullptr, absl::nullopt,
+        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{request_buffer_size_limit_reached}"));
+    return true;
+  }
+  return false;
+}
+
+bool JsonTranscoderFilter::checkIfEncoderBufferLimitReached(uint64_t buffer_length) {
+  if (buffer_length > encoder_callbacks_->encoderBufferLimit()) {
+    ENVOY_LOG(debug,
+              "Response not transcoded because the transcoder's internal buffer size exceeds the "
+              "configured limit: {} > {}",
+              buffer_length, encoder_callbacks_->encoderBufferLimit());
+    error_ = true;
+    encoder_callbacks_->sendLocalReply(
+        Http::Code::InternalServerError,
+        "Response not transcoded because the transcoder's internal buffer size exceeds the "
+        "configured limit.",
+        nullptr, absl::nullopt,
+        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{response_buffer_size_limit_reached}"));
+    return true;
+  }
+  return false;
 }
 
 } // namespace GrpcJsonTranscoder

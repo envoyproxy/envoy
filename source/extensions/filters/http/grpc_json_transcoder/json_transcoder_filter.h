@@ -186,6 +186,10 @@ private:
   void doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers);
   void initPerRouteConfig();
 
+  // Helpers for flow control.
+  bool checkIfDecoderBufferLimitReached(uint64_t buffer_length);
+  bool checkIfEncoderBufferLimitReached(uint64_t buffer_length);
+
   JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;

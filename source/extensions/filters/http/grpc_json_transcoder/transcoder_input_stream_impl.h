@@ -15,6 +15,10 @@ public:
   // TranscoderInputStream
   int64_t BytesAvailable() const override;
   bool Finished() const override;
+
+  // Returns the total number of bytes stored in the underlying buffer.
+  // Useful for flow control.
+  int64_t BytesStored() const;
 };
 
 } // namespace GrpcJsonTranscoder

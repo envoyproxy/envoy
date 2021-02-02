@@ -345,6 +345,10 @@ protected:
       : config_(proto_config, *api_), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
+
+    // Have buffer limits match Envoy's default (1 MiB).
+    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(2 << 20));
+    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
   static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
@@ -655,6 +659,55 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 }
 
+// Requests that exceed the configured decoder buffer limit will be rejected.
+TEST_F(GrpcJsonTranscoderFilterTest, RequestBodyExceedsBufferLimit) {
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillOnce(Return(8));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _));
+
+  Buffer::OwnedImpl request_data{"{\"theme\": \"123456789\"}"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
+}
+
+// Responses that exceed the configured encoder buffer limit will be rejected.
+TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillOnce(Return(8));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_data{"{\"theme\": \"Children\"}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+
+  Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+
+  bookstore::Shelf response;
+  response.set_id(20);
+  // Serialization of string field will maintain all 9 bytes.
+  response.set_theme("123456789");
+
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_.encodeData(*response_data, false));
+}
+
 class GrpcJsonTranscoderFilterSkipRecalculatingTest : public GrpcJsonTranscoderFilterTest {
 public:
   GrpcJsonTranscoderFilterSkipRecalculatingTest()
@@ -946,6 +999,32 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
+// Unary requests with HTTP bodies require the filter to buffer the entire body.
+// This results in the filter internally buffering more data than the configured limits.
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBodyExceedsBufferLimit) {
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(8));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/postBody?arg=hi"}, {"content-type", "text/plain"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("123");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+  buffer.add("456");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+
+  // Exceeds limit!
+  buffer.add("789");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(buffer, true));
+  EXPECT_EQ(buffer.length(), 0);
+
+  EXPECT_EQ(decoder_callbacks_.details(),
+            "grpc_json_transcode_failure{request_buffer_size_limit_reached}");
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithNestedHttpBody) {
   const std::string path = "/echoNestedBody?nested2.body.data=aGkh";
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1046,6 +1125,31 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   expected_request.mutable_nested()->mutable_content()->set_data("world!");
   request.ParseFromString(frames[2].data_->toString());
   EXPECT_THAT(request, ProtoEq(expected_request));
+}
+
+// Streaming requests with HTTP bodies do not internally buffer any data.
+// The configured buffer limits will not apply.
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) {
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(8));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("123");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+  buffer.add("456");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
+  EXPECT_EQ(buffer.length(), 0);
+
+  // Does NOT exceed limit.
+  buffer.add("789");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
+  EXPECT_EQ(buffer.length(), 0);
+
+  EXPECT_EQ(decoder_callbacks_.details(), "");
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithHttpBodyAsOutput) {
@@ -1329,6 +1433,10 @@ protected:
     filter_ = new JsonTranscoderFilter(*config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+    // Have buffer limits match Envoy's default (1 MiB).
+    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(2 << 20));
+    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
   ~GrpcJsonTranscoderFilterPrintTest() override {
@@ -1465,6 +1573,10 @@ protected:
     filter_ = std::make_unique<JsonTranscoderFilter>(*config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+    // Have buffer limits match Envoy's default (1 MiB).
+    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(2 << 20));
+    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
   std::unique_ptr<JsonTranscoderConfig> config_;
