@@ -12,8 +12,8 @@
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
 
-#include "extensions/io_socket/user_space/io_handle.h"
 #include "extensions/io_socket/user_space/file_event_impl.h"
+#include "extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,13 +29,13 @@ namespace UserSpace {
  * 4. The peer BufferedIoSocket must be scheduled in the same thread to avoid data race because
  *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
-class BufferedIoSocketHandleImpl final : public Network::IoHandle,
-                                         public UserSpace::IoHandle,
-                                         protected Logger::Loggable<Logger::Id::io> {
+class IoSocketHandleImpl final : public Network::IoHandle,
+                                 public UserSpace::IoHandle,
+                                 protected Logger::Loggable<Logger::Id::io> {
 public:
-  BufferedIoSocketHandleImpl();
+  IoSocketHandleImpl();
 
-  ~BufferedIoSocketHandleImpl() override;
+  ~IoSocketHandleImpl() override;
 
   // Network::IoHandle
   os_fd_t fdDoNotUse() const override {
@@ -46,7 +46,8 @@ public:
   bool isOpen() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
-  Api::IoCallUint64Result read(Buffer::Instance& buffer, absl::optional<uint64_t> max_length_opt) override;
+  Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                               absl::optional<uint64_t> max_length_opt) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
@@ -101,9 +102,10 @@ public:
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
-      user_file_event_->activateIfEnabled(Event::FileReadyType::Read |
-                             // Closed ready type is defined as `end of stream`
-                             (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
+      user_file_event_->activateIfEnabled(
+          Event::FileReadyType::Read |
+          // Closed ready type is defined as `end of stream`
+          (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
   void onPeerDestroy() override {
@@ -160,7 +162,7 @@ private:
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
 };
-} // namespace BufferedIoSocket
+} // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

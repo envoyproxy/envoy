@@ -1,7 +1,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
-#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/user_space/io_socket_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpace {
 namespace {
 
 using testing::NiceMock;
@@ -25,10 +25,10 @@ public:
 class BufferedIoSocketHandlePlatformTest : public testing::Test {
 public:
   BufferedIoSocketHandlePlatformTest() {
-    first_io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    second_io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    first_io_handle_->setWritablePeer(second_io_handle_.get());
-    second_io_handle_->setWritablePeer(first_io_handle_.get());
+    first_io_handle_ = std::make_unique<IoSocketHandleImpl>();
+    second_io_handle_ = std::make_unique<IoSocketHandleImpl>();
+    first_io_handle_->setPeerHandle(second_io_handle_.get());
+    second_io_handle_->setPeerHandle(first_io_handle_.get());
   }
 
   ~BufferedIoSocketHandlePlatformTest() override {
@@ -40,8 +40,8 @@ public:
     }
   }
 
-  std::unique_ptr<BufferedIoSocketHandleImpl> first_io_handle_;
-  std::unique_ptr<BufferedIoSocketHandleImpl> second_io_handle_;
+  std::unique_ptr<IoSocketHandleImpl> first_io_handle_;
+  std::unique_ptr<IoSocketHandleImpl> second_io_handle_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockFileEventCallback cb_;
 };
@@ -57,7 +57,7 @@ TEST_F(BufferedIoSocketHandlePlatformTest, CreatePlatformDefaultTriggerTypeFailO
 }
 
 } // namespace
-} // namespace BufferedIoSocket
+} // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

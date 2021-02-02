@@ -5,7 +5,7 @@
 #include "common/common/fancy_logger.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/user_space/io_socket_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -18,7 +18,7 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpace {
 namespace {
 
 MATCHER(IsInvalidAddress, "") {
@@ -43,15 +43,15 @@ public:
 class BufferedIoSocketHandleTest : public testing::Test {
 public:
   BufferedIoSocketHandleTest() : buf_(1024) {
-    io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_->setWritablePeer(io_handle_peer_.get());
-    io_handle_peer_->setWritablePeer(io_handle_.get());
+    io_handle_ = std::make_unique<IoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<IoSocketHandleImpl>();
+    io_handle_->setPeerHandle(io_handle_peer_.get());
+    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
   ~BufferedIoSocketHandleTest() override = default;
 
-  Buffer::WatermarkBuffer& getWatermarkBufferHelper(BufferedIoSocketHandleImpl& io_handle) {
+  Buffer::WatermarkBuffer& getWatermarkBufferHelper(IoSocketHandleImpl& io_handle) {
     return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
   }
 
@@ -60,8 +60,8 @@ public:
   // Owned by BufferedIoSocketHandle.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
   MockFileEventCallback cb_;
-  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<IoSocketHandleImpl> io_handle_;
+  std::unique_ptr<IoSocketHandleImpl> io_handle_peer_;
   absl::FixedArray<char> buf_;
 };
 
@@ -186,8 +186,8 @@ TEST_F(BufferedIoSocketHandleTest, BasicReadv) {
   io_handle_peer_->write(buf_to_write);
 
   Buffer::OwnedImpl buf;
-  buf.reserveSingleSlice(1024);
-  auto slice = buf.frontSlice();
+  auto reservation = buf.reserveSingleSlice(1024);
+  auto slice = reservation.slice();
   auto result = io_handle_->readv(1024, &slice, 1);
 
   EXPECT_TRUE(result.ok());
@@ -738,8 +738,8 @@ TEST_F(BufferedIoSocketHandleTest, WriteScheduleWritableEvent) {
       [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
           Buffer::OwnedImpl buf;
-          buf.reserveSingleSlice(1024);
-          auto slice = buf.frontSlice();
+          auto reservation = buf.reserveSingleSlice(1024);
+          auto slice = reservation.slice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
             accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
@@ -778,8 +778,8 @@ TEST_F(BufferedIoSocketHandleTest, WritevScheduleWritableEvent) {
       [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
           Buffer::OwnedImpl buf;
-          buf.reserveSingleSlice(1024);
-          auto slice = buf.frontSlice();
+          auto reservation = buf.reserveSingleSlice(1024);
+          auto slice = reservation.slice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
             accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
@@ -819,8 +819,8 @@ TEST_F(BufferedIoSocketHandleTest, ReadAfterShutdownWrite) {
       [&should_close, handle = io_handle_peer_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
           Buffer::OwnedImpl buf;
-          buf.reserveSingleSlice(1024);
-          auto slice = buf.frontSlice();
+          auto reservation = buf.reserveSingleSlice(1024);
+          auto slice = reservation.slice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
             if (result.rc_ == 0) {
@@ -947,10 +947,10 @@ TEST_F(BufferedIoSocketHandleTest, LastRoundtripTimeNullOpt) {
 class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
 public:
   BufferedIoSocketHandleNotImplementedTest() {
-    io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_->setWritablePeer(io_handle_peer_.get());
-    io_handle_peer_->setWritablePeer(io_handle_.get());
+    io_handle_ = std::make_unique<IoSocketHandleImpl>();
+    io_handle_peer_ = std::make_unique<IoSocketHandleImpl>();
+    io_handle_->setPeerHandle(io_handle_peer_.get());
+    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
   ~BufferedIoSocketHandleNotImplementedTest() override {
@@ -962,8 +962,8 @@ public:
     }
   }
 
-  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_;
-  std::unique_ptr<BufferedIoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<IoSocketHandleImpl> io_handle_;
+  std::unique_ptr<IoSocketHandleImpl> io_handle_peer_;
   Buffer::RawSlice slice_;
 };
 
@@ -1013,7 +1013,7 @@ TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnGetOption) {
   EXPECT_THAT(io_handle_->getOption(0, 0, nullptr, nullptr), IsNotSupportedResult());
 }
 } // namespace
-} // namespace BufferedIoSocket
+} // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy
