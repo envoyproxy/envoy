@@ -176,14 +176,15 @@ resource:
       address: 0.0.0.0
       port_value: 10000
   )EOF");
-  const std::string resource = fmt::format(R"EOF(
+  const std::string resource =
+      fmt::format(R"EOF(
 version: system.1
 resource:
   "@type": type.googleapis.com/envoy.config.listener.v3.ListenerCollection
   entries:
   - inline_entry: {}
   )EOF",
-                                           MessageUtil::getJsonStringFromMessage(inline_entry));
+                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry));
   DecodedResourcesWrapper decoded_resources;
   decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
   EXPECT_CALL(callbacks_,
@@ -204,14 +205,15 @@ resource:
       address: 0.0.0.1
       port_value: 10001
   )EOF");
-  const std::string resource_2 = fmt::format(R"EOF(
+  const std::string resource_2 =
+      fmt::format(R"EOF(
 version: system.2
 resource:
   "@type": type.googleapis.com/envoy.config.listener.v3.ListenerCollection
   entries:
   - inline_entry: {}
   )EOF",
-                                             MessageUtil::getJsonStringFromMessage(inline_entry_2));
+                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
     decoded_resources_2.pushBack(

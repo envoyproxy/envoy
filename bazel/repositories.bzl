@@ -142,6 +142,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_luajit_luajit()
     _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
+    _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_absl()
@@ -161,6 +162,7 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
+    _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
@@ -416,6 +418,18 @@ def _com_github_datadog_dd_opentracing_cpp():
     native.bind(
         name = "dd_opentracing_cpp",
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+    )
+
+def _com_github_skyapm_cpp2sky():
+    external_http_archive(
+        name = "com_github_skyapm_cpp2sky",
+    )
+    external_http_archive(
+        name = "skywalking_data_collect_protocol",
+    )
+    native.bind(
+        name = "cpp2sky",
+        actual = "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
     )
 
 def _com_github_tencent_rapidjson():
@@ -691,10 +705,6 @@ def _com_googlesource_googleurl():
         patches = ["@envoy//bazel/external:googleurl.patch"],
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "googleurl",
-        actual = "@com_googlesource_googleurl//url:url",
-    )
 
 def _org_llvm_releases_compiler_rt():
     external_http_archive(
@@ -877,6 +887,14 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+
+def _rules_fuzzing():
+    external_http_archive(
+        name = "rules_fuzzing",
+        repo_mapping = {
+            "@fuzzing_py_deps": "@fuzzing_pip3",
+        },
     )
 
 def _kafka_deps():

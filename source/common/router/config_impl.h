@@ -220,7 +220,6 @@ private:
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
                         Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
-
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
@@ -1025,6 +1024,10 @@ public:
     return most_specific_header_mutations_wins_;
   }
 
+  uint32_t maxDirectResponseBodySizeBytes() const override {
+    return max_direct_response_body_size_bytes_;
+  }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -1034,6 +1037,7 @@ private:
   Stats::SymbolTable& symbol_table_;
   const bool uses_vhds_;
   const bool most_specific_header_mutations_wins_;
+  const uint32_t max_direct_response_body_size_bytes_;
 };
 
 /**
@@ -1059,6 +1063,7 @@ public:
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
   bool mostSpecificHeaderMutationsWins() const override { return false; }
+  uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
