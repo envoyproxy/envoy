@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.RouteConfiguration";
@@ -107,6 +107,19 @@ message RouteConfiguration {
   // option. Users may wish to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;
+
+  // The maximum bytes of the response :ref:`direct response body
+  // <envoy_api_field_config.route.v4alpha.DirectResponseAction.body>` size. If not specified the default
+  // is 4096.
+  //
+  // .. warning::
+  //
+  //   Envoy currently holds the content of :ref:`direct response body
+  //   <envoy_api_field_config.route.v4alpha.DirectResponseAction.body>` in memory. Be careful setting
+  //   this to be larger than the default 4KB, since the allocated memory for direct response body
+  //   is not subject to data plane buffering controls.
+  //
+  google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
 }
 
 message Vhds {

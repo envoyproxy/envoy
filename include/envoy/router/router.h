@@ -1149,6 +1149,13 @@ public:
    * manager level.
    */
   virtual bool mostSpecificHeaderMutationsWins() const PURE;
+
+  /**
+   * @return uint32_t The maximum bytes of the response direct response body size. The default value
+   * is 4096.
+   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
+   */
+  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
