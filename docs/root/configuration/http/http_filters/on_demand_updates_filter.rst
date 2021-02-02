@@ -1,24 +1,20 @@
 .. _config_http_filters_on_demand:
 
-On-demand VHDS and S/RDS Updates
+按需更新 VHDS 和 S/RDS
 ================================
 
-The on demand filter can be used to support either on demand VHDS or S/RDS update if configured in the filter chain.
+如果在过滤器链中配置了这个按需过滤器，则可用于支持按需的 VHDS 或 S/RDS 更新。
 
-The on-demand update filter can be used to request a :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
-data if it's not already present in the :ref:`Route Configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`. The
-contents of the *Host* or *:authority* header is used to create the on-demand request. For an on-demand
-request to be created, :ref:`VHDS <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhds>` must be enabled and either *Host*
-or *:authority* header be present.
+如在 :ref:`路由配置 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` 中不存在虚拟主机的信息，则按需更新过滤器可用于请求 :ref:`虚拟主机 <envoy_v3_api_msg_config.route.v3.VirtualHost>` 的数据。
+的数据。*Host* 或者 *:authority* 头部的内容可以用于创建按需请求。对于要创建的按需请求， :ref:`VHDS <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhds>` 必须启用，并且 *Host* 或者 *:authority* 头部要存在。
 
-The on-demand update filter can also be used to request a *Route Configuration* data if RouteConfiguration is specified to be 
-loaded on demand in the :ref:`Scoped RouteConfiguration <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`. 
-The contents of the HTTP header is used to find the scope and create the on-demand request. 
+如果 :ref:`RouteConfiguration 作用域 <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` 中指定了按需加载 RouteConfiguration，则按需更新过滤器还可以用于请求*路由配置*数据。
+HTTP 头部的内容用于查找作用域并创建按需请求。
 
-On-demand VHDS and on-demand S/RDS can not be used at the same time at this point.
+按需 VHDS 和按需 S/RDS 目前不能同时使用。
 
-Configuration
+配置
 -------------
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
-* This filter should be configured with the name *envoy.filters.http.on_demand*.
-* The filter should be placed before *envoy.filters.http.router* filter in the HttpConnectionManager's filter chain.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+* 该过滤器的名称应该配置为 *envoy.filters.http.on_demand*。
+* 该过滤器应放在 HttpConnectionManager 的过滤器链中，并在 *envoy.filters.http.router* 过滤器之前。
