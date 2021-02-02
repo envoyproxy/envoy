@@ -56,7 +56,6 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
   }
 
   trust_bundle_stores_.reserve(size);
-  std::vector<std::string> ca_file_names = {};
   for (auto& it : message.trust_bundles()) {
     auto cert = Config::DataSource::read(it.second, true, config->api());
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
@@ -69,12 +68,25 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
 
     auto store = X509StorePtr(X509_STORE_new());
     bool has_crl = false;
+    bool ca_loaded = false;
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store.get(), item->x509);
+        X509_up_ref(item->x509);
+        ca_certs_.push_back(bssl::UniquePtr<X509>(item->x509));
+        if (!ca_loaded) {
+          // TODO: with the current interface, we cannot return the multiple
+          // cert information on getCaCertInformation method.
+          // So temporarily we return the first CA's info here.
+          ca_loaded = true;
+          auto name = it.second.filename();
+          if (name.empty()) {
+            name = "<inline>";
+          }
+          ca_file_name_ = absl::StrCat(it.first, ": ", name);
+        }
       }
-      X509_up_ref(item->x509);
-      ca_certs_.push_back(bssl::UniquePtr<X509>(item->x509));
+
       if (item->crl) {
         has_crl = true;
         X509_STORE_add_crl(store.get(), item->crl);
@@ -84,24 +96,37 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
       X509_STORE_set_flags(store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
     trust_bundle_stores_[it.first] = std::move(store);
-
-    auto name = it.second.filename();
-    if (name.empty()) {
-      name = "<inline>";
-    }
-    ca_file_names.push_back(absl::StrCat(it.first, ": ", name));
   }
-  ca_file_names_ = absl::StrJoin(ca_file_names, ", ");
 }
 
-void SPIFFEValidator::addClientValidationContext(SSL_CTX*, bool) { /* TODO */
+void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
+      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+
+  for (auto& ca : ca_certs_) {
+    X509_NAME* name = X509_get_subject_name(ca.get());
+    if (name == nullptr) {
+      throw EnvoyException(absl::StrCat("Failed to load trusted client CA certificate"));
+    }
+    // Check for duplicates.
+    if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+      continue;
+    }
+    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+    if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+      throw EnvoyException(absl::StrCat("Failed to load trusted client CA certificate"));
+    }
+  }
+  SSL_CTX_set_client_CA_list(ctx, list.release());
 }
 
 void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX&, uint8_t[EVP_MAX_MD_SIZE],
                                                unsigned) { /* TODO */
 }
 
-int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) { return SSL_VERIFY_PEER; }
+int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
+  return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+}
 
 int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
                                        Ssl::SslExtendedSocketInfo* ssl_extended_info,
@@ -177,11 +202,12 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
 }
 
 size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
-  size_t ret = SIZE_MAX;
-  for (auto& iter : ca_certs_) {
-    ret = std::min<size_t>(ret, Utility::getDaysUntilExpiration(iter.get(), time_source_));
+  if (ca_certs_.empty()) {
+    return 0;
   }
-  return ret;
+  // TODO: with the current interface, we cannot pass the multiple cert information.
+  // So temporarily we return the first CA's info here.
+  return Utility::getDaysUntilExpiration(ca_certs_[0].get(), time_source_);
 }
 
 Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const {
@@ -190,7 +216,7 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
   }
   // TODO: with the current interface, we cannot pass the multiple cert information.
   // So temporarily we return the first CA's info here.
-  return Utility::certificateDetails(ca_certs_[0].get(), getCaFileName(), time_source_);;
+  return Utility::certificateDetails(ca_certs_[0].get(), getCaFileName(), time_source_);
 };
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
