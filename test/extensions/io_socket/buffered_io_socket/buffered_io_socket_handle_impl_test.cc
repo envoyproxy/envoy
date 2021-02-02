@@ -186,8 +186,8 @@ TEST_F(BufferedIoSocketHandleTest, BasicReadv) {
   io_handle_peer_->write(buf_to_write);
 
   Buffer::OwnedImpl buf;
-  Buffer::RawSlice slice;
-  buf.reserve(1024, &slice, 1);
+  buf.reserveSingleSlice(1024);
+  auto slice = buf.frontSlice();
   auto result = io_handle_->readv(1024, &slice, 1);
 
   EXPECT_TRUE(result.ok());
@@ -738,8 +738,8 @@ TEST_F(BufferedIoSocketHandleTest, WriteScheduleWritableEvent) {
       [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
           Buffer::OwnedImpl buf;
-          Buffer::RawSlice slice;
-          buf.reserve(1024, &slice, 1);
+          buf.reserveSingleSlice(1024);
+          auto slice = buf.frontSlice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
             accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
@@ -778,8 +778,8 @@ TEST_F(BufferedIoSocketHandleTest, WritevScheduleWritableEvent) {
       [&should_close, handle = io_handle_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
           Buffer::OwnedImpl buf;
-          Buffer::RawSlice slice;
-          buf.reserve(1024, &slice, 1);
+          buf.reserveSingleSlice(1024);
+          auto slice = buf.frontSlice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
             accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
@@ -819,8 +819,8 @@ TEST_F(BufferedIoSocketHandleTest, ReadAfterShutdownWrite) {
       [&should_close, handle = io_handle_peer_.get(), &accumulator](uint32_t events) {
         if (events & Event::FileReadyType::Read) {
           Buffer::OwnedImpl buf;
-          Buffer::RawSlice slice;
-          buf.reserve(1024, &slice, 1);
+          buf.reserveSingleSlice(1024);
+          auto slice = buf.frontSlice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
             if (result.rc_ == 0) {
