@@ -206,6 +206,7 @@ public:
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  Http::OriginalIPDetectionSharedPtr originalIpDetection() override { return nullptr; };
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
