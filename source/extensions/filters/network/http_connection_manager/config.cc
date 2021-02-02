@@ -288,11 +288,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   // Check if we are provided with an IP detection extension.
-  if (config.original_ip_detection().has_typed_config()) {
-    auto& typed_config = config.original_ip_detection().typed_config();
-    const std::string type{TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url())};
+  if (config.has_original_ip_detection()) {
+    auto& typed_config = config.original_ip_detection();
     auto* factory =
-        Registry::FactoryRegistry<Http::OriginalIPDetectionFactory>::getFactoryByType(type);
+        Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(typed_config);
     if (!factory) {
       throw EnvoyException("Original IP detection extension not found");
     }

@@ -1748,6 +1748,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
   route_config:
     name: local_route
   original_ip_detection:
+    name: envoy.ip_detection.UnknownOriginalIPDetectionExtension
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   http_filters:
@@ -1784,6 +1785,7 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   route_config:
     name: local_route
   original_ip_detection:
+    name: envoy.ip_detection.OriginalIPDetectionExtension
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   http_filters:

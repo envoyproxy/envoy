@@ -589,7 +589,7 @@ message HttpConnectionManager {
   // The configuration of the original IP detection extension.
   //
   // If not set, Envoy uses the default remote IP detection mechanism.
-  OriginalIPDetectionExtension original_ip_detection = 43;
+  config.core.v3.TypedExtensionConfig original_ip_detection = 43;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
@@ -859,10 +859,5 @@ message RequestIDExtension {
       "envoy.config.filter.network.http_connection_manager.v2.RequestIDExtension";
 
   // Request ID extension specific configuration.
-  google.protobuf.Any typed_config = 1;
-}
-
-message OriginalIPDetectionExtension {
-  // Original IP detection extension configuration.
   google.protobuf.Any typed_config = 1;
 }
