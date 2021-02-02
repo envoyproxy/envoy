@@ -31,8 +31,8 @@ For more info see `Using Bind or Connect Redirection <https://docs.microsoft.com
 
     At the time of writing (February 2021) the OS support for original destination is only available through the
     `Windows insider program <https://insider.windows.com/en-us/for-developers>`_.
-    The feature will be fully supported in Windows Server 20H2 and eventually supported in Windows Server 2019
-    `Windows Server Release info <https://docs.microsoft.com/en-us/windows-server/get-started/windows-server-release-info>`_.
+    The feature will be fully supported in Windows Server 20H2
+     `Windows Server Release info <https://docs.microsoft.com/en-us/windows-server/get-started/windows-server-release-info>`_.
 
 Later processing in Envoy sees the restored destination address as the connection's local address,
 rather than the address at which the listener is listening at. Furthermore, :ref:`an original

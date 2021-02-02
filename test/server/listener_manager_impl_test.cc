@@ -3696,6 +3696,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateCertPrivateKeyMisma
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
+#ifdef SOL_IP
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -3739,6 +3740,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
                               &listener_factory_context->listenerMetadata(), "com.bar.foo", "baz")
                               .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
+#endif
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoTrafficDirection) {
@@ -3767,6 +3769,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoFeatureSu
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains: {}
+    traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
       typed_config: {}
