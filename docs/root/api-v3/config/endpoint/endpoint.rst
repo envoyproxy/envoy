@@ -1,4 +1,4 @@
-Endpoint
+端点
 ========
 
 .. toctree::
