@@ -83,7 +83,7 @@ namespace Envoy {
 
 // Expect that the statement hits an ENVOY_BUG containing the specified message.
 #ifdef NDEBUG
-// ENVOY_BUGs in release mode log fatal.
+// ENVOY_BUGs in release mode log error.
 #define EXPECT_ENVOY_BUG(statement, message) EXPECT_LOG_CONTAINS("error", message, statement)
 #else
 // ENVOY_BUGs in debug mode is fatal.
