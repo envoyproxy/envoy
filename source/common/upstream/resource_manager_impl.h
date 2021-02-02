@@ -99,6 +99,9 @@ public:
   ResourceLimit& retries() override { return retries_; }
   ResourceLimit& connectionPools() override { return connection_pools_; }
 
+  static double defaultBudgetPercent() { return 20.0; }
+  static uint32_t defaultMinRetryConcurrency() { return 3; }
+
 private:
   class RetryBudgetImpl : public ResourceLimit {
   public:

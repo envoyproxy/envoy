@@ -1241,17 +1241,13 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
     if (it->has_retry_budget()) {
-      // The budget_percent and min_retry_concurrency values do not set defaults like the other
-      // members of the 'threshold' message, because the behavior of the retry circuit breaker
-      // changes depending on whether it has been configured. Therefore, it's necessary to manually
-      // check if the threshold message has a retry budget configured and only set the values if so.
-      budget_percent = it->retry_budget().has_budget_percent()
-                           ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), budget_percent)
-                           : budget_percent;
-      min_retry_concurrency =
-          it->retry_budget().has_min_retry_concurrency()
-              ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), min_retry_concurrency)
-              : min_retry_concurrency;
+      // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
+      // message set in the cluster config.
+      budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          it->retry_budget(), budget_percent, ResourceManagerImpl::defaultBudgetPercent());
+      min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          it->retry_budget(), min_retry_concurrency,
+          ResourceManagerImpl::defaultMinRetryConcurrency());
     }
   }
   return std::make_unique<ResourceManagerImpl>(
