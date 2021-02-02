@@ -576,7 +576,7 @@ public:
 class MockReceivedSettings : public ReceivedSettings {
 public:
   MockReceivedSettings();
-  ~MockReceivedSettings() = default;
+  ~MockReceivedSettings() override = default;
 
   MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
 

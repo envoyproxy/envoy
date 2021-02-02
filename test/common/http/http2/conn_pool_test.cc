@@ -1452,6 +1452,8 @@ TEST_F(Http2ConnPoolImplTest, PreconnectOffWithSettings) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.allow_preconnect", "false"}});
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.improved_stream_limit_handling", "true"}});
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1));
 
