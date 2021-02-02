@@ -466,4 +466,76 @@ body_format:
   EXPECT_EQ(response->body(), "");
 }
 
+// Should match and rewrite an upstream response that does not contain a body.
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusHeadersOnly) {
+  const std::string yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 429
+          runtime_key: key_b
+  status_code: 450
+body_format:
+  text_format_source:
+    inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
+)EOF";
+  setLocalReplyConfig(yaml);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "429"}}, true);
+  response->waitForHeaders();
+
+  EXPECT_EQ("450", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "450: via_upstream");
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithBody) {
+  const std::string yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 429
+          runtime_key: key_b
+  status_code: 451
+body_format:
+  text_format_source:
+    inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
+)EOF";
+  setLocalReplyConfig(yaml);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "429"}}, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForHeaders();
+
+  EXPECT_EQ("451", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "451: via_upstream");
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy

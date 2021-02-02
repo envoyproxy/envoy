@@ -909,6 +909,11 @@ public:
    */
   void maybeEndEncode(bool end_stream);
 
+  /**
+   * Rewrite the response headers and body using local_reply_.
+   */
+  void rewriteResponse();
+
   void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -1076,6 +1081,8 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
+  bool do_rewrite_{};
+  bool did_rewrite_{};
   OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.

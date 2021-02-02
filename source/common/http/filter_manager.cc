@@ -879,8 +879,15 @@ void FilterManager::sendLocalReplyViaFilterChain(
                  absl::string_view& content_type) -> void {
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
             // opt refs.
+            ENVOY_STREAM_LOG(
+                trace, "sendLocalReply local_reply_.rewrite code={}, body={}, content_type={}",
+                *this, code, body, content_type);
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  stream_info_, code, body, content_type);
+            // Note that we did a local reply rewrite so that we don't try to do it again in encodeHeaders.
+            // This isn't very clean but we're trying to support local reply rewrites as well as upstream
+            // rewrites, where the match + rewrite logic makes the most sense in encodeHeaders/Data.
+            did_rewrite_ = true;
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
@@ -1044,9 +1051,44 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
-  const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
+  // See if the response would be written by local_reply_.
+  if (!did_rewrite_) {
+    do_rewrite_ =
+        local_reply_.match(filter_manager_callbacks_.requestHeaders().ptr(), *filter_manager_callbacks_.responseHeaders(),
+                          filter_manager_callbacks_.responseTrailers().ptr(),
+                          stream_info_);
+  }
+
+  bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
+  const bool original_modified_end_stream = modified_end_stream;
+  ENVOY_STREAM_LOG(debug, "FilterManager::encodeHeaders: end_stream={}, modified_end_stream={}, do_rewrite_={}",
+                   *this, end_stream, modified_end_stream, do_rewrite_);
+  if (do_rewrite_) {
+    // _This_ actually sets buffered_response_data_ internally.
+    rewriteResponse();
+
+    if (buffered_response_data_->length() > 0) {
+      // If we're going to rewrite the response here, then modified_end_stream can no longer be true
+      // because we have a body now.
+      modified_end_stream = false;
+    }
+  }
+
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
+
+  // Encode the rewritten response right away if the original `modified_end_stream` was true.
+  // If it wasn't, then we know a body will be encoded later, and we'll let that function
+  // take care of encoding the rewritten response.
+  if (do_rewrite_ && original_modified_end_stream && buffered_response_data_->length() > 0) {
+    ASSERT(!did_rewrite_);
+    ENVOY_STREAM_LOG(trace,
+                     "FilterManager::encodeData calling filter_manager_callbacks_ with {} bytes "
+                     "from buffered_response_data and modified_end_stream={}",
+                     *this, buffered_response_data_->length(), modified_end_stream);
+    filter_manager_callbacks_.encodeData(*buffered_response_data_, modified_end_stream);
+  }
+
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
@@ -1180,7 +1222,24 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   }
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
-  filter_manager_callbacks_.encodeData(data, modified_end_stream);
+  if (do_rewrite_ && buffered_response_data_->length() > 0) {
+    // If we're doing a rewrite and modified_end_stream=true, encode the buffered_response_data_
+    // that was set by rewriteResponse() earlier in encodeHeaders().
+    if (modified_end_stream) {
+      ENVOY_STREAM_LOG(trace,
+                       "FilterManager::encodeData calling filter_manager_callbacks_ with {} bytes "
+                       "from buffered_response_data and modified_end_stream={}",
+                       *this, buffered_response_data_->length(), modified_end_stream);
+      filter_manager_callbacks_.encodeData(*buffered_response_data_, modified_end_stream);
+    }
+  } else {
+    // We're not rewriting the response, so encode the data as is.
+    ENVOY_STREAM_LOG(trace,
+                     "FilterManager::encodeData calling filter_manager_callbacks_.encodeData with "
+                     "{} bytes and modified_end_stream={}",
+                     *this, data.length(), modified_end_stream);
+    filter_manager_callbacks_.encodeData(data, modified_end_stream);
+  }
   maybeEndEncode(modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
@@ -1222,6 +1281,34 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     filter_manager_callbacks_.endStream();
+  }
+}
+
+void FilterManager::rewriteResponse() {
+  ASSERT(do_rewrite_);
+  ASSERT(!did_rewrite_);
+
+  auto response_headers = filter_manager_callbacks_.responseHeaders();
+  ASSERT(response_headers.ptr() != nullptr);
+
+  std::string rewritten_body{};
+  absl::string_view rewritten_content_type{};
+  Http::Code rewritten_code{static_cast<Http::Code>(Utility::getResponseStatus(*response_headers))};
+
+  ENVOY_STREAM_LOG(trace, "rewriteResponse: calling local_reply_.rewrite with code={}", *this,
+                   rewritten_code);
+  local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), *response_headers,
+                       stream_info_, rewritten_code, rewritten_body, rewritten_content_type);
+  ENVOY_STREAM_LOG(trace, "rewriteResponse: local_reply_.rewrite returned body=\"{}\", content_type={}, code={}", *this,
+                   rewritten_body, rewritten_content_type, rewritten_code);
+
+  buffered_response_data_ = std::make_unique<Buffer::OwnedImpl>(rewritten_body);
+  if (!rewritten_body.empty()) {
+    // Since we overwrote the response body, we need to set the content-length too.
+    response_headers->setContentLength(buffered_response_data_->length());
+  }
+  if (!rewritten_content_type.empty()) {
+    response_headers->setContentType(rewritten_content_type);
   }
 }
 

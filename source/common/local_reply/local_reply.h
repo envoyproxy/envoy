@@ -26,6 +26,11 @@ public:
                        Http::ResponseHeaderMap& response_headers,
                        StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        absl::string_view& content_type) const PURE;
+
+  virtual bool match(const Http::RequestHeaderMap* request_headers,
+                     const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap* response_trailers,
+                     StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using LocalReplyPtr = std::unique_ptr<LocalReply>;

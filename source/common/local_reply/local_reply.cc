@@ -11,6 +11,7 @@
 #include "common/formatter/substitution_format_string.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 #include "common/router/header_parser.h"
 
 namespace Envoy {
@@ -80,10 +81,48 @@ public:
                        StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
-    if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
+    if (!match(&request_headers, response_headers, &response_trailers, stream_info)) {
       return false;
     }
 
+    rewrite(request_headers, response_headers, stream_info, code, body, final_formatter);
+    return true;
+  }
+
+  // Decide if a request/response pair matches this mapper.
+  bool match(const Http::RequestHeaderMap* request_headers,
+             const Http::ResponseHeaderMap& response_headers,
+             const Http::ResponseTrailerMap* response_trailers,
+             StreamInfo::StreamInfo& stream_info) const {
+    // Set response code on the stream_info because it's used by the StatusCode filter.
+    // Further, we know that the status header present on the upstream response headers
+    // is the status we want to match on. It may not be the status we send downstream
+    // to the client, though, because we may call `rewrite` later.
+    //
+    // Under normal circumstances we should have a response status by this point, because
+    // either the upstream set it or the router filter set it. If for whatever reason we
+    // don't, skip setting the stream info's response code and just let our evaluation
+    // logic do without it. We can't do much better, and we certainly don't want to throw
+    // an exception and crash here.
+    if (response_headers.Status() != nullptr) {
+      stream_info.setResponseCode(
+          static_cast<uint32_t>(Http::Utility::getResponseStatus(response_headers)));
+    }
+
+    if (request_headers == nullptr) {
+      request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
+    }
+
+    if (response_trailers == nullptr) {
+      response_trailers = Http::StaticEmptyHeaders::get().response_trailers.get();
+    }
+
+    return filter_->evaluate(stream_info, *request_headers, response_headers, *response_trailers);
+  }
+
+  void rewrite(const Http::RequestHeaderMap&, Http::ResponseHeaderMap& response_headers,
+               StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
+               BodyFormatter*& final_formatter) const {
     if (body_.has_value()) {
       body = body_.value();
     }
@@ -99,7 +138,6 @@ public:
     if (body_formatter_) {
       final_formatter = body_formatter_.get();
     }
-    return true;
   }
 
 private:
@@ -126,6 +164,18 @@ public:
     for (const auto& mapper : config.mappers()) {
       mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
     }
+  }
+
+  bool match(const Http::RequestHeaderMap* request_headers,
+             const Http::ResponseHeaderMap& response_headers,
+             const Http::ResponseTrailerMap* response_trailers,
+             StreamInfo::StreamInfo& stream_info) const override {
+    for (const auto& mapper : mappers_) {
+      if (mapper->match(request_headers, response_headers, response_trailers, stream_info)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void rewrite(const Http::RequestHeaderMap* request_headers,
