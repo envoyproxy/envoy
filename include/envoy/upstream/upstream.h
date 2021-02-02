@@ -872,6 +872,13 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
+   * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
+   * config dumps. This can be configured with :ref:`alt_stat_name
+   * <envoy_api_field_Cluster.alt_stat_name>`. The default value is the cluster name.
+   */
+  virtual const std::string& observabilityName() const PURE;
+
+  /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at
    *         a particular priority).
    */

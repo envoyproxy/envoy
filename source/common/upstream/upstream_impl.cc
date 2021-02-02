@@ -238,6 +238,8 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
   return net_hosts;
 }
 
+
+
 } // namespace
 
 HostDescriptionImpl::HostDescriptionImpl(
@@ -699,7 +701,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : runtime_(runtime), name_(config.name()), type_(config.type()),
+    : runtime_(runtime), name_(config.name()),
+      observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
+      type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
