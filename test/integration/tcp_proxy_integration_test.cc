@@ -1312,7 +1312,7 @@ class FakeMysqlUpstream : public FakeUpstream {
   using FakeUpstream::FakeUpstream;
 
   bool createNetworkFilterChain(Network::Connection& connection,
-                                              const std::vector<Network::FilterFactoryCb>& cb) {
+                                const std::vector<Network::FilterFactoryCb>& cb) {
     Buffer::OwnedImpl to_write("P");
     connection.write(to_write, false);
     return FakeUpstream::createNetworkFilterChain(connection, cb);
@@ -1320,29 +1320,30 @@ class FakeMysqlUpstream : public FakeUpstream {
 };
 
 class MysqlIntegrationTest : public TcpProxyIntegrationTest {
- public:
+public:
   void createUpstreams() override {
     for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
       Network::TransportSocketFactoryPtr factory =
-          upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
+          upstream_tls_ ? createUpstreamTlsContext()
+                        : Network::Test::createRawBufferSocketFactory();
       auto endpoint = upstream_address_fn_(i);
-        fake_upstreams_.emplace_back(
-            new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));
+      fake_upstreams_.emplace_back(
+          new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
   }
 
-  absl::optional<uint64_t> waitForNextUpstreamConnection(
-      const std::vector<uint64_t>& upstream_indices,
-      std::chrono::milliseconds connection_wait_timeout,
-      FakeRawConnectionPtr& fake_upstream_connection) {
+  absl::optional<uint64_t>
+  waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
+                                std::chrono::milliseconds connection_wait_timeout,
+                                FakeRawConnectionPtr& fake_upstream_connection) {
     AssertionResult result = AssertionFailure();
     int upstream_index = 0;
     Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
     // Loop over the upstreams until the call times out or an upstream request is received.
     while (!result) {
       upstream_index = upstream_index % upstream_indices.size();
-      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(fake_upstream_connection,
-                                                                                       std::chrono::milliseconds(5));
+      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
+          fake_upstream_connection, std::chrono::milliseconds(5));
       if (result) {
         return upstream_index;
       } else if (!bound.withinBound()) {
@@ -1356,25 +1357,26 @@ class MysqlIntegrationTest : public TcpProxyIntegrationTest {
   }
 
   void globalPreconnect() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-      bootstrap.mutable_static_resources()
-          ->mutable_clusters(0)
-          ->mutable_preconnect_policy()
-          ->mutable_predictive_preconnect_ratio()
-          ->set_value(1.5);
-    });
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_static_resources()
+              ->mutable_clusters(0)
+              ->mutable_preconnect_policy()
+              ->mutable_predictive_preconnect_ratio()
+              ->set_value(1.5);
+        });
   }
 
   void perUpstreamPreconnect() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-      bootstrap.mutable_static_resources()
-          ->mutable_clusters(0)
-          ->mutable_preconnect_policy()
-          ->mutable_per_upstream_preconnect_ratio()
-          ->set_value(1.5);
-    });
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_static_resources()
+              ->mutable_clusters(0)
+              ->mutable_preconnect_policy()
+              ->mutable_per_upstream_preconnect_ratio()
+              ->set_value(1.5);
+        });
   }
-
 
   void testPreconnect();
 };
@@ -1421,7 +1423,6 @@ TEST_P(MysqlIntegrationTest, DisconnectDetected) {
   tcp_client->close();
 }
 
-
 void MysqlIntegrationTest::testPreconnect() {
   globalPreconnect();
   enableHalfClose(false);
@@ -1465,9 +1466,7 @@ void MysqlIntegrationTest::testPreconnect() {
   }
 }
 
-TEST_P(MysqlIntegrationTest, Preconnect) {
-  testPreconnect();
-}
+TEST_P(MysqlIntegrationTest, Preconnect) { testPreconnect(); }
 
 TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
   upstream_tls_ = true;

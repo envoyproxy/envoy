@@ -579,8 +579,9 @@ public:
     return socket_->addressProvider().localAddress();
   }
 
-  virtual std::unique_ptr<FakeRawConnection> makeRawConnection(
-      SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system){
+  virtual std::unique_ptr<FakeRawConnection>
+  makeRawConnection(SharedConnectionWrapper& shared_connection,
+                    Event::TestTimeSystem& time_system) {
     return std::make_unique<FakeRawConnection>(shared_connection, time_system);
   }
 

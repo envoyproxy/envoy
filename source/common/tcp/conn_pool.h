@@ -128,7 +128,6 @@ public:
   ConnectionPool::ConnectionStatePtr connection_state_;
   TcpConnectionData* tcp_connection_data_{};
   bool associated_before_{};
-
 };
 
 class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase,
