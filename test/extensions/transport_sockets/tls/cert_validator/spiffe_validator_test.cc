@@ -298,6 +298,26 @@ typed_config:
   EXPECT_TRUE(foundTestCA);
 }
 
+TEST_F(TestSPIFFEValidator, TestUpdateDigestForSessionId) {
+  Event::TestRealTimeSystem time_system;
+  initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+    lyft.com:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+    example.com:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  )EOF"),
+             time_system);
+  uint8_t hash_buffer[EVP_MAX_MD_SIZE];
+  bssl::ScopedEVP_MD_CTX md;
+  EVP_DigestInit(md.get(), EVP_sha256());
+  validator().updateDigestForSessionId(md, hash_buffer, 0);
+  validator().updateDigestForSessionId(md, hash_buffer, SHA256_DIGEST_LENGTH);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

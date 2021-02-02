@@ -120,8 +120,18 @@ void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
   SSL_CTX_set_client_CA_list(ctx, list.release());
 }
 
-void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX&, uint8_t[EVP_MAX_MD_SIZE],
-                                               unsigned) { /* TODO */
+void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
+                                               uint8_t hash_buffer[EVP_MAX_MD_SIZE],
+                                               unsigned hash_length) {
+  int rc;
+  for (auto& ca : ca_certs_) {
+    rc = X509_digest(ca.get(), EVP_sha256(), hash_buffer, &hash_length);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
+                   fmt::format("invalid SHA256 hash length {}", hash_length));
+    rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
 }
 
 int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
