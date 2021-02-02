@@ -1,4 +1,4 @@
-#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/user_space/buffered_io_socket_handle_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
@@ -8,7 +8,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space/file_event_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -16,7 +16,7 @@ namespace Envoy {
 
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpace {
 namespace {
 Api::SysCallIntResult makeInvalidSyscallResult() {
   return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
@@ -36,14 +36,14 @@ BufferedIoSocketHandleImpl::~BufferedIoSocketHandleImpl() {
 Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
-    if (writable_peer_) {
+    if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
-                static_cast<void*>(writable_peer_));
+                static_cast<void*>(peer_handle_));
       // Notify the peer we won't write more data. shutdown(WRITE).
-      writable_peer_->setWriteEnd();
+      peer_handle_->setWriteEnd();
       // Notify the peer that we no longer accept data. shutdown(RD).
-      writable_peer_->onPeerDestroy();
-      writable_peer_ = nullptr;
+      peer_handle_->onPeerDestroy();
+      peer_handle_ = nullptr;
     } else {
       ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
     }
@@ -129,23 +129,23 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
                                Network::IoSocketError::deleteIoError)};
   }
   // Closed peer.
-  if (!writable_peer_) {
+  if (!peer_handle_) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
   }
   // Error: write after close.
-  if (writable_peer_->isPeerShutDownWrite()) {
+  if (peer_handle_->isPeerShutDownWrite()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
   }
   // The peer is valid but temporary not accepts new data. Likely due to flow control.
-  if (!writable_peer_->isWritable()) {
+  if (!peer_handle_->isWritable()) {
     return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                Network::IoSocketError::deleteIoError)};
   }
 
-  auto* const dest_buffer = writable_peer_->getWriteBuffer();
+  auto* const dest_buffer = peer_handle_->getWriteBuffer();
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice && !dest_buffer->highWatermarkTriggered(); i++) {
@@ -154,7 +154,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
       bytes_written += slices[i].len_;
     }
   }
-  writable_peer_->setNewDataAvailable();
+  peer_handle_->setNewDataAvailable();
   ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), bytes_written);
   return {bytes_written, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
@@ -169,33 +169,33 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
                                Network::IoSocketError::deleteIoError)};
   }
   // Closed peer.
-  if (!writable_peer_) {
+  if (!peer_handle_) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
   }
   // Error: write after close.
-  if (writable_peer_->isPeerShutDownWrite()) {
+  if (peer_handle_->isPeerShutDownWrite()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
   }
   // The peer is valid but temporary not accepts new data. Likely due to flow control.
-  if (!writable_peer_->isWritable()) {
+  if (!peer_handle_->isWritable()) {
     return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                Network::IoSocketError::deleteIoError)};
   }
   uint64_t total_bytes_to_write = 0;
   const uint64_t max_bytes_to_write = buffer.length();
-  while (writable_peer_->isWritable()) {
+  while (peer_handle_->isWritable()) {
     const auto& front_slice = buffer.frontSlice();
     if (front_slice.len_ == 0) {
       break;
     } else {
-      writable_peer_->getWriteBuffer()->move(buffer, front_slice.len_);
+      peer_handle_->getWriteBuffer()->move(buffer, front_slice.len_);
       total_bytes_to_write += front_slice.len_;
     }
   }
-  writable_peer_->setNewDataAvailable();
+  peer_handle_->setNewDataAvailable();
   ENVOY_LOG(trace, "socket {} writev {} bytes of {}", static_cast<void*>(this),
             total_bytes_to_write, max_bytes_to_write);
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
@@ -292,7 +292,7 @@ void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatch
   ASSERT(user_file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                       "file descriptor. This is not allowed.");
   ASSERT(trigger != Event::FileTriggerType::Level, "Native level trigger is not supported yet.");
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(dispatcher, cb, events, *this);
+  user_file_event_ = std::make_unique<FileEventImpl>(dispatcher, cb, events, *this);
 }
 
 Network::IoHandlePtr BufferedIoSocketHandleImpl::duplicate() {
@@ -324,9 +324,9 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
   ASSERT(how == ENVOY_SHUT_WR);
   ASSERT(!closed_);
   if (!write_shutdown_) {
-    ASSERT(writable_peer_);
+    ASSERT(peer_handle_);
     // Notify the peer we won't write more data.
-    writable_peer_->setWriteEnd();
+    peer_handle_->setWriteEnd();
     write_shutdown_ = true;
   }
   return {0, 0};

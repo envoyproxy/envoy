@@ -42,3 +42,19 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "buffered_io_socket_handle_lib",
+    srcs = [
+        "buffered_io_socket_handle_impl.cc",
+    ],
+    hdrs = [
+        "buffered_io_socket_handle_impl.h",
+    ],
+    deps = [
+        ":io_handle_lib",
+        ":file_event_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/network:default_socket_interface_lib",
+    ],
+)

@@ -12,13 +12,13 @@
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
 
-#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space/io_handle.h"
+#include "extensions/io_socket/user_space/file_event_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpace {
 /**
  * Network::IoHandle implementation which provides a buffer as data source. It is designed to used
  * by Network::ConnectionImpl. Some known limitations include
@@ -30,7 +30,7 @@ namespace BufferedIoSocket {
  *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
 class BufferedIoSocketHandleImpl final : public Network::IoHandle,
-                                         public UserspaceIoHandle,
+                                         public UserSpace::IoHandle,
                                          protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl();
@@ -83,17 +83,17 @@ public:
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
   void onBelowLowWatermark() {
-    if (writable_peer_) {
+    if (peer_handle_) {
       ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.", static_cast<void*>(this),
-                static_cast<void*>(writable_peer_));
-      writable_peer_->onPeerBufferLowWatermark();
+                static_cast<void*>(peer_handle_));
+      peer_handle_->onPeerBufferLowWatermark();
     }
   }
   void onAboveHighWatermark() {
     // Low to high is checked by peer after peer writes data.
   }
 
-  // WritablePeer
+  // UserSpace::IoHandle
   void setWriteEnd() override {
     receive_data_end_stream_ = true;
     setNewDataAvailable();
@@ -101,25 +101,25 @@ public:
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
-      user_file_event_->poll(Event::FileReadyType::Read |
+      user_file_event_->activateIfEnabled(Event::FileReadyType::Read |
                              // Closed ready type is defined as `end of stream`
                              (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
   void onPeerDestroy() override {
-    writable_peer_ = nullptr;
+    peer_handle_ = nullptr;
     write_shutdown_ = true;
   }
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
-      user_file_event_->poll(Event::FileReadyType::Write);
+      user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
     }
   }
   bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }
   bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
   bool isPeerWritable() const override {
-    return writable_peer_ != nullptr && !writable_peer_->isPeerShutDownWrite() &&
-           writable_peer_->isWritable();
+    return peer_handle_ != nullptr && !peer_handle_->isPeerShutDownWrite() &&
+           peer_handle_->isWritable();
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
@@ -129,11 +129,11 @@ public:
   }
 
   // Set the peer which will populate the owned pending_received_data.
-  void setWritablePeer(WritablePeer* writable_peer) {
+  void setPeerHandle(UserSpace::IoHandle* writable_peer) {
     // Swapping writable peer is undefined behavior.
-    ASSERT(!writable_peer_);
+    ASSERT(!peer_handle_);
     ASSERT(!write_shutdown_);
-    writable_peer_ = writable_peer;
+    peer_handle_ = writable_peer;
   }
 
 private:
@@ -144,7 +144,7 @@ private:
   // The attached file event with this socket. The event is not owned by the socket in the current
   // Envoy model. Multiple events can be created during the life time of this IO handle but at any
   // moment at most 1 event is attached.
-  std::unique_ptr<UserSpaceFileEventImpl> user_file_event_;
+  std::unique_ptr<FileEventImpl> user_file_event_;
 
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
   // pending data to drain.
@@ -155,7 +155,7 @@ private:
   Buffer::WatermarkBuffer pending_received_data_;
 
   // Destination of the write(). The value remains non-null until the peer is closed.
-  WritablePeer* writable_peer_{nullptr};
+  UserSpace::IoHandle* peer_handle_{nullptr};
 
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};

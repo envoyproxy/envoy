@@ -153,8 +153,6 @@ extensions/filters/common/original_src @snowp @klarose
 # Core upstream code
 extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
-# user space socket pair and event
-/*/extensions/io_socket/buffered_io_socket @lambdai @antoniovicente
 # OAuth2
 extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Local Rate Limit

@@ -220,12 +220,6 @@ EXTENSIONS = {
     #
 
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
-    
-    #
-    # IO socket
-    #
-
-    "envoy.io_socket.user_space_socket":                "//source/extensions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
 
     #
     # WebAssembly runtimes
