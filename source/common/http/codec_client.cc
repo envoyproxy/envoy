@@ -146,6 +146,7 @@ void CodecClient::onData(Buffer::Instance& data) {
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
       host_->cluster().stats().upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
+      connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
     }
     ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();

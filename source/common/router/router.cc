@@ -1042,7 +1042,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   }
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
-  chargeUpstreamAbort(Http::Code::ServiceUnavailable, dropped, upstream_request);
+  chargeUpstreamAbort(Http::Code::BadGateway, dropped, upstream_request);
   upstream_request.removeFromList(upstream_requests_);
 
   // If there are other in-flight requests that might see an upstream response,
@@ -1069,7 +1069,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string details = absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
       transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
-  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
+  onUpstreamAbort(Http::Code::BadGateway, response_flags, body, dropped, details);
 }
 
 void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
