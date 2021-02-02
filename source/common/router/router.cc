@@ -610,9 +610,18 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.http.generic");
   }
-  const bool should_tcp_proxy =
-      route_entry_->connectConfig().has_value() &&
-      downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
+
+  bool should_tcp_proxy = false;
+
+  if (route_entry_->connectConfig().has_value()) {
+    auto method = downstream_headers_->getMethodValue();
+    should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
+
+    // Allow POST for proxying raw TCP if it is configured.
+    if (!should_tcp_proxy && route_entry_->connectConfig().value().allow_post()) {
+      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
+    }
+  }
   return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }

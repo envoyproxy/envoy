@@ -88,6 +88,7 @@ protected:
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
   bool connect_request_ : 1;
+  bool is_tcp_tunneling_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
 
@@ -159,6 +160,7 @@ public:
   // Http::RequestEncoder
   Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
+  void enableTcpTunneling() override { is_tcp_tunneling_ = true; }
 
 private:
   bool upgrade_request_{};

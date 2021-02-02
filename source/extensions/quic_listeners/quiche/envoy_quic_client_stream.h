@@ -39,6 +39,7 @@ public:
   // Http::RequestEncoder
   Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const Http::RequestTrailerMap& trailers) override;
+  void enableTcpTunneling() override {}
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;

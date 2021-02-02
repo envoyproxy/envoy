@@ -702,12 +702,12 @@ TEST(RequiredHeaders, IsRemovableHeader) {
 }
 
 TEST(RequiredHeaders, IsModifiableHeader) {
-  EXPECT_FALSE(HeaderUtility::isRemovableHeader(":path"));
-  EXPECT_FALSE(HeaderUtility::isRemovableHeader("host"));
-  EXPECT_FALSE(HeaderUtility::isRemovableHeader("Host"));
-  EXPECT_TRUE(HeaderUtility::isRemovableHeader(""));
-  EXPECT_TRUE(HeaderUtility::isRemovableHeader("hostname"));
-  EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader(":path"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader("host"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader("Host"));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader(""));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader("hostname"));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader("Content-Type"));
 }
 
 } // namespace Http

@@ -117,6 +117,11 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(const RequestTrailerMap& trailers) PURE;
+
+  /**
+   * Enable TCP Tunneling.
+   */
+  virtual void enableTcpTunneling() PURE;
 };
 
 /**
