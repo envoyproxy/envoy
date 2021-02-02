@@ -1,4 +1,5 @@
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -23,13 +24,14 @@ using SPIFFEValidatorPtr = std::unique_ptr<SPIFFEValidator>;
 using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
 using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
-class TestSPIFFEValidator : public SPIFFEValidator, public testing::Test {
+class TestSPIFFEValidator : public testing::Test {
 public:
   void initialize(std::string yaml) {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
     TestCertificateValidationContextConfig config(typed_conf);
-    validator_ = std::make_unique<SPIFFEValidator>(&config);
+    validator_ = std::make_unique<SPIFFEValidator>(
+        &config, TestCertificateValidationContextConfig{}.api().timeSource());
   };
 
   SPIFFEValidator& validator() { return *validator_; };
@@ -53,13 +55,22 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    example.com:
+    hello.com:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
     k8s-west.example.com:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keyusage_crl_sign_cert.pem"
   )EOF"));
 
   EXPECT_EQ(2, validator().trustBundleStores().size());
+
+  EXPECT_NE(validator().getCaFileName().find("test_data/ca_cert.pem"),
+            std::string::npos);
+  EXPECT_NE(validator().getCaFileName().find("test_data/keyusage_crl_sign_cert.pem"),
+            std::string::npos);
+  EXPECT_NE(validator().getCaFileName().find("hello.com"),
+            std::string::npos);
+    EXPECT_NE(validator().getCaFileName().find("k8s-west.example.com"),
+            std::string::npos);
 }
 
 TEST(SPIFFEValidator, TestExtractTrustDomain) {
@@ -97,12 +108,12 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 }
 
 TEST(SPIFFEValidator, TestInitializeSslContexts) {
-  auto validator = SPIFFEValidator{};
+  auto validator = SPIFFEValidator(TestCertificateValidationContextConfig{}.api().timeSource());
   EXPECT_EQ(SSL_VERIFY_PEER, validator.initializeSslContexts({}, false));
 }
 
 TEST(SPIFFEValidator, TestGetTrustBundleStore) {
-  auto validator = SPIFFEValidator{};
+  auto validator = SPIFFEValidator(TestCertificateValidationContextConfig{}.api().timeSource());
   // no san
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
@@ -155,6 +166,10 @@ typed_config:
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 }
+
+TEST_F(TestSPIFFEValidator, TestGetCaCertInformation) {}
+
+TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {}
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomain) {
   initialize(TestEnvironment::substitute(R"EOF(

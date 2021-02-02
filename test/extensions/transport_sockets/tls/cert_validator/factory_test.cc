@@ -18,7 +18,7 @@ TEST(FactoryTest, TestGetCertValidatorName) {
 
   envoy::config::core::v3::TypedExtensionConfig custom_config = {};
   custom_config.set_name("envoy.tls.cert_validator.spiffe");
-  config.reset(new TestCertificateValidationContextConfig(custom_config));
+  config = std::make_unique<TestCertificateValidationContextConfig>(custom_config);
   EXPECT_EQ(custom_config.name(), getCertValidatorName(config.get()));
 }
 

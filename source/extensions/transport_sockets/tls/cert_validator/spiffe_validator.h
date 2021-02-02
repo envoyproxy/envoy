@@ -32,8 +32,8 @@ using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 class SPIFFEValidator : public CertValidator {
 public:
-  SPIFFEValidator() = default;
-  SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config);
+  SPIFFEValidator(TimeSource& time_source): time_source_(time_source){};
+  SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config, TimeSource& time_source);
   ~SPIFFEValidator() override = default;
 
   // Tls::CertValidator
@@ -49,7 +49,7 @@ public:
                                 unsigned hash_length) override;
 
   size_t daysUntilFirstCertExpires() const override;
-  std::string getCaFileName() const override;
+  std::string getCaFileName() const override { return ca_file_names_; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
   // utility functions
@@ -61,7 +61,10 @@ public:
   };
 
 private:
+  std::vector<bssl::UniquePtr<X509>> ca_certs_;
+  std::string ca_file_names_;
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
+  TimeSource& time_source_;
 };
 
 } // namespace Tls
