@@ -1,5 +1,5 @@
-Internal Redirect Predicates
-============================
+内部重定向谓词
+==================
 
 .. toctree::
   :glob:
