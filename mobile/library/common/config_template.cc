@@ -207,6 +207,13 @@ stats_sinks:
       grpc_service:
         envoy_grpc:
           cluster_name: stats
+  - name: envoy.stat_sinks.metrics_service.mobile
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.stat_sinks.metrics_service.EnvoyMobileMetricsServiceConfig
+      report_counters_as_deltas: true
+      grpc_service:
+        envoy_grpc:
+          cluster_name: stats
 stats_config:
   stats_matcher:
     inclusion_list:

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package envoymobile.extensions.stat_sinks.metrics_service;
+
+import "envoy/config/core/v3/base.proto";
+import "metrics.proto";
+import "validate/validate.proto";
+
+service EnvoyMobileMetricsService {
+  rpc EnvoyMobileStreamMetrics(stream EnvoyMobileStreamMetricsMessage)
+      returns (stream EnvoyMobileStreamMetricsResponse) {
+  }
+}
+
+message EnvoyMobileStreamMetricsResponse {
+  string batch_id = 1;
+}
+
+message EnvoyMobileStreamMetricsMessage {
+
+  message Identifier {
+    // The node sending metrics over the stream.
+    envoy.config.core.v3.Node node = 1 [(validate.rules).message = {required: true}];
+  }
+
+  // Identifier data effectively is a structured metadata. As a performance optimization this will
+  // only be sent in the first message on the stream.
+  Identifier identifier = 1;
+
+  // Identifier for the current envoy_metrics batch.
+  string batch_id = 2;
+
+  // A list of metric entries.
+  repeated io.prometheus.client.MetricFamily envoy_metrics = 3;
+}

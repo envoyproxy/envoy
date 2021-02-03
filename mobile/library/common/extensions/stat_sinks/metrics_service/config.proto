@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoymobile.extensions.stat_sinks.metrics_service;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "validate/validate.proto";
+
+import "google/protobuf/wrappers.proto";
+
+message EnvoyMobileMetricsServiceConfig {
+
+  // The upstream gRPC cluster that hosts the metrics service.
+  envoy.config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // If true, counters are reported as the delta between flushing intervals. Otherwise, the current
+  // counter value is reported. Defaults to false.
+  google.protobuf.BoolValue report_counters_as_deltas = 2;
+}
