@@ -252,12 +252,12 @@ private:
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
   void abortWithStatus(Http::Code http_status_code,
                        absl::optional<Grpc::Status::GrpcStatus> grpc_status_code);
-  bool activeFaults();
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
   bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);
   bool isDelayEnabled(const Http::RequestHeaderMap& request_headers);
   bool isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers);
+  bool isResponseRateLimitConfigured();
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   AbortHttpAndGrpcStatus abortStatus(const Http::RequestHeaderMap& request_headers);

@@ -263,7 +263,7 @@ bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) 
 }
 
 bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers) {
-  if (fault_settings_->responseRateLimit() == nullptr) {
+  if (!isResponseRateLimitConfigured()) {
     return false;
   }
 
@@ -434,13 +434,8 @@ void FaultFilter::onDestroy() {
   }
 }
 
-bool FaultFilter::activeFaults() {
-  // Check if there is a delay timer or response rate limiter still applying
-  if (delay_timer_ != nullptr || fault_settings_->responseRateLimit() != nullptr) {
-    return true;
-  } else {
-    return false;
-  }
+bool FaultFilter::isResponseRateLimitConfigured() {
+  return fault_settings_->responseRateLimit() != nullptr;
 }
 
 void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_headers) {
@@ -454,9 +449,10 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   if (http_status.has_value()) {
     abortWithStatus(http_status.value(), grpc_status);
   } else {
-    // Should not continue to count as an active fault after the delay has elapsed
-    // if no other type of fault is active
-    if (!activeFaults() && fault_active_) {
+    // Should not continue to count as an active fault after the delay has elapsed if no other type
+    // of fault is active. As the delay timer is always done at this point and followed abort faults
+    // have been checked earlier, here we just check if there's a response rate limit configured.
+    if (!isResponseRateLimitConfigured()) {
       config_->stats().active_faults_.dec();
       fault_active_ = false;
     }

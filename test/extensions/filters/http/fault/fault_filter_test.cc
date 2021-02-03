@@ -588,17 +588,17 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
 }
 
-// Verifies that 2 consecutive delay faults be allowed with the max number of faults set to 1
+// Verifies that 2 consecutive delay faults be allowed with the max number of faults set to 1.
 TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   setUpTest(fixed_delay_only_yaml);
 
-  // Set the max number of faults to 1
+  // Set the max number of faults to 1.
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
       .WillOnce(Return(1))
       .WillOnce(Return(1));
 
-  // Delay related calls
+  // Delay related calls.
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("fault.http.delay.fixed_delay_percent",
@@ -617,11 +617,11 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
       .Times(2);
 
-  // Start request 1 with a fault delay
+  // Start request 1 with a fault delay.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  // Delay only case, no aborts
+  // Delay only case, no aborts.
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", _)).Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -636,30 +636,30 @@ TEST_F(FaultFilterTest, ConsecutiveDelayFaults) {
   EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_));
 
-  // Finish request 1 delay but not request 1
+  // Finish request 1 delay but not request 1.
   timer_->invokeCallback();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
-  // Should stop counting as active fault after delay elapsed
+  // Should stop counting as active fault after delay elapsed.
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 
-  // Prep up request 2, with setups and expectations same as request 1
+  // Prep up request 2, with setups and expectations same as request 1.
   setUpTest(fixed_delay_only_yaml);
   expectDelayTimer(5000UL);
 
-  // Start request 2
+  // Start request 2.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  // No overflow should happen as we stop counting active after the first elapsed
+  // No overflow should happen as we stop counting active after the first elapsed.
   EXPECT_EQ(0UL, config_->stats().faults_overflow_.value());
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
 
   EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_));
 
-  // Have the fault delay of request 2 kick in, which should be delayed with success
+  // Have the fault delay of request 2 kick in, which should be delayed with success.
   timer_->invokeCallback();
   filter_->onDestroy();
 
@@ -1226,7 +1226,7 @@ public:
         .WillOnce(Return(enable_runtime));
   }
 
-  // Enable rate limit test with customized fault config input
+  // Enable rate limit test with customized fault config input.
   void setupRateLimitTest(envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
     fault.mutable_response_rate_limit()->mutable_fixed_limit()->set_limit_kbps(1);
     fault.mutable_response_rate_limit()->mutable_percentage()->set_numerator(100);
@@ -1270,8 +1270,8 @@ TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
 }
 
-// Make sure the rate limiter doesn't free up after the delay elapsed
-// Regression test for https://github.com/envoyproxy/envoy/pull/14762
+// Make sure the rate limiter doesn't free up after the delay elapsed.
+// Regression test for https://github.com/envoyproxy/envoy/pull/14762.
 TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   fault.mutable_delay()->mutable_percentage()->set_numerator(100);
@@ -1284,7 +1284,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
       .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
 
-  // Delay related calls
+  // Delay related calls.
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("fault.http.delay.fixed_delay_percent",
@@ -1300,15 +1300,15 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
 
-  // Rate limiter related calls
+  // Rate limiter related calls.
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
-  // The timer is consumed but not used by this test
+  // The timer is consumed but not used by this test.
   new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
 
-  // Delay with rate limiter enabled case
+  // Delay with rate limiter enabled case.
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
@@ -1323,7 +1323,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
 
   timer_->invokeCallback();
 
-  // Make sure the rate limiter doesn't free up after the delay elapsed
+  // Make sure the rate limiter doesn't free up after the delay elapsed.
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
 
   filter_->onDestroy();
