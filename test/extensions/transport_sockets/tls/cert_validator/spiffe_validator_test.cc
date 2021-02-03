@@ -314,7 +314,6 @@ typed_config:
   uint8_t hash_buffer[EVP_MAX_MD_SIZE];
   bssl::ScopedEVP_MD_CTX md;
   EVP_DigestInit(md.get(), EVP_sha256());
-  validator().updateDigestForSessionId(md, hash_buffer, 0);
   validator().updateDigestForSessionId(md, hash_buffer, SHA256_DIGEST_LENGTH);
 }
 

@@ -198,7 +198,7 @@ int SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
   }
 
   auto us = X509_get_key_usage(leaf_cert);
-  return !(us & KU_CRL_SIGN) && !(us & KU_KEY_CERT_SIGN);
+  return !(us & (KU_CRL_SIGN | KU_KEY_CERT_SIGN));
 }
 
 std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {

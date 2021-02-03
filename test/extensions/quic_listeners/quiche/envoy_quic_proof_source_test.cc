@@ -70,6 +70,8 @@ public:
         .WillByDefault(ReturnRef(empty_string_list));
     ON_CALL(cert_validation_ctx_config_, verifyCertificateSpkiList())
         .WillByDefault(ReturnRef(empty_string_list));
+    const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
+    ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     verifier_ =
         std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
   }

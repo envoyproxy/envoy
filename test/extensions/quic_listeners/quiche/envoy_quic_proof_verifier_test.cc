@@ -65,6 +65,8 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, verifyCertificateSpkiList())
         .WillRepeatedly(ReturnRef(empty_string_list_));
+    EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
+        .WillRepeatedly(ReturnRef(absl::nullopt));
     verifier_ =
         std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
   }
