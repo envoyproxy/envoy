@@ -342,7 +342,7 @@ stages:
             env:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               NO_BUILD_SETUP: 1
-      - job: examples-build
+      - job: examples_build
         dependsOn: []
         pool:
           vmImage: "ubuntu-18.04"
