@@ -34,7 +34,9 @@ namespace Upstream {
 namespace {
 
 // Test Cluster Factory without custom configuration
-class TestStaticClusterFactory : public ClusterFactoryImplBase {
+class TestStaticClusterFactory : public Event::TestUsingSimulatedTime,
+                                 public ClusterFactoryImplBase {
+
 public:
   TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
 
@@ -62,7 +64,7 @@ protected:
   const NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

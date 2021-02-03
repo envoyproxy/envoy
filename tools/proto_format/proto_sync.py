@@ -204,8 +204,8 @@ def GetImportDeps(proto_path):
           imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
           continue
         # Special case handling for UDPA core.
-        if import_path.startswith('udpa/core/v1/'):
-          imports.append('@com_github_cncf_udpa//udpa/core/v1:pkg')
+        if import_path.startswith('xds/core/v3/'):
+          imports.append('@com_github_cncf_udpa//xds/core/v3:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
@@ -433,7 +433,7 @@ def Sync(api_root, mode, labels, shadow):
         if deleted_files:
           print('The following files will be deleted: %s' % sorted(deleted_files))
           print(
-              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/master/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
+              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
           )
           if input('Delete files? [yN] ').strip().lower() == 'y':
             subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))

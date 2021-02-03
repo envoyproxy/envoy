@@ -51,10 +51,12 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(
             std::shared_ptr<Upstream::MockClusterInfo> cluster{
                 new NiceMock<Upstream::MockClusterInfo>()};
             Event::MockDispatcher dispatcher_;
-            return new CodecClientForTest(
+            test_session.codec_client_ = new CodecClientForTest(
                 Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
                 test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher_.timeSource()),
+                dispatcher_);
+            return test_session.codec_client_;
           }));
 }
 
@@ -129,7 +131,8 @@ void GrpcHealthCheckerImplTestBaseUtils::expectClientCreate(size_t index) {
             test_session.codec_client_ = new CodecClientForTest(
                 Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
                 test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher_.timeSource()),
+                dispatcher_);
             return test_session.codec_client_;
           }));
 }

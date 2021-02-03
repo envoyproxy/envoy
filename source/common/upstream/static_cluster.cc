@@ -11,7 +11,8 @@ StaticClusterImpl::StaticClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
+                      factory_context.dispatcher().timeSource()),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
@@ -23,13 +24,15 @@ StaticClusterImpl::StaticClusterImpl(
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
+  Event::Dispatcher& dispatcher = factory_context.dispatcher();
+
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
-          locality_lb_endpoint, lb_endpoint);
+          locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }

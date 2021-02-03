@@ -41,10 +41,10 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
-                                 Http::Context& http_context)
-    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-                                 std::move(shadow_writer), true, false, false, false, {},
-                                 dispatcher.timeSource(), http_context),
+                                 Http::Context& http_context, Router::Context& router_context)
+    : cluster_(cluster), config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm,
+                                 runtime, random, std::move(shadow_writer), true, false, false,
+                                 false, {}, dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -81,7 +81,8 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSource()),
+      router_(parent.config_),
+      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
                                          options.hash_policy)),

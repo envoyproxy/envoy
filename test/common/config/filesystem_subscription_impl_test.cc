@@ -164,7 +164,7 @@ TEST_F(FilesystemCollectionSubscriptionImplTest, InlineEntrySuccess) {
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, ""));
   // Initial config load.
   const auto inline_entry =
-      TestUtility::parseYaml<udpa::core::v1::CollectionEntry::InlineEntry>(R"EOF(
+      TestUtility::parseYaml<xds::core::v3::CollectionEntry::InlineEntry>(R"EOF(
 name: foo
 version: resource.1
 resource:
@@ -176,14 +176,15 @@ resource:
       address: 0.0.0.0
       port_value: 10000
   )EOF");
-  const std::string resource = fmt::format(R"EOF(
+  const std::string resource =
+      fmt::format(R"EOF(
 version: system.1
 resource:
   "@type": type.googleapis.com/envoy.config.listener.v3.ListenerCollection
   entries:
   - inline_entry: {}
   )EOF",
-                                           MessageUtil::getJsonStringFromMessage(inline_entry));
+                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry));
   DecodedResourcesWrapper decoded_resources;
   decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
   EXPECT_CALL(callbacks_,
@@ -192,7 +193,7 @@ resource:
   EXPECT_TRUE(statsAre(2, 1, 0, 0, 1471442407191366964, "system.1"));
   // Update.
   const auto inline_entry_2 =
-      TestUtility::parseYaml<udpa::core::v1::CollectionEntry::InlineEntry>(R"EOF(
+      TestUtility::parseYaml<xds::core::v3::CollectionEntry::InlineEntry>(R"EOF(
 name: foo
 version: resource.2
 resource:
@@ -204,14 +205,15 @@ resource:
       address: 0.0.0.1
       port_value: 10001
   )EOF");
-  const std::string resource_2 = fmt::format(R"EOF(
+  const std::string resource_2 =
+      fmt::format(R"EOF(
 version: system.2
 resource:
   "@type": type.googleapis.com/envoy.config.listener.v3.ListenerCollection
   entries:
   - inline_entry: {}
   )EOF",
-                                             MessageUtil::getJsonStringFromMessage(inline_entry_2));
+                  MessageUtil::getJsonStringFromMessageOrDie(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
     decoded_resources_2.pushBack(

@@ -20,6 +20,7 @@
 #include "envoy/http/context.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/router/context.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/shadow_writer.h"
@@ -30,6 +31,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/linked_object.h"
 #include "common/http/message_impl.h"
@@ -49,7 +51,7 @@ public:
                   Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info,
                   Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                   Random::RandomGenerator& random, Router::ShadowWriterPtr&& shadow_writer,
-                  Http::Context& http_context);
+                  Http::Context& http_context, Router::Context& router_context);
   ~AsyncClientImpl() override;
 
   // Http::AsyncClient
@@ -182,6 +184,7 @@ private:
     const std::string& name() const override { return EMPTY_STRING; }
     bool usesVhds() const override { return false; }
     bool mostSpecificHeaderMutationsWins() const override { return false; }
+    uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -397,10 +400,13 @@ private:
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
   void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
+  ResponseHeaderMapOptRef continueHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
+  ResponseHeaderMapOptRef responseHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  ResponseTrailerMapOptRef responseTrailers() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {

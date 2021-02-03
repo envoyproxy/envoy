@@ -75,3 +75,4 @@ cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
 
 # Misc. manual copies to keep generated_api_shadow/ in sync with api/.
 cp -f ./api/bazel/*.bzl ./api/bazel/BUILD ./generated_api_shadow/bazel
+cp -f ./api/BUILD ./generated_api_shadow/

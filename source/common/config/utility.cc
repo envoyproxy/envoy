@@ -57,25 +57,29 @@ void Utility::translateApiConfigSource(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
 
-void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm, bool allow_added_via_api) {
-  Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
-  if (cluster == nullptr) {
+Upstream::ClusterConstOptRef Utility::checkCluster(absl::string_view error_prefix,
+                                                   absl::string_view cluster_name,
+                                                   Upstream::ClusterManager& cm,
+                                                   bool allow_added_via_api) {
+  const auto cluster = cm.clusters().getCluster(cluster_name);
+  if (!cluster.has_value()) {
     throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
-  if (!allow_added_via_api && cluster->info()->addedViaApi()) {
+  if (!allow_added_via_api && cluster->get().info()->addedViaApi()) {
     throw EnvoyException(fmt::format(
         "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
         error_prefix, cluster_name));
   }
+  return cluster;
 }
 
-void Utility::checkClusterAndLocalInfo(absl::string_view error_prefix,
-                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
-                                       const LocalInfo::LocalInfo& local_info) {
-  checkCluster(error_prefix, cluster_name, cm);
+Upstream::ClusterConstOptRef
+Utility::checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
+                                  Upstream::ClusterManager& cm,
+                                  const LocalInfo::LocalInfo& local_info) {
   checkLocalInfo(error_prefix, local_info);
+  return checkCluster(error_prefix, cluster_name, cm);
 }
 
 void Utility::checkLocalInfo(absl::string_view error_prefix,
@@ -149,6 +153,13 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& pr
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterSet& primary_clusters,
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+  // We don't need to check backing sources for ADS sources, the backing cluster must be verified in
+  // the ads_config.
+  if (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
+      api_config_source.api_type() ==
+          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+    return;
+  }
   Utility::checkApiConfigSourceNames(api_config_source);
 
   const bool is_grpc =

@@ -92,6 +92,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context_impl.cc"],
+    hdrs = ["context_impl.h"],
+    deps = [
+        "//include/envoy/router:context_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/stats:stats_macros",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_config_lib",
     srcs = ["debug_config.cc"],
     hdrs = ["debug_config.h"],
@@ -253,7 +264,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -270,6 +280,7 @@ envoy_cc_library(
     ],
     deps = [
         ":config_lib",
+        ":context_lib",
         ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",
@@ -323,11 +334,13 @@ envoy_cc_library(
     hdrs = ["router_ratelimit.h"],
     deps = [
         ":config_utility_lib",
+        "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:metadata_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -354,6 +367,7 @@ envoy_cc_library(
     deps = [
         ":header_formatter_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

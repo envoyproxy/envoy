@@ -45,13 +45,13 @@ protected:
       auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lds_cluster->set_name("lds_cluster");
-      lds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*lds_cluster);
 
       // Add the static cluster to serve RDS.
       auto* rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       rds_cluster->set_name("rds_cluster");
-      rds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*rds_cluster);
     });
 
     config_helper_.addConfigModifier(
@@ -65,6 +65,7 @@ protected:
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               rds_config->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
@@ -84,6 +85,7 @@ protected:
       lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
@@ -146,18 +148,27 @@ protected:
     createStream(&lds_upstream_info_, getLdsFakeUpstream(), listener_name_);
   }
 
-  void sendLdsResponse(const std::vector<std::string>& listener_configs,
+  void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listener_configs,
                        const std::string& version) {
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().Listener);
-    for (const auto& listener_blob : listener_configs) {
-      const auto listener_config =
-          TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob);
+    for (const auto& listener_config : listener_configs) {
       response.add_resources()->PackFrom(listener_config);
     }
     ASSERT(lds_upstream_info_.stream_by_resource_name_[listener_name_] != nullptr);
     lds_upstream_info_.stream_by_resource_name_[listener_name_]->sendGrpcMessage(response);
+  }
+
+  void sendLdsResponse(const std::vector<std::string>& listener_configs,
+                       const std::string& version) {
+    std::vector<envoy::config::listener::v3::Listener> proto_configs;
+    proto_configs.reserve(listener_configs.size());
+    for (const auto& listener_blob : listener_configs) {
+      proto_configs.emplace_back(
+          TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob));
+    }
+    sendLdsResponse(proto_configs, version);
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
@@ -181,6 +192,32 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// Tests that an update with an unknown filter config proto is rejected.
+TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+    name: fake_listener
+    address:
+      socket_address:
+        address: "::"
+        port_value: 4242
+    filter_chains:
+      - filters:
+        - name: "filter_name"
+        )EOF");
+    auto* typed_config =
+        listener.mutable_filter_chains(0)->mutable_filters(0)->mutable_typed_config();
+    typed_config->set_type_url("type.googleapis.com/unknown.type.url");
+    typed_config->set_value("non-empty config contents");
+    sendLdsResponse({listener}, "1");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server
 // from starting.
 TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
@@ -198,7 +235,7 @@ TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
 
   // This actually deletes the only listener.
-  sendLdsResponse({}, "2");
+  sendLdsResponse(std::vector<std::string>{}, "2");
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 0);
   // Server instance is ready now because the listener's destruction marked the listener

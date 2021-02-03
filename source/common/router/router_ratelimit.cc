@@ -11,10 +11,32 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/metadata.h"
+#include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Router {
+
+namespace {
+bool populateDescriptor(const std::vector<RateLimit::DescriptorProducerPtr>& actions,
+                        std::vector<RateLimit::DescriptorEntry>& descriptor_entries,
+                        const std::string& local_service_cluster,
+                        const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& info) {
+  bool result = true;
+  for (const RateLimit::DescriptorProducerPtr& action : actions) {
+    RateLimit::DescriptorEntry descriptor_entry;
+    result = result &&
+             action->populateDescriptor(descriptor_entry, local_service_cluster, headers, info);
+    if (!result) {
+      break;
+    }
+    if (!descriptor_entry.key_.empty()) {
+      descriptor_entries.push_back(descriptor_entry);
+    }
+  }
+  return result;
+}
+} // namespace
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
@@ -43,30 +65,25 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
   return false;
 }
 
-bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
-                                             RateLimit::Descriptor& descriptor,
+bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                              const std::string& local_service_cluster,
-                                             const Http::HeaderMap&,
-                                             const Network::Address::Instance&,
-                                             const envoy::config::core::v3::Metadata*) const {
-  descriptor.entries_.push_back({"source_cluster", local_service_cluster});
+                                             const Http::RequestHeaderMap&,
+                                             const StreamInfo::StreamInfo&) const {
+  descriptor_entry = {"source_cluster", local_service_cluster};
   return true;
 }
 
-bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
-                                                  RateLimit::Descriptor& descriptor,
-                                                  const std::string&, const Http::HeaderMap&,
-                                                  const Network::Address::Instance&,
-                                                  const envoy::config::core::v3::Metadata*) const {
-  descriptor.entries_.push_back({"destination_cluster", route.clusterName()});
+bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                  const std::string&, const Http::RequestHeaderMap&,
+                                                  const StreamInfo::StreamInfo& info) const {
+  descriptor_entry = {"destination_cluster", info.routeEntry()->clusterName()};
   return true;
 }
 
-bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
-                                              RateLimit::Descriptor& descriptor, const std::string&,
-                                              const Http::HeaderMap& headers,
-                                              const Network::Address::Instance&,
-                                              const envoy::config::core::v3::Metadata*) const {
+bool RequestHeadersAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                              const std::string&,
+                                              const Http::RequestHeaderMap& headers,
+                                              const StreamInfo::StreamInfo&) const {
   const auto header_value = headers.get(header_name_);
 
   // If header is not present in the request and if skip_if_absent is true skip this descriptor,
@@ -76,29 +93,27 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
     return skip_if_absent_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  descriptor.entries_.push_back(
-      {descriptor_key_, std::string(header_value[0]->value().getStringView())});
+  descriptor_entry = {descriptor_key_, std::string(header_value[0]->value().getStringView())};
   return true;
 }
 
-bool RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
-                                             RateLimit::Descriptor& descriptor, const std::string&,
-                                             const Http::HeaderMap&,
-                                             const Network::Address::Instance& remote_address,
-                                             const envoy::config::core::v3::Metadata*) const {
-  if (remote_address.type() != Network::Address::Type::Ip) {
+bool RemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                             const std::string&, const Http::RequestHeaderMap&,
+                                             const StreamInfo::StreamInfo& info) const {
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
     return false;
   }
 
-  descriptor.entries_.push_back({"remote_address", remote_address.ip()->addressAsString()});
+  descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
   return true;
 }
 
-bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
-                                          RateLimit::Descriptor& descriptor, const std::string&,
-                                          const Http::HeaderMap&, const Network::Address::Instance&,
-                                          const envoy::config::core::v3::Metadata*) const {
-  descriptor.entries_.push_back({descriptor_key_, descriptor_value_});
+bool GenericKeyAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                          const std::string&, const Http::RequestHeaderMap&,
+                                          const StreamInfo::StreamInfo&) const {
+  descriptor_entry = {descriptor_key_, descriptor_value_};
   return true;
 }
 
@@ -112,18 +127,17 @@ MetaDataAction::MetaDataAction(
       default_value_(action.default_value()),
       source_(envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC) {}
 
-bool MetaDataAction::populateDescriptor(
-    const Router::RouteEntry& route, RateLimit::Descriptor& descriptor, const std::string&,
-    const Http::HeaderMap&, const Network::Address::Instance&,
-    const envoy::config::core::v3::Metadata* dynamic_metadata) const {
+bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                        const std::string&, const Http::RequestHeaderMap&,
+                                        const StreamInfo::StreamInfo& info) const {
   const envoy::config::core::v3::Metadata* metadata_source;
 
   switch (source_) {
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
-    metadata_source = dynamic_metadata;
+    metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &route.metadata();
+    metadata_source = &info.routeEntry()->metadata();
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -133,10 +147,10 @@ bool MetaDataAction::populateDescriptor(
       Envoy::Config::Metadata::metadataValue(metadata_source, metadata_key_).string_value();
 
   if (!metadata_string_value.empty()) {
-    descriptor.entries_.push_back({descriptor_key_, metadata_string_value});
+    descriptor_entry = {descriptor_key_, metadata_string_value};
     return true;
   } else if (metadata_string_value.empty() && !default_value_.empty()) {
-    descriptor.entries_.push_back({descriptor_key_, default_value_});
+    descriptor_entry = {descriptor_key_, default_value_};
     return true;
   }
 
@@ -149,13 +163,12 @@ HeaderValueMatchAction::HeaderValueMatchAction(
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
       action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
 
-bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
-                                                RateLimit::Descriptor& descriptor,
-                                                const std::string&, const Http::HeaderMap& headers,
-                                                const Network::Address::Instance&,
-                                                const envoy::config::core::v3::Metadata*) const {
+bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                const std::string&,
+                                                const Http::RequestHeaderMap& headers,
+                                                const StreamInfo::StreamInfo&) const {
   if (expect_match_ == Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
-    descriptor.entries_.push_back({"header_match", descriptor_value_});
+    descriptor_entry = {"header_match", descriptor_value_};
     return true;
   } else {
     return false;
@@ -163,7 +176,8 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
-    const envoy::config::route::v3::RateLimit& config)
+    const envoy::config::route::v3::RateLimit& config,
+    ProtobufMessage::ValidationVisitor& validator)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
@@ -192,6 +206,25 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
       break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kExtension: {
+      auto* factory = Envoy::Config::Utility::getFactory<RateLimit::DescriptorProducerFactory>(
+          action.extension());
+      if (!factory) {
+        throw EnvoyException(
+            absl::StrCat("Rate limit descriptor extension not found: ", action.extension().name()));
+      }
+      auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+          action.extension().typed_config(), validator, *factory);
+      RateLimit::DescriptorProducerPtr producer =
+          factory->createDescriptorProducerFromProto(*message, validator);
+      if (producer) {
+        actions_.emplace_back(std::move(producer));
+      } else {
+        throw EnvoyException(
+            absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
+      }
+      break;
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -208,23 +241,16 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
   }
 }
 
-void RateLimitPolicyEntryImpl::populateDescriptors(
-    const Router::RouteEntry& route, std::vector<RateLimit::Descriptor>& descriptors,
-    const std::string& local_service_cluster, const Http::HeaderMap& headers,
-    const Network::Address::Instance& remote_address,
-    const envoy::config::core::v3::Metadata* dynamic_metadata) const {
+void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
+                                                   const std::string& local_service_cluster,
+                                                   const Http::RequestHeaderMap& headers,
+                                                   const StreamInfo::StreamInfo& info) const {
   RateLimit::Descriptor descriptor;
-  bool result = true;
-  for (const RateLimitActionPtr& action : actions_) {
-    result = result && action->populateDescriptor(route, descriptor, local_service_cluster, headers,
-                                                  remote_address, dynamic_metadata);
-    if (!result) {
-      break;
-    }
-  }
+  bool result =
+      populateDescriptor(actions_, descriptor.entries_, local_service_cluster, headers, info);
 
   if (limit_override_) {
-    limit_override_.value()->populateOverride(descriptor, dynamic_metadata);
+    limit_override_.value()->populateOverride(descriptor, &info.dynamicMetadata());
   }
 
   if (result) {
@@ -232,12 +258,25 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
   }
 }
 
+void RateLimitPolicyEntryImpl::populateLocalDescriptors(
+    std::vector<Envoy::RateLimit::LocalDescriptor>& descriptors,
+    const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& info) const {
+  RateLimit::LocalDescriptor descriptor({});
+  bool result =
+      populateDescriptor(actions_, descriptor.entries_, local_service_cluster, headers, info);
+  if (result) {
+    descriptors.emplace_back(descriptor);
+  }
+}
+
 RateLimitPolicyImpl::RateLimitPolicyImpl(
-    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits)
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
+    ProtobufMessage::ValidationVisitor& validator)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit));
+        new RateLimitPolicyEntryImpl(rate_limit, validator));
     uint64_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
