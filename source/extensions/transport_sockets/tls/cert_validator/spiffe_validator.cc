@@ -62,7 +62,7 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr) {
+    if (list == nullptr || sk_X509_INFO_num(list.get()) == 0) {
       throw EnvoyException(absl::StrCat("Failed to load trusted CA certificate for ", it.first));
     }
 
@@ -79,11 +79,8 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
           // cert information on getCaCertInformation method.
           // So temporarily we return the first CA's info here.
           ca_loaded = true;
-          auto name = it.second.filename();
-          if (name.empty()) {
-            name = "<inline>";
-          }
-          ca_file_name_ = absl::StrCat(it.first, ": ", name);
+          ca_file_name_ = absl::StrCat(
+              it.first, ": ", it.second.filename().empty() ? "<inline>" : it.second.filename());
         }
       }
 
@@ -175,7 +172,7 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
       X509_get_ext_d2i(leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
-  if (san_names == nullptr) {
+  if (!san_names) {
     return nullptr;
   }
 
@@ -192,11 +189,7 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
   }
 
   auto target_store = trust_bundle_stores_.find(trust_domain);
-  if (target_store == trust_bundle_stores_.end()) {
-    return nullptr;
-  }
-
-  return target_store->second.get();
+  return target_store != trust_bundle_stores_.end() ? target_store->second.get() : nullptr;
 }
 
 bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {

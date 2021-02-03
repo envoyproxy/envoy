@@ -269,3 +269,6 @@ generate_x509_cert keyusage_crl_sign ca
 
 generate_rsa_key spiffe_san
 generate_x509_cert spiffe_san ca
+
+generate_rsa_key non_spiffe_san
+generate_x509_cert non_spiffe_san ca

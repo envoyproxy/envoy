@@ -48,6 +48,10 @@ public:
         std::make_unique<SPIFFEValidator>(config_.get(), stats_, config_->api().timeSource());
   };
 
+  void initializeWithNullptr() {
+    validator_ = std::make_unique<SPIFFEValidator>(nullptr, stats_, time_system_);
+  }
+
   void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, time_system_); }
 
   SPIFFEValidator& validator() { return *validator_; }
@@ -61,6 +65,23 @@ private:
   Event::TestRealTimeSystem time_system_;
 };
 
+TEST_F(TestSPIFFEValidator, NullConfigException) {
+  EXPECT_THROW_WITH_MESSAGE(initializeWithNullptr(), EnvoyException,
+                            "SPIFFE cert validator connot be initialized from null configuration");
+}
+
+TEST_F(TestSPIFFEValidator, InvalidCA) {
+  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+    hello.com:
+      inline_string: "invalid"
+  )EOF")),
+                            EnvoyException, "Failed to load trusted CA certificate for hello.com");
+}
+
 TEST_F(TestSPIFFEValidator, Constructor) {
   EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -70,17 +91,18 @@ typed_config:
   )EOF")),
                             EnvoyException,
                             "SPIFFE cert validator requires at least one trusted CA");
+
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     hello.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
   )EOF"));
 
   EXPECT_EQ(1, validator().trustBundleStores().size());
-  EXPECT_NE(validator().getCaFileName().find("test_data/ca_cert.pem"), std::string::npos);
+  EXPECT_NE(validator().getCaFileName().find("test_data/ca_cert_with_crl.pem"), std::string::npos);
   EXPECT_NE(validator().getCaFileName().find("hello.com"), std::string::npos);
 
   initialize(TestEnvironment::substitute(R"EOF(
@@ -145,15 +167,20 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
+  // non spiffe san
+  cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
+
   // spiffe san
   cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
 
   // trust bundle not provided
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // trust bundle provided
-  validator().trustBundleStores().emplace("lyft.com", X509StorePtr(X509_STORE_new()));
+  validator().trustBundleStores().emplace("example.com", X509StorePtr(X509_STORE_new()));
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 
@@ -254,6 +281,9 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
+  initialize();
+  EXPECT_EQ(0, validator().daysUntilFirstCertExpires());
+
   Event::SimulatedTimeSystem time_system;
   time_system.setSystemTime(std::chrono::milliseconds(0));
 
@@ -291,7 +321,7 @@ typed_config:
   bool foundTestCA = false;
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
   validator().addClientValidationContext(ctx.get(), false);
-  for (const X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
+  for (X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
     const int cn_index = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
     EXPECT_TRUE(cn_index >= 0);
     X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(name, cn_index);
