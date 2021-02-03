@@ -246,7 +246,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, CompressorProxyingConnectIntegrationTest,
 void CompressorProxyingConnectIntegrationTest::initialize() {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
   config_helper_.addFilter(compressorFilterConfig);
   HttpProtocolIntegrationTest::initialize();
 }
