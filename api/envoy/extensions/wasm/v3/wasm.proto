@@ -18,14 +18,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
 
-// Configuration for restricting proxy-wasm capabilities available to modules.
+// Configuration for restricting Proxy-Wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
-  // The proxy-wasm capabilities which will be allowed. Capabilities are mapped by
+  // The Proxy-Wasm capabilities which will be allowed. Capabilities are mapped by
   // name. The *SanitizationConfig* which each capability maps to is currently unimplemented and ignored,
   // and so should be left empty.
   //
   // The capability names are given in the
-  // `proxy-wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`_.
+  // `Proxy-Wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`_.
   // Additionally, the following WASI capabilities from
   // `this list <https://github.com/WebAssembly/WASI/blob/master/phases/snapshot/docs.md#modules>`_
   // are implemented and can be allowed:
@@ -126,7 +126,7 @@ message PluginConfig {
   // startup the proxy will not start.
   bool fail_open = 5;
 
-  // Configuration for restricting proxy-wasm capabilities available to modules.
+  // Configuration for restricting Proxy-Wasm capabilities available to modules.
   CapabilityRestrictionConfig capability_restriction_config = 6;
 }
 
