@@ -59,11 +59,11 @@ response_headers_to_add:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_TRUE(config->requestAllowed());
+  EXPECT_TRUE(config->requestAllowed({}));
 }
 
 TEST(Factory, EnabledEnforcedDisabledByDefault) {
@@ -81,7 +81,7 @@ token_bucket:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -119,7 +119,159 @@ token_bucket:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
+  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                       ProtobufMessage::getNullValidationVisitor()),
+               EnvoyException);
+}
+
+TEST(Factory, RouteSpecificFilterConfigWithDescriptorsWithNoTokenBucket) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 1000s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - append: false
+    header:
+      key: x-test-rate-limit
+      value: 'true'
+descriptors:
+- entries:
+   - key: hello
+     value: world
+   - key: foo
+     value: bar
+- entries:
+   - key: foo2
+     value: bar2
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                       ProtobufMessage::getNullValidationVisitor()),
+               EnvoyException);
+}
+
+TEST(Factory, RouteSpecificFilterConfigWithDescriptors) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 60s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - append: false
+    header:
+      key: x-test-rate-limit
+      value: 'true'
+descriptors:
+- entries:
+  - key: hello
+    value: world
+  - key: foo
+    value: bar
+  token_bucket:
+    max_tokens: 10
+    tokens_per_fill: 10
+    fill_interval: 60s
+- entries:
+  - key: foo2
+    value: bar2
+  token_bucket:
+    max_tokens: 100
+    tokens_per_fill: 100
+    fill_interval: 3600s
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
+  EXPECT_TRUE(config->requestAllowed({}));
+}
+
+TEST(Factory, RouteSpecificFilterConfigWithDescriptorsTimerNotDivisible) {
+  const std::string config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval: 100s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - append: false
+    header:
+      key: x-test-rate-limit
+      value: 'true'
+descriptors:
+- entries:
+  - key: hello
+    value: world
+  - key: foo
+    value: bar
+  token_bucket:
+    max_tokens: 10
+    tokens_per_fill: 10
+    fill_interval: 1s
+- entries:
+  - key: foo2
+    value: bar2
+  token_bucket:
+    max_tokens: 100
+    tokens_per_fill: 100
+    fill_interval: 86400s
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
                                                        ProtobufMessage::getNullValidationVisitor()),
                EnvoyException);

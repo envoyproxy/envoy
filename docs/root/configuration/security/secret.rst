@@ -123,10 +123,14 @@ This example shows how to configure secrets fetched from remote SDS servers:
 
     clusters:
       - name: sds_server_mtls
-        http2_protocol_options:
-          connection_keepalive:
-            interval: 30s
-            timeout: 5s
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options:
+                connection_keepalive:
+                  interval: 30s
+                  timeout: 5s
         load_assignment:
           cluster_name: sds_server_mtls
           endpoints:
@@ -147,7 +151,11 @@ This example shows how to configure secrets fetched from remote SDS servers:
               private_key:
                 filename: certs/sds_key.pem
       - name: sds_server_uds
-        http2_protocol_options: {}
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options: {}
         load_assignment:
           cluster_name: sds_server_uds
           endpoints:
@@ -169,8 +177,10 @@ This example shows how to configure secrets fetched from remote SDS servers:
                 tls_certificate_sds_secret_configs:
                 - name: client_cert
                   sds_config:
+                    resource_api_version: V3
                     api_config_source:
                       api_type: GRPC
+                      transport_api_version: V3
                       grpc_services:
                         google_grpc:
                           target_uri: unix:/tmp/uds_path
@@ -185,16 +195,20 @@ This example shows how to configure secrets fetched from remote SDS servers:
               tls_certificate_sds_secret_configs:
               - name: server_cert
                 sds_config:
+                  resource_api_version: V3
                   api_config_source:
                     api_type: GRPC
+                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: sds_server_mtls
               validation_context_sds_secret_config:
                 name: validation_context
                 sds_config:
+                  resource_api_version: V3
                   api_config_source:
                     api_type: GRPC
+                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: sds_server_uds
@@ -228,7 +242,11 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
                 socket_address:
                   address: controlplane
                   port_value: 8443
-      http2_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
       transport_socket:
         name: "envoy.transport_sockets.tls"
         typed_config:

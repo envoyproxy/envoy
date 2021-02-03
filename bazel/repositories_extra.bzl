@@ -1,6 +1,6 @@
 load("@rules_python//python:repositories.bzl", "py_repositories")
 load("@rules_python//python:pip.bzl", "pip3_import", "pip_repositories")
-load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_raze__fetch_remote_crates")
+load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_remote_crates")
 
 # Python dependencies.
 def _python_deps():
@@ -97,8 +97,25 @@ def _python_deps():
         # release_date = "2020-05-21"
         # use_category = ["test"],
     )
+    pip3_import(
+        name = "fuzzing_pip3",
+        requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+
+        # project_name = "Abseil Python Common Libraries",
+        # project_url = "https://github.com/abseil/abseil-py",
+        # version = "0.11.0",
+        # release_date = "2020-10-27",
+        # use_category = ["test"],
+
+        # project_name = "Six: Python 2 and 3 Compatibility Library",
+        # project_url = "https://six.readthedocs.io/",
+        # version = "1.15.0",
+        # release_date = "2020-05-21"
+        # use_category = ["test"],
+    )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
 def envoy_dependencies_extra():
     _python_deps()
-    proxy_wasm_cpp_host_raze__fetch_remote_crates()
+    proxy_wasm_cpp_host_fetch_remote_crates()

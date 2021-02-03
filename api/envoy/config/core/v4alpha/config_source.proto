@@ -7,7 +7,7 @@ import "envoy/config/core/v4alpha/grpc_service.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/authority.proto";
+import "xds/core/v3/authority.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -24,13 +24,14 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // xDS API and non-xDS services version. This is used to describe both resource and transport
 // protocol versions (in distinct configuration fields).
 enum ApiVersion {
+  reserved 1;
+
+  reserved "V2";
+
   // When not specified, we assume v2, to ease migration to Envoy's stable API
   // versioning. If a client does not support v2 (e.g. due to deprecation), this
   // is an invalid value.
-  AUTO = 0;
-
-  // Use xDS v2 API.
-  V2 = 1;
+  DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
 
   // Use xDS v3 API.
   V3 = 2;
@@ -154,12 +155,11 @@ message RateLimitSettings {
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.ConfigSource";
 
-  // Authorities that this config source may be used for. An authority specified
-  // in a *udpa.core.v1.ResourceLocator* is resolved to a *ConfigSource* prior
-  // to configuration fetch. This field provides the association between
-  // authority name and configuration source.
+  // Authorities that this config source may be used for. An authority specified in a xdstp:// URL
+  // is resolved to a *ConfigSource* prior to configuration fetch. This field provides the
+  // association between authority name and configuration source.
   // [#not-implemented-hide:]
-  repeated udpa.core.v1.Authority authorities = 7;
+  repeated xds.core.v3.Authority authorities = 7;
 
   oneof config_source_specifier {
     option (validate.required) = true;

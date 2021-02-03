@@ -332,7 +332,7 @@ following are the command line options that Envoy supports.
   extensions cannot be used by static or dynamic configuration, though they are still linked into
   Envoy and may run start-up code or have other runtime effects. Extension names are created by
   joining the extension category and name with a forward slash,
-  e.g. ``grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
+  e.g. ``envoy.grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
 
 .. option:: --version
 

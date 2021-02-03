@@ -166,17 +166,17 @@ public:
   // Based on MessageUtil::hash() defined below.
   template <class ProtoType>
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
-    // message doesn't hash to different values.
     std::string text;
     {
-      // For memory safety, the StringOutputStream needs to be destroyed before
-      // we read the string.
-      Protobuf::io::StringOutputStream string_stream(&text);
-      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-      coded_stream.SetSerializationDeterministic(true);
+      Protobuf::TextFormat::Printer printer;
+      printer.SetExpandAny(true);
+      printer.SetUseFieldNumber(true);
+      printer.SetSingleLineMode(true);
+      printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
-        message.SerializeToCodedStream(&coded_stream);
+        std::string text_message;
+        printer.PrintToString(message, &text_message);
+        absl::StrAppend(&text, text_message);
       }
     }
     return HashUtil::xxHash64(text);
@@ -422,16 +422,51 @@ public:
                                               const bool always_print_primitive_fields = false);
 
   /**
-   * Extract JSON as string from a google.protobuf.Message.
+   * Extract JSON as string from a google.protobuf.Message. Returns an error if the message cannot
+   * be represented as JSON, which can occur if it contains an Any proto with an unrecognized type
+   * URL or invalid data, or if memory cannot be allocated.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @param pretty_print whether the returned JSON should be formatted.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
+   * @return ProtobufUtil::StatusOr<std::string> of formatted JSON object, or an error status if
+   * conversion fails.
+   */
+  static ProtobufUtil::StatusOr<std::string>
+  getJsonStringFromMessage(const Protobuf::Message& message, bool pretty_print = false,
+                           bool always_print_primitive_fields = false);
+
+  /**
+   * Extract JSON as string from a google.protobuf.Message, crashing if the conversion to JSON
+   * fails. This method is safe so long as the message does not contain an Any proto with an
+   * unrecognized type or invalid data.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
    * values, e.g. an int32 set to 0 or a bool set to false.
    * @return std::string of formatted JSON object.
    */
-  static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              bool pretty_print = false,
-                                              bool always_print_primitive_fields = false);
+  static std::string getJsonStringFromMessageOrDie(const Protobuf::Message& message,
+                                                   bool pretty_print = false,
+                                                   bool always_print_primitive_fields = false) {
+    auto json_or_error =
+        getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
+    RELEASE_ASSERT(json_or_error.ok(), json_or_error.status().ToString());
+    return std::move(json_or_error).value();
+  }
+
+  /**
+   * Extract JSON as string from a google.protobuf.Message, returning some error string if the
+   * conversion to JSON fails.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @param pretty_print whether the returned JSON should be formatted.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
+   * @return std::string of formatted JSON object, or an error message if conversion fails.
+   */
+  static std::string getJsonStringFromMessageOrError(const Protobuf::Message& message,
+                                                     bool pretty_print = false,
+                                                     bool always_print_primitive_fields = false);
 
   /**
    * Utility method to create a Struct containing the passed in key/value strings.

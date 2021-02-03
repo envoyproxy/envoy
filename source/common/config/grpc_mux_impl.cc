@@ -48,8 +48,13 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     }
   }
 
-  if (skip_subsequent_node_ && !first_stream_request_) {
-    request.clear_node();
+  if (skip_subsequent_node_) {
+    if (first_stream_request_) {
+      // Node may have been cleared during a previous request.
+      request.mutable_node()->MergeFrom(local_info_.node());
+    } else {
+      request.clear_node();
+    }
   }
   VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
@@ -63,7 +68,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
-                                      const std::set<std::string>& resources,
+                                      const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
                                       OpaqueResourceDecoder& resource_decoder, const bool) {
   auto watch =

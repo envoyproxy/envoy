@@ -9,14 +9,15 @@ blog post for more information on the universal data plane concept.
 # Repository structure
 
 The API tree can be found at two locations:
-* https://github.com/envoyproxy/envoy/tree/master/api - canonical read/write home for the APIs.
+* https://github.com/envoyproxy/envoy/tree/main/api - canonical read/write home for the APIs.
 * https://github.com/envoyproxy/data-plane-api - read-only mirror of
-  https://github.com/envoyproxy/envoy/tree/master/api, providing the ability to consume the data
+  https://github.com/envoyproxy/envoy/tree/main/api, providing the ability to consume the data
   plane APIs without the Envoy implementation.
 
 # Further API reading
 
-* [API overview for developers](API_OVERVIEW.md)
+* [API style guide](STYLE.md)
+* [API versioning guide](API_VERSIONING.md)
 * [API overview for users](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#)
 * [xDS protocol overview](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol)
 * [Contributing guide](CONTRIBUTING.md)

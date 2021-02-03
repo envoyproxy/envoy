@@ -19,11 +19,12 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":file_event_interface",
+        ":scaled_timer",
         ":schedulable_cb_interface",
         ":signal_interface",
+        ":timer_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/filesystem:watcher_interface",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",
@@ -42,9 +43,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scaled_timer",
+    hdrs = ["scaled_timer.h"],
+    deps = [
+        "//source/common/common:interval_value",
+    ],
+)
+
+envoy_cc_library(
     name = "scaled_range_timer_manager_interface",
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
+        ":scaled_timer",
         ":timer_interface",
     ],
 )

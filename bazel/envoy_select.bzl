@@ -58,10 +58,3 @@ def envoy_select_wasm_wasmtime(xs):
         "@envoy//bazel:wasm_wasmtime": xs,
         "//conditions:default": [],
     })
-
-# Select the given values if use legacy codecs in test is on in the current build.
-def envoy_select_new_codecs_in_integration_tests(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_new_codecs_in_integration_tests": xs,
-        "//conditions:default": [],
-    })

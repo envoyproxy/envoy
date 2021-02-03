@@ -716,6 +716,15 @@ void ConnectionImpl::shutdownNotice() {
   }
 }
 
+Status ConnectionImpl::protocolErrorForTest() {
+  int rc = nghttp2_submit_goaway(session_, NGHTTP2_FLAG_NONE,
+                                 nghttp2_session_get_last_proc_stream_id(session_),
+                                 NGHTTP2_PROTOCOL_ERROR, nullptr, 0);
+  ASSERT(rc == 0);
+
+  return sendPendingFrames();
+}
+
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
@@ -1007,7 +1016,7 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
   StreamImpl* stream = getStream(stream_id);
-  if (!stream) {
+  if (!stream || stream->remote_end_stream_) {
     return 0;
   }
 
@@ -1020,7 +1029,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
                  stream_id, end_metadata);
 
   StreamImpl* stream = getStream(stream_id);
-  if (stream == nullptr) {
+  if (!stream || stream->remote_end_stream_) {
     return 0;
   }
 

@@ -77,7 +77,7 @@ private:
   Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
-  const std::string& listener_name_;
+  const std::string listener_name_;
   const bool reuse_port_;
   Network::SocketSharedPtr socket_;
   absl::once_flag steal_once_;
@@ -104,6 +104,7 @@ public:
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
+  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
@@ -169,6 +170,7 @@ public:
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
+  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;

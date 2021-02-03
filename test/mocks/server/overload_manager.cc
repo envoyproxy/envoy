@@ -17,12 +17,6 @@ using ::testing::ReturnRef;
 MockThreadLocalOverloadState::MockThreadLocalOverloadState()
     : disabled_state_(OverloadActionState::inactive()) {
   ON_CALL(*this, getState).WillByDefault(ReturnRef(disabled_state_));
-  ON_CALL(*this, createScaledTimer_).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
-}
-
-Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(OverloadTimerType timer_type,
-                                                                Event::TimerCb callback) {
-  return Event::TimerPtr{createScaledTimer_(timer_type, std::move(callback))};
 }
 
 MockOverloadManager::MockOverloadManager() {

@@ -6,6 +6,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -24,13 +25,17 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
   connection_->detectEarlyCloseWhenReadDisabled(false);
-  connection_->addReadFilter(std::make_shared<ConnReadFilter>(*this));
+  read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
+  connection_->addReadFilter(read_filter_handle_);
   connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
                                    host->cluster().stats().upstream_cx_rx_bytes_buffered_,
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
                                    &host->cluster().stats().bind_errors_, nullptr});
 
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    connection_->noDelay(true);
+  }
   connection_->connect();
 }
 
@@ -49,7 +54,7 @@ ActiveTcpClient::~ActiveTcpClient() {
 void ActiveTcpClient::clearCallbacks() {
   if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
-    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
   }
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
@@ -59,14 +64,21 @@ void ActiveTcpClient::clearCallbacks() {
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
-  // Do not pass the Connected event to any session which registered during onEvent above.
-  // Consumers of connection pool connections assume they are receiving already connected
-  // connections.
-  if (callbacks_ && event != Network::ConnectionEvent::Connected) {
-    callbacks_->onEvent(event);
-    // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
-    // Clear the pointer to avoid using it again.
-    callbacks_ = nullptr;
+  if (callbacks_) {
+    // Do not pass the Connected event to any session which registered during onEvent above.
+    // Consumers of connection pool connections assume they are receiving already connected
+    // connections.
+    if (event == Network::ConnectionEvent::Connected) {
+      connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
+    } else {
+      if (tcp_connection_data_) {
+        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
+      }
+      callbacks_->onEvent(event);
+      // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
+      // Clear the pointer to avoid using it again.
+      callbacks_ = nullptr;
+    }
   }
 }
 

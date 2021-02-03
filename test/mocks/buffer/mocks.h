@@ -76,7 +76,9 @@ public:
 
   Buffer::InstancePtr create(std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) override {
-    return Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
+    auto buffer = Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
+    ASSERT(buffer != nullptr);
+    return buffer;
   }
 
   MOCK_METHOD(Buffer::Instance*, create_,

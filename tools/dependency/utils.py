@@ -30,6 +30,16 @@ def RepositoryLocations():
   return locations
 
 
+# Obtain GitHub project URL from a list of URLs.
+def GetGitHubProjectUrl(urls):
+  for url in urls:
+    if not url.startswith('https://github.com/'):
+      continue
+    components = url.split('/')
+    return f'https://github.com/{components[3]}/{components[4]}'
+  return None
+
+
 # Information releated to a GitHub release version.
 GitHubRelease = namedtuple('GitHubRelease', ['organization', 'project', 'version', 'tagged'])
 
