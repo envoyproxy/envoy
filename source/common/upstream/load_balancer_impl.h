@@ -395,6 +395,7 @@ protected:
   virtual void refresh(uint32_t priority);
 
   bool noHostsAreInSlowStart();
+  bool adheresToEndpointWarmingPolicy(const Host& host);
 
   virtual void recalculateHostsInSlowStart(const HostVector& hosts_added,
                                            const HostVector& hosts_removed);
@@ -407,6 +408,7 @@ protected:
   const uint64_t seed_;
 
 private:
+  friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
@@ -416,11 +418,13 @@ private:
 
   // Scheduler for each valid HostsSource.
   absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+
+protected:
   // Slow start related configs
   const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy
-      endpoint_warming_policy;
-  const std::chrono::milliseconds slow_start_window;
-  double time_bias_{};
+      endpoint_warming_policy_;
+  const std::chrono::milliseconds slow_start_window_;
+  double time_bias_{1.0};
   const std::unique_ptr<Runtime::Double> time_bias_runtime_;
   TimeSource& time_source_;
   struct orderByCreateDateDesc {
@@ -428,8 +432,14 @@ private:
       return l->creationTime() < r->creationTime();
     }
   };
-  absl::btree_multiset<HostSharedPtr, orderByCreateDateDesc> hosts_in_slow_start_;
-  friend class EdfLoadBalancerBasePeer;
+  // Used exclusively for:
+  //    - checking if at least one host is in slow start;
+  //    - ordering of hosts by creation date in ascending order.
+  // Not meant to check if given host is in slow start.
+  // That check could be done inline by comparing host creation date to slow start window
+  // and by checking if hosts adheres to endpoint warming policy.
+  std::shared_ptr<absl::btree_set<HostSharedPtr, orderByCreateDateDesc>> hosts_in_slow_start_;
+  bool is_slow_start_enabled_;
 };
 
 /**
@@ -458,7 +468,27 @@ private:
     // index.
     peekahead_index_ = 0;
   }
-  double hostWeight(const Host& host) override { return host.weight(); }
+  double hostWeight(const Host& host) override {
+    if (is_slow_start_enabled_) {
+      auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+          time_source_.monotonicTime() - host.creationTime());
+      if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(host)) {
+
+        time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
+
+        if (time_bias_ < 0.0) {
+          // ENVOY_LOG(warn, "upstream: invalid time bias supplied (runtime key {}), using 1.0",
+          //           time_bias_runtime_->runtimeKey());
+          time_bias_ = 1.0;
+        }
+        return host.weight() * time_bias_;
+      } else {
+        return host.weight();
+      }
+    } else {
+      return host.weight();
+    }
+  }
   HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
     auto i = rr_indexes_.find(source);

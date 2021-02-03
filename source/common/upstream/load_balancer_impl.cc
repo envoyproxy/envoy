@@ -698,21 +698,24 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()),
-      endpoint_warming_policy(common_config.has_slow_start_config()
-                                  ? common_config.slow_start_config().endpoint_warming_policy()
-                                  : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
-      slow_start_window(std::chrono::milliseconds(
-                            common_config.has_slow_start_config()
-                                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.slow_start_config(),
-                                                                  slow_start_window, 0)
-                                : 0) *
-                        1000),
+      endpoint_warming_policy_(common_config.has_slow_start_config()
+                                   ? common_config.slow_start_config().endpoint_warming_policy()
+                                   : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
+      slow_start_window_(std::chrono::milliseconds(
+                             common_config.has_slow_start_config()
+                                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                       common_config.slow_start_config(), slow_start_window, 0)
+                                 : 0) *
+                         1000),
       time_bias_runtime_(
           common_config.has_slow_start_config() && common_config.slow_start_config().has_time_bias()
               ? std::make_unique<Runtime::Double>(common_config.slow_start_config().time_bias(),
                                                   runtime)
               : nullptr),
-      time_source_(time_source) {
+      time_source_(time_source),
+      hosts_in_slow_start_(
+          std::make_shared<absl::btree_set<HostSharedPtr, orderByCreateDateDesc>>()),
+      is_slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -720,12 +723,16 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
-        recalculateHostsInSlowStart(hosts_added, hosts_removed);
+        if (is_slow_start_enabled_) {
+          recalculateHostsInSlowStart(hosts_added, hosts_removed);
+        }
         refresh(priority);
       });
   priority_set.addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
-        recalculateHostsInSlowStart(hosts_added, hosts_removed);
+        if (is_slow_start_enabled_) {
+          recalculateHostsInSlowStart(hosts_added, hosts_removed);
+        }
       });
 }
 
@@ -737,42 +744,24 @@ void EdfLoadBalancerBase::initialize() {
 
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
                                                       const HostVector& hosts_removed) {
+  auto current_time = time_source_.monotonicTime();
   for (const auto& host : hosts_added) {
-    auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        time_source_.monotonicTime() - host->creationTime());
+    auto host_create_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(current_time - host->creationTime());
     // Check if host existence time is within slow start window.
-    if (host_create_duration <= slow_start_window) {
-      // If it is, then we need to verify that hosts adheres to endpoint warming policy.
-      switch (endpoint_warming_policy) {
-      case envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT:
-        // Host enters slow start immediately
-        hosts_in_slow_start_.insert(host);
-        break;
-      case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
-        // Check health status of host. It should be marked as healthy and have first passed
-        // healthcheck. TODO(nezdolik) is this equivalent to "host has passed first HC" ?
-        if (host->health() == Upstream::Host::Health::Healthy &&
-            !host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
-          hosts_in_slow_start_.insert(host);
-        }
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-    } else if (hosts_in_slow_start_.find(host) != hosts_in_slow_start_.end()) {
-      // Removes all hosts with same creation date, which are outside of slow start window.
-      hosts_in_slow_start_.erase(host);
+    if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(*host)) {
+      hosts_in_slow_start_->insert(host);
+    } else {
+      // Yields a noop if `hosts_in_slow_start_` do not contain host.
+      hosts_in_slow_start_->erase(host);
     }
   }
   // Compact hosts_in_slow_start_, erase hosts that are outside of slow start window.
-  auto current_time =
-      std::chrono::time_point_cast<std::chrono::milliseconds>(time_source_.monotonicTime());
-
-  while (!hosts_in_slow_start_.empty() &&
-         (current_time - (std::chrono::time_point_cast<std::chrono::milliseconds>(
-                             (*(--hosts_in_slow_start_.end()))->creationTime())) >
-          slow_start_window)) {
-    hosts_in_slow_start_.erase(--hosts_in_slow_start_.end());
+  while (!hosts_in_slow_start_->empty() &&
+         std::chrono::duration_cast<std::chrono::milliseconds>(
+             current_time - (*(hosts_in_slow_start_->begin()))->creationTime()) >
+             slow_start_window_) {
+    hosts_in_slow_start_->erase(hosts_in_slow_start_->begin());
   }
 }
 
@@ -790,7 +779,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // Skip edf creation.
       return;
     }
-
     scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
 
     // Populate scheduler with host list.
@@ -799,10 +787,15 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // We should probably change this to refresh at all times. See the comment in
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
+      // We use a fixed weight here. While the weight may change without
+      // notification, this will only be stale until this host is next picked,
+      // at which point it is reinserted into the EdfScheduler with its new
+      // weight in chooseHost().
       auto host_weight = hostWeight(*host);
       auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           time_source_.monotonicTime() - host->creationTime());
-      if (host_create_duration <= slow_start_window) {
+      if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(*host)) {
+
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
 
         if (time_bias_ < 0.0) {
@@ -812,11 +805,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         }
         host_weight *= time_bias_;
       }
-
-      // We use a fixed weight here. While the weight may change without
-      // notification, this will only be stale until this host is next picked,
-      // at which point it is reinserted into the EdfScheduler with its new
-      // weight in chooseHost().
       scheduler.edf_->add(host_weight, host);
     }
 
@@ -853,8 +841,27 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
+bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
+  switch (endpoint_warming_policy_) {
+  case envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT:
+    // Host enters slow start immediately.
+    return true;
+  case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
+    // Check health status of host. It should be marked as healthy and have first passed
+    // healthcheck. TODO(nezdolik) is this equivalent to "host has passed first HC" ?
+    if (host.health() == Upstream::Host::Health::Healthy &&
+        !host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+      return true;
+    } else {
+      return false;
+    }
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
-  if (hosts_in_slow_start_.size() == 0) {
+  if (hosts_in_slow_start_->size() == 0) {
     return true;
   } else {
     auto current_time =
@@ -865,9 +872,10 @@ bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
     // If all hosts are out of the window, we no longer need to track them and therefore we erase
     // tracked hosts set.
     auto latest_host_added_time = std::chrono::time_point_cast<std::chrono::milliseconds>(
-        (*hosts_in_slow_start_.begin())->creationTime());
-    if (current_time - latest_host_added_time > slow_start_window) {
-      hosts_in_slow_start_.erase(hosts_in_slow_start_.begin(), hosts_in_slow_start_.end());
+        (*(--hosts_in_slow_start_->end()))->creationTime());
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(
+            current_time - latest_host_added_time) > slow_start_window_) {
+      hosts_in_slow_start_->erase(hosts_in_slow_start_->begin(), hosts_in_slow_start_->end());
       return true;
     } else {
       return false;
@@ -877,6 +885,7 @@ bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
+
   if (!hosts_source) {
     return nullptr;
   }
@@ -907,6 +916,7 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   if (!hosts_source) {
     return nullptr;
   }
+
   auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();

@@ -1,3 +1,5 @@
+#include <functional>
+#include <iostream>
 #include <memory>
 #include <set>
 #include <string>
@@ -31,6 +33,24 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+
+class EdfLoadBalancerBasePeer {
+public:
+  static const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy&
+  endpointWarmingPolicy(EdfLoadBalancerBase& edf_lb) {
+    return edf_lb.endpoint_warming_policy_;
+  }
+  static const std::chrono::milliseconds& slowStartWindow(EdfLoadBalancerBase& edf_lb) {
+    return edf_lb.slow_start_window_;
+  }
+  static double timeBias(EdfLoadBalancerBase& edf_lb) { return edf_lb.time_bias_; }
+  static const std::shared_ptr<
+      absl::btree_set<HostSharedPtr, EdfLoadBalancerBase::orderByCreateDateDesc>>&
+  hostsInSlowStart(EdfLoadBalancerBase& edf_lb) {
+    return edf_lb.hosts_in_slow_start_;
+  }
+};
+
 namespace {
 
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
@@ -228,8 +248,8 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
     const auto hs = lb_.chooseHostSet(&context, 0);
     switch (hs.second) {
     case LoadBalancerBase::HostAvailability::Healthy:
-      // Either we selected one of the healthy hosts or we failed to select anything and defaulted
-      // to healthy.
+      // Either we selected one of the healthy hosts or we failed to select anything and
+      // default to healthy.
       EXPECT_TRUE(!hs.first.healthyHosts().empty() ||
                   (hs.first.healthyHosts().empty() && hs.first.degradedHosts().empty()));
       break;
@@ -315,7 +335,9 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   // Health P=0 == 100*1.4 == 35 P=1 == 35
   // Since 3 hosts are excluded, P=0 should be considered fully healthy.
   // Total health = 100% + 35% is greater than 100%. Panic should not trigger.
-  updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+  updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */, 0 /* num_degraded_hosts
+                                                                            */
+                ,
                 3 /* num_excluded_hosts */);
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, 0));
@@ -326,7 +348,9 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   // All priorities are in panic mode (situation called TotalPanic)
   // Load is distributed based on number of hosts regardless of their health status.
   // P=0 and P=1 have 4 hosts each so each priority will receive 50% of the traffic.
-  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts
+                                                                            */
+                ,
                 4 /* num_excluded_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
@@ -338,7 +362,9 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   // P=0 has 4 hosts with 1 excluded, P=1 has 6 hosts with 2 excluded.
   // P=0 should receive 4/(4+6)=40% of traffic
   // P=1 should receive 6/(4+6)=60% of traffic
-  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts
+                                                                            */
+                ,
                 1 /* num_excluded_hosts */);
   updateHostSet(failover_host_set_, 6 /* num_hosts */, 1 /* num_healthy_hosts */,
                 0 /* num_degraded_hosts */, 2 /* num_excluded_hosts */);
@@ -548,7 +574,7 @@ public:
       local_priority_set_->getOrCreateHostSet(0);
     }
     lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
-                                                   runtime_, random_, common_config_);
+                                                   runtime_, random_, common_config_, simTime());
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -1274,8 +1300,8 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   // The following host distribution with current precision should lead to the no_capacity_left
   // situation.
-  // Reuse the same host in all of the structures below to reduce time test takes and this does not
-  // impact load balancing logic.
+  // Reuse the same host in all of the structures below to reduce time test takes and this does
+  // not impact load balancing logic.
   HostSharedPtr host = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
   HostVector current(45000);
 
@@ -1454,10 +1480,90 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
                          ::testing::Values(true, false));
 
+TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
+  init(false);
+  const auto endpoint_warming_policy =
+      EdfLoadBalancerBasePeer::endpointWarmingPolicy(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT, endpoint_warming_policy);
+  const auto slow_start_window =
+      EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
+  const auto time_bias = EdfLoadBalancerBasePeer::timeBias(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_EQ(1.0d, time_bias);
+  const auto hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_TRUE(hosts_in_slow_start->empty());
+}
+
+TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
+  common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
+      envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT);
+  // Set slow start window to 60 seconds.
+  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_value(60);
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
+  host_set_.hosts_ = {host1};
+
+  init(true);
+
+  HostVector empty;
+  HostVector hosts_added;
+  hosts_added.push_back(host1);
+  simTime().advanceTimeWait(std::chrono::seconds(5));
+  hostSet().runCallbacks(hosts_added, empty);
+  auto hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+
+  EXPECT_EQ(1, hosts_in_slow_start->size());
+
+  // Advance time, so that host is no longer in slow start.
+  simTime().advanceTimeWait(std::chrono::seconds(56));
+
+  hosts_added.clear();
+  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+
+  hosts_added.push_back(host2);
+
+  hostSet().healthy_hosts_ = {host1, host2};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks(hosts_added, empty);
+
+  EXPECT_EQ(1, hosts_in_slow_start->size());
+
+  hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+
+  // We expect 3:1 ratio, as host2 is in slow start mode and should get half less traffic than
+  // usual.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+
+  // Advance time, so that none of the hosts is in slow start.
+  simTime().advanceTimeWait(std::chrono::seconds(65));
+
+  // As there were no priority/cluster updates, run another round of selection to update weights in
+  // edf scheduler.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+
+  // Now expect 1:1 ratio.
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
   LeastRequestLoadBalancer lb_{
-      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_};
+      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_,
+      simTime()};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -1534,11 +1640,11 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   // Creating various load balancer objects with different choice configs.
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
-                                random_,       common_config_, lr_lb_config};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(5);
-  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,      runtime_,
-                                random_,       common_config_, lr_lb_config};
+  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
 
   // Verify correct number of choices.
 
@@ -1614,8 +1720,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
-                                random_,       common_config_, lr_lb_config};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(-1.0));
 
@@ -1668,8 +1774,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
-                                random_,       common_config_, lr_lb_config};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
+                                random_,       common_config_, lr_lb_config, simTime()};
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(0.0));
 

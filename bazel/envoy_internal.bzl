@@ -8,6 +8,8 @@ def envoy_copts(repository, test = False):
         "-Wall",
         "-Wextra",
         # "-Werror",
+        "-Wno-inaccessible-base",
+        "-Wno-deprecated-declarations",
         "-Wno-unused-variable",
         "-Wno-unused-parameter",
         "-Wnon-virtual-dtor",
