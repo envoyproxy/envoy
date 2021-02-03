@@ -137,7 +137,7 @@ private:
         : health_checker_(health_checker), host_(host) {}
 
     // Upstream::HealthCheckHostMonitor
-    void setUnhealthy() override;
+    void setUnhealthy(UnhealthyType type) override;
 
     std::weak_ptr<HealthCheckerImplBase> health_checker_;
     std::weak_ptr<Host> host_;
@@ -154,7 +154,8 @@ private:
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
-  void setUnhealthyCrossThread(const HostSharedPtr& host);
+  void setUnhealthyCrossThread(const HostSharedPtr& host,
+                               HealthCheckHostMonitor::UnhealthyType type);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>
   initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
   static MetadataConstSharedPtr

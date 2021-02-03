@@ -188,12 +188,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     int num_regions = GetReadableRegions(&iov, 1);
     ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;
-    Buffer::RawSlice slice;
-    buffer->reserve(bytes_read, &slice, 1);
-    ASSERT(slice.len_ >= bytes_read);
-    slice.len_ = bytes_read;
-    memcpy(slice.mem_, iov.iov_base, iov.iov_len);
-    buffer->commit(&slice, 1);
+    buffer->add(iov.iov_base, bytes_read);
     MarkConsumed(bytes_read);
   }
   ASSERT(buffer->length() == 0 || !end_stream_decoded_);
