@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/formatter:substitution_formatter_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -24,6 +25,7 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

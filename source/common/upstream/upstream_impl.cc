@@ -238,8 +238,6 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
   return net_hosts;
 }
 
-
-
 } // namespace
 
 HostDescriptionImpl::HostDescriptionImpl(

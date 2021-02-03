@@ -20,6 +20,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -342,9 +343,23 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    const std::string upstream_cluster_name = "cluster_name";
-    EXPECT_CALL(stream_info.host_->cluster_, name())
-        .WillRepeatedly(ReturnRef(upstream_cluster_name));
+    const std::string observable_cluster_name = "observability_name";
+    EXPECT_CALL(stream_info.host_->cluster_, observabilityName())
+        .WillRepeatedly(ReturnRef(observable_cluster_name));
+    EXPECT_EQ("observability_name", upstream_format.format(request_headers, response_headers,
+                                                           response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("observability_name")));
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    const std::string cluster_name = "cluster_name";
+    EXPECT_CALL(stream_info.host_->cluster_, name()).WillRepeatedly(ReturnRef(cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(request_headers, response_headers,
                                                      response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,

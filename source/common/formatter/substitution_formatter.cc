@@ -19,6 +19,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -742,7 +743,12 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
           if (nullptr != stream_info.upstreamHost()) {
-            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+            if (Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.use_observable_cluster_name")) {
+              upstream_cluster_name = stream_info.upstreamHost()->cluster().observabilityName();
+            } else {
+              upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+            }
           }
 
           return upstream_cluster_name.empty()
