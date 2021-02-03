@@ -996,7 +996,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
                                      {":path", "/unknown/path"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      R"({ "theme" : "Children")", {}, {}, Status(),
+      "", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}},
       "Bad request: Could not resolve /unknown/path to a method.", true, false, "", false);
 
@@ -1007,7 +1007,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
                                      {":path", "/shelves/100?unknown=1"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      R"({ "theme" : "Children")", {}, {}, Status(),
+      "", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}},
       "Bad request: Could not find field \"unknown\" in the type \"bookstore.GetShelfRequest\".",
       true, false, "", false);
