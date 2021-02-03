@@ -1381,7 +1381,7 @@ public:
   void testPreconnect();
 };
 
-// This just verifies that FakeMysqlUpstream works as advertized, and the early data
+// This just verifies that FakeMysqlUpstream works as advertised, and the early data
 // makes it to the client.
 TEST_P(MysqlIntegrationTest, UpstreamWritesFirst) {
   globalPreconnect();
