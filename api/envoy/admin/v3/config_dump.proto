@@ -17,6 +17,28 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: ConfigDump]
 
+// Config status from the view of a xDS client, which tells the synchronization
+// status between the xDS client and the xDS server.
+enum ConfigErrorStatus {
+  // Config status is not available/unknown.
+  UNKNOWN = 0;
+
+  // Client requested the config but hasn't received any config from management
+  // server. The client will not fail traffic, but will queue them until update
+  // arrived or timed out.
+  REQUESTED = 1;
+
+  // Client received the config and replied with NACK.
+  NACKED = 2;
+
+  // This config has been requested by the client but has either not been
+  // delivered by the server or was previously delivered by the server and then
+  // subsequently removed from configs provided by the server. For more
+  // information, please refer to the :ref:`"Knowing When a Requested Resource
+  // Does Not Exist" <xds_protocol_resource_not_existed>` section.
+  DOES_NOT_EXIST = 3;
+}
+
 // The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper
 // message to maintain and serve arbitrary configuration information from any component in Envoy.
 message ConfigDump {
@@ -59,17 +81,13 @@ message UpdateFailureState {
   // Details about the last failed update attempt.
   string details = 3;
 
-  // This is the version of the rejected resource.
+  // This is the version of the latest update for this resource.
   // [#not-implemented-hide:]
   string version_info = 4;
 
-  // This resource is not included in the update or being explicitly removed by
-  // an update, either case means that this resource no longer existed in the
-  // xDS server. For more information, please refer to the :ref:`"Knowing When a
-  // Requested Resource Does Not Exist" <xds_protocol_resource_not_existed>`
-  // section.
+  // Error status code of this config.
   // [#not-implemented-hide:]
-  bool does_not_exist_at_server = 5;
+  ConfigErrorStatus status = 5;
 }
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes
