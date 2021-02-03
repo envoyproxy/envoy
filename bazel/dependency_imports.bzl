@@ -4,6 +4,7 @@ load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains
 load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+load("@rules_fuzzing//fuzzing:repositories.bzl", "oss_fuzz_dependencies", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
@@ -12,6 +13,7 @@ load("@headersplit_pip3//:requirements.bzl", headersplit_pip_install = "pip_inst
 load("@kafka_pip3//:requirements.bzl", kafka_pip_install = "pip_install")
 load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 load("@thrift_pip3//:requirements.bzl", thrift_pip_install = "pip_install")
+load("@fuzzing_pip3//:requirements.bzl", fuzzing_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 
@@ -29,6 +31,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
+    rules_fuzzing_dependencies()
+    oss_fuzz_dependencies()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
@@ -82,3 +86,4 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     kafka_pip_install()
     protodoc_pip_install()
     thrift_pip_install()
+    fuzzing_pip_install()

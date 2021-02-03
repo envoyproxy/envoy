@@ -30,12 +30,11 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
-  void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   SliceDataPtr extractMutableFrontSlice() override;
-  uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
+  Reservation reserveForRead() override;
   void postProcess() override { checkLowWatermark(); }
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
@@ -52,6 +51,9 @@ protected:
   void checkLowWatermark();
 
 private:
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              ReservationSlicesOwnerPtr slices_owner) override;
+
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;
