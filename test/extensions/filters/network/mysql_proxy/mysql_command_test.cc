@@ -33,15 +33,15 @@ public:
     mysql_cmd_encode.encode(decode_data);
     BufferHelper::encodeHdr(decode_data, 0);
 
-    if (BufferHelper::peekHdr(decode_data, len, seq) != MYSQL_SUCCESS) {
-      return MYSQL_FAILURE;
+    if (BufferHelper::peekHdr(decode_data, len, seq) != DecodeStatus::Success) {
+      return DecodeStatus::Failure;
     }
     BufferHelper::consumeHdr(decode_data);
-    if (mysql_cmd_decode.decode(decode_data, seq, len) != MYSQL_SUCCESS) {
-      return MYSQL_FAILURE;
+    if (mysql_cmd_decode.decode(decode_data, seq, len) != DecodeStatus::Success) {
+      return DecodeStatus::Failure;
     }
     hsql::SQLParser::parse(mysql_cmd_decode.getData(), &result);
-    return MYSQL_SUCCESS;
+    return DecodeStatus::Success;
   }
 
   enum TestResource {
@@ -220,7 +220,7 @@ public:
 TEST_F(MySQLCommandTest, MySQLTest1) {
   std::string command = buildShow("databases");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtShow, {});
 }
 
@@ -230,7 +230,7 @@ TEST_F(MySQLCommandTest, MySQLTest1) {
 TEST_F(MySQLCommandTest, MySQLTest2) {
   std::string command = buildShow("tables");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtShow, {});
 }
 
@@ -242,7 +242,7 @@ TEST_F(MySQLCommandTest, MySQLTest3) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{table, {"create"}}});
 }
@@ -256,7 +256,7 @@ TEST_F(MySQLCommandTest, MySQLTest4) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   hsql::SQLParserResult result;
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"table1", {"create"}}});
 }
@@ -270,7 +270,7 @@ TEST_F(MySQLCommandTest, MySQLTest5) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"table1", {"create"}}});
 }
@@ -284,7 +284,7 @@ TEST_F(MySQLCommandTest, MySQLTest6) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   hsql::SQLParserResult result;
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"table 1", {"create"}}});
 }
@@ -298,7 +298,7 @@ TEST_F(MySQLCommandTest, MySQLTest7) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"table number 1", {"create"}}});
 }
@@ -312,7 +312,7 @@ TEST_F(MySQLCommandTest, MySQLTest8) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"my sql table number 1", {"create"}}});
 }
@@ -326,7 +326,7 @@ TEST_F(MySQLCommandTest, MySQLTest9) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "", true, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"my sql table number 1", {"create"}}});
 }
@@ -339,7 +339,7 @@ TEST_F(MySQLCommandTest, MySQLTest10) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "", false, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{table, {"create"}}});
 }
@@ -352,7 +352,7 @@ TEST_F(MySQLCommandTest, MySQLTest11) {
   std::string command = "CREATE ";
   command.append(table);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   EXPECT_EQ(false, result.isValid());
 }
 
@@ -365,7 +365,7 @@ TEST_F(MySQLCommandTest, MySQLTest12) {
   std::string value = "(Usr VARCHAR(40),Count INT);";
   std::string command = buildCreate(TestResource::TABLE, "TEMPORARY", false, table, value);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate,
                                        {{"table1", {"create"}}});
 }
@@ -377,7 +377,7 @@ TEST_F(MySQLCommandTest, MySQLTest13) {
   std::string db = "mysqldb";
   std::string command = buildCreate(TestResource::DB, "", false, db, "");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate, {});
 }
 
@@ -389,7 +389,7 @@ TEST_F(MySQLCommandTest, MySQLTest14) {
   std::string db = "mysqldb";
   std::string command = buildCreate(TestResource::DB, "", true, db, "");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtCreate, {});
 }
 
@@ -400,7 +400,7 @@ TEST_F(MySQLCommandTest, MySQLTest15) {
   std::string event = "event1";
   std::string command = buildCreate(TestResource::EVENT, "", false, event, "");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   EXPECT_EQ(false, result.isValid());
 }
 
@@ -411,7 +411,7 @@ TEST_F(MySQLCommandTest, MySQLTest16) {
   std::string db = "mysqldb";
   std::string command = buildAlter(TestResource::DB, db, "CHARACTER SET charset_name");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter, {});
 }
 
@@ -422,7 +422,7 @@ TEST_F(MySQLCommandTest, MySQLTest17) {
   std::string db = "mysqldb";
   std::string command = buildAlter(TestResource::DB, db, "default CHARACTER SET charset_name");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter, {});
 }
 
@@ -433,7 +433,7 @@ TEST_F(MySQLCommandTest, MySQLTest18) {
   std::string db = "mysqldb";
   std::string command = buildAlter(TestResource::DB, db, "default CHARACTER SET = charset_name");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter, {});
 }
 
@@ -445,7 +445,7 @@ TEST_F(MySQLCommandTest, MySQLTest19) {
   std::string command =
       buildAlter(TestResource::SCHEMA, db, "default CHARACTER SET = charset_name");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter, {});
 }
 
@@ -456,7 +456,7 @@ TEST_F(MySQLCommandTest, MySQLTest20) {
   std::string table = "table1";
   std::string command = buildAlter(TestResource::TABLE, table, "add column Id varchar (20)");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtAlter,
                                        {{table, {"alter"}}});
 }
@@ -468,7 +468,7 @@ TEST_F(MySQLCommandTest, MySQLTest21) {
   std::string db = "mysqldb";
   std::string command = buildDrop(TestResource::DB, false, db);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDrop, {});
 }
 
@@ -480,7 +480,7 @@ TEST_F(MySQLCommandTest, MySQLTest22) {
   std::string db = "mysqldb";
   std::string command = buildDrop(TestResource::DB, true, db);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDrop, {});
 }
 
@@ -492,7 +492,7 @@ TEST_F(MySQLCommandTest, MySQLTest23) {
   std::string table = "table1";
   std::string command = buildDrop(TestResource::TABLE, true, table);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDrop, {{table, {"drop"}}});
 }
 
@@ -504,7 +504,7 @@ TEST_F(MySQLCommandTest, MySQLTest24) {
   std::string table = "table1";
   std::string command = buildInsert("", true, table, " (Usr, Count) VALUES ('allsp2', 3)");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtInsert,
                                        {{table, {"insert"}}});
 }
@@ -518,7 +518,7 @@ TEST_F(MySQLCommandTest, MySQLTest25) {
   std::string command =
       buildInsert("LOW_PRIORITY", true, table, " (Usr, Count) VALUES ('allsp2', 3)");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtInsert,
                                        {{table, {"insert"}}});
 }
@@ -531,7 +531,7 @@ TEST_F(MySQLCommandTest, MySQLTest26) {
   std::string table = "table1";
   std::string command = buildInsert("IGNORE", true, table, " (Usr, Count) VALUES ('allsp2', 3)");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtInsert,
                                        {{table, {"insert"}}});
 }
@@ -544,7 +544,7 @@ TEST_F(MySQLCommandTest, MySQLTest27) {
   std::string table = "table1";
   std::string command = buildDelete("", table, "WHERE Count > 3");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDelete,
                                        {{table, {"delete"}}});
 }
@@ -557,7 +557,7 @@ TEST_F(MySQLCommandTest, MySQLTest28) {
   std::string table = "table1";
   std::string command = buildDelete("LOW_PRIORITY", table, "WHERE Count > 3");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDelete,
                                        {{table, {"delete"}}});
 }
@@ -570,7 +570,7 @@ TEST_F(MySQLCommandTest, MySQLTest29) {
   std::string table = "table1";
   std::string command = buildDelete("QUICK", table, "WHERE Count > 3");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDelete,
                                        {{table, {"delete"}}});
 }
@@ -583,7 +583,7 @@ TEST_F(MySQLCommandTest, MySQLTest30) {
   std::string table = "table1";
   std::string command = buildDelete("IGNORE", table, "WHERE Count > 3");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtDelete,
                                        {{table, {"delete"}}});
 }
@@ -596,7 +596,7 @@ TEST_F(MySQLCommandTest, MySQLTest31) {
   std::string table = "table1";
   std::string command = buildSelect("*", table, "WHERE Count = 1");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtSelect,
                                        {{table, {"select"}}});
 }
@@ -609,7 +609,7 @@ TEST_F(MySQLCommandTest, MySQLTest32) {
   std::string table = "table1";
   std::string command = buildSelect("Product.category", table, "WHERE Count = 1");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtSelect,
                                        {{table, {"select"}}, {"Product", {"unknown"}}});
 }
@@ -622,7 +622,7 @@ TEST_F(MySQLCommandTest, MySQLTest33) {
   std::string table = "table1";
   std::string command = buildSelect("DISTINCT Usr", table, "");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtSelect,
                                        {{table, {"select"}}});
 }
@@ -635,7 +635,7 @@ TEST_F(MySQLCommandTest, MySQLTest34) {
   std::string table = "table1";
   std::string command = buildSelect("Usr,Count", table, "ORDER BY Count DESC");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtSelect,
                                        {{table, {"select"}}});
 }
@@ -648,7 +648,7 @@ TEST_F(MySQLCommandTest, MySQLTest35) {
   std::string table = "table1";
   std::string command = buildSelect("Usr,Count", table, "ORDER BY Count DESC");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtSelect,
                                        {{table, {"select"}}});
 }
@@ -659,7 +659,7 @@ TEST_F(MySQLCommandTest, MySQLTest35) {
 TEST_F(MySQLCommandTest, MySQLTest36) {
   std::string command = buildSelect("", "", "");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   EXPECT_EQ(false, result.isValid());
 }
 
@@ -669,7 +669,7 @@ TEST_F(MySQLCommandTest, MySQLTest36) {
 TEST_F(MySQLCommandTest, MySQLTest37) {
   std::string command = buildSelect("USr,Count", "", "");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   EXPECT_EQ(false, result.isValid());
 }
 
@@ -684,7 +684,7 @@ TEST_F(MySQLCommandTest, MySQLTest38) {
   std::string sel_command = buildSelect("*", table2, "" /*"WHERE tbl_temp1.fld_order_id > 100"*/);
   ins_command.append(sel_command);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(ins_command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtInsert,
                                        {{table1, {"insert"}}, {table2, {"select"}}});
   // SPELLCHECKER(on)
@@ -700,7 +700,7 @@ TEST_F(MySQLCommandTest, MySQLTest39) {
   std::string sel_command = buildSelect("tbl_temp1.fld_order_id", table2, "");
   ins_command.append(sel_command);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(ins_command, result));
   expectStatementTypeAndTableAccessMap(
       result, hsql::StatementType::kStmtInsert,
       {{"tbl_temp1", {"unknown"}}, {"table2", {"select"}}, {"table1", {"insert"}}});
@@ -720,7 +720,7 @@ TEST_F(MySQLCommandTest, MySQLTest40) {
   ins_command.append(ins_command2);
   ins_command.append(sel_command);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(ins_command, result));
   EXPECT_EQ(true, result.isValid());
   EXPECT_EQ(1UL, result.size());
 }
@@ -732,7 +732,7 @@ TEST_F(MySQLCommandTest, MySQLTest41) {
   std::string table = "table1";
   std::string command = buildUpdate(table, "", "SET col1 = col1 + 1");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtUpdate,
                                        {{table, {"update"}}});
 }
@@ -744,7 +744,7 @@ TEST_F(MySQLCommandTest, MySQLTest42) {
   std::string table = "table1";
   std::string command = buildUpdate(table, "LOW_PRIORITY", "SET col1 = col1 + 1");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtUpdate,
                                        {{table, {"update"}}});
 }
@@ -756,7 +756,7 @@ TEST_F(MySQLCommandTest, MySQLTest43) {
   std::string table = "table1";
   std::string command = buildUpdate(table, "IGNORE", "SET col1 = col1 + 1");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtUpdate,
                                        {{table, {"update"}}});
 }
@@ -768,7 +768,7 @@ TEST_F(MySQLCommandTest, MySQLTest44) {
   std::string table = "table1";
   std::string command = buildUpdate(table, "LOW_PRIORITY IGNORE", "SET col1 = col1 + 1");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtUpdate,
                                        {{table, {"update"}}});
 }
@@ -784,7 +784,7 @@ TEST_F(MySQLCommandTest, MySQLTest45) {
   command.append("(");
   command.append(command2);
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtUpdate,
                                        {{table1, {"update"}}, {table2, {"select"}}});
 }
@@ -796,7 +796,7 @@ TEST_F(MySQLCommandTest, MySQLTest46) {
   std::string table = "table1";
   std::string command = buildSelect("12 AS a, a ", table, "GROUP BY a;");
   hsql::SQLParserResult result;
-  EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(command, result));
+  EXPECT_EQ(DecodeStatus::Success, encodeQuery(command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtSelect,
                                        {{table, {"select"}}});
 }

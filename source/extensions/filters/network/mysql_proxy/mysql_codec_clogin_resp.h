@@ -15,32 +15,25 @@ namespace MySQLProxy {
 enum ClientLoginResponseType { Null, Ok, Err, AuthSwitch, AuthMoreData };
 
 // ClientLoginResponse could be
-// Protocol::OldAuthSwitchRequest, Protocol::AuthSwitchRequest when server want switch auth method
+// Protocol::OldAuthSwitchRequest, Protocol::AuthSwitchRequest when server wants switch auth method
 // or OK_Packet, ERR_Packet when server auth ok or error
 class ClientLoginResponse : public MySQLCodec {
 public:
   ClientLoginResponse() : type_(Null) {}
-  ~ClientLoginResponse() override { cleanup(); }
-
-  ClientLoginResponse(const ClientLoginResponse& other);                // copy constructor
-  ClientLoginResponse(ClientLoginResponse&& other) noexcept;            // move constructor
-  ClientLoginResponse& operator=(const ClientLoginResponse& other);     // copy assignment
-  ClientLoginResponse& operator=(ClientLoginResponse&& other) noexcept; // move assignment
+  ClientLoginResponse(const ClientLoginResponse&);
+  ClientLoginResponse(ClientLoginResponse&&) noexcept;
+  ClientLoginResponse& operator=(const ClientLoginResponse&);
+  ClientLoginResponse& operator=(ClientLoginResponse&&) noexcept;
   bool operator==(const ClientLoginResponse& other) const; // test for equality, unit tests
   bool operator!=(const ClientLoginResponse& other) const { return !(*this == other); }
 
   // MySQLCodec
-  int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
+  DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   void encode(Buffer::Instance&) override;
 
   class AuthMoreMessage {
   public:
-    AuthMoreMessage() = default;
-    ~AuthMoreMessage() = default;
-    AuthMoreMessage(const AuthMoreMessage&) = default;
-    AuthMoreMessage(AuthMoreMessage&&) noexcept;
-    AuthMoreMessage& operator=(const AuthMoreMessage&) = default;
-    AuthMoreMessage& operator=(AuthMoreMessage&&) noexcept;
+    using AuthMoreMessagePtr = std::unique_ptr<AuthMoreMessage>;
     bool operator==(const AuthMoreMessage&) const;
     const std::string& getAuthMoreData() const { return more_plugin_data_; }
     void setAuthMoreData(const std::string& data) { more_plugin_data_ = data; }
@@ -52,12 +45,7 @@ public:
 
   class AuthSwitchMessage {
   public:
-    AuthSwitchMessage() = default;
-    ~AuthSwitchMessage() = default;
-    AuthSwitchMessage(const AuthSwitchMessage&);
-    AuthSwitchMessage(AuthSwitchMessage&&) noexcept;
-    AuthSwitchMessage& operator=(const AuthSwitchMessage&) = default;
-    AuthSwitchMessage& operator=(AuthSwitchMessage&&) noexcept;
+    using AuthSwitchMessagePtr = std::unique_ptr<AuthSwitchMessage>;
     bool operator==(const AuthSwitchMessage&) const;
     bool isOldAuthSwitch() const { return is_old_auth_switch_; }
     const std::string& getAuthPluginData() const { return auth_plugin_data_; }
@@ -75,12 +63,7 @@ public:
 
   class OkMessage {
   public:
-    OkMessage() = default;
-    ~OkMessage() = default;
-    OkMessage(const OkMessage&) = default;
-    OkMessage(OkMessage&&) noexcept;
-    OkMessage& operator=(const OkMessage&) = default;
-    OkMessage& operator=(OkMessage&&) noexcept;
+    using OkMessagePtr = std::unique_ptr<OkMessage>;
     bool operator==(const OkMessage&) const;
     void setAffectedRows(uint64_t affected_rows) { affected_rows_ = affected_rows; }
     void setLastInsertId(uint64_t last_insert_id) { last_insert_id_ = last_insert_id; }
@@ -104,12 +87,7 @@ public:
 
   class ErrMessage {
   public:
-    ErrMessage() = default;
-    ~ErrMessage() = default;
-    ErrMessage(const ErrMessage&) = default;
-    ErrMessage(ErrMessage&&) noexcept;
-    ErrMessage& operator=(const ErrMessage&) = default;
-    ErrMessage& operator=(ErrMessage&&) noexcept;
+    using ErrMessagePtr = std::unique_ptr<ErrMessage>;
     bool operator==(const ErrMessage&) const;
     void setErrorCode(uint16_t error_code) { error_code_ = error_code; }
     void setSqlStateMarker(uint8_t marker) { marker_ = marker; }
@@ -127,13 +105,10 @@ public:
     std::string sql_state_;
     std::string error_message_;
   };
-  const OkMessage& asOkMessage() const;
+
   OkMessage& asOkMessage();
-  const ErrMessage& asErrMessage() const;
   ErrMessage& asErrMessage();
-  const AuthSwitchMessage& asAuthSwitchMessage() const;
   AuthSwitchMessage& asAuthSwitchMessage();
-  const AuthMoreMessage& asAuthMoreMessage() const;
   AuthMoreMessage& asAuthMoreMessage();
 
   /**
@@ -145,24 +120,23 @@ public:
   void type(ClientLoginResponseType);
 
 private:
-  int parseAuthSwitch(Buffer::Instance& buffer, uint32_t len);
-  int parseOk(Buffer::Instance& buffer, uint32_t len);
-  int parseErr(Buffer::Instance& buffer, uint32_t len);
-  int parseAuthMore(Buffer::Instance& buffer, uint32_t len);
+  DecodeStatus parseAuthSwitch(Buffer::Instance& buffer, uint32_t len);
+  DecodeStatus parseOk(Buffer::Instance& buffer, uint32_t len);
+  DecodeStatus parseErr(Buffer::Instance& buffer, uint32_t len);
+  DecodeStatus parseAuthMore(Buffer::Instance& buffer, uint32_t len);
   void encodeAuthSwitch(Buffer::Instance&);
   void encodeOk(Buffer::Instance&);
   void encodeErr(Buffer::Instance&);
   void encodeAuthMore(Buffer::Instance&);
 
+  // cleanup storage when change type
   void cleanup();
 
   ClientLoginResponseType type_{};
-  union {
-    AuthSwitchMessage auth_switch_;
-    AuthMoreMessage auth_more_;
-    ErrMessage err_;
-    OkMessage ok_;
-  };
+  AuthSwitchMessage::AuthSwitchMessagePtr auth_switch_;
+  AuthMoreMessage::AuthMoreMessagePtr auth_more_;
+  ErrMessage::ErrMessagePtr err_;
+  OkMessage::OkMessagePtr ok_;
 };
 
 } // namespace MySQLProxy

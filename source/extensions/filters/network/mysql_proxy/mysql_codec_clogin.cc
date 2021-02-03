@@ -55,13 +55,13 @@ bool ClientLogin::isClientSecureConnection() const {
   return client_cap_ & CLIENT_SECURE_CONNECTION;
 }
 
-int ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
-  /* 4.0 uses 2 byte, 4.1+ uses 4 bytes, but the proto-flag is in the lower 2
+DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
+  /* 4.0 uses 2 bytes, 4.1+ uses 4 bytes, but the proto-flag is in the lower 2
    * bytes */
-  uint16_t base_cap = 0;
-  if (BufferHelper::peekUint16(buffer, base_cap) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring cap client login message");
-    return MYSQL_FAILURE;
+  uint16_t base_cap;
+  if (BufferHelper::peekUint16(buffer, base_cap) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing cap client login message");
+    return DecodeStatus::Failure;
   }
   setBaseClientCap(base_cap);
   if (client_cap_ & CLIENT_SSL) {
@@ -73,118 +73,118 @@ int ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
   return parseResponse320(buffer);
 }
 
-int ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
-  if (BufferHelper::readUint32(buffer, client_cap_) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring cap client ssl message");
-    return MYSQL_FAILURE;
+DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
+  if (BufferHelper::readUint32(buffer, client_cap_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing cap client ssl message");
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readUint32(buffer, max_packet_) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring max packet client ssl message");
-    return MYSQL_FAILURE;
+  if (BufferHelper::readUint32(buffer, max_packet_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing max packet client ssl message");
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readUint8(buffer, charset_) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring character client ssl message");
-    return MYSQL_FAILURE;
+  if (BufferHelper::readUint8(buffer, charset_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing character client ssl message");
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring reserved data of client ssl message");
-    return MYSQL_FAILURE;
+  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing reserved data of client ssl message");
+    return DecodeStatus::Failure;
   }
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
-int ClientLogin::parseResponse41(Buffer::Instance& buffer) {
-  if (BufferHelper::readUint32(buffer, client_cap_) != MYSQL_SUCCESS) {
+DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
+  if (BufferHelper::readUint32(buffer, client_cap_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing client cap of client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readUint32(buffer, max_packet_) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint32(buffer, max_packet_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing max packet of client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readUint8(buffer, charset_) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(buffer, charset_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing charset of client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when skiping bytes of client login message");
-    return MYSQL_FAILURE;
+  if (BufferHelper::readBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when skipping bytes of client login message");
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readString(buffer, username_) != MYSQL_SUCCESS) {
+  if (BufferHelper::readString(buffer, username_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing username of client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
   if (client_cap_ & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
     uint64_t auth_len;
-    if (BufferHelper::readLengthEncodedInteger(buffer, auth_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::readLengthEncodedInteger(buffer, auth_len) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing username of client login message");
-      return MYSQL_FAILURE;
+      return DecodeStatus::Failure;
     }
-    if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != MYSQL_SUCCESS) {
+    if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp of client login message");
-      return MYSQL_FAILURE;
+      return DecodeStatus::Failure;
     }
   } else if (client_cap_ & CLIENT_SECURE_CONNECTION) {
     uint8_t auth_len;
-    if (BufferHelper::readUint8(buffer, auth_len) != MYSQL_SUCCESS) {
+    if (BufferHelper::readUint8(buffer, auth_len) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp length of client login message");
-      return MYSQL_FAILURE;
+      return DecodeStatus::Failure;
     }
-    if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != MYSQL_SUCCESS) {
+    if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp data of client login message");
-      return MYSQL_FAILURE;
+      return DecodeStatus::Failure;
     }
   } else {
-    if (BufferHelper::readString(buffer, auth_resp_) != MYSQL_SUCCESS) {
+    if (BufferHelper::readString(buffer, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp data of client login message");
-      return MYSQL_FAILURE;
+      return DecodeStatus::Failure;
     }
   }
 
   if ((client_cap_ & CLIENT_CONNECT_WITH_DB) &&
-      (BufferHelper::readString(buffer, db_) != MYSQL_SUCCESS)) {
+      (BufferHelper::readString(buffer, db_) != DecodeStatus::Success)) {
     ENVOY_LOG(info, "error when parsing db name client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
   if ((client_cap_ & CLIENT_PLUGIN_AUTH) &&
-      (BufferHelper::readString(buffer, auth_plugin_name_) != MYSQL_SUCCESS)) {
+      (BufferHelper::readString(buffer, auth_plugin_name_) != DecodeStatus::Success)) {
     ENVOY_LOG(info, "error when parsing auth plugin name of client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
-int ClientLogin::parseResponse320(Buffer::Instance& buffer) {
-  uint16_t base_cap = 0;
-  if (BufferHelper::readUint16(buffer, base_cap) != MYSQL_SUCCESS) {
+DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer) {
+  uint16_t base_cap;
+  if (BufferHelper::readUint16(buffer, base_cap) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing cap of client login message");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
   setBaseClientCap(base_cap);
-  if (BufferHelper::readUint24(buffer, max_packet_) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring max packet of client login message");
-    return MYSQL_FAILURE;
+  if (BufferHelper::readUint24(buffer, max_packet_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing max packet of client login message");
+    return DecodeStatus::Failure;
   }
-  if (BufferHelper::readString(buffer, username_) != MYSQL_SUCCESS) {
-    ENVOY_LOG(info, "error when paring username of client login message");
-    return MYSQL_FAILURE;
+  if (BufferHelper::readString(buffer, username_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error when parsing username of client login message");
+    return DecodeStatus::Failure;
   }
   if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
     if (BufferHelper::readString(buffer, auth_resp_)) {
-      ENVOY_LOG(info, "error when paring auth resp of client login message");
-      return MYSQL_FAILURE;
+      ENVOY_LOG(info, "error when parsing auth resp of client login message");
+      return DecodeStatus::Failure;
     }
     if (BufferHelper::readString(buffer, db_)) {
-      ENVOY_LOG(info, "error when paring db of client login message");
-      return MYSQL_FAILURE;
+      ENVOY_LOG(info, "error when parsing db of client login message");
+      return DecodeStatus::Failure;
     }
   } else {
     if (BufferHelper::readStringEof(buffer, auth_resp_)) {
-      ENVOY_LOG(info, "error when paring auth resp of client login message");
-      return MYSQL_FAILURE;
+      ENVOY_LOG(info, "error when parsing auth resp of client login message");
+      return DecodeStatus::Failure;
     }
   }
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
 void ClientLogin::encode(Buffer::Instance& out) {
@@ -251,7 +251,7 @@ void ClientLogin::encodeResponse320(Buffer::Instance& out) {
     BufferHelper::addUint8(out, enc_end_string);
   } else {
     BufferHelper::addString(out, auth_resp_);
-    BufferHelper::addUint8(out, -1);
+    BufferHelper::addUint8(out, EOF);
   }
 }
 

@@ -1,13 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 
@@ -20,14 +14,12 @@ constexpr int MYSQL_UT_LAST_ID = 0;
 constexpr int MYSQL_UT_SERVER_OK = 0;
 constexpr int MYSQL_UT_SERVER_WARNINGS = 0x0001;
 
-class MySQLCLoginRespTest : public testing::Test {};
-
 /*
  * Test the MYSQL Server Login Response OK message parser:
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOkEncDec) {
+TEST(MySQLCLoginRespTest, MySQLLoginOkEncDec) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.type(Ok);
   mysql_loginok_encode.asOkMessage().setAffectedRows(1);
@@ -47,7 +39,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkEncDec) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginErrEncDec) {
+TEST(MySQLCLoginRespTest, MySQLLoginErrEncDec) {
   ClientLoginResponse mysql_loginerr_encode{};
   mysql_loginerr_encode.type(Err);
   mysql_loginerr_encode.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
@@ -67,7 +59,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrEncDec) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOldAuthSwitch) {
+TEST(MySQLCLoginRespTest, MySQLLoginOldAuthSwitch) {
   ClientLoginResponse mysql_old_auth_switch_encode{};
   mysql_old_auth_switch_encode.type(AuthSwitch);
   Buffer::OwnedImpl decode_data;
@@ -83,7 +75,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOldAuthSwitch) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitch) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthSwitch) {
   ClientLoginResponse mysql_auth_switch_encode{};
   mysql_auth_switch_encode.type(AuthSwitch);
   mysql_auth_switch_encode.asAuthSwitchMessage().setAuthPluginName(
@@ -103,7 +95,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitch) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMore) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthMore) {
   ClientLoginResponse mysql_auth_more_encode{};
   mysql_auth_more_encode.type(AuthMoreData);
   mysql_auth_more_encode.asAuthMoreMessage().setAuthMoreData(MySQLTestUtils::getAuthPluginData20());
@@ -119,7 +111,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMore) {
  * Negative Test the MYSQL Server Login OK message parser:
  * - incomplete response code
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteRespCode) {
+TEST(MySQLCLoginRespTest, MySQLLoginOkIncompleteRespCode) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.type(Ok);
   Buffer::OwnedImpl decode_data;
@@ -133,7 +125,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteRespCode) {
  * Negative Test the MYSQL Server Login OK message parser:
  * - incomplete affected rows
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteAffectedRows) {
+TEST(MySQLCLoginRespTest, MySQLLoginOkIncompleteAffectedRows) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.type(Ok);
   mysql_loginok_encode.asOkMessage().setAffectedRows(1);
@@ -152,7 +144,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteAffectedRows) {
  * Negative Test the MYSQL Server Login OK message parser:
  * - incomplete Client Login OK last insert id
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteLastInsertId) {
+TEST(MySQLCLoginRespTest, MySQLLoginOkIncompleteLastInsertId) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.type(Ok);
   mysql_loginok_encode.asOkMessage().setAffectedRows(1);
@@ -175,7 +167,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteLastInsertId) {
  * Negative Test the MYSQL Server Login OK message parser:
  * - incomplete server status
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteServerStatus) {
+TEST(MySQLCLoginRespTest, MySQLLoginOkIncompleteServerStatus) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.type(Ok);
   mysql_loginok_encode.asOkMessage().setAffectedRows(1);
@@ -205,7 +197,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteServerStatus) {
  * Negative Test the MYSQL Server Login OK message parser:
  * - incomplete warnings
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteWarnings) {
+TEST(MySQLCLoginRespTest, MySQLLoginOkIncompleteWarnings) {
   ClientLoginResponse mysql_loginok_encode{};
   mysql_loginok_encode.type(Ok);
   mysql_loginok_encode.asOkMessage().setAffectedRows(1);
@@ -239,7 +231,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteWarnings) {
  * Negative Test the MYSQL Server Login Err message parser:
  * - incomplete response code
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteRespCode) {
+TEST(MySQLCLoginRespTest, MySQLLoginErrIncompleteRespCode) {
   ClientLoginResponse mysql_loginerr_encode{};
   mysql_loginerr_encode.type(Err);
   Buffer::OwnedImpl decode_data;
@@ -253,7 +245,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteRespCode) {
  * Negative Test the MYSQL Server Login ERR message parser:
  * - incomplete error code
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteErrorcode) {
+TEST(MySQLCLoginRespTest, MySQLLoginErrIncompleteErrorcode) {
   ClientLoginResponse mysql_loginerr_encode{};
   mysql_loginerr_encode.type(Err);
   mysql_loginerr_encode.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
@@ -273,7 +265,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteErrorcode) {
  * Negative Test the MYSQL Server Login ERR message parser:
  * - incomplete sql state marker
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteStateMarker) {
+TEST(MySQLCLoginRespTest, MySQLLoginErrIncompleteStateMarker) {
   ClientLoginResponse mysql_loginerr_encode{};
   mysql_loginerr_encode.type(Err);
   mysql_loginerr_encode.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
@@ -297,7 +289,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteStateMarker) {
  * Negative Test the MYSQL Server Login ERR message parser:
  * - incomplete sql state
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteSqlState) {
+TEST(MySQLCLoginRespTest, MySQLLoginErrIncompleteSqlState) {
   ClientLoginResponse mysql_loginerr_encode{};
   mysql_loginerr_encode.type(Err);
   mysql_loginerr_encode.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
@@ -325,7 +317,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteSqlState) {
  * Negative Test the MYSQL Server Login ERR message parser:
  * - incomplete error message
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteErrorMessage) {
+TEST(MySQLCLoginRespTest, MySQLLoginErrIncompleteErrorMessage) {
   ClientLoginResponse mysql_loginerr_encode{};
   mysql_loginerr_encode.type(Err);
   mysql_loginerr_encode.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
@@ -357,7 +349,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteErrorMessage) {
  * Negative Test the MYSQL Server Login Auth Switch message parser:
  * - incomplete response code
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompleteRespCode) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompleteRespCode) {
   ClientLoginResponse mysql_login_auth_switch_encode{};
   mysql_login_auth_switch_encode.type(AuthSwitch);
   Buffer::OwnedImpl decode_data;
@@ -371,7 +363,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompleteRespCode) {
  * Negative Test the MYSQL Server Login ERR message parser:
  * - incomplete auth plugin name
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginName) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginName) {
   ClientLoginResponse mysql_login_auth_switch_encode{};
   mysql_login_auth_switch_encode.type(AuthSwitch);
   mysql_login_auth_switch_encode.asAuthSwitchMessage().setAuthPluginName(
@@ -392,7 +384,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginName) {
  * Negative Test the MYSQL Server Login Auth Switch message parser:
  * - incomplete auth plugin data
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginData) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginData) {
   ClientLoginResponse mysql_login_auth_switch_encode{};
   mysql_login_auth_switch_encode.type(AuthSwitch);
   mysql_login_auth_switch_encode.asAuthSwitchMessage().setAuthPluginName(
@@ -419,7 +411,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginData) {
  * Negative Test the MYSQL Server Auth More message parser:
  * - incomplete response code
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompleteRespCode) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompleteRespCode) {
   ClientLoginResponse mysql_login_auth_more_encode{};
   mysql_login_auth_more_encode.type(AuthMoreData);
   Buffer::OwnedImpl decode_data;
@@ -433,7 +425,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompleteRespCode) {
  * Negative Test the MYSQL Server Auth More message parser:
  * - incomplete auth plugin name
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompletePluginData) {
+TEST(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompletePluginData) {
   ClientLoginResponse mysql_login_auth_more_encode{};
   mysql_login_auth_more_encode.type(AuthMoreData);
   mysql_login_auth_more_encode.asAuthMoreMessage().setAuthMoreData(

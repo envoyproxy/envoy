@@ -11,7 +11,7 @@ namespace MySQLProxy {
 class ServerGreeting : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
+  DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   void encode(Buffer::Instance&) override;
 
   uint8_t getProtocol() const { return protocol_; }
@@ -37,12 +37,14 @@ public:
   void setBaseServerCap(uint16_t base_server_cap);
   void setExtServerCap(uint16_t ext_server_cap);
   void setAuthPluginName(const std::string& name);
+  void setAuthPluginData(const std::string& salt);
   void setAuthPluginData1(const std::string& name);
   void setAuthPluginData2(const std::string& name);
   void setServerCharset(uint8_t server_language);
   void setServerStatus(uint16_t server_status);
 
-  void setAuthPluginData(const std::string& salt);
+private:
+  DecodeStatus check() const;
 
 private:
   uint8_t protocol_{0};

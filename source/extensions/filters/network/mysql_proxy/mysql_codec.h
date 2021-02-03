@@ -63,7 +63,7 @@ constexpr uint8_t LOGIN_OK_SEQ = 2;
 constexpr uint8_t GREETING_SEQ_NUM = 0;
 constexpr uint8_t CHALLENGE_SEQ_NUM = 1;
 constexpr uint8_t CHALLENGE_RESP_SEQ_NUM = 2;
-constexpr uint8_t AUTH_SWITH_RESP_SEQ = 3;
+constexpr uint8_t AUTH_SWITH_RESP_SEQ = 4;
 constexpr uint32_t MYSQL_THREAD_ID = 0x5e;
 constexpr uint16_t MYSQL_SERVER_CAPAB = 0x0101;
 constexpr uint8_t MYSQL_SERVER_LANGUAGE = 0x21;
@@ -89,9 +89,12 @@ constexpr uint8_t LENENCODINT_2BYTES = 0xfc;
 constexpr uint8_t LENENCODINT_3BYTES = 0xfd;
 constexpr uint8_t LENENCODINT_8BYTES = 0xfe;
 
-constexpr int MYSQL_SUCCESS = 0;
-constexpr int MYSQL_FAILURE = -1;
 constexpr char MYSQL_STR_END = '\0';
+
+enum DecodeStatus : uint8_t {
+  Success = 0,
+  Failure = 1,
+};
 
 // error code
 constexpr uint16_t MYSQL_CR_AUTH_PLUGIN_ERR = 2061;
@@ -105,7 +108,7 @@ public:
 
   virtual ~MySQLCodec() = default;
 
-  int decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {
+  DecodeStatus decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {
     seq_ = seq;
     return parseMessage(data, len);
   }
@@ -113,7 +116,7 @@ public:
   virtual void encode(Buffer::Instance& out) PURE;
 
 protected:
-  virtual int parseMessage(Buffer::Instance& data, uint32_t len) PURE;
+  virtual DecodeStatus parseMessage(Buffer::Instance& data, uint32_t len) PURE;
 
   uint8_t seq_;
 };

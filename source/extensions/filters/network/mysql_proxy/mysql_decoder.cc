@@ -1,5 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -41,6 +42,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   }
 
   case MySQLSession::State::SslPt:
+    // just consume
+    message.drain(len);
     break;
 
   case MySQLSession::State::ChallengeResp41:
@@ -154,7 +157,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   uint32_t len = 0;
   uint8_t seq = 0;
-  if (BufferHelper::peekHdr(data, len, seq) != MYSQL_SUCCESS) {
+  if (BufferHelper::peekHdr(data, len, seq) != DecodeStatus::Success) {
     throw EnvoyException("error parsing mysql packet header");
   }
 

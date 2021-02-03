@@ -1,13 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 
@@ -16,9 +10,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-class MySQLGreetTest : public testing::Test {};
-
-TEST_F(MySQLGreetTest, MySQLServerChallengeV9EncDec) {
+TEST(MySQLGreetTest, MySQLServerChallengeV9EncDec) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_9);
   std::string ver(MySQLTestUtils::getVersion());
@@ -45,7 +37,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeV9EncDec) {
  * - message is encoded using the ServerGreeting class
  * - message is decoded using the ServerGreeting class
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeV10EncDec) {
+TEST(MySQLGreetTest, MySQLServerChallengeV10EncDec) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -77,7 +69,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeV10EncDec) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete protocol
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteProtocol) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteProtocol) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   Buffer::OwnedImpl buffer;
@@ -95,7 +87,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteProtocol) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete version
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteVersion) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteVersion) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   mysql_greet_encode.setVersion(MySQLTestUtils::getVersion());
@@ -115,7 +107,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteVersion) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete thread_id
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteThreadId) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteThreadId) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -138,7 +130,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteThreadId) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete auth_plugin_data
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteSalt) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteSalt) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -164,7 +156,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteSalt) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete Server Capabilities
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteServerCap) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteServerCap) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -193,7 +185,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteServerCap) {
  * Negative Testing: Server Greetings Incomplete
  * - incomplete Server Status
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteServerStatus) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteServerStatus) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -225,7 +217,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteServerStatus) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete extended Server Capabilities
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteExtServerCap) {
+TEST(MySQLGreetTest, MySQLServerChallengeIncompleteExtServerCap) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -260,7 +252,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteExtServerCap) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete extended Server Capabilities
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerCapOnly) {
+TEST(MySQLGreetTest, MySQLServerChallengeP10ServerCapOnly) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   mysql_greet_encode.setVersion(MySQLTestUtils::getVersion());
@@ -291,7 +283,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerCapOnly) {
 /*
  * Testing: Server Greetings Protocol 10 Server Capabilities with auth plugin data flag
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerCapAuthPlugin) {
+TEST(MySQLGreetTest, MySQLServerChallengeP10ServerCapAuthPlugin) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -325,7 +317,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerCapAuthPlugin) {
  * Testing: Server Greetings Protocol 10 Server Capabilities with auth plugin data flag incomplete
  * - incomplete of auth-plugin-data2
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthData2) {
+TEST(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthData2) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   mysql_greet_encode.setVersion(MySQLTestUtils::getVersion());
@@ -361,7 +353,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthData
  * Testing: Server Greetings Protocol 10 Server Capabilities with auth plugin data flag incomplete
  * - incomplete of auth plugin name
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthPluginName) {
+TEST(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthPluginName) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   mysql_greet_encode.setVersion(MySQLTestUtils::getVersion());
@@ -398,7 +390,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerAuthPluginInCompleteAuthPlug
 /*
  * Testing: Server Greetings Protocol 10 Server Capabilities with security connection flag
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerCapSecurityConnection) {
+TEST(MySQLGreetTest, MySQLServerChallengeP10ServerCapSecurityConnection) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());
@@ -431,7 +423,7 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerCapSecurityConnection) {
  * Testing: Server Greetings Protocol 10 Server Capabilities with security connection flag
  * - incomplete of auth-plugin-data2
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeP10ServerSecurityConnectionInCompleteData2) {
+TEST(MySQLGreetTest, MySQLServerChallengeP10ServerSecurityConnectionInCompleteData2) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(MYSQL_PROTOCOL_10);
   std::string ver(MySQLTestUtils::getVersion());

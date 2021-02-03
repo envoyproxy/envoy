@@ -34,21 +34,21 @@ public:
   static void addStringBySize(Buffer::Instance& buffer, size_t len, const std::string& str);
   static void encodeHdr(Buffer::Instance& pkg, uint8_t seq);
   static bool endOfBuffer(Buffer::Instance& buffer);
-  static int readUint8(Buffer::Instance& buffer, uint8_t& val);
-  static int readUint16(Buffer::Instance& buffer, uint16_t& val);
-  static int readUint24(Buffer::Instance& buffer, uint32_t& val);
-  static int readUint32(Buffer::Instance& buffer, uint32_t& val);
-  static int readLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& val);
-  static int readBytes(Buffer::Instance& buffer, size_t skip_bytes);
-  static int readString(Buffer::Instance& buffer, std::string& str);
-  static int readStringBySize(Buffer::Instance& buffer, size_t len, std::string& str);
-  static int readStringEof(Buffer::Instance& buffer, std::string& str);
-  static int readAll(Buffer::Instance& buffer, std::string& str);
-  static int peekUint32(Buffer::Instance& buffer, uint32_t& val);
-  static int peekUint16(Buffer::Instance& buffer, uint16_t& val);
-  static int peekUint8(Buffer::Instance& buffer, uint8_t& val);
+  static DecodeStatus readUint8(Buffer::Instance& buffer, uint8_t& val);
+  static DecodeStatus readUint16(Buffer::Instance& buffer, uint16_t& val);
+  static DecodeStatus readUint24(Buffer::Instance& buffer, uint32_t& val);
+  static DecodeStatus readUint32(Buffer::Instance& buffer, uint32_t& val);
+  static DecodeStatus readLengthEncodedInteger(Buffer::Instance& buffer, uint64_t& val);
+  static DecodeStatus readBytes(Buffer::Instance& buffer, size_t skip_bytes);
+  static DecodeStatus readString(Buffer::Instance& buffer, std::string& str);
+  static DecodeStatus readStringBySize(Buffer::Instance& buffer, size_t len, std::string& str);
+  static DecodeStatus readStringEof(Buffer::Instance& buffer, std::string& str);
+  static DecodeStatus readAll(Buffer::Instance& buffer, std::string& str);
+  static DecodeStatus peekUint32(Buffer::Instance& buffer, uint32_t& val);
+  static DecodeStatus peekUint16(Buffer::Instance& buffer, uint16_t& val);
+  static DecodeStatus peekUint8(Buffer::Instance& buffer, uint8_t& val);
   static void consumeHdr(Buffer::Instance& buffer);
-  static int peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq);
+  static DecodeStatus peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq);
 };
 
 } // namespace MySQLProxy

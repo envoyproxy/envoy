@@ -1,0 +1,36 @@
+#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+
+#include "gtest/gtest.h"
+#include "mysql_test_utils.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MySQLProxy {
+
+TEST(MySQLAuthSwithRespTest, AuthSwithResp) {
+  ClientSwitchResponse switch_resp_encode{};
+  switch_resp_encode.setAuthPluginResp(MySQLTestUtils::getAuthResp8());
+  Buffer::OwnedImpl decode_data;
+  switch_resp_encode.encode(decode_data);
+
+  ClientSwitchResponse switch_resp_decode{};
+  switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, decode_data.length());
+  EXPECT_EQ(switch_resp_decode.getAuthPluginResp(), switch_resp_encode.getAuthPluginResp());
+}
+
+TEST(MySQLAuthSwithRespTest, AuthSwithRespIncompleteResp) {
+  ClientSwitchResponse switch_resp_encode{};
+  switch_resp_encode.setAuthPluginResp(MySQLTestUtils::getAuthResp8());
+  Buffer::OwnedImpl decode_data;
+  switch_resp_encode.encode(decode_data);
+
+  ClientSwitchResponse switch_resp_decode{};
+  switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, 0);
+  EXPECT_EQ(switch_resp_decode.getAuthPluginResp(), "");
+}
+
+} // namespace MySQLProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

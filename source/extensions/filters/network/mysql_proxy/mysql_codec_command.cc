@@ -14,7 +14,7 @@ namespace MySQLProxy {
 
 Command::Cmd Command::parseCmd(Buffer::Instance& data) {
   uint8_t cmd;
-  if (BufferHelper::readUint8(data, cmd) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint8(data, cmd) != DecodeStatus::Success) {
     return Command::Cmd::Null;
   }
   return static_cast<Command::Cmd>(cmd);
@@ -22,13 +22,13 @@ Command::Cmd Command::parseCmd(Buffer::Instance& data) {
 
 void Command::setCmd(Command::Cmd cmd) { cmd_ = cmd; }
 
-void Command::setDb(std::string db) { db_ = db; }
+void Command::setDb(const std::string& db) { db_ = db; }
 
-int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
+DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   Command::Cmd cmd = parseCmd(buffer);
   setCmd(cmd);
   if (cmd == Command::Cmd::Null) {
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
 
   switch (cmd) {
@@ -53,7 +53,7 @@ int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
     break;
   }
 
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
 void Command::setData(const std::string& data) { data_.assign(data); }
@@ -63,12 +63,12 @@ void Command::encode(Buffer::Instance& out) {
   BufferHelper::addString(out, data_);
 }
 
-int CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {
-  if (BufferHelper::readStringBySize(buffer, len, data_) != MYSQL_SUCCESS) {
+DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {
+  if (BufferHelper::readStringBySize(buffer, len, data_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "read command response error");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
 } // namespace MySQLProxy

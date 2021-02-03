@@ -47,6 +47,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "mysql_auth_switch_resp_tests",
+    srcs = [
+        "mysql_auth_switch_resp_test.cc",
+    ],
+    extension_name = "envoy.filters.network.mysql_proxy",
+    deps = [
+        ":mysql_test_utils_lib",
+        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "mysql_clogin_tests",
     srcs = [
         "mysql_clogin_test.cc",

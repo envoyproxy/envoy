@@ -14,7 +14,7 @@ constexpr int UNSET_BYTES = 23;
 class ClientLogin : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
+  DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   void encode(Buffer::Instance&) override;
 
   uint32_t getClientCap() const { return client_cap_; }
@@ -43,9 +43,9 @@ public:
   void setAuthPluginName(const std::string& auth_plugin_name);
 
 private:
-  int parseResponseSsl(Buffer::Instance& buffer);
-  int parseResponse41(Buffer::Instance& buffer);
-  int parseResponse320(Buffer::Instance& buffer);
+  DecodeStatus parseResponseSsl(Buffer::Instance& buffer);
+  DecodeStatus parseResponse41(Buffer::Instance& buffer);
+  DecodeStatus parseResponse320(Buffer::Instance& buffer);
   void encodeResponseSsl(Buffer::Instance& out);
   void encodeResponse41(Buffer::Instance& out);
   void encodeResponse320(Buffer::Instance& out);

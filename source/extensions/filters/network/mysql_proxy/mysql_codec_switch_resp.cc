@@ -12,16 +12,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void ClientSwitchResponse::setAuthPluginResp(const std::string& auth_plugin_resp) {
-  auth_plugin_resp_.assign(auth_plugin_resp);
-}
-
-int ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32_t) {
-  if (BufferHelper::readString(buffer, auth_plugin_resp_) != MYSQL_SUCCESS) {
+DecodeStatus ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32_t) {
+  if (BufferHelper::readString(buffer, auth_plugin_resp_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing auth plugin data in client switch response");
-    return MYSQL_FAILURE;
+    return DecodeStatus::Failure;
   }
-  return MYSQL_SUCCESS;
+  return DecodeStatus::Success;
 }
 
 void ClientSwitchResponse::encode(Buffer::Instance& out) {

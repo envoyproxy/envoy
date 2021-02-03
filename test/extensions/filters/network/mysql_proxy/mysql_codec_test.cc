@@ -1,13 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 
@@ -16,9 +10,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-class MySQLCodecTest : public testing::Test {};
-
-TEST_F(MySQLCodecTest, MySQLCommandError) {
+TEST(MySQLCodecTest, MySQLCommandError) {
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(""));
   Command mysql_cmd_decode{};
   decode_data->drain(4);
@@ -26,7 +18,7 @@ TEST_F(MySQLCodecTest, MySQLCommandError) {
   EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::Null);
 }
 
-TEST_F(MySQLCodecTest, MySQLCommandInitDb) {
+TEST(MySQLCodecTest, MySQLCommandInitDb) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::InitDb);
   std::string db = "mysqlDB";
@@ -42,7 +34,7 @@ TEST_F(MySQLCodecTest, MySQLCommandInitDb) {
   EXPECT_EQ(mysql_cmd_decode.getDb(), db);
 }
 
-TEST_F(MySQLCodecTest, MySQLCommandCreateDb) {
+TEST(MySQLCodecTest, MySQLCommandCreateDb) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::CreateDb);
   std::string db = "mysqlDB";
@@ -58,7 +50,7 @@ TEST_F(MySQLCodecTest, MySQLCommandCreateDb) {
   EXPECT_EQ(mysql_cmd_decode.getDb(), db);
 }
 
-TEST_F(MySQLCodecTest, MySQLCommandDropDb) {
+TEST(MySQLCodecTest, MySQLCommandDropDb) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::DropDb);
   std::string db = "mysqlDB";
@@ -74,7 +66,7 @@ TEST_F(MySQLCodecTest, MySQLCommandDropDb) {
   EXPECT_EQ(mysql_cmd_decode.getDb(), db);
 }
 
-TEST_F(MySQLCodecTest, MySQLCommandOther) {
+TEST(MySQLCodecTest, MySQLCommandOther) {
   Command mysql_cmd_encode{};
   mysql_cmd_encode.setCmd(Command::Cmd::FieldList);
   Buffer::OwnedImpl decode_data;

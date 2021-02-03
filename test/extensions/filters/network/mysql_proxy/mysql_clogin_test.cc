@@ -1,13 +1,8 @@
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 
@@ -16,15 +11,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-class MySQLCLoginTest : public testing::Test {};
-
 /*
  * Test the MYSQL Client Login 41 message parser:
  * - message is encoded using the ClientLogin class
  *   - CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA set
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MySQLCLoginTest, MySQLClLoginV41PluginAuthEncDec) {
+TEST(MySQLCLoginTest, MySQLClLoginV41PluginAuthEncDec) {
   ClientLogin mysql_clogin_encode{};
   uint32_t client_capab = 0;
   client_capab |= (CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH);
@@ -61,7 +54,7 @@ TEST_F(MySQLCLoginTest, MySQLClLoginV41PluginAuthEncDec) {
  *   - CLIENT_SECURE_CONNECTION set
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnEncDec) {
+TEST(MySQLCLoginTest, MySQLClientLogin41SecureConnEncDec) {
   ClientLogin mysql_clogin_encode{};
   uint32_t client_capab = 0;
   client_capab |= (CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION);
@@ -96,7 +89,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnEncDec) {
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41EncDec) {
+TEST(MySQLCLoginTest, MySQLClientLogin41EncDec) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -129,7 +122,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41EncDec) {
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin320EncDec) {
+TEST(MySQLCLoginTest, MySQLClientLogin320EncDec) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(0);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -156,49 +149,50 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320EncDec) {
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), 0);
 }
 
-TEST_F(MySQLCLoginTest, MySQLParseLengthEncodedInteger) {
+TEST(MySQLCLoginTest, MySQLParseLengthEncodedInteger) {
+  Buffer::OwnedImpl buffer;
   {
     // encode 2 byte value
-    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    buffer.drain(buffer.length());
     uint64_t input_val = 5;
     uint64_t output_val = 0;
-    BufferHelper::addUint8(*buffer, LENENCODINT_2BYTES);
-    BufferHelper::addUint16(*buffer, input_val);
-    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_SUCCESS);
+    BufferHelper::addUint8(buffer, LENENCODINT_2BYTES);
+    BufferHelper::addUint16(buffer, input_val);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(buffer, output_val), DecodeStatus::Success);
     EXPECT_EQ(input_val, output_val);
   }
   {
     // encode 3 byte value
-    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    buffer.drain(buffer.length());
     uint64_t input_val = 5;
     uint64_t output_val = 0;
-    BufferHelper::addUint8(*buffer, LENENCODINT_3BYTES);
-    BufferHelper::addUint16(*buffer, input_val);
-    BufferHelper::addUint8(*buffer, 0);
-    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_SUCCESS);
+    BufferHelper::addUint8(buffer, LENENCODINT_3BYTES);
+    BufferHelper::addUint16(buffer, input_val);
+    BufferHelper::addUint8(buffer, 0);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(buffer, output_val), DecodeStatus::Success);
     EXPECT_EQ(input_val, output_val);
   }
 
   {
     // encode 8 byte value
-    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    buffer.drain(buffer.length());
     uint64_t input_val = 5;
     uint64_t output_val = 0;
-    BufferHelper::addUint8(*buffer, LENENCODINT_8BYTES);
-    BufferHelper::addUint32(*buffer, input_val);
-    BufferHelper::addUint32(*buffer, 0);
-    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_SUCCESS);
+    BufferHelper::addUint8(buffer, LENENCODINT_8BYTES);
+    BufferHelper::addUint32(buffer, input_val);
+    BufferHelper::addUint32(buffer, 0);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(buffer, output_val), DecodeStatus::Success);
     EXPECT_EQ(input_val, output_val);
   }
 
   {
     // encode invalid length header
-    Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
+    buffer.drain(buffer.length());
     uint64_t input_val = 5;
     uint64_t output_val = 0;
-    BufferHelper::addUint8(*buffer, 0xff);
-    BufferHelper::addUint32(*buffer, input_val);
-    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(*buffer, output_val), MYSQL_FAILURE);
+    BufferHelper::addUint8(buffer, 0xff);
+    BufferHelper::addUint32(buffer, input_val);
+    EXPECT_EQ(BufferHelper::readLengthEncodedInteger(buffer, output_val), DecodeStatus::Failure);
   }
   {
     // encode and decode length encoded integer
@@ -209,7 +203,7 @@ TEST_F(MySQLCLoginTest, MySQLParseLengthEncodedInteger) {
         (1 << 24) + 5,
     };
     for (uint64_t& input_val : input_vals) {
-      Buffer::OwnedImpl buffer;
+      buffer.drain(buffer.length());
       uint64_t output_val = 0;
       BufferHelper::addLengthEncodedInteger(buffer, input_val);
       BufferHelper::readLengthEncodedInteger(buffer, output_val);
@@ -218,7 +212,7 @@ TEST_F(MySQLCLoginTest, MySQLParseLengthEncodedInteger) {
   }
   {
     // encode decode uint24
-    Buffer::OwnedImpl buffer;
+    buffer.drain(buffer.length());
     uint32_t val = 0xfffefd;
     BufferHelper::addUint32(buffer, val);
     uint32_t res = 0;
@@ -231,7 +225,7 @@ TEST_F(MySQLCLoginTest, MySQLParseLengthEncodedInteger) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at Client Capability
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteClientCap) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteClientCap) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41);
   Buffer::OwnedImpl buffer;
@@ -249,7 +243,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteClientCap) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at Extended Client Capability
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteExtClientCap) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteExtClientCap) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41);
   Buffer::OwnedImpl buffer;
@@ -268,7 +262,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteExtClientCap) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at Max Packet
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteMaxPacket) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteMaxPacket) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
   Buffer::OwnedImpl buffer;
@@ -289,7 +283,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteMaxPacket) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at Charset
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteCharset) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteCharset) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -312,7 +306,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteCharset) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at Unset bytes
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteUnsetBytes) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteUnsetBytes) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -338,7 +332,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteUnsetBytes) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at username
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteUser) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteUser) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -365,7 +359,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteUser) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at auth data length
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthLen) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthLen) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -396,7 +390,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthLen) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at auth response
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPasswd) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPasswd) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -429,7 +423,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPasswd) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at db name
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteDbName) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteDbName) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -462,7 +456,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteDbName) {
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete header at auth plugin name
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPluginName) {
+TEST(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPluginName) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB |
                                    CLIENT_PLUGIN_AUTH);
@@ -499,7 +493,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPluginName) {
  * Negative Test the MYSQL Client 320 login message parser:
  * Incomplete header at cap
  */
-TEST_F(MySQLCLoginTest, MySQLClient320LoginIncompleteClientCap) {
+TEST(MySQLCLoginTest, MySQLClient320LoginIncompleteClientCap) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_CONNECT_WITH_DB);
   Buffer::OwnedImpl buffer;
@@ -517,7 +511,7 @@ TEST_F(MySQLCLoginTest, MySQLClient320LoginIncompleteClientCap) {
  * Negative Test the MYSQL Client 320 login message parser:
  * Incomplete max packet
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteMaxPacketSize) {
+TEST(MySQLCLoginTest, MySQLClientLogin320IncompleteMaxPacketSize) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(0);
   mysql_clogin_encode.setExtendedClientCap(0);
@@ -538,7 +532,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteMaxPacketSize) {
  * Negative Test the MYSQL Client login 320 message parser:
  * Incomplete username
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteUsername) {
+TEST(MySQLCLoginTest, MySQLClientLogin320IncompleteUsername) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(0);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -560,7 +554,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteUsername) {
  * Negative Test the MYSQL Client login 320 message parser:
  * Incomplete auth response
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteAuthResp) {
+TEST(MySQLCLoginTest, MySQLClientLogin320IncompleteAuthResp) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(0);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -585,7 +579,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteAuthResp) {
  * Negative Test the MYSQL Client login 320 with CLIENT_CONNECT_WITH_DB message parser:
  * Incomplete auth response
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteAuthResp) {
+TEST(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteAuthResp) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_CONNECT_WITH_DB);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -610,7 +604,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteAuthResp) {
  * Negative Test the MYSQL Client login 320 with CLIENT_CONNECT_WITH_DB message parser:
  * Incomplete db name
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteDb) {
+TEST(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteDb) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_CONNECT_WITH_DB);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -639,7 +633,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteDb) {
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
  */
-TEST_F(MySQLCLoginTest, MySQLClientLoginSSLEncDec) {
+TEST(MySQLCLoginTest, MySQLClientLoginSSLEncDec) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_SSL | CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -658,7 +652,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLoginSSLEncDec) {
  * Negative Test the MYSQL Client login SSL message parser:
  * Incomplete cap flag
  */
-TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteCap) {
+TEST(MySQLCLoginTest, MySQLClientLoginSslIncompleteCap) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_SSL);
   Buffer::OwnedImpl buffer;
@@ -676,7 +670,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteCap) {
  * Negative Test the MYSQL Client login SSL message parser:
  * Incomplete max packet
  */
-TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteMaxPacket) {
+TEST(MySQLCLoginTest, MySQLClientLoginSslIncompleteMaxPacket) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_SSL);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -696,7 +690,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteMaxPacket) {
  * Negative Test the MYSQL Client login SSL message parser:
  * Incomplete character set
  */
-TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteCharset) {
+TEST(MySQLCLoginTest, MySQLClientLoginSslIncompleteCharset) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_SSL);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
@@ -719,7 +713,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteCharset) {
  * Negative Test the MYSQL Client login SSL message parser:
  * Incomplete reserved
  */
-TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteReserved) {
+TEST(MySQLCLoginTest, MySQLClientLoginSslIncompleteReserved) {
   ClientLogin mysql_clogin_encode{};
   mysql_clogin_encode.setClientCap(CLIENT_SSL);
   mysql_clogin_encode.setMaxPacket(MYSQL_MAX_PACKET);
