@@ -28,7 +28,7 @@ namespace Envoy {
 namespace {
 
 // For historical reasons, these v2 protos are allowed in v3 and will not be removed during the v2
-// turndown.
+// turn down.
 static const absl::flat_hash_set<absl::string_view>& v2ProtosAllowedInV3() {
   CONSTRUCT_ON_FIRST_USE(
       absl::flat_hash_set<absl::string_view>,
