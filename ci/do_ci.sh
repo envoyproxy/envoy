@@ -142,7 +142,6 @@ function run_process_test_result() {
 }
 
 function run_ci_verify () {
-  df -h
   echo "verify examples..."
   docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
   _images=$(docker image list --format "{{.Repository}}")
@@ -163,7 +162,6 @@ function run_ci_verify () {
   umask 027
   chmod -R o-rwx examples/
   ci/verify_examples.sh "${@}" || exit
-  df -h
 }
 
 CI_TARGET=$1
