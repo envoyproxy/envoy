@@ -39,7 +39,7 @@ const std::string compressorFilterConfig = R"EOF(
 name: envoy.filters.http.compressor
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-  reque_direction_config:
+  request_direction_config:
   response_direction_config:
   compressor_library:
     name: test
@@ -221,7 +221,7 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
   auto request_compressed_counter =
       test_server_->counter("http.config_test.compressor.test.gzip.request.compressed");
   ASSERT_NE(request_compressed_counter, nullptr);
-  ASSERT_EQ(1, request_compressed_counter->value());
+  ASSERT_EQ(0, request_compressed_counter->value());
 
   auto request_uncompressed_counter =
       test_server_->counter("http.config_test.compressor.test.gzip.request.not_compressed");
@@ -284,11 +284,12 @@ TEST_P(CompressorProxyingConnectIntegrationTest, ProxyConnect) {
 
   // Make sure that even once the response has started, that data can continue to go upstream.
   codec_client_->sendData(*request_encoder_, "hello", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello"));
 
   // Also test upstream to downstream data.
-  upstream_request_->encodeData(12, false);
-  response_->waitForBodyData(12);
+  upstream_request_->encodeData("world", false);
+  response_->waitForBodyData(5);
+  EXPECT_EQ("world", response_->body());
 
   cleanupUpstreamAndDownstream();
 }

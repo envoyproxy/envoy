@@ -157,8 +157,6 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   const auto& request_config = config_->requestDirectionConfig();
-  // temp variable to preserve old behavior w/ http upgrade. should be removed when
-  // enable_compression_without_content_length_header runtime variable would be removed
   const bool is_not_upgrade =
       !Http::Utility::isUpgrade(headers) ||
       !Runtime::runtimeFeatureEnabled(
@@ -223,13 +221,12 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
                           StreamInfo::FilterState::StateType::Mutable);
   }
 }
+
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
-  // temp variable to preserve old behavior w/ http upgrade. should be removed when
-  // enable_compression_without_content_length_header runtime variable would be removed
   const bool is_not_upgrade =
       !Http::Utility::isUpgrade(headers) ||
       !Runtime::runtimeFeatureEnabled(
@@ -522,7 +519,7 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header")) {
-    // return true to ignore the minimum length configuration if no content-length header presents
+    // return true to ignore the minimum length configuration if no content-length header is present
     return true;
   }
   return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
