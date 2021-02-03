@@ -34,7 +34,8 @@ message CapabilityRestrictionConfig {
   map<string, SanitizationConfig> allowed_capabilities = 1;
 }
 
-// Configuration for sanitization of inputs to an allowed capability. NOTE: This is currently unimplemented.
+// Configuration for sanitization of inputs to an allowed capability.
+// NOTE: This is currently unimplemented.
 message SanitizationConfig {
 }
 
