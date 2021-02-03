@@ -11,6 +11,7 @@
 #include "common/protobuf/utility.h"
 
 #include "test/common/matcher/test_utility.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -24,6 +25,7 @@ public:
 
   StringActionFactory action_factory_;
   Registry::InjectFactory<ActionFactory> inject_action_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
 TEST_F(MatcherTest, TestMatcher) {
@@ -60,7 +62,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
+  MatchTreeFactory<TestData> factory(factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -99,7 +101,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
+  MatchTreeFactory<TestData> factory(factory_context_);
 
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
   NeverMatchFactory match_factory;
@@ -154,7 +156,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
+  MatchTreeFactory<TestData> factory(factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -210,7 +212,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
+  MatchTreeFactory<TestData> factory(factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -260,7 +262,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(ProtobufMessage::getStrictValidationVisitor());
+  MatchTreeFactory<TestData> factory(factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");

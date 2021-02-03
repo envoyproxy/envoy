@@ -110,8 +110,9 @@ the :ref:`outlier_detection.consecutive_5xx<envoy_v3_api_field_config.cluster.v3
 Consecutive Gateway Failure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This detection type takes into account a subset of 5xx errors, called "gateway errors" (502, 503 or 504 status code)
-and is supported only by the :ref:`http router <config_http_filters_router>`.
+In the default mode (:ref:`outlier_detection.split_external_local_origin_errors<envoy_v3_api_field_config.cluster.v3.OutlierDetection.split_external_local_origin_errors>` is *false*) this detection type takes into account a subset of 5xx errors, called "gateway errors" (502, 503 or 504 status code) and local origin failures, such as timeout, TCP reset etc.
+
+In split mode (:ref:`outlier_detection.split_external_local_origin_errors<envoy_v3_api_field_config.cluster.v3.OutlierDetection.split_external_local_origin_errors>` is *true*) this detection type takes into account a subset of 5xx errors, called "gateway errors" (502, 503 or 504 status code) and is supported only by the :ref:`http router <config_http_filters_router>`.
 
 If an upstream host returns some number of consecutive "gateway errors" (502, 503 or 504 status
 code), it will be ejected.

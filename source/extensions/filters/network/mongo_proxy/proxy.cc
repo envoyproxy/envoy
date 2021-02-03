@@ -58,7 +58,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
                          const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
                          const Network::DrainDecision& drain_decision, TimeSource& time_source,
-                         bool emit_dynamic_metadata, MongoStats& mongo_stats)
+                         bool emit_dynamic_metadata, const MongoStatsSharedPtr& mongo_stats)
     : stats_(generateStats(stat_prefix, scope)), runtime_(runtime), drain_decision_(drain_decision),
       access_log_(access_log), fault_config_(fault_config), time_source_(time_source),
       emit_dynamic_metadata_(emit_dynamic_metadata), mongo_stats_(mongo_stats) {
@@ -144,22 +144,22 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   ActiveQueryPtr active_query(new ActiveQuery(*this, *message));
   if (!active_query->query_info_.command().empty()) {
     // First field key is the operation.
-    mongo_stats_.incCounter({mongo_stats_.cmd_,
-                             mongo_stats_.getBuiltin(active_query->query_info_.command(),
-                                                     mongo_stats_.unknown_command_),
-                             mongo_stats_.total_});
+    mongo_stats_->incCounter({mongo_stats_->cmd_,
+                              mongo_stats_->getBuiltin(active_query->query_info_.command(),
+                                                       mongo_stats_->unknown_command_),
+                              mongo_stats_->total_});
   } else {
     // Normal query, get stats on a per collection basis first.
     QueryMessageInfo::QueryType query_type = active_query->query_info_.type();
     Stats::ElementVec names;
     names.reserve(6); // 2 entries are added by chargeQueryStats().
-    names.push_back(mongo_stats_.collection_);
+    names.push_back(mongo_stats_->collection_);
     names.push_back(Stats::DynamicName(active_query->query_info_.collection()));
     chargeQueryStats(names, query_type);
 
     // Callsite stats if we have it.
     if (!active_query->query_info_.callsite().empty()) {
-      names.push_back(mongo_stats_.callsite_);
+      names.push_back(mongo_stats_->callsite_);
       names.push_back(Stats::DynamicName(active_query->query_info_.callsite()));
       chargeQueryStats(names, query_type);
     }
@@ -185,17 +185,17 @@ void ProxyFilter::chargeQueryStats(Stats::ElementVec& names,
   // state it had on entry. Both of these variations by appending {"query", "total"}.
   size_t orig_size = names.size();
   ASSERT(names.capacity() - orig_size >= 2); // Ensures the caller has reserved() enough memory.
-  names.push_back(mongo_stats_.query_);
-  names.push_back(mongo_stats_.total_);
-  mongo_stats_.incCounter(names);
+  names.push_back(mongo_stats_->query_);
+  names.push_back(mongo_stats_->total_);
+  mongo_stats_->incCounter(names);
 
   // And now replace "total" with either "scatter_get" or "multi_get" if depending on query_type.
   if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
-    names.back() = mongo_stats_.scatter_get_;
-    mongo_stats_.incCounter(names);
+    names.back() = mongo_stats_->scatter_get_;
+    mongo_stats_->incCounter(names);
   } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
-    names.back() = mongo_stats_.multi_get_;
-    mongo_stats_.incCounter(names);
+    names.back() = mongo_stats_->multi_get_;
+    mongo_stats_->incCounter(names);
   }
   names.resize(orig_size);
 }
@@ -222,15 +222,15 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     }
 
     if (!active_query.query_info_.command().empty()) {
-      Stats::ElementVec names{mongo_stats_.cmd_,
-                              mongo_stats_.getBuiltin(active_query.query_info_.command(),
-                                                      mongo_stats_.unknown_command_)};
+      Stats::ElementVec names{mongo_stats_->cmd_,
+                              mongo_stats_->getBuiltin(active_query.query_info_.command(),
+                                                       mongo_stats_->unknown_command_)};
       chargeReplyStats(active_query, names, *message);
     } else {
       // Collection stats first.
-      Stats::ElementVec names{mongo_stats_.collection_,
+      Stats::ElementVec names{mongo_stats_->collection_,
                               Stats::DynamicName(active_query.query_info_.collection()),
-                              mongo_stats_.query_};
+                              mongo_stats_->query_};
       chargeReplyStats(active_query, names, *message);
 
       // Callsite stats if we have it.
@@ -238,9 +238,9 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
         // Currently, names == {"collection", collection, "query"} and we are going
         // to mutate the array to {"collection", collection, "callsite", callsite, "query"}.
         ASSERT(names.size() == 3);
-        names.back() = mongo_stats_.callsite_; // Replaces "query".
+        names.back() = mongo_stats_->callsite_; // Replaces "query".
         names.push_back(Stats::DynamicName(active_query.query_info_.callsite()));
-        names.push_back(mongo_stats_.query_);
+        names.push_back(mongo_stats_->query_);
         chargeReplyStats(active_query, names, *message);
       }
     }
@@ -300,16 +300,16 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::ElementVec&
   // that was passed in. Here we overwrite the passed-in names, but we restore
   // names to its original state upon return.
   const size_t orig_size = names.size();
-  names.push_back(mongo_stats_.reply_num_docs_);
-  mongo_stats_.recordHistogram(names, Stats::Histogram::Unit::Unspecified,
-                               message.documents().size());
-  names[orig_size] = mongo_stats_.reply_size_;
-  mongo_stats_.recordHistogram(names, Stats::Histogram::Unit::Bytes, reply_documents_byte_size);
-  names[orig_size] = mongo_stats_.reply_time_ms_;
-  mongo_stats_.recordHistogram(names, Stats::Histogram::Unit::Milliseconds,
-                               std::chrono::duration_cast<std::chrono::milliseconds>(
-                                   time_source_.monotonicTime() - active_query.start_time_)
-                                   .count());
+  names.push_back(mongo_stats_->reply_num_docs_);
+  mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Unspecified,
+                                message.documents().size());
+  names[orig_size] = mongo_stats_->reply_size_;
+  mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Bytes, reply_documents_byte_size);
+  names[orig_size] = mongo_stats_->reply_time_ms_;
+  mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Milliseconds,
+                                std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    time_source_.monotonicTime() - active_query.start_time_)
+                                    .count());
   names.resize(orig_size);
 }
 

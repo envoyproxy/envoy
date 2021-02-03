@@ -94,6 +94,14 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
     health_status.set_pending_active_hc(
         host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
     break;
+  case Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL:
+    health_status.set_excluded_via_immediate_hc_fail(
+        host.healthFlagGet(Upstream::Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL));
+    break;
+  case Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT:
+    health_status.set_active_hc_timeout(
+        host.healthFlagGet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+    break;
   }
 }
 
@@ -181,7 +189,7 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
       }
     }
   }
-  response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessageOrError(clusters, true)); // pretty-print
 }
 
 // TODO(efimki): Add support of text readouts stats.

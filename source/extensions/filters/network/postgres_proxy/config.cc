@@ -20,7 +20,7 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   PostgresFilterConfigSharedPtr filter_config(
       std::make_shared<PostgresFilterConfig>(stat_prefix, enable_sql, context.scope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<PostgresFilter>(*filter_config));
+    filter_manager.addFilter(std::make_shared<PostgresFilter>(filter_config));
   };
 }
 

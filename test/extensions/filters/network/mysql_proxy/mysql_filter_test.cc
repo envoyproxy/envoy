@@ -23,7 +23,7 @@ public:
 
   void initialize() {
     config_ = std::make_shared<MySQLFilterConfig>(stat_prefix_, scope_);
-    filter_ = std::make_unique<MySQLFilter>(*config_);
+    filter_ = std::make_unique<MySQLFilter>(config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
