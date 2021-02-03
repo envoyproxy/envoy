@@ -149,7 +149,7 @@ stages:
               AZP_BRANCH: $(Build.SourceBranch)
 
   - stage: linux_x64
-    dependsOn: []
+    dependsOn: ["precheck"]
     # For post-submit builds, continue even if precheck fails
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
     jobs:
