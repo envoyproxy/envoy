@@ -164,7 +164,7 @@ ClientLoginResponse& ClientLoginResponse::operator=(const ClientLoginResponse& o
   case Null:
     break;
   case AuthSwitch:
-    *auth_switch_ = *auth_switch_;
+    *auth_switch_ = *other.auth_switch_;
     break;
   case AuthMoreData:
     *auth_more_ = *other.auth_more_;
