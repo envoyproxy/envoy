@@ -62,15 +62,6 @@ Status ProtocolConstraints::trackInboundFrames(const nghttp2_frame_hd* hd,
   switch (hd->type) {
   case NGHTTP2_HEADERS:
   case NGHTTP2_CONTINUATION:
-    // Track new streams.
-
-    // TODO(yanavlasov): The protocol constraint tracker for upstream connections considers the
-    // stream to be in the OPEN state after the server sends complete response headers. The
-    // correctness of this is debatable and needs to be revisited.
-    if (hd->flags & NGHTTP2_FLAG_END_HEADERS) {
-      inbound_streams_++;
-    }
-    FALLTHRU;
   case NGHTTP2_DATA:
     // Track frames with an empty payload and no end stream flag.
     if (hd->length - padding_length == 0 && !(hd->flags & NGHTTP2_FLAG_END_STREAM)) {
@@ -106,14 +97,14 @@ Status ProtocolConstraints::checkInboundFrameLimits() {
   }
 
   if (inbound_priority_frames_ >
-      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + inbound_streams_)) {
+      static_cast<uint64_t>(max_inbound_priority_frames_per_stream_) * (1 + opened_streams_)) {
     stats_.inbound_priority_frames_flood_.inc();
     return bufferFloodError("Too many PRIORITY frames");
   }
 
   if (inbound_window_update_frames_ >
-      1 + 2 * (inbound_streams_ +
-               max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)) {
+      (10 * (1 + opened_streams_) +
+       (2 * max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_))) {
     stats_.inbound_window_update_frames_flood_.inc();
     return bufferFloodError("Too many WINDOW_UPDATE frames");
   }

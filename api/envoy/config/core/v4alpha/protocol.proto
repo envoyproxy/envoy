@@ -320,8 +320,8 @@ message Http2ProtocolOptions {
   // of WINDOW_UPDATE frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //     1 + 2 * (inbound_streams +
-  //              max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
+  //     10 * (1 + inbound_streams) +
+  //     (2 * max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
   //
   // the connection is terminated. The ``http2.inbound_priority_frames_flood`` stat tracks
   // the number of connections terminated due to flood mitigation. The default limit is 10.

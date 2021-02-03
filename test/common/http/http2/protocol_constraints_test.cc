@@ -156,12 +156,9 @@ TEST_F(ProtocolConstraintsTest, Priority) {
   options_.mutable_max_inbound_priority_frames_per_stream()->set_value(2);
   ProtocolConstraints constraints(http2CodecStats(), options_);
   // Create one stream
-  nghttp2_frame_hd frame;
-  frame.type = NGHTTP2_HEADERS;
-  frame.length = 1;
-  frame.flags = NGHTTP2_FLAG_END_HEADERS;
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
+  constraints.incrementOpenedStreamCount();
 
+  nghttp2_frame_hd frame;
   frame.type = NGHTTP2_PRIORITY;
   EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
   EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
@@ -177,23 +174,19 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   options_.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(1);
   ProtocolConstraints constraints(http2CodecStats(), options_);
   // Create one stream
-  nghttp2_frame_hd frame;
-  frame.type = NGHTTP2_HEADERS;
-  frame.length = 1;
-  frame.flags = NGHTTP2_FLAG_END_HEADERS;
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
+  constraints.incrementOpenedStreamCount();
   // Send 2 DATA frames
   constraints.incrementOutboundDataFrameCount();
   constraints.incrementOutboundDataFrameCount();
 
+  // Per the `10 * (1 + inbound_streams_) + (2 *
+  // max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)` formula 20 + 4
+  // = 24 WINDOW_UPDATE should NOT fail constraint check, but 25th should
+  nghttp2_frame_hd frame;
   frame.type = NGHTTP2_WINDOW_UPDATE;
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
-  EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
+  for (uint32_t i = 0; i < 24; ++i) {
+    EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
+  }
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrames(&frame, 0)));
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many WINDOW_UPDATE frames", constraints.status().message());
