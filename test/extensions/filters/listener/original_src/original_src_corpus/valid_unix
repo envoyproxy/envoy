@@ -1,0 +1,10 @@
+config {
+  bind_port: true
+  mark: 15
+}
+
+fuzzed {
+  sock {
+    remote_address: "unix://domain.socket"
+  }
+}

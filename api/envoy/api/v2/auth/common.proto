@@ -45,8 +45,8 @@ message TlsParameters {
   // servers.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // Maximum TLS protocol version. By default, it's ``TLSv1_3`` for servers in non-FIPS builds, and
-  // ``TLSv1_2`` for clients and for servers using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`.
+  // Maximum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_3`` for
+  // servers.
   TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum = {defined_only: true}];
 
   // If specified, the TLS listener will only support the specified `cipher list

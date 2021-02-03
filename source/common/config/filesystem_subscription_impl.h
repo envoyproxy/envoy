@@ -17,10 +17,11 @@ namespace Config {
  * lists of xDS resources.
  */
 class FilesystemSubscriptionImpl : public Config::Subscription,
-                                   Logger::Loggable<Logger::Id::config> {
+                                   protected Logger::Loggable<Logger::Id::config> {
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
-                             SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                             SubscriptionCallbacks& callbacks,
+                             OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::Subscription
@@ -28,8 +29,12 @@ public:
   // unused, and updateResourceInterest is a no-op (other than updating a stat).
   void start(const std::set<std::string>&) override;
   void updateResourceInterest(const std::set<std::string>&) override;
+  void requestOnDemandUpdate(const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
-private:
+protected:
+  virtual std::string refreshInternal(ProtobufTypes::MessagePtr* config_update);
   void refresh();
   void configRejected(const EnvoyException& e, const std::string& message);
 
@@ -37,9 +42,24 @@ private:
   const std::string path_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks& callbacks_;
+  OpaqueResourceDecoder& resource_decoder_;
   SubscriptionStats stats_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+// Currently a FilesystemSubscriptionImpl subclass, but this will need to change when we support
+// non-inline collection resources.
+class FilesystemCollectionSubscriptionImpl : public FilesystemSubscriptionImpl {
+public:
+  FilesystemCollectionSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
+                                       SubscriptionCallbacks& callbacks,
+                                       OpaqueResourceDecoder& resource_decoder,
+                                       SubscriptionStats stats,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api);
+
+  std::string refreshInternal(ProtobufTypes::MessagePtr* config_update) override;
 };
 
 } // namespace Config

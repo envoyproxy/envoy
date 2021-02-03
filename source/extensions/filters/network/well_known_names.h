@@ -31,7 +31,7 @@ public:
   // MySQL proxy filter
   const std::string MySQLProxy = "envoy.filters.network.mysql_proxy";
   // Postgres proxy filter
-  const std::string Postgres = "envoy.filters.network.postgres_proxy";
+  const std::string PostgresProxy = "envoy.filters.network.postgres_proxy";
   // Rate limit filter
   const std::string RateLimit = "envoy.filters.network.ratelimit";
   // Redis proxy filter
@@ -52,6 +52,8 @@ public:
   const std::string SniDynamicForwardProxy = "envoy.filters.network.sni_dynamic_forward_proxy";
   // ZooKeeper proxy filter
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
+  // WebAssembly filter
+  const std::string Wasm = "envoy.filters.network.wasm";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

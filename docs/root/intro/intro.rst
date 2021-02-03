@@ -8,6 +8,7 @@ Introduction
 
   what_is_envoy
   arch_overview/arch_overview
+  life_of_a_request
   deployment_types/deployment_types
   getting_help
 

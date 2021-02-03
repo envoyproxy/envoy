@@ -1,10 +1,12 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "common/grpc/async_client_impl.h"
+#include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
 
@@ -27,8 +29,14 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+
+    auto& initial_metadata_entry = *config.mutable_initial_metadata()->Add();
+    initial_metadata_entry.set_key("downstream-local-address");
+    initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-    ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
+    cm_.initializeThreadLocalClusters({"test_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
@@ -38,6 +46,101 @@ public:
   DangerousDeprecatedTestTime test_time_;
 };
 
+// Validate that the host header is the cluster name in grpc config.
+TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster";
+              })));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validate that the host header is the authority field in grpc config.
+TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+
+  grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "demo.com";
+              })));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validate that the metadata header is the initial metadata in gRPC service config and the value is
+// interpolated.
+TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  const std::string expected_downstream_local_address = "5.5.5.5";
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([&expected_downstream_local_address](
+                                                         Http::RequestHeaderMap& headers) {
+                return headers.get(Http::LowerCaseString("downstream-local-address"))[0]->value() ==
+                       expected_downstream_local_address;
+              })));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+
+  // Prepare the parent context of this call.
+  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
+  Http::AsyncClient::ParentContext parent_context{&stream_info};
+
+  Http::AsyncClient::StreamOptions stream_options;
+  stream_options.setParentContext(parent_context);
+
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validate that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
@@ -46,7 +149,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-  EXPECT_TRUE(grpc_stream == nullptr);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 // Validate that a failure in the HTTP client returns immediately with status
@@ -98,7 +201,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Internal, ""));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-  EXPECT_TRUE(grpc_stream == nullptr);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 // Validate that a failure to sendHeaders() in the HTTP client returns
@@ -145,12 +248,12 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
 // status UNAVAILABLE and error message "Cluster not available"
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available"));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-  EXPECT_TRUE(grpc_stream == nullptr);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 } // namespace

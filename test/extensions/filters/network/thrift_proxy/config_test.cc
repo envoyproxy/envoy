@@ -5,7 +5,7 @@
 #include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
@@ -122,6 +122,30 @@ TEST_F(ThriftFilterConfigTest, ThriftProxyWithEmptyProto) {
   testConfig(config);
 }
 
+// Test config with an invalid cluster_header.
+TEST_F(ThriftFilterConfigTest, RouterConfigWithInvalidClusterHeader) {
+  const std::string yaml = R"EOF(
+stat_prefix: thrift
+route_config:
+  name: local_route
+  routes:
+    match:
+      method_name: A
+    route:
+      cluster_header: A
+thrift_filters:
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  std::string header = "A";
+  header.push_back('\000'); // Add an invalid character for http header.
+  config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster_header(
+      header);
+  EXPECT_THROW(factory_.createFilterFactoryFromProto(config, context_), ProtoValidationException);
+}
+
 // Test config with an explicitly defined router filter.
 TEST_F(ThriftFilterConfigTest, ThriftProxyWithExplicitRouterConfig) {
   const std::string yaml = R"EOF(
@@ -180,6 +204,24 @@ thrift_filters:
   EXPECT_EQ(1, factory.config_struct_.fields_size());
   EXPECT_EQ("value", factory.config_struct_.fields().at("key").string_value());
   EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
+}
+
+// Test config with payload passthrough enabled.
+TEST_F(ThriftFilterConfigTest, ThriftProxyPayloadPassthrough) {
+  const std::string yaml = R"EOF(
+stat_prefix: ingress
+payload_passthrough: true
+route_config:
+  name: local_route
+thrift_filters:
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  testConfig(config);
+
+  EXPECT_EQ(true, config.payload_passthrough());
 }
 
 } // namespace ThriftProxy

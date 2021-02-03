@@ -11,6 +11,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
@@ -29,8 +30,11 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
+    EXPECT_CALL(dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
+
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
-    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, store_, config_);
+    dns_cache_ =
+        std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, loader_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
@@ -58,7 +62,8 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Runtime::MockLoader> loader_;
   Stats::IsolatedStoreImpl store_;
   std::unique_ptr<DnsCache> dns_cache_;
   MockUpdateCallbacks update_callbacks_;
@@ -543,6 +548,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   auto result1 = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks1);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result1.status_);
   EXPECT_NE(result1.handle_, nullptr);
+  EXPECT_EQ(dns_cache_->getHost("foo.com"), absl::nullopt);
 
   MockLoadDnsCacheEntryCallbacks callbacks2;
   Network::DnsResolver::ResolveCb resolve_cb2;
@@ -551,6 +557,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   auto result2 = dns_cache_->loadDnsCacheEntry("bar.com", 443, callbacks2);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result2.status_);
   EXPECT_NE(result2.handle_, nullptr);
+  EXPECT_EQ(dns_cache_->getHost("bar.com"), absl::nullopt);
 
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("bar.com", DnsHostInfoEquals("10.0.0.1:443", "bar.com", false)));
@@ -564,10 +571,20 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   resolve_cb1(Network::DnsResolver::ResolutionStatus::Success,
               TestUtility::makeDnsResponse({"10.0.0.2"}));
 
-  auto hosts = dns_cache_->hosts();
+  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts;
+  dns_cache_->iterateHostMap(
+      [&](absl::string_view host, const DnsHostInfoSharedPtr& info) { hosts.emplace(host, info); });
   EXPECT_EQ(2, hosts.size());
   EXPECT_THAT(hosts["bar.com"], DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
   EXPECT_THAT(hosts["foo.com"], DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
+
+  EXPECT_TRUE(dns_cache_->getHost("bar.com").has_value());
+  EXPECT_THAT(dns_cache_->getHost("bar.com").value(),
+              DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
+  EXPECT_TRUE(dns_cache_->getHost("foo.com").has_value());
+  EXPECT_THAT(dns_cache_->getHost("foo.com").value(),
+              DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
+  EXPECT_EQ(dns_cache_->getHost("baz.com"), absl::nullopt);
 }
 
 // A successful resolve followed by a cache hit.
@@ -642,13 +659,68 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.host_overflow")->value());
 }
 
+TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
+  initialize();
+
+  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  EXPECT_NE(raii_ptr.get(), nullptr);
+}
+
+TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
+  config_.mutable_dns_cache_circuit_breaker()->mutable_max_pending_requests()->set_value(0);
+  initialize();
+
+  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  EXPECT_EQ(raii_ptr.get(), nullptr);
+  EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
+}
+
+TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
+  initialize();
+  NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
+
+  EXPECT_CALL(pending_requests_, canCreate()).WillOnce(Return(false));
+  auto raii_ptr = dns_cache_->canCreateDnsRequest(pending_requests_);
+  EXPECT_EQ(raii_ptr.get(), nullptr);
+  EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
+}
+
+TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionSet) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(true);
+  EXPECT_CALL(dispatcher, createDnsResolver(_, true)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
+TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionUnSet) {
+  NiceMock<Event::MockDispatcher> dispatcher;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
+  Stats::IsolatedStoreImpl store;
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+  config.set_use_tcp_for_dns_lookups(false);
+  EXPECT_CALL(dispatcher, createDnsResolver(_, false)).WillOnce(Return(resolver));
+  DnsCacheImpl dns_cache_(dispatcher, tls, random, loader, store, config);
+}
+
 // DNS cache manager config tests.
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
   Stats::IsolatedStoreImpl store;
-  DnsCacheManagerImpl cache_manager(dispatcher, tls, random, store);
+  DnsCacheManagerImpl cache_manager(dispatcher, tls, random, loader, store);
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
   config1.set_name("foo");
@@ -680,7 +752,7 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
 // I spent too much time trying to figure this out. So for the moment I have copied this test body
 // here. I will spend some more time fixing this, but wanted to land unblocking functionality first.
 TEST(UtilityTest, PrepareDnsRefreshStrategy) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
 
   {
     // dns_failure_refresh_rate not set.
@@ -699,7 +771,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     BackOffStrategyPtr strategy = Config::Utility::prepareDnsRefreshStrategy<
         envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(dns_cache_config,
                                                                               5000, random);
-    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+    EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
   }
 
   {

@@ -9,15 +9,18 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/conn_pool.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
@@ -32,7 +35,9 @@ namespace Envoy {
 
 namespace Upstream {
 class ClusterManager;
-}
+class LoadBalancerContext;
+class ThreadLocalCluster;
+} // namespace Upstream
 
 namespace Router {
 
@@ -147,6 +152,23 @@ public:
 };
 
 /**
+ * An interface to be implemented by rate limited reset header parsers.
+ */
+class ResetHeaderParser {
+public:
+  virtual ~ResetHeaderParser() = default;
+
+  /**
+   * Iterate over the headers, choose the first one that matches by name, and try to parse its
+   * value.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseInterval(TimeSource& time_source, const Http::HeaderMap& headers) const PURE;
+};
+
+using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
+
+/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -165,6 +187,7 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   static const uint32_t RETRY_ON_RESET                   = 0x800;
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
+  static const uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -230,6 +253,18 @@ public:
    * @return absl::optional<std::chrono::milliseconds> maximum retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+
+  /**
+   * @return std::vector<Http::ResetHeaderParserSharedPtr>& list of reset header
+   * parsers that will be used to extract a retry back-off interval from response headers.
+   */
+  virtual const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds upper limit placed on a retry
+   * back-off interval parsed from response headers.
+   */
+  virtual std::chrono::milliseconds resetMaxInterval() const PURE;
 };
 
 /**
@@ -288,6 +323,14 @@ public:
    * @return true if a policy is in place for the active request that allows retries.
    */
   virtual bool enabled() PURE;
+
+  /**
+   * Attempts to parse any matching rate limited reset headers (RFC 7231), either in the form of an
+   * interval directly, or in the form of a unix timestamp relative to the current system time.
+   * @return the interval if parsing was successful.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseResetInterval(const Http::ResponseHeaderMap& response_headers) const PURE;
 
   /**
    * Determine whether a request should be retried based on the response headers.
@@ -410,20 +453,22 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 /**
  * All virtual cluster stats. @see stats_macro.h
  */
-#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_total)
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(other)                                                                                  \
+  STATNAME(vcluster)                                                                               \
+  STATNAME(vhost)
 
 /**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
-struct VirtualClusterStats {
-  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -443,8 +488,9 @@ public:
    */
   virtual VirtualClusterStats& stats() const PURE;
 
-  static VirtualClusterStats generateStats(Stats::Scope& scope) {
-    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  static VirtualClusterStats generateStats(Stats::Scope& scope,
+                                           const VirtualClusterStatNames& stat_names) {
+    return VirtualClusterStats(stat_names, scope);
   }
 };
 
@@ -754,6 +800,22 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the max grpc-timeout this route will allow.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the delta between grpc-timeout and enforced grpc
+   *         timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const PURE;
+
+  /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
    * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
    * header, while 0 represents infinity.
@@ -808,7 +870,7 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
    * this route.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
@@ -1090,6 +1152,171 @@ public:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+
+class GenericConnectionPoolCallbacks;
+class GenericUpstream;
+
+/**
+ * An API for wrapping either an HTTP or a TCP connection pool.
+ *
+ * The GenericConnPool exists to create a GenericUpstream handle via a call to
+ * newStream resulting in an eventual call to onPoolReady
+ */
+class GenericConnPool {
+public:
+  virtual ~GenericConnPool() = default;
+
+  /**
+   * Called to create a new HTTP stream or TCP connection for "CONNECT streams".
+   *
+   * The implementation of the GenericConnPool will either call
+   * GenericConnectionPoolCallbacks::onPoolReady
+   * when a stream is available or GenericConnectionPoolCallbacks::onPoolFailure
+   * if stream creation fails.
+   *
+   * The caller is responsible for calling cancelAnyPendingStream() if stream
+   * creation is no longer desired. newStream may only be called once per
+   * GenericConnPool.
+   *
+   * @param callbacks callbacks to communicate stream failure or creation on.
+   */
+  virtual void newStream(GenericConnectionPoolCallbacks* callbacks) PURE;
+  /**
+   * Called to cancel any pending newStream request,
+   */
+  virtual bool cancelAnyPendingStream() PURE;
+  /**
+   * @return optionally returns the host for the connection pool.
+   */
+  virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+};
+
+/**
+ * An API for the interactions the upstream stream needs to have with the downstream stream
+ * and/or router components
+ */
+class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
+public:
+  /**
+   * @return return the routeEntry for the downstream stream.
+   */
+  virtual const RouteEntry& routeEntry() const PURE;
+  /**
+   * @return return the connection for the downstream stream.
+   */
+  virtual const Network::Connection& connection() const PURE;
+};
+
+/**
+ * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
+ *
+ * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
+ * will either call onPoolReady when a GenericUpstream is ready, or
+ * onPoolFailure if a connection/stream can not be established.
+ */
+class GenericConnectionPoolCallbacks {
+public:
+  virtual ~GenericConnectionPoolCallbacks() = default;
+
+  /**
+   * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
+   *
+   * @param reason supplies the failure reason.
+   * @param transport_failure_reason supplies the details of the transport failure reason.
+   * @param host supplies the description of the host that caused the failure. This may be nullptr
+   *             if no host was involved in the failure (for example overflow).
+   */
+  virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                             absl::string_view transport_failure_reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
+  /**
+   * Called when GenericConnPool::newStream has established a new stream.
+   *
+   * @param upstream supplies the generic upstream for the stream.
+   * @param host supplies the description of the host that will carry the request. For logical
+   *             connection pools the description may be different each time this is called.
+   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param info supplies the stream info object associated with the upstream connection.
+   * @param protocol supplies the protocol associated with the upstream connection.
+   */
+  virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
+
+  // @return the UpstreamToDownstream interface for this stream.
+  //
+  // This is the interface for all interactions the upstream stream needs to have with the
+  // downstream stream. It is in the GenericConnectionPoolCallbacks as the GenericConnectionPool
+  // creates the GenericUpstream, and the GenericUpstream will need this interface.
+  virtual UpstreamToDownstream& upstreamToDownstream() PURE;
+};
+
+/**
+ * An API for sending information to either a TCP or HTTP upstream.
+ *
+ * It is similar logically to RequestEncoder, only without the getStream interface.
+ */
+class GenericUpstream {
+public:
+  virtual ~GenericUpstream() = default;
+  /**
+   * Encode a data frame.
+   * @param data supplies the data to encode. The data may be moved by the encoder.
+   * @param end_stream supplies whether this is the last data frame.
+   */
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  /**
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
+   */
+  virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
+  /**
+   * Encode headers, optionally indicating end of stream.
+   * @param headers supplies the header map to encode.
+   * @param end_stream supplies whether this is a header only request.
+   * @return status indicating success. Encoding will fail if headers do not have required HTTP
+   * headers.
+   */
+  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  /**
+   * Encode trailers. This implicitly ends the stream.
+   * @param trailers supplies the trailers to encode.
+   */
+  virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  /**
+   * Enable/disable further data from this stream.
+   */
+  virtual void readDisable(bool disable) PURE;
+  /**
+   * Reset the stream. No events will fire beyond this point.
+   * @param reason supplies the reset reason.
+   */
+  virtual void resetStream() PURE;
+};
+
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
+
+/*
+ * A factory for creating generic connection pools.
+ */
+class GenericConnPoolFactory : public Envoy::Config::TypedFactory {
+public:
+  ~GenericConnPoolFactory() override = default;
+
+  /*
+   * @param options for creating the transport socket
+   * @return may be null
+   */
+  virtual GenericConnPoolPtr
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+                        const RouteEntry& route_entry,
+                        absl::optional<Http::Protocol> downstream_protocol,
+                        Upstream::LoadBalancerContext* ctx) const PURE;
+};
+
+using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;
 
 } // namespace Router
 } // namespace Envoy

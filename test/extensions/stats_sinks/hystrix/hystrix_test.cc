@@ -2,12 +2,18 @@
 #include <memory>
 #include <sstream>
 
+#include "common/json/json_loader.h"
+
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/priority_set.h"
 
 #include "absl/strings/str_split.h"
 #include "circllhist.h"
@@ -120,33 +126,30 @@ class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_ = std::make_unique<HystrixSink>(server_, window_size_); }
 
-  Buffer::OwnedImpl createClusterAndCallbacks() {
+  void createClusterAndCallbacks() {
     // Set cluster.
-    cluster_map_.emplace(cluster1_name_, cluster1_.cluster_);
+    cluster_maps_.active_clusters_.emplace(cluster1_name_, cluster1_.cluster_);
     ON_CALL(server_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
 
-    Buffer::OwnedImpl buffer;
-    auto encode_callback = [&buffer](Buffer::Instance& data, bool) {
+    ON_CALL(callbacks_, encodeData(_, _)).WillByDefault(Invoke([&](Buffer::Instance& data, bool) {
       // Set callbacks to send data to buffer. This will append to the end of the buffer, so
       // multiple calls will all be dumped one after another into this buffer.
-      buffer.add(data);
-    };
-    ON_CALL(callbacks_, encodeData(_, _)).WillByDefault(Invoke(encode_callback));
-    return buffer;
+      cluster_stats_buffer_.add(data);
+    }));
   }
 
   void addClusterToMap(const std::string& cluster_name,
                        NiceMock<Upstream::MockClusterMockPrioritySet>& cluster) {
-    cluster_map_.emplace(cluster_name, cluster);
-    // Redefining since cluster_map_ is returned by value.
-    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+    cluster_maps_.active_clusters_.emplace(cluster_name, cluster);
+    // Redefining since cluster_maps_ is returned by value.
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
   }
 
   void removeClusterFromMap(const std::string& cluster_name) {
-    cluster_map_.erase(cluster_name);
-    // Redefining since cluster_map_ is returned by value.
-    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+    cluster_maps_.active_clusters_.erase(cluster_name);
+    // Redefining since cluster_maps_ is returned by value.
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_maps_));
   }
 
   void addSecondClusterHelper(Buffer::OwnedImpl& buffer) {
@@ -155,7 +158,7 @@ public:
     addClusterToMap(cluster2_name_, cluster2_.cluster_);
   }
 
-  std::unordered_map<std::string, std::string>
+  absl::node_hash_map<std::string, std::string>
   addSecondClusterAndSendDataHelper(Buffer::OwnedImpl& buffer, const uint64_t success_step,
                                     const uint64_t error_step, const uint64_t timeout_step,
                                     const uint64_t success_step2, const uint64_t error_step2,
@@ -214,8 +217,8 @@ public:
     }
   }
 
-  std::unordered_map<std::string, std::string> buildClusterMap(absl::string_view data_message) {
-    std::unordered_map<std::string, std::string> cluster_message_map;
+  absl::node_hash_map<std::string, std::string> buildClusterMap(absl::string_view data_message) {
+    absl::node_hash_map<std::string, std::string> cluster_message_map;
     std::vector<std::string> messages =
         absl::StrSplit(data_message, "data: ", absl::SkipWhitespace());
     for (auto message : messages) {
@@ -241,8 +244,9 @@ public:
   ClusterTestInfo cluster2_{cluster2_name_};
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<Server::MockInstance> server_;
-  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_;
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps_;
+  Buffer::OwnedImpl cluster_stats_buffer_;
 
   std::unique_ptr<HystrixSink> sink_;
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
@@ -251,18 +255,18 @@ public:
 
 TEST_F(HystrixSinkTest, EmptyFlush) {
   InSequence s;
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
   sink_->flush(snapshot_);
-  std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(buffer.toString());
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(cluster_stats_buffer_.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
 
 TEST_F(HystrixSinkTest, BasicFlow) {
   InSequence s;
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
@@ -272,14 +276,14 @@ TEST_F(HystrixSinkTest, BasicFlow) {
 
   sink_->flush(snapshot_); // init window with 0
   for (uint64_t i = 0; i < (window_size_ - 1); i++) {
-    buffer.drain(buffer.length());
+    cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
     traffic_counter += rand_.random() % 1000;
     ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(traffic_counter));
     sink_->flush(snapshot_);
   }
 
-  std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(buffer.toString());
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(cluster_stats_buffer_.toString());
 
   Json::ObjectSharedPtr json_buffer =
       Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
@@ -303,7 +307,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   const uint64_t rejected_step = 6;
 
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
-    buffer.drain(buffer.length());
+    cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
     cluster1_.setCounterReturnValues(i, success_step, error_4xx_step, error_4xx_retry_step,
                                      error_5xx_step, error_5xx_retry_step, timeout_step,
                                      timeout_retry_step, rejected_step);
@@ -314,7 +318,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"))
       << "cluster1_name = " << cluster1_name_;
 
-  cluster_message_map = buildClusterMap(buffer.toString());
+  cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());
 
   // Check stream format and data.
   validateResults(cluster_message_map[cluster1_name_], success_step,
@@ -322,20 +326,20 @@ TEST_F(HystrixSinkTest, BasicFlow) {
                   timeout_step, timeout_retry_step, rejected_step, window_size_);
 
   // Check the values are reset.
-  buffer.drain(buffer.length());
+  cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
   sink_->resetRollingWindow();
   sink_->flush(snapshot_);
-  cluster_message_map = buildClusterMap(buffer.toString());
+  cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
 
 //
 TEST_F(HystrixSinkTest, Disconnect) {
   InSequence s;
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
 
   sink_->flush(snapshot_);
-  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(cluster_stats_buffer_.length(), 0);
 
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
@@ -344,31 +348,31 @@ TEST_F(HystrixSinkTest, Disconnect) {
   uint64_t success_step = 1;
 
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
-    buffer.drain(buffer.length());
+    cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
     ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
     sink_->flush(snapshot_);
   }
 
-  EXPECT_NE(buffer.length(), 0);
-  std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(buffer.toString());
+  EXPECT_NE(cluster_stats_buffer_.length(), 0);
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(cluster_stats_buffer_.toString());
   Json::ObjectSharedPtr json_buffer =
       Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
   EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), (success_step * window_size_));
 
   // Disconnect.
-  buffer.drain(buffer.length());
+  cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
   sink_->unregisterConnection(&callbacks_);
   sink_->flush(snapshot_);
-  EXPECT_EQ(buffer.length(), 0);
+  EXPECT_EQ(cluster_stats_buffer_.length(), 0);
 
   // Reconnect.
-  buffer.drain(buffer.length());
+  cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
   sink_->registerConnection(&callbacks_);
   ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(success_step));
   sink_->flush(snapshot_);
-  EXPECT_NE(buffer.length(), 0);
-  cluster_message_map = buildClusterMap(buffer.toString());
+  EXPECT_NE(cluster_stats_buffer_.length(), 0);
+  cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());
   json_buffer = Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
   EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), 0);
 }
@@ -387,12 +391,12 @@ TEST_F(HystrixSinkTest, AddCluster) {
   const uint64_t error_step2 = 33;
   const uint64_t timeout_step2 = 22;
 
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
 
   // Add cluster and "run" some traffic.
-  std::unordered_map<std::string, std::string> cluster_message_map =
-      addSecondClusterAndSendDataHelper(buffer, success_step, error_step, timeout_step,
-                                        success_step2, error_step2, timeout_step2);
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
+      addSecondClusterAndSendDataHelper(cluster_stats_buffer_, success_step, error_step,
+                                        timeout_step, success_step2, error_step2, timeout_step2);
 
   // Expect that add worked.
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
@@ -421,30 +425,30 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   const uint64_t error_step2 = 934;
   const uint64_t timeout_step2 = 212;
 
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
 
   // Add cluster and "run" some traffic.
-  addSecondClusterAndSendDataHelper(buffer, success_step, error_step, timeout_step, success_step2,
-                                    error_step2, timeout_step2);
+  addSecondClusterAndSendDataHelper(cluster_stats_buffer_, success_step, error_step, timeout_step,
+                                    success_step2, error_step2, timeout_step2);
 
   // Remove cluster and flush data to sink.
-  removeSecondClusterHelper(buffer);
+  removeSecondClusterHelper(cluster_stats_buffer_);
 
   // Check that removed worked.
-  std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(buffer.toString());
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(cluster_stats_buffer_.toString());
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
   ASSERT_EQ(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
       << "cluster2_name = " << cluster2_name_;
 
   // Add cluster again and flush data to sink.
-  addSecondClusterHelper(buffer);
+  addSecondClusterHelper(cluster_stats_buffer_);
 
   sink_->flush(snapshot_);
 
   // Check that add worked.
-  cluster_message_map = buildClusterMap(buffer.toString());
+  cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
   ASSERT_NE(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
@@ -478,13 +482,13 @@ TEST_F(HystrixSinkTest, HistogramTest) {
       .WillByDefault(testing::ReturnRef(h1_interval_statistics));
   snapshot_.histograms_.push_back(*histogram);
 
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
   sink_->flush(snapshot_);
 
-  std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(buffer.toString());
+  absl::node_hash_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(cluster_stats_buffer_.toString());
 
   Json::ObjectSharedPtr latency = Json::Factory::loadFromString(cluster_message_map[cluster1_name_])
                                       ->getObject("latencyExecute");
@@ -499,14 +503,14 @@ TEST_F(HystrixSinkTest, HistogramTest) {
 
 TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   InSequence s;
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
   // This value doesn't matter in handlerHystrixEventStream
   absl::string_view path_and_query;
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
 
   NiceMock<Server::MockAdminStream> admin_stream_mock;
   NiceMock<Network::MockConnection> connection_mock;
@@ -518,22 +522,19 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   ON_CALL(admin_stream_mock, http1StreamEncoderOptions())
       .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options)));
   ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
-  ON_CALL(connection_mock, remoteAddress()).WillByDefault(ReturnRef(addr_instance_));
+  connection_mock.stream_info_.downstream_address_provider_->setRemoteAddress(addr_instance_);
 
   EXPECT_CALL(stream_encoder_options, disableChunkEncoding());
-  ASSERT_EQ(
-      sink_->handlerHystrixEventStream(path_and_query, response_headers, buffer, admin_stream_mock),
-      Http::Code::OK);
+  ASSERT_EQ(sink_->handlerHystrixEventStream(path_and_query, response_headers,
+                                             cluster_stats_buffer_, admin_stream_mock),
+            Http::Code::OK);
 
   // Check that response_headers has been set correctly
   EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
-  EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
+  EXPECT_EQ(response_headers.get_("cache-control"), "no-cache");
   EXPECT_EQ(response_headers.Connection()->value(), "close");
-  EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
-
-  std::string access_control_allow_headers =
-      std::string(response_headers.getAccessControlAllowHeadersValue());
-  EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
+  EXPECT_EQ(response_headers.get_("access-control-allow-origin"), "*");
+  EXPECT_THAT(response_headers.get_("access-control-allow-headers"), HasSubstr("Accept"));
 }
 
 } // namespace

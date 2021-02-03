@@ -10,6 +10,7 @@ namespace Envoy {
 namespace Upstream {
 
 using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
+using NormalizedHostWeightMap = std::map<HostConstSharedPtr, double>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
@@ -28,6 +29,42 @@ public:
   };
   using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
+  /**
+   * Class for consistent hashing load balancer (CH-LB) with bounded loads.
+   * It is common to both RingHash and Maglev load balancers, because the logic of selecting the
+   * next host when one is overloaded is independent of the CH-LB type.
+   */
+  class BoundedLoadHashingLoadBalancer : public HashingLoadBalancer {
+  public:
+    BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hashing_lb_ptr,
+                                   NormalizedHostWeightVector normalized_host_weights,
+                                   uint32_t hash_balance_factor)
+        : normalized_host_weights_map_(initNormalizedHostWeightMap(normalized_host_weights)),
+          hashing_lb_ptr_(std::move(hashing_lb_ptr)),
+          normalized_host_weights_(std::move(normalized_host_weights)),
+          hash_balance_factor_(hash_balance_factor) {
+      ASSERT(hashing_lb_ptr_ != nullptr);
+      ASSERT(hash_balance_factor > 0);
+    }
+    HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+
+  protected:
+    virtual double hostOverloadFactor(const Host& host, double weight) const;
+    const NormalizedHostWeightMap normalized_host_weights_map_;
+
+  private:
+    const NormalizedHostWeightMap
+    initNormalizedHostWeightMap(const NormalizedHostWeightVector& normalized_host_weights) {
+      NormalizedHostWeightMap normalized_host_weights_map;
+      for (auto const& item : normalized_host_weights) {
+        normalized_host_weights_map[item.first] = item.second;
+      }
+      return normalized_host_weights_map;
+    }
+    const HashingLoadBalancerSharedPtr hashing_lb_ptr_;
+    const NormalizedHostWeightVector normalized_host_weights_;
+    const uint32_t hash_balance_factor_;
+  };
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
@@ -36,11 +73,13 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  // Preconnect not implemented for hash based load balancing
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
 
 protected:
   ThreadAwareLoadBalancerBase(
       const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-      Runtime::RandomGenerator& random,
+      Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
         factory_(new LoadBalancerFactoryImpl(stats, random)) {}
@@ -53,28 +92,30 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Runtime::RandomGenerator& random)
+    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    // Preconnect not implemented for hash based load balancing
+    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
 
     ClusterStats& stats_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Runtime::RandomGenerator& random)
+    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
 
     ClusterStats& stats_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.

@@ -12,6 +12,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/tag_utility.h"
@@ -24,16 +25,32 @@ namespace Stats {
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
-    : alloc_(alloc), default_scope_(createScope("")),
-      tag_producer_(std::make_unique<TagProducerImpl>()),
-      stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
-      null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
-      null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable()) {}
+    : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>()),
+      stats_matcher_(std::make_unique<StatsMatcherImpl>()),
+      histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
+      heap_allocator_(alloc.symbolTable()), null_counter_(alloc.symbolTable()),
+      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()),
+      null_text_readout_(alloc.symbolTable()),
+      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) {
+  for (const auto& desc : Config::TagNames::get().descriptorVec()) {
+    well_known_tags_->rememberBuiltin(desc.name_);
+  }
+  StatNameManagedStorage empty("", alloc.symbolTable());
+  default_scope_ = ThreadLocalStoreImpl::scopeFromStatName(empty.statName());
+}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
+}
+
+void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    ASSERT(scope->central_cache_->histograms_.empty());
+  }
+  histogram_settings_ = std::move(histogram_settings);
 }
 
 void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
@@ -47,11 +64,21 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   // in the default_scope. There should be no requests, so there will
   // be no copies in TLS caches.
   Thread::LockGuard lock(lock_);
+  const uint32_t first_histogram_index = deleted_histograms_.size();
   for (ScopeImpl* scope : scopes_) {
     removeRejectedStats(scope->central_cache_->counters_, deleted_counters_);
     removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
     removeRejectedStats(scope->central_cache_->text_readouts_, deleted_text_readouts_);
+  }
+
+  // Remove any newly rejected histograms from histogram_set_.
+  {
+    Thread::LockGuard hist_lock(hist_mutex_);
+    for (uint32_t i = first_histogram_index; i < deleted_histograms_.size(); ++i) {
+      uint32_t erased = histogram_set_.erase(deleted_histograms_[i].get());
+      ASSERT(erased == 1);
+    }
   }
 }
 
@@ -102,6 +129,11 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 }
 
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
+  return scopeFromStatName(stat_name_storage.statName());
+}
+
+ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
@@ -144,16 +176,11 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
 
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
-  Thread::LockGuard lock(lock_);
-  // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
-  // here. We need to create global storage for histograms similar to how we have a central storage
-  // in shared memory for counters/gauges. In the interim, no de-dup is done here. This may result
-  // in histograms with duplicate names, but until shared storage is implemented it's ultimately
-  // less confusing for users who have such configs.
-  for (ScopeImpl* scope : scopes_) {
-    for (const auto& name_histogram_pair : scope->central_cache_->histograms_) {
-      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
-      ret.push_back(parent_hist);
+  Thread::LockGuard lock(hist_mutex_);
+  {
+    ret.reserve(histogram_set_.size());
+    for (const auto& histogram_ptr : histogram_set_) {
+      ret.emplace_back(histogram_ptr);
     }
   }
 
@@ -164,29 +191,30 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
                                                ThreadLocal::Instance& tls) {
   threading_ever_initialized_ = true;
   main_thread_dispatcher_ = &main_thread_dispatcher;
-  tls_ = tls.allocateSlot();
-  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<TlsCache>();
-  });
+  tls_cache_ = ThreadLocal::TypedSlot<TlsCache>::makeUnique(tls);
+  tls_cache_->set(
+      [](Event::Dispatcher&) -> std::shared_ptr<TlsCache> { return std::make_shared<TlsCache>(); });
 }
 
 void ThreadLocalStoreImpl::shutdownThreading() {
   // This will block both future cache fills as well as cache flushes.
   shutting_down_ = true;
+  Thread::LockGuard lock(hist_mutex_);
+  for (ParentHistogramImpl* histogram : histogram_set_) {
+    histogram->setShuttingDown(true);
+  }
+  histogram_set_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
     ASSERT(!merge_in_progress_);
     merge_in_progress_ = true;
-    tls_->runOnAllThreads(
-        [this]() -> void {
-          for (const auto& scope : tls_->getTyped<TlsCache>().scope_cache_) {
-            const TlsCacheEntry& tls_cache_entry = scope.second;
-            for (const auto& name_histogram_pair : tls_cache_entry.histograms_) {
-              const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
-              tls_hist->beginMerge();
-            }
+    tls_cache_->runOnAllThreads(
+        [](OptRef<TlsCache> tls_cache) {
+          for (const auto& id_hist : tls_cache->tls_histogram_cache_) {
+            const TlsHistogramSharedPtr& tls_hist = id_hist.second;
+            tls_hist->beginMerge();
           }
         },
         [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
@@ -241,10 +269,23 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   if (!shutting_down_ && main_thread_dispatcher_) {
     const uint64_t scope_id = scope->scope_id_;
     lock.release();
+
+    // TODO(jmarantz): consider batching all the scope IDs that should be
+    // cleared from TLS caches to reduce bursts of runOnAllThreads on a large
+    // config update. See the pattern below used for histograms.
     main_thread_dispatcher_->post([this, central_cache, scope_id]() {
       sync_.syncPoint(MainDispatcherCleanupSync);
       clearScopeFromCaches(scope_id, central_cache);
     });
+  }
+}
+
+void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
+  // This can happen from any thread. We post() back to the main thread which will initiate the
+  // cache flush operation.
+  if (!shutting_down_ && main_thread_dispatcher_) {
+    main_thread_dispatcher_->post(
+        [this, histogram_id]() { clearHistogramFromCaches(histogram_id); });
   }
 }
 
@@ -254,6 +295,12 @@ ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
 }
 
 void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
+void ThreadLocalStoreImpl::TlsCache::eraseHistogram(uint64_t histogram_id) {
+  // This is called for every histogram in every thread, even though the
+  // histogram may not have been cached in each thread yet. So we don't
+  // want to check whether the erase() call erased anything.
+  tls_histogram_cache_.erase(histogram_id);
+}
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
                                                 CentralCacheEntrySharedPtr central_cache) {
@@ -261,16 +308,32 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
-    tls_->runOnAllThreads(
-        [this, scope_id]() { tls_->getTyped<TlsCache>().eraseScope(scope_id); },
+    tls_cache_->runOnAllThreads(
+        [scope_id](OptRef<TlsCache> tls_cache) { tls_cache->eraseScope(scope_id); },
         [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
   }
 }
 
-ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
+void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
+  // If we are shutting down we no longer perform cache flushes as workers may be shutting down
+  // at the same time.
+  if (!shutting_down_) {
+    // Perform a cache flush on all threads.
+    //
+    // TODO(jmarantz): If this cross-thread posting proves to be a performance
+    // bottleneck,
+    // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
+    // contains a patch that will implement batching together to clear multiple
+    // histograms.
+    tls_cache_->runOnAllThreads(
+        [histogram_id](OptRef<TlsCache> tls_cache) { tls_cache->eraseHistogram(histogram_id); });
+  }
+}
+
+ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix)
     : scope_id_(parent.next_scope_id_++), parent_(parent),
-      prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()),
-      central_cache_(new CentralCacheEntry(parent.symbolTable())) {}
+      prefix_(prefix, parent.alloc_.symbolTable()),
+      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   parent_.releaseScopeCrossThread(this);
@@ -292,11 +355,15 @@ public:
       : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
     if (!stat_name_tags) {
       TagVector tags;
-      tls.symbolTable().callWithStringView(name, [&tags, &tls, this](absl::string_view name_str) {
-        tag_extracted_name_ = pool_.add(tls.tagProducer().produceTags(name_str, tags));
-      });
+      tag_extracted_name_ =
+          pool_.add(tls.tagProducer().produceTags(tls.symbolTable().toString(name), tags));
+      StatName empty;
       for (const auto& tag : tags) {
-        stat_name_tags_.emplace_back(pool_.add(tag.name_), pool_.add(tag.value_));
+        StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
+        if (tag_name.empty()) {
+          tag_name = pool_.add(tag.name_);
+        }
+        stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
       }
     } else {
       tag_extracted_name_ = name;
@@ -391,8 +458,10 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 template <class StatType>
-absl::optional<std::reference_wrapper<const StatType>>
-ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
+using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+
+template <class StatType>
+StatTypeOptConstRef<StatType> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
     StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
@@ -424,8 +493,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   // initialized currently.
   StatRefMap<Counter>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().insertScope(this->scope_id_);
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tlsCache().insertScope(this->scope_id_);
     tls_cache = &entry.counters_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -476,8 +545,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tlsCache().scope_cache_[this->scope_id_];
     tls_cache = &entry.gauges_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -514,8 +583,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tlsCache().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;
     auto iter = tls_cache->find(final_stat_name);
     if (iter != tls_cache->end()) {
@@ -538,9 +607,25 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   } else {
     StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
 
-    RefcountPtr<ParentHistogramImpl> stat(
-        new ParentHistogramImpl(final_stat_name, unit, parent_, *this,
-                                tag_helper.tagExtractedName(), tag_helper.statNameTags()));
+    ConstSupportedBuckets* buckets = nullptr;
+    buckets = &parent_.histogram_settings_->buckets(symbolTable().toString(final_stat_name));
+
+    RefcountPtr<ParentHistogramImpl> stat;
+    {
+      Thread::LockGuard lock(parent_.hist_mutex_);
+      auto iter = parent_.histogram_set_.find(final_stat_name);
+      if (iter != parent_.histogram_set_.end()) {
+        stat = RefcountPtr<ParentHistogramImpl>(*iter);
+      } else {
+        stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
+                                       tag_helper.tagExtractedName(), tag_helper.statNameTags(),
+                                       *buckets, parent_.next_histogram_id_++);
+        if (!parent_.shutting_down_) {
+          parent_.histogram_set_.insert(stat.get());
+        }
+      }
+    }
+
     central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -573,8 +658,8 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   // initialized currently.
   StatRefMap<TextReadout>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().insertScope(this->scope_id_);
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    TlsCacheEntry& entry = parent_.tlsCache().insertScope(this->scope_id_);
     tls_cache = &entry.text_readouts_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -611,34 +696,33 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
-                                                         ParentHistogramImpl& parent) {
+Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {
   // tlsHistogram() is generally not called for a histogram that is rejected by
   // the matcher, so no further rejection-checking is needed at this level.
   // TlsHistogram inherits its reject/accept status from ParentHistogram.
 
   // See comments in counterFromStatName() which explains the logic here.
 
-  StatNameHashMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
-    auto iter = tls_cache->find(name);
-    if (iter != tls_cache->end()) {
-      return *iter->second;
+  TlsHistogramSharedPtr* tls_histogram = nullptr;
+  if (!shutting_down_ && tls_cache_) {
+    tls_histogram = &(tlsCache().tls_histogram_cache_[id]);
+    if (*tls_histogram != nullptr) {
+      return **tls_histogram;
     }
   }
 
-  StatNameTagHelper tag_helper(parent_, name, absl::nullopt);
+  StatNameTagHelper tag_helper(*this, parent.statName(), absl::nullopt);
 
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, parent.unit(), tag_helper.tagExtractedName(),
+      new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
                                    tag_helper.statNameTags(), symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
-  if (tls_cache) {
-    tls_cache->insert(std::make_pair(hist_tls_ptr->statName(), hist_tls_ptr));
+  if (tls_histogram != nullptr) {
+    *tls_histogram = hist_tls_ptr;
   }
+
   return *hist_tls_ptr;
 }
 
@@ -654,7 +738,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Uni
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
-  MetricImpl::clear(symbolTable());
+  MetricImpl::clear(symbol_table_);
   hist_free(histograms_[0]);
   hist_free(histograms_[1]);
 }
@@ -671,26 +755,78 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
-                                         TlsScope& tls_scope, StatName tag_extracted_name,
-                                         const StatNameTagVector& stat_name_tags)
-    : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
-      parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
-      cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
-      cumulative_statistics_(cumulative_histogram_), merged_(false) {}
+ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
+                                         ThreadLocalStoreImpl& thread_local_store,
+                                         StatName tag_extracted_name,
+                                         const StatNameTagVector& stat_name_tags,
+                                         ConstSupportedBuckets& supported_buckets, uint64_t id)
+    : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
+      unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
+      cumulative_histogram_(hist_alloc()),
+      interval_statistics_(interval_histogram_, supported_buckets),
+      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
-  MetricImpl::clear(symbolTable());
+  thread_local_store_.releaseHistogramCrossThread(id_);
+  ASSERT(ref_count_ == 0);
+  MetricImpl::clear(thread_local_store_.symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
 
+void ParentHistogramImpl::incRefCount() { ++ref_count_; }
+
+bool ParentHistogramImpl::decRefCount() {
+  bool ret;
+  if (shutting_down_) {
+    // When shutting down, we cannot reference thread_local_store_, as
+    // histograms can outlive the store. So we decrement the ref-count without
+    // the stores' lock. We will not be removing the object from the store's
+    // histogram map in this scenario, as the set was cleared during shutdown,
+    // and will not be repopulated in histogramFromStatNameWithTags after
+    // initiating shutdown.
+    ret = --ref_count_ == 0;
+  } else {
+    // We delegate to the Store object to decrement the ref-count so it can hold
+    // the lock to the map. If we don't hold a lock, another thread may
+    // simultaneously try to allocate the same name'd histogram after we
+    // decrement it, and we'll wind up with a dtor/update race. To avoid this we
+    // must hold the lock until the histogram is removed from the map.
+    //
+    // See also StatsSharedImpl::decRefCount() in allocator_impl.cc, which has
+    // the same issue.
+    ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
+  }
+  return ret;
+}
+
+bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
+                                                std::atomic<uint32_t>& ref_count) {
+  // We must hold the store's histogram lock when decrementing the
+  // refcount. Otherwise another thread may simultaneously try to allocate the
+  // same name'd stat after we decrement it, and we'll wind up with a
+  // dtor/update race. To avoid this we must hold the lock until the stat is
+  // removed from the map.
+  Thread::LockGuard lock(hist_mutex_);
+  ASSERT(ref_count >= 1);
+  if (--ref_count == 0) {
+    if (!shutting_down_) {
+      const size_t count = histogram_set_.erase(hist.statName());
+      ASSERT(shutting_down_ || count == 1);
+    }
+    return true;
+  }
+  return false;
+}
+
+SymbolTable& ParentHistogramImpl::symbolTable() { return thread_local_store_.symbolTable(); }
+
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = tls_scope_.tlsHistogram(statName(), *this);
+  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_);
   tls_histogram.recordValue(value);
-  parent_.deliverHistogramToSinks(*this, value);
+  thread_local_store_.deliverHistogramToSinks(*this, value);
 }
 
 bool ParentHistogramImpl::used() const {
@@ -737,7 +873,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
 const std::string ParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
-    const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
+    ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
     bucket_summary.reserve(supported_buckets.size());
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],

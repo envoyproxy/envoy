@@ -1,11 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -20,8 +15,7 @@ public:
   TransportSockeMatchIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::httpProxyConfig()),
-        num_hosts_{2} {
+                            ConfigHelper::httpProxyConfig()) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
   }
@@ -40,7 +34,7 @@ match:
 transport_socket:
   name: tls
   typed_config:
-    "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     common_tls_context:
       tls_certificates:
       - certificate_chain: { filename: "%s" }
@@ -118,29 +112,6 @@ transport_socket:
         .set_string_value(host_type);
   };
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-    const std::string yaml = absl::StrFormat(
-        R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain: { filename: "%s" }
-    private_key: { filename: "%s" }
-  validation_context:
-    trusted_ca: { filename: "%s" }
-require_client_certificate: true
-)EOF",
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    TestUtility::loadFromYaml(yaml, tls_context);
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
-  }
-
   bool isTLSUpstream(int index) { return index % 2 == 0; }
 
   void createUpstreams() override {
@@ -148,12 +119,12 @@ require_client_certificate: true
       auto endpoint = upstream_address_fn_(i);
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
-            createUpstreamSslContext(), endpoint->ip()->port(), FakeHttpConnection::Type::HTTP1,
-            endpoint->ip()->version(), timeSystem(), false));
+            HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
+            endpoint->ip()->version(), upstreamConfig(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
+            endpoint->ip()->version(), upstreamConfig(), false));
       }
     }
   }
@@ -163,7 +134,7 @@ require_client_certificate: true
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   }
 
-  const uint32_t num_hosts_;
+  const uint32_t num_hosts_{2};
   Http::TestRequestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
                                                          {":path", "/test"},
                                                          {":scheme", "http"},

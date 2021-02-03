@@ -3,19 +3,61 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/random_generator.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
+
+namespace {
+const std::string
+toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase specifier) {
+  switch (specifier) {
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
+    return "exact_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
+      kHiddenEnvoyDeprecatedRegexMatch:
+    return "regex_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
+    return "safe_regex_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
+    return "range_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
+      HEADER_MATCH_SPECIFIER_NOT_SET:
+    return "present_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
+    return "prefix_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
+    return "suffix_match";
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
+    return "contains_match";
+    break;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+const std::string toString(const Envoy::Http::HeaderMap::GetResult& entry) {
+  // TODO(mattklein123): Print multiple header values.
+  return entry.empty() ? "NULL" : std::string(entry[0]->value().getStringView());
+}
+
+} // namespace
 
 namespace Envoy {
 // static
@@ -84,7 +126,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
 void RouterCheckTool::assignUniqueRouteNames(
     envoy::config::route::v3::RouteConfiguration& route_config) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       route.set_name(random.uuid());
@@ -111,6 +153,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
     if (tool_config.route_->directResponseEntry() != nullptr) {
       tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
                                                                    true);
+      sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
           *tool_config.response_headers_, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
@@ -122,6 +165,27 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
   }
 
   headers_finalized_ = true;
+}
+
+void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
+                                     const Router::DirectResponseEntry& entry) {
+  auto encode_functions = Envoy::Http::Utility::EncodeFunctions{
+      nullptr, nullptr,
+      [&](Envoy::Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+        UNREFERENCED_PARAMETER(end_stream);
+        Http::HeaderMapImpl::copyFrom(*tool_config.response_headers_->header_map_, *headers);
+      },
+      [&](Envoy::Buffer::Instance& data, bool end_stream) -> void {
+        UNREFERENCED_PARAMETER(data);
+        UNREFERENCED_PARAMETER(end_stream);
+      }};
+
+  bool is_grpc = false;
+  bool is_head_request = false;
+  Envoy::Http::Utility::LocalReplyData local_reply_data{
+      is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request};
+
+  Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }
 
 RouterCheckTool::RouterCheckTool(
@@ -157,9 +221,11 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
        validation_config.tests()) {
     active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
+    auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+        nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource());
-    stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
+                                                  factory_context_->dispatcher().timeSource(),
+                                                  address_provider);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
@@ -177,8 +243,8 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
-        [this](auto&... params) -> bool { return this->compareRequestHeaderField(params...); },
-        [this](auto&... params) -> bool { return this->compareResponseHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
+        [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
     finalizeHeaders(tool_config, stream_info);
     // Call appropriate function for each match case.
@@ -337,12 +403,23 @@ bool RouterCheckTool::compareRedirectPath(
   return compareRedirectPath(tool_config, expected.path_redirect().value());
 }
 
-bool RouterCheckTool::compareRequestHeaderField(
+bool RouterCheckTool::compareRequestHeaderFields(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
+  if (expected.request_header_matches().data()) {
+    for (const envoy::config::route::v3::HeaderMatcher& header :
+         expected.request_header_matches()) {
+      if (!matchHeaderField(*tool_config.request_headers_, header, "request_header_matches")) {
+        no_failures = false;
+      }
+    }
+  }
+  // TODO(kb000) : Remove deprecated request_header_fields.
   if (expected.request_header_fields().data()) {
     for (const envoy::config::core::v3::HeaderValue& header : expected.request_header_fields()) {
-      if (!compareRequestHeaderField(tool_config, header.key(), header.value())) {
+      auto actual = tool_config.request_headers_->get_(header.key());
+      auto const& expected = header.value();
+      if (!compareResults(actual, expected, "request_header_fields")) {
         no_failures = false;
       }
     }
@@ -350,18 +427,23 @@ bool RouterCheckTool::compareRequestHeaderField(
   return no_failures;
 }
 
-bool RouterCheckTool::compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                                                const std::string& expected) {
-  std::string actual = tool_config.request_headers_->get_(field);
-  return compareResults(actual, expected, "request_header_fields");
-}
-
-bool RouterCheckTool::compareResponseHeaderField(
+bool RouterCheckTool::compareResponseHeaderFields(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
+  if (expected.response_header_matches().data()) {
+    for (const envoy::config::route::v3::HeaderMatcher& header :
+         expected.response_header_matches()) {
+      if (!matchHeaderField(*tool_config.response_headers_, header, "response_header_matches")) {
+        no_failures = false;
+      }
+    }
+  }
+  // TODO(kb000) : Remove deprecated response_header_fields.
   if (expected.response_header_fields().data()) {
     for (const envoy::config::core::v3::HeaderValue& header : expected.response_header_fields()) {
-      if (!compareResponseHeaderField(tool_config, header.key(), header.value())) {
+      auto actual = tool_config.response_headers_->get_(header.key());
+      auto const& expected = header.value();
+      if (!compareResults(actual, expected, "response_header_fields")) {
         no_failures = false;
       }
     }
@@ -369,32 +451,72 @@ bool RouterCheckTool::compareResponseHeaderField(
   return no_failures;
 }
 
-bool RouterCheckTool::compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                                 const std::string& expected) {
-  std::string actual = tool_config.response_headers_->get_(field);
-  return compareResults(actual, expected, "response_header_fields");
+template <typename HeaderMap>
+bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
+                                       const envoy::config::route::v3::HeaderMatcher& header,
+                                       const std::string test_type) {
+  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header};
+  if (Envoy::Http::HeaderUtility::matchHeaders(header_map, expected_header_data)) {
+    return true;
+  }
+
+  // Test failed. Decide on what to log.
+  std::string actual, expected;
+  std::string match_test_type{test_type + "." + ::toString(header.header_match_specifier_case())};
+  switch (header.header_match_specifier_case()) {
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
+    actual =
+        header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
+    expected = header.name() + ": " + header.exact_match();
+    reportFailure(actual, expected, match_test_type, !header.invert_match());
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
+      HEADER_MATCH_SPECIFIER_NOT_SET:
+    actual = "has(" + header.name() + "):" + (header.invert_match() ? "true" : "false");
+    expected = "has(" + header.name() + "):" + (header.invert_match() ? "false" : "true");
+    reportFailure(actual, expected, match_test_type);
+    break;
+  default:
+    actual =
+        header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
+    tests_.back().second.emplace_back("actual: [" + actual + "], test type: " + match_test_type);
+    break;
+  }
+
+  return false;
 }
 
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
-                                     const std::string& test_type) {
-  if (expected == actual) {
-    return true;
+                                     const std::string& test_type, const bool expect_match) {
+  if ((expected == actual) != expect_match) {
+    reportFailure(actual, expected, test_type, expect_match);
+    return false;
   }
-  tests_.back().second.emplace_back("expected: [" + expected + "], actual: [" + actual +
-                                    "], test type: " + test_type);
-  return false;
+  return true;
+}
+
+void RouterCheckTool::reportFailure(const std::string& actual, const std::string& expected,
+                                    const std::string& test_type, const bool expect_match) {
+  tests_.back().second.emplace_back("expected: [" + expected + "], " +
+                                    "actual: " + (expect_match ? "" : "NOT ") + "[" + actual +
+                                    "]," + " test type: " + test_type);
 }
 
 void RouterCheckTool::printResults() {
   // Output failure details to stdout if details_ flag is set to true
   for (const auto& test_result : tests_) {
-    // All test names are printed if the details_ flag is true unless only_show_failures_ is also
-    // true.
+    // All test names are printed if the details_ flag is true unless only_show_failures_ is
+    // also true.
     if ((details_ && !only_show_failures_) ||
         (only_show_failures_ && !test_result.second.empty())) {
-      std::cout << test_result.first << std::endl;
-      for (const auto& failure : test_result.second) {
-        std::cerr << failure << std::endl;
+      if (test_result.second.empty()) {
+        std::cout << test_result.first << std::endl;
+      } else {
+        std::cerr << test_result.first << std::endl;
+        for (const auto& failure : test_result.second) {
+          std::cerr << failure << std::endl;
+        }
       }
     }
   }

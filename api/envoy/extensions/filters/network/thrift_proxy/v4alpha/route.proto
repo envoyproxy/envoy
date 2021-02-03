@@ -91,7 +91,7 @@ message RouteAction {
 
     // Indicates a single upstream cluster to which the request should be routed
     // to.
-    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -103,7 +103,8 @@ message RouteAction {
     // header is not found or the referenced cluster does not exist Envoy will
     // respond with an unknown method exception or an internal error exception,
     // respectively.
-    string cluster_header = 6 [(validate.rules).string = {min_bytes: 1}];
+    string cluster_header = 6
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -136,7 +137,7 @@ message WeightedCluster {
         "envoy.extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight";
 
     // Name of the upstream cluster.
-    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // When a request matches the route, the choice of an upstream cluster is determined by its
     // weight. The sum of weights across all entries in the clusters array determines the total

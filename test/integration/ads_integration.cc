@@ -20,124 +20,79 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, ipVersion(),
-          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+AdsIntegrationTest::AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
+                                       envoy::config::core::v3::ApiVersion transport_api_version)
+    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                          ConfigHelper::adsBootstrap(
+                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                              resource_api_version, transport_api_version)) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
+  api_version_ = resource_api_version;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 }
 
-void AdsIntegrationTest::TearDown() {
-  cleanUpXdsConnection();
-  test_server_.reset();
-  fake_upstreams_.clear();
+void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
+
+envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name,
+                                                                     const std::string& lb_policy) {
+  return ConfigHelper::buildCluster(name, lb_policy, api_version_);
 }
 
-envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::string& name) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: EDS
-      eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
-      lb_policy: ROUND_ROBIN
-      http2_protocol_options: {{}}
-    )EOF",
-                                                                                 name));
+envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
+  return ConfigHelper::buildTlsCluster(name, "ROUND_ROBIN", api_version_);
 }
 
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
-      name: {}
-      connect_timeout: 5s
-      type: EDS
-      eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
-      lb_policy: MAGLEV
-    )EOF",
-                                                                                 name));
+  return ConfigHelper::buildCluster(name, "MAGLEV", api_version_);
 }
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
-  return TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      fmt::format(R"EOF(
-      cluster_name: {}
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: {}
-                port_value: {}
-    )EOF",
-                  name, Network::Test::getLoopbackAddressString(ipVersion()),
-                  fake_upstreams_[0]->localAddress()->ip()->port()));
+  return ConfigHelper::buildClusterLoadAssignment(
+      name, Network::Test::getLoopbackAddressString(ipVersion()),
+      fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
+}
+
+envoy::config::endpoint::v3::ClusterLoadAssignment
+AdsIntegrationTest::buildTlsClusterLoadAssignment(const std::string& name) {
+  return ConfigHelper::buildClusterLoadAssignment(
+      name, Network::Test::getLoopbackAddressString(ipVersion()), 8443, api_version_);
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildListener(const std::string& name, const std::string& route_config,
                                   const std::string& stat_prefix) {
-  return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
-      R"EOF(
-      name: {}
-      address:
-        socket_address:
-          address: {}
-          port_value: 0
-      filter_chains:
-        filters:
-        - name: http
-          typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
-            stat_prefix: {}
-            codec_type: HTTP2
-            rds:
-              route_config_name: {}
-              config_source: {{ ads: {{}} }}
-            http_filters: [{{ name: envoy.filters.http.router }}]
-    )EOF",
-      name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
+  return ConfigHelper::buildListener(name, route_config,
+                                     Network::Test::getLoopbackAddressString(ipVersion()),
+                                     stat_prefix, api_version_);
 }
 
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildRedisListener(const std::string& name, const std::string& cluster) {
-  return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(fmt::format(
+  std::string redis = fmt::format(
       R"EOF(
-      name: {}
-      address:
-        socket_address:
-          address: {}
-          port_value: 0
-      filter_chains:
         filters:
         - name: redis
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
-            settings: 
+            "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+            settings:
               op_timeout: 1s
             stat_prefix: {}
             prefix_routes:
-              catch_all_route: 
+              catch_all_route:
                 cluster: {}
     )EOF",
-      name, Network::Test::getLoopbackAddressString(ipVersion()), name, cluster));
+      name, cluster);
+  return ConfigHelper::buildBaseListener(name, Network::Test::getLoopbackAddressString(ipVersion()),
+                                         redis, api_version_);
 }
 
 envoy::config::route::v3::RouteConfiguration
 AdsIntegrationTest::buildRouteConfig(const std::string& name, const std::string& cluster) {
-  return TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(fmt::format(R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-    )EOF",
-                                                                                          name,
-                                                                                          cluster));
+  return ConfigHelper::buildRouteConfig(name, cluster, api_version_);
 }
 
 void AdsIntegrationTest::makeSingleRequest() {
@@ -174,7 +129,9 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
     ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  if (api_version_ == envoy::config::core::v3::ApiVersion::V2 && !fatal_by_default_v2_override_) {
+    config_helper_.enableDeprecatedV2Api();
+  }
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {
     createXdsConnection();

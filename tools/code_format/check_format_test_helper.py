@@ -61,12 +61,12 @@ def fixFileExpectingSuccess(file, extra_input_files=None):
   command, infile, outfile, status, stdout = fixFileHelper(file,
                                                            extra_input_files=extra_input_files)
   if status != 0:
-    print("FAILED:")
+    print("FAILED: " + infile)
     emitStdoutAsError(stdout)
     return 1
   status, stdout, stderr = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print("FAILED:")
+    print("FAILED: " + infile)
     emitStdoutAsError(stdout + stderr)
     return 1
   return 0
@@ -166,6 +166,10 @@ def runChecks():
       "Don't reference real-world time sources from production code; use injection")
   errors += checkUnfixableError("real_time_source.cc", real_time_inject_error)
   errors += checkUnfixableError("real_time_system.cc", real_time_inject_error)
+  errors += checkUnfixableError(
+      "duration_value.cc",
+      "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
+  )
   errors += checkUnfixableError("system_clock.cc", real_time_inject_error)
   errors += checkUnfixableError("steady_clock.cc", real_time_inject_error)
   errors += checkUnfixableError(
@@ -226,10 +230,43 @@ def runChecks():
                                 "Don't use mangled Protobuf names for enum constants")
   errors += checkUnfixableError("test_naming.cc",
                                 "Test names should be CamelCase, starting with a capital letter")
+  errors += checkUnfixableError("mock_method_n.cc", "use MOCK_METHOD() instead")
   errors += checkUnfixableError(
       "test/register_factory.cc",
       "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
       "Registry::InjectFactory instead.")
+  errors += checkUnfixableError("strerror.cc",
+                                "Don't use strerror; use Envoy::errorDetails instead")
+  errors += checkUnfixableError(
+      "std_unordered_map.cc", "Don't use std::unordered_map; use absl::flat_hash_map instead " +
+      "or absl::node_hash_map if pointer stability of keys/values is required")
+  errors += checkUnfixableError(
+      "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
+      "or absl::node_hash_set if pointer stability of keys/values is required")
+  errors += checkUnfixableError("std_any.cc", "Don't use std::any; use absl::any instead")
+  errors += checkUnfixableError("std_get_if.cc", "Don't use std::get_if; use absl::get_if instead")
+  errors += checkUnfixableError(
+      "std_holds_alternative.cc",
+      "Don't use std::holds_alternative; use absl::holds_alternative instead")
+  errors += checkUnfixableError("std_make_optional.cc",
+                                "Don't use std::make_optional; use absl::make_optional instead")
+  errors += checkUnfixableError("std_monostate.cc",
+                                "Don't use std::monostate; use absl::monostate instead")
+  errors += checkUnfixableError("std_optional.cc",
+                                "Don't use std::optional; use absl::optional instead")
+  errors += checkUnfixableError("std_string_view.cc",
+                                "Don't use std::string_view; use absl::string_view instead")
+  errors += checkUnfixableError("std_variant.cc",
+                                "Don't use std::variant; use absl::variant instead")
+  errors += checkUnfixableError("std_visit.cc", "Don't use std::visit; use absl::visit instead")
+  errors += checkUnfixableError(
+      "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
+  errors += checkUnfixableError("pgv_string.proto", "min_bytes is DEPRECATED, Use min_len.")
+  errors += checkFileExpectingOK("commented_throw.cc")
+  errors += checkUnfixableError("repository_url.bzl",
+                                "Only repository_locations.bzl may contains URL references")
+  errors += checkUnfixableError("repository_urls.bzl",
+                                "Only repository_locations.bzl may contains URL references")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -267,8 +304,11 @@ def runChecks():
   errors += checkAndFixError(
       "cpp_std.cc",
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
+  errors += checkAndFixError("code_conventions.cc",
+                             "term .Times(1); should be replaced with preferred term ;")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
+  errors += checkFileExpectingOK("duration_value_zero.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
   return errors

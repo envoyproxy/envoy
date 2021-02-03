@@ -1,6 +1,10 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@protodoc_pip3//:requirements.bzl", "requirement")
+load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+
 licenses(["notice"])  # Apache 2
 
-load("@protodoc_pip3//:requirements.bzl", "requirement")
+envoy_package()
 
 py_binary(
     name = "generate_empty",
@@ -9,12 +13,18 @@ py_binary(
     deps = [":protodoc"],
 )
 
+envoy_proto_library(
+    name = "manifest_proto",
+    srcs = ["manifest.proto"],
+)
+
 py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
-    data = ["//docs:edge_defaults_manifest.yaml"],
+    data = ["//docs:protodoc_manifest.yaml"],
     visibility = ["//visibility:public"],
     deps = [
+        ":manifest_proto_py_proto",
         "//tools/api_proto_plugin",
         "//tools/config_validation:validate_fragment",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",

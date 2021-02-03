@@ -14,9 +14,6 @@
 namespace Envoy {
 namespace Logger {
 
-class DelegatingLogSink;
-using DelegatingLogSinkSharedPtr = std::shared_ptr<DelegatingLogSink>;
-
 /**
  * SinkDelegate that writes log messages to a file.
  */
@@ -24,6 +21,7 @@ class FileSinkDelegate : public SinkDelegate {
 public:
   FileSinkDelegate(const std::string& log_path, AccessLog::AccessLogManager& log_manager,
                    DelegatingLogSinkSharedPtr log_sink);
+  ~FileSinkDelegate() override;
 
   // SinkDelegate
   void log(absl::string_view msg) override;

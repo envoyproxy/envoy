@@ -1,0 +1,19 @@
+config {
+  name: "envoy.filters.network.direct_response"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config"
+    value: "\n\032\n\030*\014\n\002\020\001\"\006\020\001\"\002\030\0012\003\032\001\':\003\032\001\'"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions{
+  on_data{
+  }
+}
+actions {
+  on_new_connection {
+  }
+}

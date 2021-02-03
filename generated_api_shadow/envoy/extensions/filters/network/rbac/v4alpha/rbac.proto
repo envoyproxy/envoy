@@ -46,7 +46,7 @@ message RBAC {
   config.rbac.v4alpha.RBAC shadow_rules = 2;
 
   // The prefix to use when emitting statistics.
-  string stat_prefix = 3 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 3 [(validate.rules).string = {min_len: 1}];
 
   // RBAC enforcement strategy. By default RBAC will be enforced only once
   // when the first byte of data arrives from the downstream. When used in

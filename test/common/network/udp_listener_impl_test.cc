@@ -3,18 +3,20 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/network/utility.h"
 
-#include "test/common/network/listener_impl_test_base.h"
+#include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -27,81 +29,47 @@
 using testing::_;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Network {
 namespace {
 
-class UdpListenerImplTest : public ListenerImplTestBase {
+// UdpGro is only supported on Linux versions >= 5.0. Also, the
+// underlying platform only performs the payload concatenation when
+// packets are sent from a network namespace different to that of
+// the client. Currently, the testing framework does not support
+// this behavior.
+// This helper allows to intercept syscalls and
+// toggle the behavior as per individual test requirements.
+class OverrideOsSysCallsImpl : public Api::OsSysCallsImpl {
 public:
-  UdpListenerImplTest()
-      : server_socket_(createServerSocket(true)), send_to_addr_(getServerLoopbackAddress()) {
-    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
-  }
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
+  MOCK_METHOD(bool, supportsMmsg, (), (const));
+};
 
+class UdpListenerImplTest : public UdpListenerImplTestBase {
+public:
   void SetUp() override {
+    ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(false));
+    // Return the real version by default.
+    ON_CALL(override_syscall_, supportsMmsg())
+        .WillByDefault(Return(os_calls.latched().supportsMmsg()));
+
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
-
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
+    }
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+    udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
+    ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
 
-protected:
-  Address::Instance* getServerLoopbackAddress() {
-    if (version_ == Address::IpVersion::v4) {
-      return new Address::Ipv4Instance(Network::Test::getLoopbackAddressString(version_),
-                                       server_socket_->localAddress()->ip()->port());
-    }
-    return new Address::Ipv6Instance(Network::Test::getLoopbackAddressString(version_),
-                                     server_socket_->localAddress()->ip()->port());
-  }
-
-  SocketSharedPtr createServerSocket(bool bind) {
-    // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
-    return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
-#ifdef IP_FREEBIND
-                                             SocketOptionFactory::buildIpFreebindOptions(),
-#else
-                                             nullptr,
-#endif
-                                             bind);
-  }
-
-  // Validates receive data, source/destination address and received time.
-  void validateRecvCallbackParams(const UdpRecvData& data) {
-    ASSERT_NE(data.addresses_.local_, nullptr);
-
-    ASSERT_NE(data.addresses_.peer_, nullptr);
-    ASSERT_NE(data.addresses_.peer_->ip(), nullptr);
-
-    EXPECT_EQ(data.addresses_.local_->asString(), send_to_addr_->asString());
-
-    EXPECT_EQ(data.addresses_.peer_->ip()->addressAsString(),
-              client_.localAddress()->ip()->addressAsString());
-
-    EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
-
-    size_t num_packet_per_recv = 1u;
-    if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
-      num_packet_per_recv = 16u;
-    }
-    EXPECT_EQ(time_system_.monotonicTime(),
-              data.receive_time_ +
-                  std::chrono::milliseconds(
-                      (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
-    // Advance time so that next onData() should have different received time.
-    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
-    ++num_packets_received_by_listener_;
-  }
-
-  SocketSharedPtr server_socket_;
-  Network::Test::UdpSyncPeer client_{GetParam()};
-  Address::InstanceConstSharedPtr send_to_addr_;
-  MockUdpListenerCallbacks listener_callbacks_;
-  std::unique_ptr<UdpListenerImpl> listener_;
-  size_t num_packets_received_by_listener_{0};
+  NiceMock<OverrideOsSysCallsImpl> override_syscall_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&override_syscall_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
@@ -144,13 +112,11 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
-
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
         EXPECT_EQ(data.buffer_->toString(), first);
       }))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
-
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
         EXPECT_EQ(data.buffer_->toString(), second);
 
         dispatcher_->exit();
@@ -158,10 +124,58 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+        EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test a large datagram that gets dropped using recvmmsg if supported.
+TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
+  // This will get dropped.
+  const std::string first(4096, 'a');
+  client_.write(first, *send_to_addr_);
+  const std::string second("second");
+  client_.write(second, *send_to_addr_);
+  // This will get dropped.
+  const std::string third(4096, 'b');
+  client_.write(third, *send_to_addr_);
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+    EXPECT_EQ(data.buffer_->toString(), second);
+
+    dispatcher_->exit();
+  }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, listener_->packetsDropped());
+}
+
+// Test a large datagram that gets dropped using recvmsg.
+TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
+  ON_CALL(override_syscall_, supportsMmsg()).WillByDefault(Return(false));
+
+  // This will get dropped.
+  const std::string first(4096, 'a');
+  client_.write(first, *send_to_addr_);
+  const std::string second("second");
+  client_.write(second, *send_to_addr_);
+  // This will get dropped.
+  const std::string third(4096, 'b');
+  client_.write(third, *send_to_addr_);
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+    EXPECT_EQ(data.buffer_->toString(), second);
+
+    dispatcher_->exit();
+  }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, listener_->packetsDropped());
 }
 
 /**
@@ -185,7 +199,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         test_peer_address = data.addresses_.peer_;
 
@@ -195,7 +209,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         server_received_data.push_back(data_str);
       }))
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
@@ -204,7 +218,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
       }));
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
     ASSERT_NE(test_peer_address, nullptr);
 
     for (const auto& data : server_received_data) {
@@ -244,7 +258,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
  * Tests UDP listener's `enable` and `disable` APIs.
  */
 TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
-  auto const* server_ip = server_socket_->localAddress()->ip();
+  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // We first disable the listener and then send two packets.
@@ -271,7 +285,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
       .Times(2)
       .WillOnce(Return())
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
 
         EXPECT_EQ(data.buffer_->toString(), second);
 
@@ -280,7 +294,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+        EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -290,7 +304,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
  * Tests UDP listener's error callback.
  */
 TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
-  auto const* server_ip = server_socket_->localAddress()->ip();
+  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // When the `receive` system call returns an error, we expect the `onReceiveError`
@@ -301,7 +315,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
-    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
   }));
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
@@ -314,8 +328,10 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsUdpGro());
   EXPECT_CALL(os_sys_calls, supportsMmsg());
-  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -327,35 +343,12 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
  * address.
  */
 TEST_P(UdpListenerImplTest, SendData) {
+  EXPECT_FALSE(udp_packet_writer_->isBatchMode());
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
-  // Use a self address that is unlikely to be picked by source address discovery
-  // algorithm if not specified in recvmsg/recvmmsg. Port is not taken into
-  // consideration.
-  Address::InstanceConstSharedPtr send_from_addr;
-  if (version_ == Address::IpVersion::v4) {
-    // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
-    send_from_addr = std::make_shared<Address::Ipv4Instance>(
-#ifndef __APPLE__
-        "127.1.2.3",
-#else
-        "127.0.0.1",
-#endif
-        server_socket_->localAddress()->ip()->port());
-  } else {
-    // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
-    // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
-    // customized source address is doing the work because kernel also picks ::1
-    // if it's not specified in cmsghdr.
-    send_from_addr = std::make_shared<Address::Ipv6Instance>(
-#ifdef IP_FREEBIND
-        "::9",
-#else
-        "::1",
-#endif
-        server_socket_->localAddress()->ip()->port());
-  }
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
 
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};
 
@@ -369,33 +362,180 @@ TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_EQ(bytes_to_read, data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
+
+  // Verify External Flush is a No-op
+  auto flush_result = udp_packet_writer_->flush();
+  EXPECT_TRUE(flush_result.ok());
+  EXPECT_EQ(0, flush_result.rc_);
 }
 
 /**
  * The send fails because the server_socket is created with bind=false.
  */
 TEST_P(UdpListenerImplTest, SendDataError) {
-  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->localAddress(), *buffer};
+  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(),
+                        *buffer};
 
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
   auto send_result = listener_->send(send_data);
+  EXPECT_FALSE(send_result.ok());
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
+  // Verify the writer is set to blocked
+  EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
+
+  // Reset write_blocked status
+  udp_packet_writer_->setWritable();
+  EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
+  send_result = listener_->send(send_data);
   EXPECT_FALSE(send_result.ok());
   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
   // Failed write shouldn't drain the data.
   EXPECT_EQ(payload.length(), buffer->length());
 
-  ON_CALL(os_sys_calls, sendmsg(_, _, _)).WillByDefault(Return(Api::SysCallSizeResult{-1, EINVAL}));
+  ON_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
   // EINVAL should cause RELEASE_ASSERT.
   EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
 }
+
+/**
+ * Test that multiple stacked packets of the same size are properly segmented
+ * when UDP GRO is enabled on the platform.
+ */
+#ifdef UDP_GRO
+TEST_P(UdpListenerImplTest, UdpGroBasic) {
+  // We send 4 packets (3 of equal length and 1 as a trail), which are concatenated together by
+  // kernel supporting udp gro. Verify the concatenated packet is transformed back into individual
+  // packets
+  absl::FixedArray<std::string> client_data({"Equal!!!", "Length!!", "Messages", "trail"});
+
+  for (const auto& i : client_data) {
+    client_.write(i, *send_to_addr_);
+  }
+
+  // The concatenated payload received from kernel supporting udp_gro
+  std::string stacked_message = absl::StrJoin(client_data, "");
+
+  // Mock OsSysCalls to mimic kernel behavior for packet concatenation
+  // based on udp_gro. supportsUdpGro should return true and recvmsg should
+  // return the concatenated payload with the gso_size set appropriately.
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsUdpGro).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
+        // Set msg_name and msg_namelen
+        if (client_.localAddress()->ip()->version() == Address::IpVersion::v4) {
+          sockaddr_storage ss;
+          auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+          memset(ipv4_addr, 0, sizeof(sockaddr_in));
+          ipv4_addr->sin_family = AF_INET;
+          ipv4_addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+          ipv4_addr->sin_port = client_.localAddress()->ip()->port();
+          msg->msg_namelen = sizeof(sockaddr_in);
+          *reinterpret_cast<sockaddr_in*>(msg->msg_name) = *ipv4_addr;
+        } else if (client_.localAddress()->ip()->version() == Address::IpVersion::v6) {
+          sockaddr_storage ss;
+          auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+          memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+          ipv6_addr->sin6_family = AF_INET6;
+          ipv6_addr->sin6_addr = in6addr_loopback;
+          ipv6_addr->sin6_port = client_.localAddress()->ip()->port();
+          *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
+          msg->msg_namelen = sizeof(sockaddr_in6);
+        }
+
+        // Set msg_iovec
+        EXPECT_EQ(msg->msg_iovlen, 1);
+        memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), stacked_message.length());
+        msg->msg_iov[0].iov_len = stacked_message.length();
+
+        // Set control headers
+        memset(msg->msg_control, 0, msg->msg_controllen);
+        cmsghdr* cmsg = CMSG_FIRSTHDR(msg);
+        if (send_to_addr_->ip()->version() == Address::IpVersion::v4) {
+          cmsg->cmsg_level = IPPROTO_IP;
+#ifndef IP_RECVDSTADDR
+          cmsg->cmsg_type = IP_PKTINFO;
+          cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
+          reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg))->ipi_addr.s_addr =
+              send_to_addr_->ip()->ipv4()->address();
+#else
+          cmsg.cmsg_type = IP_RECVDSTADDR;
+          cmsg->cmsg_len = CMSG_LEN(sizeof(in_addr));
+          *reinterpret_cast<in_addr*>(CMSG_DATA(cmsg)) = send_to_addr_->ip()->ipv4()->address();
+#endif
+        } else if (send_to_addr_->ip()->version() == Address::IpVersion::v6) {
+          cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
+          cmsg->cmsg_level = IPPROTO_IPV6;
+          cmsg->cmsg_type = IPV6_PKTINFO;
+          auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+          pktinfo->ipi6_ifindex = 0;
+          *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) =
+              send_to_addr_->ip()->ipv6()->address();
+        }
+
+        // Set gso_size
+        cmsg = CMSG_NXTHDR(msg, cmsg);
+        cmsg->cmsg_level = SOL_UDP;
+        cmsg->cmsg_type = UDP_GRO;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(uint16_t));
+        const uint16_t gso_size = 8;
+        *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg)) = gso_size;
+
+#ifdef SO_RXQ_OVFL
+        // Set SO_RXQ_OVFL
+        cmsg = CMSG_NXTHDR(msg, cmsg);
+        EXPECT_NE(cmsg, nullptr);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SO_RXQ_OVFL;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+        const uint32_t overflow = 0;
+        *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg)) = overflow;
+#endif
+        return Api::SysCallSizeResult{static_cast<long>(stacked_message.length()), 0};
+      }))
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, EAGAIN}));
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, client_data.size());
+
+        const std::string data_str = data.buffer_->toString();
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
+      }))
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, client_data.size());
+
+        const std::string data_str = data.buffer_->toString();
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
+      }));
+
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
+    dispatcher_->exit();
+  }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+#endif
 
 } // namespace
 } // namespace Network

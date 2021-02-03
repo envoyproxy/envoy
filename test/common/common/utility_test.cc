@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -8,6 +9,7 @@
 
 #include "common/common/utility.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -18,6 +20,10 @@
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
+#ifdef WIN32
+using testing::HasSubstr;
+using testing::Not;
+#endif
 
 namespace Envoy {
 
@@ -110,6 +116,60 @@ TEST(DateUtil, NowToMilliseconds) {
   const SystemTime time_with_millis(std::chrono::seconds(12345) + std::chrono::milliseconds(67));
   test_time.setSystemTime(time_with_millis);
   EXPECT_EQ(12345067, DateUtil::nowToMilliseconds(test_time));
+}
+
+TEST(OutputBufferStream, FailsOnWriteToEmptyBuffer) {
+  constexpr char data = 'x';
+  OutputBufferStream ostream{nullptr, 0};
+  ASSERT_TRUE(ostream.good());
+
+  ostream << data;
+
+  EXPECT_TRUE(ostream.bad());
+}
+
+TEST(OutputBufferStream, CanWriteToBuffer) {
+  constexpr char data[] = "123";
+  std::array<char, 3> buffer;
+
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ASSERT_EQ(ostream.bytesWritten(), 0);
+
+  ostream << data;
+
+  EXPECT_EQ(ostream.contents(), data);
+  EXPECT_EQ(ostream.bytesWritten(), 3);
+}
+
+TEST(OutputBufferStream, CannotOverwriteBuffer) {
+  constexpr char data[] = "123";
+  std::array<char, 2> buffer;
+
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ASSERT_EQ(ostream.bytesWritten(), 0);
+
+  // Initial write should stop before overflowing.
+  ostream << data << std::endl;
+  EXPECT_EQ(ostream.contents(), "12");
+  EXPECT_EQ(ostream.bytesWritten(), 2);
+
+  // Try a subsequent write, which shouldn't change anything since
+  // the buffer is full.
+  ostream << data << std::endl;
+  EXPECT_EQ(ostream.contents(), "12");
+  EXPECT_EQ(ostream.bytesWritten(), 2);
+}
+
+TEST(OutputBufferStream, DoesNotAllocateMemoryEvenIfWeTryToOverflowBuffer) {
+  constexpr char data[] = "123";
+  std::array<char, 2> buffer;
+  Stats::TestUtil::MemoryTest memory_test;
+
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ostream << data << std::endl;
+
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  EXPECT_EQ(ostream.contents(), "12");
 }
 
 TEST(InputConstMemoryStream, All) {
@@ -813,6 +873,26 @@ TEST(DateFormatter, FromTime) {
   EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
 }
 
+// Check the time complexity. Make sure DateFormatter can finish parsing long messy string without
+// crashing/freezing. This should pass in 0-2 seconds if O(n). Finish in 30-120 seconds if O(n^2)
+TEST(DateFormatter, ParseLongString) {
+  std::string input;
+  std::string expected_output;
+  int num_duplicates = 400;
+  std::string duplicate_input = "%%1f %1f, %2f, %3f, %4f, ";
+  std::string duplicate_output = "%1 1, 14, 142, 1420, ";
+  for (int i = 0; i < num_duplicates; i++) {
+    absl::StrAppend(&input, duplicate_input, "(");
+    absl::StrAppend(&expected_output, duplicate_output, "(");
+  }
+  absl::StrAppend(&input, duplicate_input);
+  absl::StrAppend(&expected_output, duplicate_output);
+
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
+  std::string output = DateFormatter(input).fromTime(time1);
+  EXPECT_EQ(expected_output, output);
+}
+
 // Verify that two DateFormatter patterns with the same ??? patterns but
 // different format strings don't false share cache entries. This is a
 // regression test for when they did.
@@ -874,5 +954,27 @@ TEST(InlineStorageTest, InlineString) {
   EXPECT_EQ("Hello, world!", hello->toStringView());
   EXPECT_EQ("Hello, world!", hello->toString());
 }
+
+#ifdef WIN32
+TEST(ErrorDetailsTest, WindowsFormatMessage) {
+  // winsock2 error
+  EXPECT_NE(errorDetails(SOCKET_ERROR_AGAIN), "");
+  EXPECT_THAT(errorDetails(SOCKET_ERROR_AGAIN), Not(HasSubstr("\r\n")));
+  EXPECT_NE(errorDetails(SOCKET_ERROR_AGAIN), "Unknown error");
+
+  // winsock2 error with a long message
+  EXPECT_NE(errorDetails(SOCKET_ERROR_MSG_SIZE), "");
+  EXPECT_THAT(errorDetails(SOCKET_ERROR_MSG_SIZE), Not(HasSubstr("\r\n")));
+  EXPECT_NE(errorDetails(SOCKET_ERROR_MSG_SIZE), "Unknown error");
+
+  // regular Windows error
+  EXPECT_NE(errorDetails(ERROR_FILE_NOT_FOUND), "");
+  EXPECT_THAT(errorDetails(ERROR_FILE_NOT_FOUND), Not(HasSubstr("\r\n")));
+  EXPECT_NE(errorDetails(ERROR_FILE_NOT_FOUND), "Unknown error");
+
+  // invalid error code
+  EXPECT_EQ(errorDetails(99999), "Unknown error");
+}
+#endif
 
 } // namespace Envoy

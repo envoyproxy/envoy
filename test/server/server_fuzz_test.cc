@@ -3,17 +3,18 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/listener_hooks.h"
-#include "server/proto_descriptors.h"
 #include "server/server.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/hot_restart.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
@@ -26,7 +27,9 @@ void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
                       envoy::config::core::v3::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
-  } else if (address.has_pipe()) {
+  } else if (address.has_pipe() || address.has_envoy_internal_address()) {
+    // TODO(asraa): Remove this work-around to replace EnvoyInternalAddress when implemented and
+    // remove condition at line 74.
     address.mutable_pipe()->set_path("@" + test_env.testId() + address.pipe().path());
   }
 }
@@ -56,7 +59,10 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     for (auto& health_check : *cluster.mutable_health_checks()) {
       // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
       // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
-      health_check.mutable_http_health_check()->clear_codec_client_type();
+      if (health_check.http_health_check().codec_client_type() ==
+          envoy::type::v3::CodecClientType::HTTP3) {
+        health_check.mutable_http_health_check()->clear_codec_client_type();
+      }
     }
     // We may have both deprecated hosts() or load_assignment().
     for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
@@ -66,7 +72,8 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
       auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
         auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
-        if (lb_endpoint->endpoint().address().has_socket_address()) {
+        if (lb_endpoint->endpoint().address().has_socket_address() ||
+            lb_endpoint->endpoint().address().has_envoy_internal_address()) {
           makePortHermetic(test_env, *lb_endpoint->mutable_endpoint()->mutable_address());
         }
       }
@@ -100,7 +107,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
     server = std::make_unique<InstanceImpl>(
         init_manager, options, test_time.timeSystem(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
-        fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
+        fakelock, component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
         thread_local_instance, Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         nullptr);
   } catch (const EnvoyException& ex) {

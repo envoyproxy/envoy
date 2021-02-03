@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
+#include "common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -31,11 +33,11 @@ ConfigImpl::ConfigImpl(
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
-    read_policy_ = ReadPolicy::Master;
+    read_policy_ = ReadPolicy::Primary;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
       PREFER_MASTER:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::PreferPrimary;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::REPLICA:
     read_policy_ = ReadPolicy::Replica;
@@ -64,7 +66,9 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
-  client->connection_->noDelay(true);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    client->connection_->noDelay(true);
+  }
   return client;
 }
 
@@ -240,7 +244,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
       }
     }
     if (!redirected) {
-      callbacks.onResponse(std::move(value));
+      if (err[0] == RedirectionResponse::get().CLUSTER_DOWN) {
+        callbacks.onFailure();
+      } else {
+        callbacks.onResponse(std::move(value));
+      }
     }
   } else {
     callbacks.onResponse(std::move(value));
@@ -285,16 +293,20 @@ void ClientImpl::PendingRequest::cancel() {
   canceled_ = true;
 }
 
-void ClientImpl::initialize(const std::string& auth_password) {
-  if (!auth_password.empty()) {
+void ClientImpl::initialize(const std::string& auth_username, const std::string& auth_password) {
+  if (!auth_username.empty()) {
+    // Send an AUTH command to the upstream server with username and password.
+    Utility::AuthRequest auth_request(auth_username, auth_password);
+    makeRequest(auth_request, null_pool_callbacks);
+  } else if (!auth_password.empty()) {
     // Send an AUTH command to the upstream server.
     Utility::AuthRequest auth_request(auth_password);
     makeRequest(auth_request, null_pool_callbacks);
   }
   // Any connection to replica requires the READONLY command in order to perform read.
-  // Also the READONLY command is a no-opt for the master.
+  // Also the READONLY command is a no-opt for the primary.
   // We only need to send the READONLY command iff it's possible that the host is a replica.
-  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
+  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
     makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
   }
 }
@@ -304,10 +316,11 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
-                                    Stats::Scope& scope, const std::string& auth_password) {
+                                    Stats::Scope& scope, const std::string& auth_username,
+                                    const std::string& auth_password) {
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
                                         decoder_factory_, config, redis_command_stats, scope);
-  client->initialize(auth_password);
+  client->initialize(auth_username, auth_password);
   return client;
 }
 

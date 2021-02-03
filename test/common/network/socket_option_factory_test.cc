@@ -24,8 +24,8 @@ public:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{[this]() {
     // Before injecting OsSysCallsImpl, make sure validateIpv{4,6}Supported is called so the static
     // bool is initialized without requiring to mock ::socket and ::close. :( :(
-    std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
-    std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
+    (void)std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
+    (void)std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
     return &os_sys_calls_mock_;
   }()};
 
@@ -33,12 +33,14 @@ protected:
   testing::NiceMock<MockListenSocket> socket_mock_;
   Api::MockOsSysCalls os_sys_calls_mock_;
 
-  void SetUp() override { socket_mock_.local_address_.reset(); }
+  void SetUp() override { socket_mock_.address_provider_->setLocalAddress(nullptr); }
   void makeSocketV4() {
-    socket_mock_.local_address_ = std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
+    socket_mock_.address_provider_->setLocalAddress(
+        std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678));
   }
   void makeSocketV6() {
-    socket_mock_.local_address_ = std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
+    socket_mock_.address_provider_->setLocalAddress(
+        std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678));
   }
 };
 
@@ -92,7 +94,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
       }));
-
+  EXPECT_CALL(socket_mock_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -120,6 +122,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
         return {0, 0};
       }));
 
+  EXPECT_CALL(socket_mock_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v6));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -130,13 +133,20 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption> socket_options_proto;
   Envoy::Protobuf::TextFormat::Parser parser;
   envoy::config::core::v3::SocketOption socket_option_proto;
+  struct linger expected_linger;
+  expected_linger.l_onoff = 1;
+  expected_linger.l_linger = 3456;
+  absl::string_view linger_bstr{reinterpret_cast<const char*>(&expected_linger),
+                                sizeof(struct linger)};
+  std::string linger_bstr_formatted = testing::PrintToString(linger_bstr);
   static const char linger_option_format[] = R"proto(
     state: STATE_PREBIND
     level: %d
     name: %d
-    buf_value: "\x01\x00\x00\x00\x80\x0d\x00\x00"
+    buf_value: %s
   )proto";
-  auto linger_option = absl::StrFormat(linger_option_format, SOL_SOCKET, SO_LINGER);
+  auto linger_option =
+      absl::StrFormat(linger_option_format, SOL_SOCKET, SO_LINGER, linger_bstr_formatted);
   ASSERT_TRUE(parser.ParseFromString(linger_option, &socket_option_proto));
   *socket_options_proto.Add() = socket_option_proto;
   static const char keepalive_option_format[] = R"proto(
@@ -156,11 +166,6 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   EXPECT_TRUE(option_details.has_value());
   EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
   EXPECT_EQ(SO_LINGER, option_details->name_.option());
-  struct linger expected_linger;
-  expected_linger.l_onoff = 1;
-  expected_linger.l_linger = 3456;
-  absl::string_view linger_bstr{reinterpret_cast<const char*>(&expected_linger),
-                                sizeof(struct linger)};
   EXPECT_EQ(linger_bstr, option_details->value_);
 
   option_details = socket_options->at(1)->getOptionDetails(

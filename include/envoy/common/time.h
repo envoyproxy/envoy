@@ -12,6 +12,7 @@ namespace Envoy {
  * SystemTime should be used when getting a time to present to the user, e.g. for logging.
  * MonotonicTime should be used when tracking time for computing an interval.
  */
+using Seconds = std::chrono::seconds;
 using SystemTime = std::chrono::time_point<std::chrono::system_clock>;
 using MonotonicTime = std::chrono::time_point<std::chrono::steady_clock>;
 

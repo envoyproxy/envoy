@@ -38,4 +38,4 @@ The content of the request that are passed to an authorization service is specif
   :glob:
   :maxdepth: 2
 
-  ../../../api-v2/service/auth/v2/*
+  ../../../api-v3/service/auth/v3/*

@@ -3,8 +3,6 @@
 #include <string>
 
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
@@ -40,24 +38,14 @@ void RouteConfigUpdateReceiverImpl::onUpdateCommon(
 }
 
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const VirtualHostRefVector& added_vhosts, const std::set<std::string>& added_resource_ids,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  collectResourceIdsInUpdate(added_resources);
+  resource_ids_in_last_update_ = added_resource_ids;
   const bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
-  const bool updated = updateVhosts(vhds_virtual_hosts_, added_resources);
+  const bool updated = updateVhosts(vhds_virtual_hosts_, added_vhosts);
   onUpdateCommon(route_config_proto_, version_info);
   return removed || updated || !resource_ids_in_last_update_.empty();
-}
-
-void RouteConfigUpdateReceiverImpl::collectResourceIdsInUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources) {
-  resource_ids_in_last_update_.clear();
-  for (const auto& resource : added_resources) {
-    resource_ids_in_last_update_.emplace(resource.name());
-    std::copy(resource.aliases().begin(), resource.aliases().end(),
-              std::inserter(resource_ids_in_last_update_, resource_ids_in_last_update_.end()));
-  }
 }
 
 void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
@@ -84,22 +72,14 @@ bool RouteConfigUpdateReceiverImpl::removeVhosts(
 
 bool RouteConfigUpdateReceiverImpl::updateVhosts(
     std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources) {
+    const VirtualHostRefVector& added_vhosts) {
   bool vhosts_added = false;
-  for (const auto& resource : added_resources) {
-    // the management server returns empty resources (they contain no virtual hosts in this case)
-    // for aliases that it couldn't resolve.
-    if (onDemandFetchFailed(resource)) {
-      continue;
-    }
-    envoy::config::route::v3::VirtualHost vhost =
-        MessageUtil::anyConvertAndValidate<envoy::config::route::v3::VirtualHost>(
-            resource.resource(), validation_visitor_);
-    auto found = vhosts.find(vhost.name());
+  for (const auto& vhost : added_vhosts) {
+    auto found = vhosts.find(vhost.get().name());
     if (found != vhosts.end()) {
       vhosts.erase(found);
     }
-    vhosts.emplace(vhost.name(), vhost);
+    vhosts.emplace(vhost.get().name(), vhost.get());
     vhosts_added = true;
   }
   return vhosts_added;
@@ -116,11 +96,6 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   for (const auto& vhost : vhds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
   }
-}
-
-bool RouteConfigUpdateReceiverImpl::onDemandFetchFailed(
-    const envoy::service::discovery::v3::Resource& resource) const {
-  return !resource.has_resource();
 }
 
 } // namespace Router

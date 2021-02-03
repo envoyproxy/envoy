@@ -12,7 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_source)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
@@ -171,9 +171,20 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
 
   ActiveRpcPtr new_rpc(new ActiveRpc(*this));
   new_rpc->createFilterChain();
-  new_rpc->moveIntoList(std::move(new_rpc), rpcs_);
+  LinkedList::moveIntoList(std::move(new_rpc), rpcs_);
 
   return **rpcs_.begin();
+}
+
+bool ConnectionManager::passthroughEnabled() const {
+  if (!config_.payloadPassthrough()) {
+    return false;
+  }
+
+  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
+  // be in the rpcs_ list.
+  ASSERT(!rpcs_.empty());
+  return (*rpcs_.begin())->passthroughSupported();
 }
 
 bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
@@ -201,11 +212,28 @@ FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view na
     // Reply messages contain a struct where field 0 is the call result and fields 1+ are
     // exceptions, if defined. At most one field may be set. Therefore, the very first field we
     // encounter in a reply is either field 0 (success) or not (IDL exception returned).
-    success_ = field_id == 0 && field_type != FieldType::Stop;
+    // If first fieldType is FieldType::Stop then it is a void success and handled in messageEnd()
+    // because decoder state machine does not call decoder event callback fieldBegin on
+    // FieldType::Stop.
+    success_ = (field_id == 0);
     first_reply_field_ = false;
   }
 
   return ProtocolConverter::fieldBegin(name, field_type, field_id);
+}
+
+FilterStatus ConnectionManager::ResponseDecoder::messageEnd() {
+  if (first_reply_field_) {
+    // When the response is thrift void type there is never a fieldBegin call on a success
+    // because the response struct has no fields and so the first field type is FieldType::Stop.
+    // The decoder state machine handles FieldType::Stop by going immediately to structEnd,
+    // skipping fieldBegin callback. Therefore if we are still waiting for the first reply field
+    // at end of message then it is a void success.
+    success_ = true;
+    first_reply_field_ = false;
+  }
+
+  return ProtocolConverter::messageEnd();
 }
 
 FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
@@ -255,6 +283,10 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   }
 
   return FilterStatus::Continue;
+}
+
+bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
+  return parent_.parent_.passthroughEnabled();
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
@@ -379,6 +411,25 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   if (destroy_rpc) {
     parent_.doDeferredRpcDestroy(*this);
   }
+}
+
+bool ConnectionManager::ActiveRpc::passthroughSupported() const {
+  for (auto& entry : decoder_filters_) {
+    if (!entry->handle_->passthroughSupported()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
+  filter_context_ = &data;
+  filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
+    Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);
+    return filter->passthroughData(*data);
+  };
+
+  return applyDecoderFilters(nullptr);
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {

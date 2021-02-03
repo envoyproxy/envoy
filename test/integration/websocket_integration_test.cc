@@ -100,6 +100,8 @@ void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
   proxied_response_headers.removeDate();
   proxied_response_headers.removeServer();
 
+  ASSERT_TRUE(proxied_response_headers.TransferEncoding() == nullptr);
+
   commonValidate(proxied_response_headers, original_response_headers);
 
   EXPECT_THAT(&proxied_response_headers, HeaderMapEqualIgnoreOrder(&original_response_headers));
@@ -118,8 +120,12 @@ void WebsocketIntegrationTest::initialize() {
   if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          cluster->mutable_http2_protocol_options()->set_allow_connect(true);
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http2_protocol_options()
+              ->set_allow_connect(true);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
@@ -206,7 +212,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   // Verify both the data and the disconnect went through.
   response_->waitForBodyData(5);
   EXPECT_EQ("world", response_->body());
-  waitForClientDisconnectOrReset();
+  waitForClientDisconnectOrReset(Http::StreamResetReason::ConnectError);
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
@@ -418,9 +424,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   // transfer-encoding: chunked.
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
-  }
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response_->headers().TransferEncoding() != nullptr);
   }
 
   // Send both a chunked request body and "websocket" payload.

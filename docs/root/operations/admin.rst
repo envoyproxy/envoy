@@ -35,6 +35,33 @@ modify different aspects of the server:
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
+.. note::
+
+  For an endpoint with *?format=json*, it dumps data as a JSON-serialized proto. Fields with default
+  values are not rendered. For example for */clusters?format=json*, the circuit breakers thresholds
+  priority field is omitted when its value is :ref:`DEFAULT priority
+  <envoy_v3_api_enum_value_config.core.v3.RoutingPriority.DEFAULT>` as shown below:
+
+  .. code-block:: json
+
+    {
+     "thresholds": [
+      {
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      },
+      {
+       "priority": "HIGH",
+       "max_connections": 1,
+       "max_pending_requests": 1024,
+       "max_requests": 1024,
+       "max_retries": 1
+      }
+     ]
+    }
+
 .. http:get:: /
 
   Render an HTML home page with a table of links to all available options.
@@ -137,6 +164,13 @@ modify different aspects of the server:
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. _operations_admin_interface_config_dump_include_eds:
+
+.. http:get:: /config_dump?include_eds
+
+  Dump currently loaded configuration including EDS. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>` for more
+  information.
+
 .. _operations_admin_interface_config_dump_by_mask:
 
 .. http:get:: /config_dump?mask={}
@@ -205,6 +239,24 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_init_dump:
+
+.. http:get:: /init_dump
+
+  Dump currently information of unready targets of various Envoy components as JSON-serialized proto
+  messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps>` for more
+  information.
+
+.. _operations_admin_interface_init_dump_by_mask:
+
+.. http:get:: /init_dump?mask={}
+
+  When mask query parameters is specified, the mask value is the desired component to dump unready targets.
+  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the unready targets of all listeners with
+  ``/init_dump?mask=listener``
+
 .. _operations_admin_interface_listeners:
 
 .. http:get:: /listeners
@@ -230,7 +282,9 @@ modify different aspects of the server:
 
   .. note::
 
-    Generally only used during development.
+    Generally only used during development. With `--enable-fine-grain-logging` being set, the logger is represented
+    by the path of the file it belongs to (to be specific, the path determined by `__FILE__`), so the logger list
+    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
 
 .. http:get:: /memory
 
@@ -249,20 +303,28 @@ modify different aspects of the server:
 .. _operations_admin_interface_drain:
 
 .. http:post:: /drain_listeners
-   
+
    :ref:`Drains <arch_overview_draining>` all listeners.
 
    .. http:post:: /drain_listeners?inboundonly
 
-   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
-   :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener 
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in
+   :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
    is inbound or outbound.
+
+   .. http:post:: /drain_listeners?graceful
+
+   When draining listeners, enter a graceful drain period prior to closing listeners.
+   This behaviour and duration is configurable via server options or CLI
+   (:option:`--drain-time-s` and :option:`--drain-strategy`).
 
 .. attention::
 
    This operation directly stops the matched listeners on workers. Once listeners in a given
    traffic direction are stopped, listener additions and modifications in that direction
    are not allowed.
+
+.. _operations_admin_interface_server_info:
 
 .. http:get:: /server_info
 
@@ -301,7 +363,23 @@ modify different aspects of the server:
         "cpuset_threads": false
       },
       "uptime_current_epoch": "6s",
-      "uptime_all_epochs": "6s"
+      "uptime_all_epochs": "6s",
+      "node": {
+        "id": "node1",
+        "cluster": "cluster1",
+        "user_agent_name": "envoy",
+        "user_agent_build_version": {
+          "version": {
+            "major_number": 1,
+            "minor_number": 15,
+            "patch": 0
+          }
+        },
+        "metadata": {},
+        "extensions": [],
+        "client_features": [],
+        "listening_addresses": []
+      }
     }
 
   See the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an
@@ -327,11 +405,13 @@ modify different aspects of the server:
 
   Outputs all statistics on demand. This command is very useful for local debugging.
   Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
-  The output for each quantile will be in the form of (interval,cumulative) where interval value
-  represents the summary since last flush interval and cumulative value represents the
-  summary since the start of Envoy instance. "No recorded values" in the histogram output indicates
-  that it has not been updated with a value.
-  See :ref:`here <operations_stats>` for more information.
+  The output for each quantile will be in the form of (interval,cumulative) where the interval value
+  represents the summary since last flush. By default, a timer is setup to flush in intervals
+  defined by :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`,
+  defaulting to 5 seconds. If :ref:`stats_flush_on_admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_on_admin>`
+  is specified, stats are flushed when this endpoint is queried and a timer will not be used. The cumulative
+  value represents the summary since the start of Envoy instance. "No recorded values" in the histogram
+  output indicates that it has not been updated with a value. See :ref:`here <operations_stats>` for more information.
 
   .. http:get:: /stats?usedonly
 
@@ -432,9 +512,6 @@ modify different aspects of the server:
   take a global symbol table lock. During startup this is acceptable,
   but in response to user requests on high core-count machines, this
   can cause performance issues due to mutex contention.
-
-  This admin endpoint requires Envoy to be started with option
-  `--use-fake-symbol-table 0`.
 
   See :repo:`source/docs/stats.md` for more details.
 

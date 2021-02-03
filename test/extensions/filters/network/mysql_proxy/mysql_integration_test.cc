@@ -27,6 +27,7 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
   std::string mysqlConfig() {
     return fmt::format(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
                            "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml")),
+                       Platform::null_device_path,
                        Network::Test::getLoopbackAddressString(GetParam()),
                        Network::Test::getLoopbackAddressString(GetParam()),
                        Network::Test::getAnyAddressString(GetParam()));
@@ -35,14 +36,7 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
 public:
   MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
-  // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  // Destructor for an individual integration test.
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MySQLIntegrationTest,
@@ -90,7 +84,7 @@ TEST_P(MySQLIntegrationTest, MySQLLoginTest) {
 
   // Client username/password and capabilities
   std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user, CHALLENGE_SEQ_NUM);
-  tcp_client->write(login);
+  ASSERT_TRUE(tcp_client->write(login));
   ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
   EXPECT_EQ(login, rcvd_data);
 
@@ -137,7 +131,7 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
 
     // Client username/password and capabilities
     std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user, CHALLENGE_SEQ_NUM);
-    tcp_client->write(login);
+    ASSERT_TRUE(tcp_client->write(login));
     ASSERT_TRUE(fake_upstream_connection->waitForData(login.length(), &rcvd_data));
     EXPECT_EQ(login, rcvd_data);
 

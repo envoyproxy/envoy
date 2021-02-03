@@ -1,6 +1,6 @@
 #include "extensions/tracers/xray/localized_sampling.h"
 
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -22,19 +22,19 @@ protected:
 };
 
 TEST_F(LocalizedSamplingStrategyTest, EmptyRules) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   LocalizedSamplingStrategy strategy{"", random_generator, time_system_};
   ASSERT_TRUE(strategy.usingDefaultManifest());
 }
 
 TEST_F(LocalizedSamplingStrategyTest, BadJson) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   LocalizedSamplingStrategy strategy{"{{}", random_generator, time_system_};
   ASSERT_TRUE(strategy.usingDefaultManifest());
 }
 
 TEST_F(LocalizedSamplingStrategyTest, ValidCustomRules) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -59,7 +59,7 @@ TEST_F(LocalizedSamplingStrategyTest, ValidCustomRules) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, InvalidRate) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -84,7 +84,7 @@ TEST_F(LocalizedSamplingStrategyTest, InvalidRate) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, InvalidFixedTarget) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -109,7 +109,7 @@ TEST_F(LocalizedSamplingStrategyTest, InvalidFixedTarget) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, DefaultRuleMissingRate) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -133,7 +133,7 @@ TEST_F(LocalizedSamplingStrategyTest, DefaultRuleMissingRate) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, DefaultRuleMissingFixedTarget) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -157,7 +157,7 @@ TEST_F(LocalizedSamplingStrategyTest, DefaultRuleMissingFixedTarget) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, WrongVersion) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto wrong_version = R"EOF(
 {
   "version": 1,
@@ -182,7 +182,7 @@ TEST_F(LocalizedSamplingStrategyTest, WrongVersion) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, MissingVersion) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto missing_version = R"EOF(
 {
   "rules": [
@@ -206,7 +206,7 @@ TEST_F(LocalizedSamplingStrategyTest, MissingVersion) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, MissingDefaultRules) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -227,7 +227,7 @@ TEST_F(LocalizedSamplingStrategyTest, MissingDefaultRules) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleHostIsNotString) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -252,7 +252,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleHostIsNotString) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleHttpMethodIsNotString) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -277,7 +277,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleHttpMethodIsNotString) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleUrlPathIsNotString) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -302,7 +302,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleUrlPathIsNotString) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleMissingFixedTarget) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -326,7 +326,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleMissingFixedTarget) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleMissingRate) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -350,7 +350,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleMissingRate) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleArrayElementWithWrongType) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -375,7 +375,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleArrayElementWithWrongType) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleNegativeFixedRate) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -400,7 +400,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleNegativeFixedRate) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleNegativeRate) {
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
 {
   "version": 2,
@@ -425,7 +425,7 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleNegativeRate) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, TraceOnlyFromReservoir) {
-  NiceMock<Runtime::MockRandomGenerator> rng;
+  NiceMock<Random::MockRandomGenerator> rng;
   EXPECT_CALL(rng, random()).WillRepeatedly(Return(90));
   constexpr auto rules_json = R"EOF(
 {
@@ -459,7 +459,7 @@ TEST_F(LocalizedSamplingStrategyTest, TraceOnlyFromReservoir) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, TraceFromReservoirAndByRate) {
-  NiceMock<Runtime::MockRandomGenerator> rng;
+  NiceMock<Random::MockRandomGenerator> rng;
   EXPECT_CALL(rng, random()).WillRepeatedly(Return(1));
   constexpr auto rules_json = R"EOF(
 {
@@ -492,7 +492,7 @@ TEST_F(LocalizedSamplingStrategyTest, TraceFromReservoirAndByRate) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, NoMatchingHost) {
-  NiceMock<Runtime::MockRandomGenerator> rng;
+  NiceMock<Random::MockRandomGenerator> rng;
   // this following value doesn't affect the test
   EXPECT_CALL(rng, random()).WillRepeatedly(Return(50 /*50 percent*/));
   // the following rules say:
@@ -530,7 +530,7 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingHost) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, NoMatchingHttpMethod) {
-  NiceMock<Runtime::MockRandomGenerator> rng;
+  NiceMock<Random::MockRandomGenerator> rng;
   // this following value doesn't affect the test
   EXPECT_CALL(rng, random()).WillRepeatedly(Return(50 /*50 percent*/));
   // the following rules say:
@@ -568,7 +568,7 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingHttpMethod) {
 }
 
 TEST_F(LocalizedSamplingStrategyTest, NoMatchingPath) {
-  NiceMock<Runtime::MockRandomGenerator> rng;
+  NiceMock<Random::MockRandomGenerator> rng;
   // this following value doesn't affect the test
   EXPECT_CALL(rng, random()).WillRepeatedly(Return(50 /*50 percent*/));
   // the following rules say:

@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that dynamically adjusts the number of allowed concurrent
 # requests based on sampled latencies.
 # Public docs: TODO (tonya11en)
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "controller_lib",
@@ -23,6 +23,7 @@ envoy_cc_library(
         "libcircllhist",
     ],
     deps = [
+        "//include/envoy/common:time_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_lib",

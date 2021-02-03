@@ -9,6 +9,9 @@
 
 #include "common/common/thread_annotations.h"
 
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Thread {
 
@@ -20,6 +23,7 @@ public:
   ThreadId() : id_(std::numeric_limits<int64_t>::min()) {}
   explicit ThreadId(int64_t id) : id_(id) {}
 
+  int64_t getId() const { return id_; }
   std::string debugString() const { return std::to_string(id_); }
   bool isEmpty() const { return *this == ThreadId(); }
   friend bool operator==(ThreadId lhs, ThreadId rhs) { return lhs.id_ == rhs.id_; }
@@ -37,12 +41,24 @@ public:
   virtual ~Thread() = default;
 
   /**
-   * Join on thread exit.
+   * @return the name of the thread.
+   */
+  virtual std::string name() const PURE;
+
+  /**
+   * Blocks until the thread exits.
    */
   virtual void join() PURE;
 };
 
 using ThreadPtr = std::unique_ptr<Thread>;
+
+// Options specified during thread creation.
+struct Options {
+  std::string name_; // A name supplied for the thread. On Linux this is limited to 15 chars.
+};
+
+using OptionsOptConstRef = const absl::optional<Options>&;
 
 /**
  * Interface providing a mechanism for creating threads.
@@ -52,16 +68,21 @@ public:
   virtual ~ThreadFactory() = default;
 
   /**
-   * Create a thread.
+   * Creates a thread, immediately starting the thread_routine.
+   *
    * @param thread_routine supplies the function to invoke in the thread.
+   * @param options supplies options specified on thread creation.
    */
-  virtual ThreadPtr createThread(std::function<void()> thread_routine) PURE;
+  virtual ThreadPtr createThread(std::function<void()> thread_routine,
+                                 OptionsOptConstRef options = absl::nullopt) PURE;
 
   /**
    * Return the current system thread ID
    */
   virtual ThreadId currentThreadId() PURE;
 };
+
+using ThreadFactoryPtr = std::unique_ptr<ThreadFactory>;
 
 /**
  * Like the C++11 "basic lockable concept" but a pure virtual interface vs. a template, and

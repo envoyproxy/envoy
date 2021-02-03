@@ -5,7 +5,9 @@
 
 #include "extensions/filters/network/ext_authz/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -18,14 +20,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-TEST(ExtAuthzFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz(), context),
-               ProtoValidationException);
-}
-
-TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
+namespace {
+void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
+  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
+  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
+    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
+  }
   std::string yaml = R"EOF(
   grpc_service:
     google_grpc:
@@ -33,11 +33,13 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
       stat_prefix: google
   failure_mode_allow: false
   stat_prefix: name
+  transport_api_version: {}
 )EOF";
 
   ExtAuthzConfigFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(
+      fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -49,6 +51,23 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+} // namespace
+
+TEST(ExtAuthzFilterConfigTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  envoy::extensions::filters::network::ext_authz::v3::ExtAuthz config;
+  config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(config, context),
+               ProtoValidationException);
+}
+
+TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+  expectCorrectProto(envoy::config::core::v3::ApiVersion::AUTO);
+  expectCorrectProto(envoy::config::core::v3::ApiVersion::V2);
+#endif
+  expectCorrectProto(envoy::config::core::v3::ApiVersion::V3);
 }
 
 // Test that the deprecated extension name still functions.

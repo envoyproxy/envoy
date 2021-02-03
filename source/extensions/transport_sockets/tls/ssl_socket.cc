@@ -6,7 +6,10 @@
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
+#include "common/runtime/runtime_features.h"
 
+#include "extensions/transport_sockets/tls/io_handle_bio.h"
+#include "extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -39,22 +42,23 @@ public:
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
 };
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake) {
-  bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-  ssl_ = ssl.get();
-  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_);
-
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
+          handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
+                                ctx_->sslExtendedSocketInfoIndex(), this))) {
   if (state == InitialState::Client) {
-    SSL_set_connect_state(ssl_);
+    SSL_set_connect_state(rawSsl());
   } else {
     ASSERT(state == InitialState::Server);
-    SSL_set_accept_state(ssl_);
+    SSL_set_accept_state(rawSsl());
   }
 }
 
@@ -65,11 +69,18 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // Associate this SSL connection with all the certificates (with their potentially different
   // private key methods).
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
-    provider->registerPrivateKeyMethod(ssl_, *this, callbacks_->connection().dispatcher());
+    provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
-  SSL_set_bio(ssl_, bio, bio);
+  BIO* bio;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_use_io_handle_bio")) {
+    // Use custom BIO that reads from/writes to IoHandle
+    bio = BIO_new_io_handle(&callbacks_->ioHandle());
+  } else {
+    // TODO(fcoras): remove once the io_handle_bio proves to be stable
+    bio = BIO_new_socket(callbacks_->ioHandle().fdDoNotUse(), 0);
+  }
+  SSL_set_bio(rawSsl(), bio, bio);
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
@@ -77,7 +88,7 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
   uint8_t* mem = static_cast<uint8_t*>(slice.mem_);
   size_t remaining = slice.len_;
   while (remaining > 0) {
-    int rc = SSL_read(ssl_, mem, remaining);
+    int rc = SSL_read(rawSsl(), mem, remaining);
     ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
     if (rc > 0) {
       ASSERT(static_cast<size_t>(rc) <= remaining);
@@ -97,9 +108,10 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
 }
 
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
-  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
+  if (info_->state() != Ssl::SocketState::HandshakeComplete &&
+      info_->state() != Ssl::SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
+    if (action == PostIoAction::Close || info_->state() != Ssl::SocketState::HandshakeComplete) {
       // end_stream is false because either a hard error occurred (action == Close) or
       // the handshake isn't complete, so a half-close cannot occur yet.
       return {action, 0, false};
@@ -124,15 +136,23 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
       }
       if (result.error_.has_value()) {
         keep_reading = false;
-        int err = SSL_get_error(ssl_, result.error_.value());
+        int err = SSL_get_error(rawSsl(), result.error_.value());
         switch (err) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
+          // Graceful shutdown using close_notify TLS alert.
           end_stream = true;
           break;
+        case SSL_ERROR_SYSCALL:
+          if (result.error_.value() == 0) {
+            // Non-graceful shutdown by closing the underlying socket.
+            end_stream = true;
+            break;
+          }
+          FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
-        // Renegotiation has started. We don't handle renegotiation so just fall through.
+          // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
           action = PostIoAction::Close;
@@ -146,7 +166,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     if (slices_to_commit > 0) {
       read_buffer.commit(slices, slices_to_commit);
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         keep_reading = false;
       }
     }
@@ -159,7 +179,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
 void SslSocket::onPrivateKeyMethodComplete() {
   ASSERT(isThreadSafe());
-  ASSERT(state_ == SocketState::HandshakeInProgress);
+  ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
 
   // Resume handshake.
   PostIoAction action = doHandshake();
@@ -169,38 +189,16 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-PostIoAction SslSocket::doHandshake() {
-  ASSERT(state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent);
-  int rc = SSL_do_handshake(ssl_);
-  if (rc == 1) {
-    ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
-    state_ = SocketState::HandshakeComplete;
-    ctx_->logHandshake(ssl_);
-    callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+Network::Connection& SslSocket::connection() const { return callbacks_->connection(); }
 
-    // It's possible that we closed during the handshake callback.
-    return callbacks_->connection().state() == Network::Connection::State::Open
-               ? PostIoAction::KeepOpen
-               : PostIoAction::Close;
-  } else {
-    int err = SSL_get_error(ssl_, rc);
-    switch (err) {
-    case SSL_ERROR_WANT_READ:
-    case SSL_ERROR_WANT_WRITE:
-      ENVOY_CONN_LOG(debug, "handshake expecting {}", callbacks_->connection(),
-                     err == SSL_ERROR_WANT_READ ? "read" : "write");
-      return PostIoAction::KeepOpen;
-    case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
-      ENVOY_CONN_LOG(debug, "handshake continued asynchronously", callbacks_->connection());
-      state_ = SocketState::HandshakeInProgress;
-      return PostIoAction::KeepOpen;
-    default:
-      ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
-      drainErrorQueue();
-      return PostIoAction::Close;
-    }
-  }
+void SslSocket::onSuccess(SSL* ssl) {
+  ctx_->logHandshake(ssl);
+  callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
+
+void SslSocket::onFailure() { drainErrorQueue(); }
+
+PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
@@ -223,17 +221,20 @@ void SslSocket::drainErrorQueue() {
                                         ERR_func_error_string(err), ":",
                                         ERR_reason_error_string(err)));
   }
-  ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+  if (!failure_reason_.empty()) {
+    ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+  }
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
 }
 
 Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
-  ASSERT(state_ != SocketState::ShutdownSent || write_buffer.length() == 0);
-  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
+  ASSERT(info_->state() != Ssl::SocketState::ShutdownSent || write_buffer.length() == 0);
+  if (info_->state() != Ssl::SocketState::HandshakeComplete &&
+      info_->state() != Ssl::SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
+    if (action == PostIoAction::Close || info_->state() != Ssl::SocketState::HandshakeComplete) {
       return {action, 0, false};
     }
   }
@@ -255,7 +256,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     // it again with the same parameters. This is done by tracking last write size, but not write
     // data, since linearize() will return the same undrained data anyway.
     ASSERT(bytes_to_write <= write_buffer.length());
-    int rc = SSL_write(ssl_, write_buffer.linearize(bytes_to_write), bytes_to_write);
+    int rc = SSL_write(rawSsl(), write_buffer.linearize(bytes_to_write), bytes_to_write);
     ENVOY_CONN_LOG(trace, "ssl write returns: {}", callbacks_->connection(), rc);
     if (rc > 0) {
       ASSERT(rc == static_cast<int>(bytes_to_write));
@@ -263,7 +264,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       write_buffer.drain(rc);
       bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
     } else {
-      int err = SSL_get_error(ssl_, rc);
+      int err = SSL_get_error(rawSsl(), rc);
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
@@ -286,315 +287,68 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   return {PostIoAction::KeepOpen, total_bytes_written, false};
 }
 
-void SslSocket::onConnected() { ASSERT(state_ == SocketState::PreHandshake); }
+void SslSocket::onConnected() { ASSERT(info_->state() == Ssl::SocketState::PreHandshake); }
 
 Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
 
 void SslSocket::shutdownSsl() {
-  ASSERT(state_ != SocketState::PreHandshake);
-  if (state_ != SocketState::ShutdownSent &&
+  ASSERT(info_->state() != Ssl::SocketState::PreHandshake);
+  if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
-    int rc = SSL_shutdown(ssl_);
+    int rc = SSL_shutdown(rawSsl());
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      // Windows operate under `EmulatedEdge`. These are level events that are artificially
+      // made to behave like edge events. And if the rc is 0 then in that case we want read
+      // activation resumption. This code is protected with an `constexpr` if, to minimize the tax
+      // on POSIX systems that operate in Edge events.
+      if (rc == 0) {
+        // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
+        // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
+        callbacks_->setTransportSocketIsReadable();
+      }
+    }
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     drainErrorQueue();
-    state_ = SocketState::ShutdownSent;
+    info_->setState(Ssl::SocketState::ShutdownSent);
   }
 }
 
-void SslExtendedSocketInfoImpl::setCertificateValidationStatus(
-    Envoy::Ssl::ClientValidationStatus validated) {
-  certificate_validation_status_ = validated;
-}
-
-Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidationStatus() const {
-  return certificate_validation_status_;
-}
-
-SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx)
-    : ssl_(std::move(ssl)) {
-  SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
-}
-
-bool SslSocketInfo::peerCertificatePresented() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  return cert != nullptr;
-}
-
-bool SslSocketInfo::peerCertificateValidated() const {
-  return extended_socket_info_.certificateValidationStatus() ==
-         Envoy::Ssl::ClientValidationStatus::Validated;
-}
-
-absl::Span<const std::string> SslSocketInfo::uriSanLocalCertificate() const {
-  if (!cached_uri_san_local_certificate_.empty()) {
-    return cached_uri_san_local_certificate_;
+void SslSocket::shutdownBasic() {
+  if (info_->state() != Ssl::SocketState::ShutdownSent &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
+    callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
+    drainErrorQueue();
+    info_->setState(Ssl::SocketState::ShutdownSent);
   }
-
-  // The cert object is not owned.
-  X509* cert = SSL_get_certificate(ssl_.get());
-  if (!cert) {
-    ASSERT(cached_uri_san_local_certificate_.empty());
-    return cached_uri_san_local_certificate_;
-  }
-  cached_uri_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return cached_uri_san_local_certificate_;
-}
-
-absl::Span<const std::string> SslSocketInfo::dnsSansLocalCertificate() const {
-  if (!cached_dns_san_local_certificate_.empty()) {
-    return cached_dns_san_local_certificate_;
-  }
-
-  X509* cert = SSL_get_certificate(ssl_.get());
-  if (!cert) {
-    ASSERT(cached_dns_san_local_certificate_.empty());
-    return cached_dns_san_local_certificate_;
-  }
-  cached_dns_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
-  return cached_dns_san_local_certificate_;
-}
-
-const std::string& SslSocketInfo::sha256PeerCertificateDigest() const {
-  if (!cached_sha_256_peer_certificate_digest_.empty()) {
-    return cached_sha_256_peer_certificate_digest_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_sha_256_peer_certificate_digest_.empty());
-    return cached_sha_256_peer_certificate_digest_;
-  }
-
-  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-  unsigned int n;
-  X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size(), "");
-  cached_sha_256_peer_certificate_digest_ = Hex::encode(computed_hash);
-  return cached_sha_256_peer_certificate_digest_;
-}
-
-const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificate() const {
-  if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
-    return cached_url_encoded_pem_encoded_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_url_encoded_pem_encoded_peer_certificate_.empty());
-    return cached_url_encoded_pem_encoded_peer_certificate_;
-  }
-
-  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr, "");
-  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
-  const uint8_t* output;
-  size_t length;
-  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-  absl::string_view pem(reinterpret_cast<const char*>(output), length);
-  cached_url_encoded_pem_encoded_peer_certificate_ = absl::StrReplaceAll(
-      pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
-  return cached_url_encoded_pem_encoded_peer_certificate_;
-}
-
-const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificateChain() const {
-  if (!cached_url_encoded_pem_encoded_peer_cert_chain_.empty()) {
-    return cached_url_encoded_pem_encoded_peer_cert_chain_;
-  }
-
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl_.get());
-  if (cert_chain == nullptr) {
-    ASSERT(cached_url_encoded_pem_encoded_peer_cert_chain_.empty());
-    return cached_url_encoded_pem_encoded_peer_cert_chain_;
-  }
-
-  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
-    X509* cert = sk_X509_value(cert_chain, i);
-
-    bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-    RELEASE_ASSERT(buf != nullptr, "");
-    RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
-    const uint8_t* output;
-    size_t length;
-    RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-
-    absl::string_view pem(reinterpret_cast<const char*>(output), length);
-    cached_url_encoded_pem_encoded_peer_cert_chain_ = absl::StrCat(
-        cached_url_encoded_pem_encoded_peer_cert_chain_,
-        absl::StrReplaceAll(
-            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
-  }
-  return cached_url_encoded_pem_encoded_peer_cert_chain_;
-}
-
-absl::Span<const std::string> SslSocketInfo::uriSanPeerCertificate() const {
-  if (!cached_uri_san_peer_certificate_.empty()) {
-    return cached_uri_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_uri_san_peer_certificate_.empty());
-    return cached_uri_san_peer_certificate_;
-  }
-  cached_uri_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return cached_uri_san_peer_certificate_;
-}
-
-absl::Span<const std::string> SslSocketInfo::dnsSansPeerCertificate() const {
-  if (!cached_dns_san_peer_certificate_.empty()) {
-    return cached_dns_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_dns_san_peer_certificate_.empty());
-    return cached_dns_san_peer_certificate_;
-  }
-  cached_dns_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
-  return cached_dns_san_peer_certificate_;
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Unregister the SSL connection object from private key method providers.
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
-    provider->unregisterPrivateKeyMethod(ssl_);
+    provider->unregisterPrivateKeyMethod(rawSsl());
   }
 
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (state_ == SocketState::HandshakeInProgress || state_ == SocketState::HandshakeComplete) {
+  if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
+      info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
+  } else {
+    // We're not in a state to do the full SSL shutdown so perform a basic shutdown to flush any
+    // outstanding alerts
+    shutdownBasic();
   }
 }
 
 std::string SslSocket::protocol() const {
   const unsigned char* proto;
   unsigned int proto_len;
-  SSL_get0_alpn_selected(ssl_, &proto, &proto_len);
+  SSL_get0_alpn_selected(rawSsl(), &proto, &proto_len);
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-uint16_t SslSocketInfo::ciphersuiteId() const {
-  const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl_.get());
-  if (cipher == nullptr) {
-    return 0xffff;
-  }
-
-  // From the OpenSSL docs:
-  //    SSL_CIPHER_get_id returns |cipher|'s id. It may be cast to a |uint16_t| to
-  //    get the cipher suite value.
-  return static_cast<uint16_t>(SSL_CIPHER_get_id(cipher));
-}
-
-std::string SslSocketInfo::ciphersuiteString() const {
-  const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl_.get());
-  if (cipher == nullptr) {
-    return {};
-  }
-
-  return SSL_CIPHER_get_name(cipher);
-}
-
-const std::string& SslSocketInfo::tlsVersion() const {
-  if (!cached_tls_version_.empty()) {
-    return cached_tls_version_;
-  }
-  cached_tls_version_ = SSL_get_version(ssl_.get());
-  return cached_tls_version_;
-}
-
-absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return absl::nullopt;
-  }
-  return Utility::getX509ExtensionValue(*cert, extension_name);
-}
-
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
-
-const std::string& SslSocketInfo::serialNumberPeerCertificate() const {
-  if (!cached_serial_number_peer_certificate_.empty()) {
-    return cached_serial_number_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_serial_number_peer_certificate_.empty());
-    return cached_serial_number_peer_certificate_;
-  }
-  cached_serial_number_peer_certificate_ = Utility::getSerialNumberFromCertificate(*cert.get());
-  return cached_serial_number_peer_certificate_;
-}
-
-const std::string& SslSocketInfo::issuerPeerCertificate() const {
-  if (!cached_issuer_peer_certificate_.empty()) {
-    return cached_issuer_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_issuer_peer_certificate_.empty());
-    return cached_issuer_peer_certificate_;
-  }
-  cached_issuer_peer_certificate_ = Utility::getIssuerFromCertificate(*cert);
-  return cached_issuer_peer_certificate_;
-}
-
-const std::string& SslSocketInfo::subjectPeerCertificate() const {
-  if (!cached_subject_peer_certificate_.empty()) {
-    return cached_subject_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    ASSERT(cached_subject_peer_certificate_.empty());
-    return cached_subject_peer_certificate_;
-  }
-  cached_subject_peer_certificate_ = Utility::getSubjectFromCertificate(*cert);
-  return cached_subject_peer_certificate_;
-}
-
-const std::string& SslSocketInfo::subjectLocalCertificate() const {
-  if (!cached_subject_local_certificate_.empty()) {
-    return cached_subject_local_certificate_;
-  }
-  X509* cert = SSL_get_certificate(ssl_.get());
-  if (!cert) {
-    ASSERT(cached_subject_local_certificate_.empty());
-    return cached_subject_local_certificate_;
-  }
-  cached_subject_local_certificate_ = Utility::getSubjectFromCertificate(*cert);
-  return cached_subject_local_certificate_;
-}
-
-absl::optional<SystemTime> SslSocketInfo::validFromPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return absl::nullopt;
-  }
-  return Utility::getValidFrom(*cert);
-}
-
-absl::optional<SystemTime> SslSocketInfo::expirationPeerCertificate() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
-  if (!cert) {
-    return absl::nullopt;
-  }
-  return Utility::getExpirationTime(*cert);
-}
-
-const std::string& SslSocketInfo::sessionId() const {
-  if (!cached_session_id_.empty()) {
-    return cached_session_id_;
-  }
-  SSL_SESSION* session = SSL_get_session(ssl_.get());
-  if (session == nullptr) {
-    ASSERT(cached_session_id_.empty());
-    return cached_session_id_;
-  }
-
-  unsigned int session_id_length = 0;
-  const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
-  cached_session_id_ = Hex::encode(session_id, session_id_length);
-  return cached_session_id_;
-}
 
 namespace {
 SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {
@@ -608,7 +362,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -624,7 +378,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   }
   if (ssl_ctx) {
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options);
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -638,7 +392,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
@@ -649,7 +403,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -664,7 +418,8 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr);
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
+                                       config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();
@@ -678,7 +433,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }

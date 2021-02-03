@@ -1,8 +1,8 @@
 #pragma once
 
 #include <regex>
-#include <unordered_map>
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
@@ -25,18 +25,18 @@ public:
   // field in proto, and if so, return the new method name.
   static absl::optional<std::string>
   renameMethod(absl::string_view method_name,
-               const std::unordered_map<std::string, std::string> renames);
+               const absl::node_hash_map<std::string, std::string> renames);
 
   // Given a constant, e.g. kFooBar, determine if it needs upgrading. We need
   // this for synthesized oneof cases.
   static absl::optional<std::string>
   renameConstant(absl::string_view constant_name,
-                 const std::unordered_map<std::string, std::string> renames);
+                 const absl::node_hash_map<std::string, std::string> renames);
 
   // Given an enum value, e.g. FOO_BAR determine if it needs upgrading.
   static absl::optional<std::string>
   renameEnumValue(absl::string_view enum_value_name,
-                  const std::unordered_map<std::string, std::string> renames);
+                  const absl::node_hash_map<std::string, std::string> renames);
 
   // Convert from a protobuf type, e.g. foo.bar.v2, to a C++ type, e.g.
   // foo::bar::v2.

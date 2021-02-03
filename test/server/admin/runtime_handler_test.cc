@@ -8,7 +8,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, Runtime) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   Runtime::MockSnapshot snapshot;
@@ -75,17 +75,17 @@ TEST_P(AdminInstanceTest, Runtime) {
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   Runtime::MockLoader loader;
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
-  std::unordered_map<std::string, std::string> overrides;
+  absl::node_hash_map<std::string, std::string> overrides;
   overrides["foo"] = "bar";
   overrides["x"] = "42";
   overrides["nothing"] = "";
-  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  EXPECT_CALL(loader, mergeValues(overrides));
   EXPECT_EQ(Http::Code::OK,
             postCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
   EXPECT_EQ("OK\n", response.toString());
@@ -97,18 +97,18 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
 
   const std::string key = "routing.traffic_shift.foo";
   const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
-  const std::unordered_map<std::string, std::string> overrides = {{key, value}};
-  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  const absl::node_hash_map<std::string, std::string> overrides = {{key, value}};
+  EXPECT_CALL(loader, mergeValues(overrides));
 
   const std::string body = fmt::format("{}={}", key, value);
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
   EXPECT_EQ("OK\n", response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   EXPECT_EQ(Http::Code::BadRequest, postCallback("/runtime_modify", header_map, response));

@@ -16,10 +16,13 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/visitor.h"
 #include "common/protobuf/well_known.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
+
+using namespace std::chrono_literals;
 
 namespace Envoy {
 namespace {
@@ -36,12 +39,12 @@ void blockFormat(YAML::Node node) {
   node.SetStyle(YAML::EmitterStyle::Block);
 
   if (node.Type() == YAML::NodeType::Sequence) {
-    for (auto it : node) {
+    for (const auto& it : node) {
       blockFormat(it);
     }
   }
   if (node.Type() == YAML::NodeType::Map) {
-    for (auto it : node) {
+    for (const auto& it : node) {
       blockFormat(it.second);
     }
   }
@@ -118,9 +121,12 @@ void jsonConvertInternal(const Protobuf::Message& source,
 
 enum class MessageVersion {
   // This is an earlier version of a message, a later one exists.
-  EARLIER_VERSION,
+  EarlierVersion,
   // This is the latest version of a message.
-  LATEST_VERSION,
+  LatestVersion,
+  // Validating to see if the latest version will also be accepted; only apply message validators
+  // without side effects, validations should be strict.
+  LatestVersionValidate,
 };
 
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
@@ -142,7 +148,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
-    f(message, MessageVersion::LATEST_VERSION);
+    f(message, MessageVersion::LatestVersion);
     return;
   }
 
@@ -152,12 +158,21 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   try {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
-    f(*earlier_message, MessageVersion::EARLIER_VERSION);
+    f(*earlier_message, MessageVersion::EarlierVersion);
+    // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
+    // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
+    // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
+    try {
+      f(message, MessageVersion::LatestVersionValidate);
+    } catch (EnvoyException& e) {
+      MessageUtil::onVersionUpgradeDeprecation(e.what());
+    }
+    // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
   } catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
-    f(message, MessageVersion::LATEST_VERSION);
+    f(message, MessageVersion::LatestVersion);
   }
 }
 
@@ -165,7 +180,8 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
 // otherwise fatal field. Throws a warning on use of a fatal by default field.
 void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_deprecated,
                            bool proto_annotated_as_disallowed, const std::string& feature_name,
-                           std::string error, const Protobuf::Message& message) {
+                           std::string error, const Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) {
 // This option is for Envoy builds with --define deprecated_features=disabled
 // The build options CI then verifies that as Envoy developers deprecate fields,
 // that they update canonical configs and unit tests to not use those deprecated
@@ -196,14 +212,9 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   std::string with_overridden = fmt::format(
       error,
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
-  if (warn_only) {
-    ENVOY_LOG_MISC(warn, "{}", with_overridden);
-  } else {
-    const char fatal_error[] = " If continued use of this field is absolutely necessary, "
-                               "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for how "
-                               "to apply a temporary and highly discouraged override.";
-    throw ProtoValidationException(with_overridden + fatal_error, message);
-  }
+
+  validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
+                                       warn_only);
 }
 
 } // namespace
@@ -255,6 +266,51 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
+                                                    const Protobuf::Message& message) {
+  throw MissingFieldException(field_name, message);
+}
+
+void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
+                                                       const Protobuf::Message& message) {
+  throw ProtoValidationException(validation_error, message);
+}
+
+void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool reject) {
+  const std::string& warning_str =
+      fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
+                  "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
+                  desc);
+  // Always log at trace level. This is useful for tests that don't want to rely on possible
+  // elision.
+  ENVOY_LOG_MISC(trace, warning_str);
+  // Log each distinct message at warn level once every 5s. We use a static map here, which is fine
+  // as we are always on the main thread.
+  static auto* last_warned = new absl::flat_hash_map<std::string, int64_t>();
+  const auto now = t_logclock::now().time_since_epoch().count();
+  const auto it = last_warned->find(warning_str);
+  if (it == last_warned->end() ||
+      (now - it->second) > std::chrono::duration_cast<std::chrono::nanoseconds>(5s).count()) {
+    ENVOY_LOG_MISC(warn, warning_str);
+    (*last_warned)[warning_str] = now;
+  }
+  Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting();
+  // We only log, and don't bump stats, if we're sufficiently early in server initialization (i.e.
+  // bootstrap).
+  if (loader != nullptr) {
+    loader->countDeprecatedFeatureUse();
+  }
+  if (reject &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+    throw DeprecatedMajorVersionException(fmt::format(
+        "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
+        "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+        "following "
+        "the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition. ({})",
+        desc));
+  }
+}
+
 size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 
@@ -301,9 +357,11 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
     // We know it's an unknown field at this point. If we're at the latest
     // version, then it's definitely an unknown field, otherwise we try to
     // load again at a later version.
-    if (message_version == MessageVersion::LATEST_VERSION) {
+    if (message_version == MessageVersion::LatestVersion) {
       validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
                                         strict_status.ToString());
+    } else if (message_version == MessageVersion::LatestVersionValidate) {
+      throw ProtobufMessage::UnknownProtoFieldException(absl::StrCat("Unknown field in: ", json));
     } else {
       throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
     }
@@ -312,7 +370,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   if (do_boosting) {
     tryWithApiBoosting(load_json, message);
   } else {
-    load_json(message, MessageVersion::LATEST_VERSION);
+    load_json(message, MessageVersion::LatestVersion);
   }
 }
 
@@ -347,13 +405,37 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-      return;
+    auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
+                                                              MessageVersion message_version) {
+      try {
+        if (message.ParseFromString(contents)) {
+          MessageUtil::checkForUnexpectedFields(
+              message, message_version == MessageVersion::LatestVersionValidate
+                           ? ProtobufMessage::getStrictValidationVisitor()
+                           : validation_visitor);
+        }
+        return;
+      } catch (EnvoyException& ex) {
+        if (message_version == MessageVersion::LatestVersion ||
+            message_version == MessageVersion::LatestVersionValidate) {
+          // Failed reading the latest version - pass the same error upwards
+          throw ex;
+        }
+      }
+      throw ApiBoostRetryException(
+          "Failed to parse at earlier version, trying again at later version.");
+    };
+
+    if (do_boosting) {
+      // Attempts to read as the previous version and upgrade, and if it fails
+      // attempts to read as latest version.
+      tryWithApiBoosting(read_proto_binary, message);
+    } else {
+      read_proto_binary(message, MessageVersion::LatestVersion);
     }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
-                         message.GetTypeName() + ")");
+    return;
   }
+
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,
@@ -361,7 +443,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
         return;
       }
-      if (message_version == MessageVersion::LATEST_VERSION) {
+      if (message_version == MessageVersion::LatestVersion ||
+          message_version == MessageVersion::LatestVersionValidate) {
         throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
                              message.GetTypeName() + ")");
       } else {
@@ -373,7 +456,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (do_boosting) {
       tryWithApiBoosting(read_proto_text, message);
     } else {
-      read_proto_text(message, MessageVersion::LATEST_VERSION);
+      read_proto_text(message, MessageVersion::LatestVersion);
     }
     return;
   }
@@ -386,11 +469,10 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 
 namespace {
 
-void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
-                                            absl::string_view filename,
-                                            const Protobuf::FieldDescriptor* field,
-                                            const Protobuf::Reflection* reflection,
-                                            Runtime::Loader* runtime) {
+void checkForDeprecatedNonRepeatedEnumValue(
+    const Protobuf::Message& message, absl::string_view filename,
+    const Protobuf::FieldDescriptor* field, const Protobuf::Reflection* reflection,
+    Runtime::Loader* runtime, ProtobufMessage::ValidationVisitor& validation_visitor) {
   // Repeated fields will be handled by recursion in checkForUnexpectedFields.
   if (field->is_repeated() || field->cpp_type() != Protobuf::FieldDescriptor::CPPTYPE_ENUM) {
     return;
@@ -413,7 +495,7 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
       runtime, true /*deprecated*/,
       enum_value_descriptor->options().GetExtension(envoy::annotations::disallowed_by_default_enum),
       absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), error,
-      message);
+      message, validation_visitor);
 }
 
 class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
@@ -429,7 +511,8 @@ public:
 
     // Before we check to see if the field is in use, see if there's a
     // deprecated default enum value.
-    checkForDeprecatedNonRepeatedEnumValue(message, filename, &field, reflection, runtime_);
+    checkForDeprecatedNonRepeatedEnumValue(message, filename, &field, reflection, runtime_,
+                                           validation_visitor_);
 
     // If this field is not in use, continue.
     if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
@@ -439,6 +522,21 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
+      if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
+        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
+        // unless it is part of an explicit test that needs access to the deprecated field
+        // when we enable runtime deprecation override to allow point field overrides for tests.
+        if (!runtime_ ||
+            !runtime_->snapshot().deprecatedFeatureEnabled(
+                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
+          const std::string fatal_error = absl::StrCat(
+              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
+              "' from file ", filename,
+              " while using the latest V3 configuration. This field has been removed from the "
+              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
+          throw ProtoValidationException(fatal_error, message);
+        }
+      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -447,7 +545,7 @@ public:
       deprecatedFieldHelper(runtime_, true /*deprecated*/,
                             field.options().GetExtension(envoy::annotations::disallowed_by_default),
                             absl::StrCat("envoy.deprecated_features:", field.full_name()), warning,
-                            message);
+                            message, validation_visitor_);
     }
     return nullptr;
   }
@@ -546,16 +644,19 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
         Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
     // If the earlier version matches, unpack and upgrade.
     if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
-      Protobuf::DynamicMessageFactory dmf;
-      auto earlier_message =
-          ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-      ASSERT(earlier_message != nullptr);
-      if (!any_message.UnpackTo(earlier_message.get())) {
+      // Take the Any message but adjust its type URL, since earlier/later versions are wire
+      // compatible.
+      ProtobufWkt::Any any_message_with_fixup;
+      any_message_with_fixup.MergeFrom(any_message);
+      any_message_with_fixup.set_type_url("type.googleapis.com/" +
+                                          message.GetDescriptor()->full_name());
+      if (!any_message_with_fixup.UnpackTo(&message)) {
         throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                         earlier_message->GetDescriptor()->full_name(),
-                                         any_message.DebugString()));
+                                         earlier_version_desc->full_name(),
+                                         any_message_with_fixup.DebugString()));
       }
-      Config::VersionConverter::upgrade(*earlier_message, message);
+      Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
+      MessageUtil::onVersionUpgradeDeprecation(any_full_name);
       return;
     }
   }
@@ -839,6 +940,13 @@ ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
   return val;
 }
 
+ProtobufWkt::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+  if (str.has_value()) {
+    return ValueUtil::stringValue(str.value());
+  }
+  return ValueUtil::nullValue();
+}
+
 ProtobufWkt::Value ValueUtil::boolValue(bool b) {
   ProtobufWkt::Value val;
   val.set_bool_value(b);
@@ -895,14 +1003,6 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
       std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
           .time_since_epoch()
           .count()));
-}
-
-absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
-  const size_t pos = type_url.rfind('/');
-  if (pos != absl::string_view::npos) {
-    type_url = type_url.substr(pos + 1);
-  }
-  return type_url;
 }
 
 } // namespace Envoy

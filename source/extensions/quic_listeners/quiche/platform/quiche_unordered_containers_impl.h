@@ -14,7 +14,7 @@ namespace quiche {
 // The default hasher used by hash tables.
 template <typename Key> using QuicheDefaultHasherImpl = absl::Hash<Key>;
 
-// Similar to std::unordered_map, but with better performance and memory usage.
+// Similar to absl::node_hash_map, but with better performance and memory usage.
 template <typename Key, typename Value, typename Hash, typename Eq>
 using QuicheUnorderedMapImpl = absl::node_hash_map<Key, Value, Hash, Eq>;
 

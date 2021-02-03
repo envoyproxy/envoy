@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.adaptive_concurrency"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency"
+    value: "\n\016\022\005\032\003\010\200\001\032\005\n\003\010\200\001"
+  }
+}

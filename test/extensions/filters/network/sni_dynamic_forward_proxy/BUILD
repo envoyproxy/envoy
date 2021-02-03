@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -20,7 +20,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:basic_resource_limit_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg_cc_proto",
     ],
 )
@@ -32,7 +33,6 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.network.sni_dynamic_forward_proxy",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/listener/tls_inspector:config",

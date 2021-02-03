@@ -1,9 +1,9 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -15,6 +15,7 @@ exports_files([
 filegroup(
     name = "server_xds_files",
     srcs = [
+        "server_xds.bootstrap.udpa.yaml",
         "server_xds.bootstrap.yaml",
         "server_xds.cds.with_unknown_field.yaml",
         "server_xds.cds.yaml",
@@ -22,6 +23,7 @@ filegroup(
         "server_xds.eds.with_unknown_field.yaml",
         "server_xds.eds.yaml",
         "server_xds.lds.typed_struct.yaml",
+        "server_xds.lds.udpa.list_collection.yaml",
         "server_xds.lds.with_unknown_field.typed_struct.yaml",
         "server_xds.lds.with_unknown_field.yaml",
         "server_xds.lds.yaml",
@@ -40,5 +42,7 @@ filegroup(
 
 filegroup(
     name = "google_com_proxy_port_0",
-    srcs = ["google_com_proxy_port_0.v2.yaml"],
+    srcs = [
+        "google_com_proxy_port_0.yaml",
+    ],
 )

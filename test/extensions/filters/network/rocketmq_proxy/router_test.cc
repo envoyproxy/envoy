@@ -5,7 +5,7 @@
 
 #include "test/extensions/filters/network/rocketmq_proxy/mocks.h"
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"
 
@@ -24,6 +24,7 @@ public:
   RocketmqRouterTestBase()
       : config_(rocketmq_proxy_config_, context_),
         cluster_info_(std::make_shared<Upstream::MockClusterInfo>()) {
+    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     conn_manager_ =
         std::make_unique<ConnectionManager>(config_, context_.dispatcher().timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -99,15 +100,16 @@ public:
   void startRequest() { router_->sendRequestToUpstream(*active_message_); }
 
   void connectUpstream() {
-    context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+    context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
   }
 
   void startRequestWithExistingConnection() {
-    EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
+    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
         .WillOnce(
             Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.cluster_manager_.tcp_conn_pool_.newConnectionImpl(cb);
-              context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
+              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+                  upstream_connection_);
               return nullptr;
             }));
     router_->sendRequestToUpstream(*active_message_);
@@ -166,7 +168,7 @@ TEST_F(RocketmqRouterTest, PoolRemoteConnectionFailure) {
       }));
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
@@ -182,7 +184,7 @@ TEST_F(RocketmqRouterTest, PoolTimeout) {
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Timeout);
 }
 
@@ -198,7 +200,7 @@ TEST_F(RocketmqRouterTest, PoolLocalConnectionFailure) {
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
@@ -214,7 +216,7 @@ TEST_F(RocketmqRouterTest, PoolOverflowFailure) {
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Overflow);
 }
 
@@ -243,7 +245,7 @@ TEST_F(RocketmqRouterTest, NoHealthyHosts) {
       .WillOnce(Invoke([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*No host available*."));
       }));
-  EXPECT_CALL(context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(*active_message_, onReset());
 
@@ -270,7 +272,7 @@ TEST_F(RocketmqRouterTest, NoCluster) {
   initSendMessageRequest();
 
   EXPECT_CALL(*active_message_, onReset());
-  EXPECT_CALL(context_.cluster_manager_, get(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillRepeatedly(Return(nullptr));
 
   startRequest();
 }
@@ -383,7 +385,7 @@ TEST_F(RocketmqRouterTest, ReceivedSendMessageResponseWithDecodeError) {
   }));
   EXPECT_CALL(*active_message_, onReset());
 
-  active_message_->moveIntoList(std::move(active_message_), conn_manager_->activeMessageList());
+  LinkedList::moveIntoList(std::move(active_message_), conn_manager_->activeMessageList());
   router_->onUpstreamData(buffer, false);
 }
 

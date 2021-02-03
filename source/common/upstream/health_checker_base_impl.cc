@@ -15,7 +15,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              const envoy::config::core::v3::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random,
+                                             Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
       cluster_(cluster), dispatcher_(dispatcher),
@@ -26,6 +26,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
+      no_traffic_healthy_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_healthy_interval,
+                                                              no_traffic_interval_.count())),
       initial_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, initial_jitter, 0)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
       interval_jitter_percent_(config.interval_jitter_percent()),
@@ -78,17 +80,9 @@ HealthCheckerImplBase::~HealthCheckerImplBase() {
   }
 }
 
-void HealthCheckerImplBase::decHealthy() {
-  ASSERT(local_process_healthy_ > 0);
-  local_process_healthy_--;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::decHealthy() { stats_.healthy_.sub(1); }
 
-void HealthCheckerImplBase::decDegraded() {
-  ASSERT(local_process_degraded_ > 0);
-  local_process_degraded_--;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::decDegraded() { stats_.degraded_.sub(1); }
 
 HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
   std::string prefix("health_check.");
@@ -96,15 +90,9 @@ HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
                                    POOL_GAUGE_PREFIX(scope, prefix))};
 }
 
-void HealthCheckerImplBase::incHealthy() {
-  local_process_healthy_++;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::incHealthy() { stats_.healthy_.add(1); }
 
-void HealthCheckerImplBase::incDegraded() {
-  local_process_degraded_++;
-  refreshHealthyStat();
-}
+void HealthCheckerImplBase::incDegraded() { stats_.degraded_.add(1); }
 
 std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
                                                           HealthTransition changed_state) const {
@@ -137,7 +125,10 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
       break;
     }
   } else {
-    base_time_ms = no_traffic_interval_.count();
+    base_time_ms =
+        (state == HealthState::Healthy && changed_state != HealthTransition::ChangePending)
+            ? no_traffic_healthy_interval_.count()
+            : no_traffic_interval_.count();
   }
   return intervalWithJitter(base_time_ms, interval_jitter_);
 }
@@ -187,20 +178,7 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
   }
 }
 
-void HealthCheckerImplBase::refreshHealthyStat() {
-  // Each hot restarted process health checks independently. To make the stats easier to read,
-  // we assume that both processes will converge and the last one that writes wins for the host.
-  stats_.healthy_.set(local_process_healthy_);
-  stats_.degraded_.set(local_process_degraded_);
-}
-
 void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
-  // When a parent process shuts down, it will kill all of the active health checking sessions,
-  // which will decrement the healthy count and the healthy stat in the parent. If the child is
-  // stable and does not update, the healthy stat will be wrong. This routine is called any time
-  // any HC happens against a host so just refresh the healthy stat here so that it is correct.
-  refreshHealthyStat();
-
   for (const HostStatusCb& cb : callbacks_) {
     cb(host, changed_state);
   }

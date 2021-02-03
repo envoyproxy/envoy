@@ -22,6 +22,9 @@ public:
   SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen, int flags,
                             struct timespec* timeout) override;
   bool supportsMmsg() const override;
+  bool supportsUdpGro() const override;
+  bool supportsUdpGso() const override;
+  bool supportsIpTransparent() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
@@ -43,6 +46,9 @@ public:
   SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) override;
   SysCallIntResult listen(os_fd_t sockfd, int backlog) override;
   SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) override;
+  SysCallSocketResult duplicate(os_fd_t oldfd) override;
+  SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) override;
+  SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

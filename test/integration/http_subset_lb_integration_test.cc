@@ -52,8 +52,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()),
-        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
-                                   GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
+        is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                    GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
@@ -159,14 +159,14 @@ public:
 
       // Expect a response from a host in the correct subset.
       EXPECT_EQ(response->headers()
-                    .get(Envoy::Http::LowerCaseString{host_type_header_})
+                    .get(Envoy::Http::LowerCaseString{host_type_header_})[0]
                     ->value()
                     .getStringView(),
                 expected_host_type);
 
       // Record the upstream address.
       hosts.emplace(response->headers()
-                        .get(Envoy::Http::LowerCaseString{host_header_})
+                        .get(Envoy::Http::LowerCaseString{host_header_})[0]
                         ->value()
                         .getStringView());
 
@@ -186,7 +186,7 @@ public:
     }
   }
 
-  const uint32_t num_hosts_;
+  const uint32_t num_hosts_{4};
   const bool is_hash_lb_;
 
   const std::string hash_header_{"x-hash"};

@@ -34,7 +34,6 @@ private:
 };
 
 using BasePtr = CSmartPtr<event_base, event_base_free>;
-using ListenerPtr = CSmartPtr<evconnlistener, evconnlistener_free>;
 
 } // namespace Libevent
 } // namespace Event

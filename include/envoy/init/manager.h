@@ -1,8 +1,11 @@
 #pragma once
 
+#include "envoy/admin/v3/init_dump.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/init/target.h"
 #include "envoy/init/watcher.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Init {
@@ -73,6 +76,11 @@ struct Manager {
    * @param watcher the watcher to notify when initialization is complete.
    */
   virtual void initialize(const Watcher& watcher) PURE;
+
+  /**
+   * Add unready targets information into the config dump.
+   */
+  virtual void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) PURE;
 };
 
 } // namespace Init

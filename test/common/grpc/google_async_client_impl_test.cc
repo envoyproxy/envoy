@@ -4,7 +4,9 @@
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"
+#include "common/network/address_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -39,12 +41,12 @@ public:
 
 class MockStubFactory : public GoogleStubFactory {
 public:
-  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
+  GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
     return shared_stub_;
   }
 
   MockGenericStub* stub_ = new MockGenericStub();
-  std::shared_ptr<GoogleStub> shared_stub_{stub_};
+  GoogleStubSharedPtr shared_stub_{stub_};
 };
 
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
@@ -58,6 +60,11 @@ public:
     auto* google_grpc = config_.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");
+
+    auto& initial_metadata_entry = *config_.mutable_initial_metadata()->Add();
+    initial_metadata_entry.set_key("downstream-local-address");
+    initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
   }
 
@@ -72,7 +79,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Stats::ScopeSharedPtr scope_;
-  std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
+  GoogleAsyncClientThreadLocalPtr tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   StatNames stat_names_;
@@ -91,6 +98,38 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_TRUE(grpc_stream == nullptr);
+}
+
+// Validate that the metadata header is the initial metadata in gRPC service config and the value is
+// interpolated.
+TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
+  initialize();
+
+  EXPECT_CALL(*stub_factory_.stub_, PrepareCall_(_, _, _)).WillOnce(Return(nullptr));
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
+
+  const std::string expected_downstream_local_address = "5.5.5.5";
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([&expected_downstream_local_address](
+                                                         Http::RequestHeaderMap& headers) {
+                return headers.get(Http::LowerCaseString("downstream-local-address"))[0]->value() ==
+                       expected_downstream_local_address;
+              })));
+
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
+
+  // Prepare the parent context of this call.
+  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
+  Http::AsyncClient::ParentContext parent_context{&stream_info};
+
+  Http::AsyncClient::StreamOptions stream_options;
+  stream_options.setParentContext(parent_context);
+
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
   EXPECT_TRUE(grpc_stream == nullptr);
 }
 

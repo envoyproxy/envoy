@@ -20,7 +20,7 @@ protected:
   ListenerImplTestBase()
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
-            Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
+            Network::Test::getCanonicalLoopbackAddress(version_), Socket::Type::Stream)),
         api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Event::DispatcherImpl& dispatcherImpl() {

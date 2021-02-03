@@ -16,7 +16,8 @@ namespace MongoProxy {
 
 class MongoStats {
 public:
-  MongoStats(Stats::Scope& scope, absl::string_view prefix);
+  MongoStats(Stats::Scope& scope, absl::string_view prefix,
+             const std::vector<std::string>& commands);
 
   void incCounter(const Stats::ElementVec& names);
   void recordHistogram(const Stats::ElementVec& names, Stats::Histogram::Unit unit,

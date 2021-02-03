@@ -9,7 +9,8 @@ Static
 
 A minimal fully static bootstrap config is provided below:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
     access_log_path: /tmp/admin_access.log
@@ -61,7 +62,8 @@ discovery <arch_overview_dynamic_config_eds>` via an
 :ref:`EDS<envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto>` gRPC management server listening
 on 127.0.0.1:5678 is provided below:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
     access_log_path: /tmp/admin_access.log
@@ -97,16 +99,25 @@ on 127.0.0.1:5678 is provided below:
       type: EDS
       eds_cluster_config:
         eds_config:
+          resource_api_version: V3
           api_config_source:
             api_type: GRPC
+            transport_api_version: V3
             grpc_services:
-              envoy_grpc:
-                cluster_name: xds_cluster
+              - envoy_grpc:
+                  cluster_name: xds_cluster
     - name: xds_cluster
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options:
+              connection_keepalive:
+                interval: 30s
+                timeout: 5s
       upstream_connection_options:
         # configure a TCP keep-alive to detect and reconnect to the admin
         # server in the event of a TCP socket half open connection
@@ -159,7 +170,8 @@ A fully dynamic bootstrap configuration, in which all resources other than
 those belonging to the management server are discovered via xDS is provided
 below:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
     access_log_path: /tmp/admin_access.log
@@ -168,17 +180,21 @@ below:
 
   dynamic_resources:
     lds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
+        transport_api_version: V3
         grpc_services:
-          envoy_grpc:
-            cluster_name: xds_cluster
+          - envoy_grpc:
+              cluster_name: xds_cluster
     cds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
+        transport_api_version: V3
         grpc_services:
-          envoy_grpc:
-            cluster_name: xds_cluster
+          - envoy_grpc:
+              cluster_name: xds_cluster
 
   static_resources:
     clusters:
@@ -186,11 +202,16 @@ below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      upstream_connection_options:
-        # configure a TCP keep-alive to detect and reconnect to the admin
-        # server in the event of a TCP socket half open connection
-        tcp_keepalive: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options:
+              # Configure an HTTP/2 keep-alive to detect connection issues and reconnect
+              # to the admin server if the connection is no longer responsive.
+              connection_keepalive:
+                interval: 30s
+                timeout: 5s
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -223,11 +244,13 @@ The management server could respond to LDS requests with:
           rds:
             route_config_name: local_route
             config_source:
+              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
+                transport_api_version: V3
                 grpc_services:
-                  envoy_grpc:
-                    cluster_name: xds_cluster
+                  - envoy_grpc:
+                      cluster_name: xds_cluster
           http_filters:
           - name: envoy.filters.http.router
 
@@ -259,11 +282,13 @@ The management server could respond to CDS requests with:
     type: EDS
     eds_cluster_config:
       eds_config:
+        resource_api_version: V3
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
-            envoy_grpc:
-              cluster_name: xds_cluster
+            - envoy_grpc:
+                cluster_name: xds_cluster
 
 The management server could respond to EDS requests with:
 

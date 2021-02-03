@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -24,6 +24,7 @@ envoy_cc_mock(
     hdrs = ["conn_pool.h"],
     deps = [
         "//include/envoy/http:conn_pool_interface",
+        "//test/mocks:common_lib",
         "//test/mocks/upstream:host_mocks",
     ],
 )
@@ -49,6 +50,8 @@ envoy_cc_mock(
         "//include/envoy/http:filter_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/http:conn_manager_config_interface",
+        "//source/common/http:filter_manager_lib",
         "//source/common/http:header_map_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/router:router_mocks",
@@ -83,6 +86,7 @@ envoy_cc_mock(
     deps = [
         ":stream_mock",
         "//include/envoy/http:codec_interface",
+        "//source/common/http:header_utility_lib",
     ],
 )
 

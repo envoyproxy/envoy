@@ -31,32 +31,30 @@ public:
 
 // tests decodeHeaders() when no cached route is available and vhds is configured
 TEST_F(OnDemandFilterTest, TestDecodeHeaders) {
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   std::shared_ptr<Router::MockConfig> route_config_ptr{new NiceMock<Router::MockConfig>()};
   EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_, routeConfig()).Times(2).WillRepeatedly(Return(route_config_ptr));
-  EXPECT_CALL(*route_config_ptr, usesVhds()).WillOnce(Return(true));
   EXPECT_CALL(decoder_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
 // tests decodeHeaders() when no cached route is available
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailable) {
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
 // tests decodeHeaders() when no route configuration is available
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteConfigIsNotAvailable) {
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   std::shared_ptr<Router::MockConfig> route_config_ptr{new NiceMock<Router::MockConfig>()};
   EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_, routeConfig()).WillOnce(Return(absl::nullopt));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_CALL(decoder_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
-  Http::RequestTrailerMapImpl headers;
+  Http::TestRequestTrailerMapImpl headers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
@@ -93,14 +91,14 @@ TEST_F(OnDemandFilterTest, TestOnRouteConfigUpdateCompletionContinuesDecodingWit
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionContinuesDecodingIfRedirectFails) {
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_, recreateStream()).WillOnce(Return(false));
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(false));
   filter_->onRouteConfigUpdateCompletion(true);
 }
 
 // tests onRouteConfigUpdateCompletion() when route was resolved
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_, recreateStream()).WillOnce(Return(true));
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
   filter_->onRouteConfigUpdateCompletion(true);
 }
 

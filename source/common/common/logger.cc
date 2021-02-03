@@ -10,6 +10,7 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/strip.h"
 #include "spdlog/spdlog.h"
 
@@ -19,18 +20,34 @@ namespace Logger {
 StandardLogger::StandardLogger(const std::string& name)
     : Logger(std::make_shared<spdlog::logger>(name, Registry::getSink())) {}
 
-SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink)
-    : previous_delegate_(log_sink->delegate()), log_sink_(log_sink) {
-  log_sink->setDelegate(this);
-}
+SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink) : log_sink_(log_sink) {}
 
 SinkDelegate::~SinkDelegate() {
-  assert(log_sink_->delegate() == this); // Ensures stacked allocation of delegates.
+  // The previous delegate should have never been set or should have been reset by now via
+  // restoreDelegate();
+  assert(previous_delegate_ == nullptr);
+}
+
+void SinkDelegate::setDelegate() {
+  // There should be no previous delegate before this call.
+  assert(previous_delegate_ == nullptr);
+  previous_delegate_ = log_sink_->delegate();
+  log_sink_->setDelegate(this);
+}
+
+void SinkDelegate::restoreDelegate() {
+  // Ensures stacked allocation of delegates.
+  assert(log_sink_->delegate() == this);
   log_sink_->setDelegate(previous_delegate_);
+  previous_delegate_ = nullptr;
 }
 
 StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
-    : SinkDelegate(log_sink) {}
+    : SinkDelegate(log_sink) {
+  setDelegate();
+}
+
+StderrSinkDelegate::~StderrSinkDelegate() { restoreDelegate(); }
 
 void StderrSinkDelegate::log(absl::string_view msg) {
   Thread::OptionalLockGuard guard(lock_);
@@ -60,6 +77,13 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
   lock.Release();
 
+  // Hold the sink mutex while performing the actual logging. This prevents the sink from being
+  // swapped during an individual log event.
+  // TODO(mattklein123): In production this lock will never be contended. In practice, thread
+  // protection is really only needed in tests. It would be nice to figure out a test-only
+  // mechanism for this that does not require extra locking that we don't explicitly need in the
+  // prod code.
+  absl::ReaderMutexLock sink_lock(&sink_mutex_);
   if (should_escape_) {
     sink_->log(escapeLogLine(msg_view));
   } else {
@@ -87,9 +111,9 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape)
+                 Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      save_context_(current_context) {
+      enable_fine_grain_logging_(enable_fine_grain_logging), save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -105,9 +129,61 @@ Context::~Context() {
 
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
-  Registry::getSink()->set_should_escape(should_escape_);
+  Registry::getSink()->setShouldEscape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
+
+  // sets level and format for Fancy Logger
+  fancy_default_level_ = log_level_;
+  fancy_log_format_ = log_format_;
+  if (enable_fine_grain_logging_) {
+    // loggers with default level before are set to log_level_ as new default
+    getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
+    if (log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
+      fancy_log_format_ = absl::StrReplaceAll(log_format_, {{"[%n]", ""}});
+    }
+  }
+}
+
+bool Context::useFancyLogger() {
+  if (current_context) {
+    return current_context->enable_fine_grain_logging_;
+  }
+  return false;
+}
+
+void Context::enableFancyLogger() {
+  current_context->enable_fine_grain_logging_ = true;
+  if (current_context) {
+    getFancyContext().setDefaultFancyLevelFormat(current_context->log_level_,
+                                                 current_context->log_format_);
+    current_context->fancy_default_level_ = current_context->log_level_;
+    current_context->fancy_log_format_ = current_context->log_format_;
+    if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
+      current_context->fancy_log_format_ =
+          absl::StrReplaceAll(current_context->log_format_, {{"[%n]", ""}});
+    }
+  }
+}
+
+void Context::disableFancyLogger() {
+  if (current_context) {
+    current_context->enable_fine_grain_logging_ = false;
+  }
+}
+
+std::string Context::getFancyLogFormat() {
+  if (!current_context) { // Context is not instantiated in benchmark test
+    return "[%Y-%m-%d %T.%e][%t][%l] %v";
+  }
+  return current_context->fancy_log_format_;
+}
+
+spdlog::level::level_enum Context::getFancyDefaultLevel() {
+  if (!current_context) {
+    return spdlog::level::info;
+  }
+  return current_context->fancy_default_level_;
 }
 
 std::vector<Logger>& Registry::allLoggers() {
@@ -126,7 +202,12 @@ void Registry::setLogLevel(spdlog::level::level_enum log_level) {
 
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
-    logger.logger_->set_pattern(log_format);
+    auto formatter = std::make_unique<spdlog::pattern_formatter>();
+    formatter
+        ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
+            CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
+        .set_pattern(log_format);
+    logger.logger_->set_formatter(std::move(formatter));
   }
 }
 
@@ -141,5 +222,15 @@ Logger* Registry::logger(const std::string& log_name) {
   return logger_to_return;
 }
 
+namespace CustomFlagFormatter {
+
+void EscapeMessageNewLine::format(const spdlog::details::log_msg& msg, const std::tm&,
+                                  spdlog::memory_buf_t& dest) {
+  auto escaped = absl::StrReplaceAll(absl::string_view(msg.payload.data(), msg.payload.size()),
+                                     replacements());
+  dest.append(escaped.data(), escaped.data() + escaped.size());
+}
+
+} // namespace CustomFlagFormatter
 } // namespace Logger
 } // namespace Envoy

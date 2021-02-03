@@ -5,6 +5,9 @@ package envoy.service.ratelimit.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -49,6 +52,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
+// [#next-free-field: 7]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -69,6 +73,8 @@ message RateLimitResponse {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.RateLimit";
 
+    // Identifies the unit of of time for rate limit.
+    // [#comment: replace by envoy/type/v3/ratelimit_unit.proto in v4]
     enum Unit {
       // The time unit is not known.
       UNKNOWN = 0;
@@ -108,6 +114,9 @@ message RateLimitResponse {
 
     // The limit remaining in the current time unit.
     uint32 limit_remaining = 3;
+
+    // Duration until reset of the current limit window.
+    google.protobuf.Duration duration_until_reset = 4;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed
@@ -124,4 +133,16 @@ message RateLimitResponse {
 
   // A list of headers to add to the request when forwarded
   repeated config.core.v3.HeaderValue request_headers_to_add = 4;
+
+  // A response body to send to the downstream client when the response code is not OK.
+  bytes raw_body = 5;
+
+  // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
+  // filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  // that requires it:
+  //
+  // - :ref:`envoy.filters.http.ratelimit <config_http_filters_ratelimit_dynamic_metadata>` for HTTP filter.
+  // - :ref:`envoy.filters.network.ratelimit <config_network_filters_ratelimit_dynamic_metadata>` for network filter.
+  // - :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit_dynamic_metadata>` for Thrift filter.
+  google.protobuf.Struct dynamic_metadata = 6;
 }

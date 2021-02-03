@@ -30,9 +30,9 @@ void validateJwtConfig(const JwtAuthentication& proto_config, Api::Api& api) {
     if (!inline_jwks.empty()) {
       auto jwks_obj = Jwks::createFrom(inline_jwks, Jwks::JWKS);
       if (jwks_obj->getStatus() != Status::Ok) {
-        throw EnvoyException(fmt::format(
-            "Issuer '{}' in jwt_authn config has invalid local jwks: {}", provider.issuer(),
-            ::google::jwt_verify::getStatusString(jwks_obj->getStatus())));
+        throw EnvoyException(
+            fmt::format("Provider '{}' in jwt_authn config has invalid local jwks: {}", it.first,
+                        ::google::jwt_verify::getStatusString(jwks_obj->getStatus())));
       }
     }
   }
@@ -49,6 +49,14 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));
   };
+}
+
+Envoy::Router::RouteSpecificFilterConfigConstSharedPtr
+FilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig& per_route,
+    Envoy::Server::Configuration::ServerFactoryContext&,
+    Envoy::ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<PerRouteFilterConfig>(per_route);
 }
 
 /**

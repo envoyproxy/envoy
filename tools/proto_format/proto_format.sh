@@ -5,6 +5,9 @@
 set -e
 set -x
 
+read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
+
+
 [[ "$1" == "check" || "$1" == "fix" || "$1" == "freeze" ]] || \
   (echo "Usage: $0 <check|fix|freeze>"; exit 1)
 
@@ -18,14 +21,14 @@ if [[ "$2" == "--test" ]]
 then
   echo "protoxform_test..."
   ./tools/protoxform/protoxform_test.sh
-  bazel test ${BAZEL_BUILD_OPTIONS} //tools/protoxform:merge_active_shadow_test
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
 fi
 
 # Generate //versioning:active_protos and //versioning::frozen_protos.
 ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
+BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=all")
 
 # If the specified command is 'freeze', we tell protoxform to adjust package version status to
 # reflect a major version freeze and then do a regular 'fix'.
@@ -37,24 +40,28 @@ then
 fi
 
 # Invoke protoxform aspect.
-bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_target=@envoy_api_canonical//versioning:active_protos ${FREEZE_ARG} \
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api_canonical//versioning:active_protos ${FREEZE_ARG} \
   @envoy_api_canonical//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 
 # Find all source protos.
-declare -r ACTIVE_PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:active_protos))")
-declare -r FROZEN_PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:frozen_protos))")
+PROTO_TARGETS=()
+for proto_type in active frozen; do
+    protos=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:${proto_type}_protos))")
+    while read -r line; do PROTO_TARGETS+=("$line"); done \
+	<<< "$protos"
+done
 
 # Setup for proto_sync.py.
-TOOLS=$(dirname $(dirname $(realpath $0)))
+TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
 # To satisfy dependency on api_proto_plugin.
 export PYTHONPATH="$TOOLS"
 # Build protoprint and merge_active_shadow_tools for use in proto_sync.py.
-bazel build ${BAZEL_BUILD_OPTIONS} //tools/protoxform:protoprint //tools/protoxform:merge_active_shadow
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint //tools/protoxform:merge_active_shadow
 
 # Copy back the FileDescriptorProtos that protoxform emittted to the source tree. This involves
 # pretty-printing to format with protoprint and potentially merging active/shadow versions of protos
 # with merge_active_shadow.
-./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" ${ACTIVE_PROTO_TARGETS} ${FROZEN_PROTO_TARGETS}
+./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}"
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
 if [[ "$1" == "freeze" ]]
@@ -63,7 +70,7 @@ then
 fi
 
 # Generate api/BUILD file based on updated type database.
-bazel build ${BAZEL_BUILD_OPTIONS} //tools/type_whisperer:api_build_file
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
 
 # Misc. manual copies to keep generated_api_shadow/ in sync with api/.

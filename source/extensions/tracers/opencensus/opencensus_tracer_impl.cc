@@ -6,7 +6,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
-#include "common/grpc/google_grpc_utils.h"
+#include "common/common/empty_string.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -24,12 +24,18 @@
 #include "opencensus/trace/trace_config.h"
 #include "opencensus/trace/trace_params.h"
 
+#ifdef ENVOY_GOOGLE_GRPC
+#include "common/grpc/google_grpc_utils.h"
+#endif
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
+#ifdef ENVOY_GOOGLE_GRPC
 constexpr char GoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
+#endif
 
 namespace {
 
@@ -68,6 +74,12 @@ public:
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
 
+  // OpenCensus doesn't support baggage, so noop these OpenTracing functions.
+  void setBaggage(absl::string_view, absl::string_view) override{};
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; };
+
+  std::string getTraceIdAsHex() const override;
+
 private:
   ::opencensus::trace::Span span_;
   const envoy::config::trace::v3::OpenCensusConfig& oc_config_;
@@ -83,31 +95,34 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
     bool found = false;
     switch (incoming) {
     case OpenCensusConfig::TRACE_CONTEXT: {
-      const Http::HeaderEntry* header = request_headers.get(Constants::get().TRACEPARENT);
-      if (header != nullptr) {
+      const auto header = request_headers.get(Constants::get().TRACEPARENT);
+      if (!header.empty()) {
         found = true;
+        // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(
-            header->value().getStringView());
+            header[0]->value().getStringView());
       }
       break;
     }
 
     case OpenCensusConfig::GRPC_TRACE_BIN: {
-      const Http::HeaderEntry* header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
-      if (header != nullptr) {
+      const auto header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
+      if (!header.empty()) {
         found = true;
+        // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
-            Base64::decodeWithoutPadding(header->value().getStringView()));
+            Base64::decodeWithoutPadding(header[0]->value().getStringView()));
       }
       break;
     }
 
     case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
-      const Http::HeaderEntry* header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
-      if (header != nullptr) {
+      const auto header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
+      if (!header.empty()) {
         found = true;
+        // This is an implicitly untrusted header, so only the first value is used.
         parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(
-            header->value().getStringView());
+            header[0]->value().getStringView());
       }
       break;
     }
@@ -117,23 +132,27 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
       absl::string_view b3_span_id;
       absl::string_view b3_sampled;
       absl::string_view b3_flags;
-      const Http::HeaderEntry* h_b3_trace_id = request_headers.get(Constants::get().X_B3_TRACEID);
-      if (h_b3_trace_id != nullptr) {
-        b3_trace_id = h_b3_trace_id->value().getStringView();
+      const auto h_b3_trace_id = request_headers.get(Constants::get().X_B3_TRACEID);
+      if (!h_b3_trace_id.empty()) {
+        // This is an implicitly untrusted header, so only the first value is used.
+        b3_trace_id = h_b3_trace_id[0]->value().getStringView();
       }
-      const Http::HeaderEntry* h_b3_span_id = request_headers.get(Constants::get().X_B3_SPANID);
-      if (h_b3_span_id != nullptr) {
-        b3_span_id = h_b3_span_id->value().getStringView();
+      const auto h_b3_span_id = request_headers.get(Constants::get().X_B3_SPANID);
+      if (!h_b3_span_id.empty()) {
+        // This is an implicitly untrusted header, so only the first value is used.
+        b3_span_id = h_b3_span_id[0]->value().getStringView();
       }
-      const Http::HeaderEntry* h_b3_sampled = request_headers.get(Constants::get().X_B3_SAMPLED);
-      if (h_b3_sampled != nullptr) {
-        b3_sampled = h_b3_sampled->value().getStringView();
+      const auto h_b3_sampled = request_headers.get(Constants::get().X_B3_SAMPLED);
+      if (!h_b3_sampled.empty()) {
+        // This is an implicitly untrusted header, so only the first value is used.
+        b3_sampled = h_b3_sampled[0]->value().getStringView();
       }
-      const Http::HeaderEntry* h_b3_flags = request_headers.get(Constants::get().X_B3_FLAGS);
-      if (h_b3_flags != nullptr) {
-        b3_flags = h_b3_flags->value().getStringView();
+      const auto h_b3_flags = request_headers.get(Constants::get().X_B3_FLAGS);
+      if (!h_b3_flags.empty()) {
+        // This is an implicitly untrusted header, so only the first value is used.
+        b3_flags = h_b3_flags[0]->value().getStringView();
       }
-      if (h_b3_trace_id != nullptr && h_b3_span_id != nullptr) {
+      if (!h_b3_trace_id.empty() && !h_b3_span_id.empty()) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromB3Headers(b3_trace_id, b3_span_id,
                                                                      b3_sampled, b3_flags);
@@ -227,6 +246,11 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   }
 }
 
+std::string Span::getTraceIdAsHex() const {
+  const auto& ctx = span_.context();
+  return ctx.trace_id().ToHex();
+}
+
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::string& name,
                                   SystemTime /*start_time*/) {
   span_.AddAnnotation("spawnChild");
@@ -267,6 +291,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     } else if (oc_config.has_stackdriver_grpc_service() &&
                oc_config.stackdriver_grpc_service().has_google_grpc()) {
+#ifdef ENVOY_GOOGLE_GRPC
       envoy::config::core::v3::GrpcService stackdriver_service =
           oc_config.stackdriver_grpc_service();
       if (stackdriver_service.google_grpc().target_uri().empty()) {
@@ -275,7 +300,21 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
         stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
       }
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
+      // TODO(bianpengyuan): add tests for trace_service_stub and initial_metadata options with mock
+      // stubs.
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+      const auto& initial_metadata = stackdriver_service.initial_metadata();
+      if (!initial_metadata.empty()) {
+        opts.prepare_client_context = [initial_metadata](grpc::ClientContext* ctx) {
+          for (const auto& metadata : initial_metadata) {
+            ctx->AddMetadata(metadata.key(), metadata.value());
+          }
+        };
+      }
+#else
+      throw EnvoyException("Opencensus tracer: cannot handle stackdriver google grpc service, "
+                           "google grpc is not built in.");
+#endif
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
   }
@@ -290,11 +329,16 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       opts.address = oc_config.ocagent_address();
     } else if (oc_config.has_ocagent_grpc_service() &&
                oc_config.ocagent_grpc_service().has_google_grpc()) {
+#ifdef ENVOY_GOOGLE_GRPC
       const envoy::config::core::v3::GrpcService& ocagent_service =
           oc_config.ocagent_grpc_service();
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
       opts.trace_service_stub =
           ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
+#else
+      throw EnvoyException("Opencensus tracer: cannot handle ocagent google grpc service, google "
+                           "grpc is not built in.");
+#endif
     }
     opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));

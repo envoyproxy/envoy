@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/timer.h"
@@ -34,6 +35,23 @@ namespace Upstream {
  */
 struct HealthCheckerStats {
   ALL_HEALTH_CHECKER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * HealthCheckerHash and HealthCheckerEqualTo are used to allow the HealthCheck proto to be used as
+ * a flat_hash_map key.
+ */
+struct HealthCheckerHash {
+  size_t operator()(const envoy::config::core::v3::HealthCheck& health_check) const {
+    return MessageUtil::hash(health_check);
+  }
+};
+
+struct HealthCheckerEqualTo {
+  bool operator()(const envoy::config::core::v3::HealthCheck& lhs,
+                  const envoy::config::core::v3::HealthCheck& rhs) const {
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
+  }
 };
 
 /**
@@ -94,7 +112,7 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
@@ -108,7 +126,7 @@ protected:
   const uint32_t healthy_threshold_;
   HealthCheckerStats stats_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const bool reuse_connection_;
   HealthCheckEventLoggerPtr event_logger_;
 
@@ -135,7 +153,6 @@ private:
   std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
-  void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>
@@ -148,15 +165,14 @@ private:
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
+  const std::chrono::milliseconds no_traffic_healthy_interval_;
   const std::chrono::milliseconds initial_jitter_;
   const std::chrono::milliseconds interval_jitter_;
   const uint32_t interval_jitter_percent_;
   const std::chrono::milliseconds unhealthy_interval_;
   const std::chrono::milliseconds unhealthy_edge_interval_;
   const std::chrono::milliseconds healthy_edge_interval_;
-  std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
-  uint64_t local_process_healthy_{};
-  uint64_t local_process_degraded_{};
+  absl::node_hash_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
 };

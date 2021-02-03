@@ -15,20 +15,27 @@ static constexpr uint32_t RetryCount = 1;
 
 std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
                  Api::Api& api) {
+  std::string data;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
-    return api.fileSystem().fileReadToEnd(source.filename());
+    data = api.fileSystem().fileReadToEnd(source.filename());
+    break;
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes:
-    return source.inline_bytes();
+    data = source.inline_bytes();
+    break;
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineString:
-    return source.inline_string();
+    data = source.inline_string();
+    break;
   default:
     if (!allow_empty) {
       throw EnvoyException(
           fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
     }
-    return "";
   }
+  if (!allow_empty && data.empty()) {
+    throw EnvoyException("DataSource cannot be empty");
+  }
+  return data;
 }
 
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {
@@ -40,7 +47,7 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     Upstream::ClusterManager& cm, Init::Manager& manager,
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
-    Runtime::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
+    Random::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
     : allow_empty_(allow_empty), callback_(std::move(callback)),
       fetcher_(std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
                                                                         source.sha256(), *this)),
@@ -64,8 +71,8 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     }
   }
 
-  backoff_strategy_ =
-      std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+  backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms,
+                                                                           max_interval_ms, random);
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
 
   manager.add(init_target_);

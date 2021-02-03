@@ -22,6 +22,8 @@ public:
     tls_xds_upstream_ = false;
     defer_listener_finalization_ = true;
     skipPortUsageValidation();
+    // Keep using V2 bootstrap for now to allow V2 transport version.
+    v2_bootstrap_ = true;
   }
 
   static bool hasHiddenEnvoyDeprecated(const Protobuf::Message& message) {
@@ -58,7 +60,7 @@ public:
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
-      xds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*xds_cluster);
       if (ads()) {
         auto* api_config_source = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
         api_config_source->set_transport_api_version(transportApiVersion());
@@ -218,8 +220,6 @@ public:
     if (xds_stream_ != nullptr) {
       cleanUpXdsConnection();
     }
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   std::string endpoint_;
@@ -270,7 +270,7 @@ INSTANTIATE_TEST_SUITE_P(
                                      envoy::config::core::v3::ApiVersion::V3)),
     ApiVersionIntegrationTest::paramsToString);
 
-TEST_P(ApiVersionIntegrationTest, Lds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Lds)) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     setupConfigSource(*bootstrap.mutable_dynamic_resources()->mutable_lds_config());
   });
@@ -284,7 +284,7 @@ TEST_P(ApiVersionIntegrationTest, Lds) {
       "type.googleapis.com/envoy.config.listener.v3.Listener"));
 }
 
-TEST_P(ApiVersionIntegrationTest, Cds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Cds)) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     setupConfigSource(*bootstrap.mutable_dynamic_resources()->mutable_cds_config());
   });
@@ -298,7 +298,7 @@ TEST_P(ApiVersionIntegrationTest, Cds) {
       "type.googleapis.com/envoy.config.cluster.v3.Cluster"));
 }
 
-TEST_P(ApiVersionIntegrationTest, Eds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Eds)) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
     cluster->MergeFrom(bootstrap.static_resources().clusters(0));
@@ -316,11 +316,13 @@ TEST_P(ApiVersionIntegrationTest, Eds) {
       "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"));
 }
 
-TEST_P(ApiVersionIntegrationTest, Rtds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Rtds)) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
-    admin_layer->set_name("admin layer");
-    admin_layer->mutable_admin_layer();
+    if (bootstrap.mutable_layered_runtime()->layers_size() == 0) {
+      auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
+      admin_layer->set_name("admin layer");
+      admin_layer->mutable_admin_layer();
+    }
     auto* rtds_layer = bootstrap.mutable_layered_runtime()->add_layers();
     rtds_layer->set_name("rtds_layer");
     setupConfigSource(*rtds_layer->mutable_rtds_layer()->mutable_rtds_config());
@@ -335,7 +337,7 @@ TEST_P(ApiVersionIntegrationTest, Rtds) {
       "type.googleapis.com/envoy.service.runtime.v3.Runtime"));
 }
 
-TEST_P(ApiVersionIntegrationTest, Rds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Rds)) {
   // TODO(htuch): this segfaults, this is likely some untested existing issue.
   if (apiType() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
     return;
@@ -362,7 +364,7 @@ TEST_P(ApiVersionIntegrationTest, Rds) {
 // TEST_P(ApiVersionIntegrationTest, Vhds) {
 // }
 
-TEST_P(ApiVersionIntegrationTest, Srds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Srds)) {
   config_helper_.addConfigModifier(
       [this](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -395,7 +397,7 @@ fragments:
       "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration"));
 }
 
-TEST_P(ApiVersionIntegrationTest, Sds) {
+TEST_P(ApiVersionIntegrationTest, DEPRECATED_FEATURE_TEST(Sds)) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* transport_socket = listener->mutable_filter_chains(0)->mutable_transport_socket();

@@ -65,7 +65,7 @@ public:
   pickTargetHandler(BalancedConnectionHandler& current_handler) PURE;
 };
 
-using ConnectionBalancerPtr = std::unique_ptr<ConnectionBalancer>;
+using ConnectionBalancerSharedPtr = std::shared_ptr<ConnectionBalancer>;
 
 } // namespace Network
 } // namespace Envoy

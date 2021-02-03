@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //
 // A JwtProvider message specifies how a JSON Web Token (JWT) can be verified. It specifies:
 //
-// * issuer: the principal that issues the JWT. It has to match the one from the token.
+// * issuer: the principal that issues the JWT. If specified, it has to match the *iss* field in JWT.
 // * allowed audiences: the ones in the token have to be listed here.
 // * how to fetch public key JWKS to verify the token signature.
 // * how to extract JWT token in the request.
@@ -48,10 +48,11 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       http_uri:
 //         uri: https://example.com/.well-known/jwks.json
 //         cluster: example_jwks_cluster
+//         timeout: 1s
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -59,10 +60,24 @@ message JwtProvider {
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
   // the JWT, usually a URL or an email address.
   //
+  // It is optional. If specified, it has to match the *iss* field in JWT.
+  //
+  // If a JWT has *iss* field and this field is specified, they have to match, otherwise the
+  // JWT *iss* field is not checked.
+  //
+  // Note: *JwtRequirement* :ref:`allow_missing <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing>`
+  // and :ref:`allow_missing_or_failed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing_or_failed>`
+  // are implemented differently than other *JwtRequirements*. Hence the usage of this field
+  // is different as follows if *allow_missing* or *allow_missing_or_failed* is used:
+  //
+  // * If a JWT has *iss* field, it needs to be specified by this field in one of *JwtProviders*.
+  // * If a JWT doesn't have *iss* field, one of *JwtProviders* should fill this field empty.
+  // * Multiple *JwtProviders* should not have same value in this field.
+  //
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com
   //
-  string issuer = 1 [(validate.rules).string = {min_bytes: 1}];
+  string issuer = 1;
 
   // The list of JWT `audiences <https://tools.ietf.org/html/rfc7519#section-4.1.3>`_ are
   // allowed to access. A JWT containing any of these audiences will be accepted. If not specified,
@@ -94,6 +109,7 @@ message JwtProvider {
     //      http_uri:
     //        uri: https://www.googleapis.com/oauth2/v1/certs
     //        cluster: jwt.www.googleapis.com|443
+    //        timeout: 1s
     //      cache_duration:
     //        seconds: 300
     //
@@ -191,6 +207,10 @@ message JwtProvider {
   //       exp: 1501281058
   //
   string payload_in_metadata = 9;
+
+  // Specify the clock skew in seconds when verifying JWT time constraint,
+  // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
+  uint32 clock_skew_seconds = 10;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
@@ -205,6 +225,7 @@ message RemoteJwks {
   //    http_uri:
   //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
+  //      timeout: 1s
   //
   config.core.v4alpha.HttpUri http_uri = 1;
 
@@ -220,7 +241,7 @@ message JwtHeader {
 
   // The HTTP header name.
   string name = 1
-      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
@@ -388,8 +409,18 @@ message RequirementRule {
   //
   config.route.v4alpha.RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
-  // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
-  JwtRequirement requires = 2;
+  // Specify a Jwt requirement.
+  // If not specified, Jwt verification is disabled.
+  oneof requirement_type {
+    // Specify a Jwt requirement. Please see detail comment in message JwtRequirement.
+    JwtRequirement requires = 2;
+
+    // Use requirement_name to specify a Jwt requirement.
+    // This requirement_name MUST be specified at the
+    // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
+    // in `JwtAuthentication`.
+    string requirement_name = 3 [(validate.rules).string = {min_len: 1}];
+  }
 }
 
 // This message specifies Jwt requirements based on stream_info.filterState.
@@ -414,7 +445,7 @@ message FilterStateRule {
       "envoy.extensions.filters.http.jwt_authn.v3.FilterStateRule";
 
   // The filter state name to retrieve the `Router::StringAccessor` object.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.
@@ -437,6 +468,7 @@ message FilterStateRule {
 //          http_uri:
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
+//            timeout: 1s
 //      provider2:
 //        issuer: issuer2
 //        local_jwks:
@@ -462,6 +494,7 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
+// [#next-free-field: 6]
 message JwtAuthentication {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication";
@@ -480,6 +513,7 @@ message JwtAuthentication {
   //          http_uri:
   //            uri: https://example.com/.well-known/jwks.json
   //            cluster: example_jwks_cluster
+  //            timeout: 1s
   //      provider2:
   //        issuer: provider2
   //        local_jwks:
@@ -528,4 +562,28 @@ message JwtAuthentication {
   // <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ regardless of JWT
   // requirements specified in the rules.
   bool bypass_cors_preflight = 4;
+
+  // A map of unique requirement_names to JwtRequirements.
+  // :ref:`requirement_name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.PerRouteConfig.requirement_name>`
+  // in `PerRouteConfig` uses this map to specify a JwtRequirement.
+  map<string, JwtRequirement> requirement_map = 5;
+}
+
+// Specify per-route config.
+message PerRouteConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig";
+
+  oneof requirement_specifier {
+    option (validate.required) = true;
+
+    // Disable Jwt Authentication for this route.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Use requirement_name to specify a JwtRequirement.
+    // This requirement_name MUST be specified at the
+    // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
+    // in `JwtAuthentication`. If no, the requests using this route will be rejected with 403.
+    string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
+  }
 }

@@ -24,6 +24,9 @@ public:
    */
   CallbackHandle* add(Callback callback) {
     callbacks_.emplace_back(*this, callback);
+    // get the list iterator of added callback handle, which will be used to remove itself from
+    // callbacks_ list.
+    callbacks_.back().it_ = (--callbacks_.end());
     return &callbacks_.back();
   }
 
@@ -46,24 +49,21 @@ private:
     CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(cb) {}
 
     // CallbackHandle
-    void remove() override { parent_.remove(this); }
+    void remove() override { parent_.remove(it_); }
 
     CallbackManager& parent_;
     Callback cb_;
+
+    // the iterator of this callback holder inside callbacks_ list
+    // upon removal, use this iterator to delete callback holder in O(1)
+    typename std::list<CallbackHolder>::iterator it_;
   };
 
   /**
    * Remove a member update callback added via add().
    * @param handle supplies the callback handle to remove.
    */
-  void remove(CallbackHandle* handle) {
-    ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(),
-                        [handle](const CallbackHolder& holder) -> bool {
-                          return handle == &holder;
-                        }) != callbacks_.end());
-    callbacks_.remove_if(
-        [handle](const CallbackHolder& holder) -> bool { return handle == &holder; });
-  }
+  void remove(typename std::list<CallbackHolder>::iterator& it) { callbacks_.erase(it); }
 
   std::list<CallbackHolder> callbacks_;
 };

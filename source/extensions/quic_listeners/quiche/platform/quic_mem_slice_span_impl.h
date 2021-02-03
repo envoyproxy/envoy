@@ -9,7 +9,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "absl/container/fixed_array.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
+#include "absl/strings/string_view.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 
@@ -20,7 +20,7 @@ namespace quic {
 // Wraps a Buffer::Instance and deliver its data with minimum number of copies.
 class QuicMemSliceSpanImpl {
 public:
-  QuicMemSliceSpanImpl() : buffer_(nullptr) {}
+  QuicMemSliceSpanImpl() = default;
   /**
    * @param buffer has to outlive the life time of this class.
    */
@@ -43,9 +43,13 @@ public:
   }
 
   // QuicMemSliceSpan
-  quiche::QuicheStringPiece GetData(size_t index);
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  absl::string_view GetData(size_t index);
+  // NOLINTNEXTLINE(readability-identifier-naming)
   QuicByteCount total_length() { return buffer_->length(); };
+  // NOLINTNEXTLINE(readability-identifier-naming)
   size_t NumSlices() { return buffer_->getRawSlices().size(); }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume);
   bool empty() const { return buffer_->length() == 0; }
 
@@ -54,6 +58,7 @@ private:
 };
 
 template <typename ConsumeFunction>
+// NOLINTNEXTLINE(readability-identifier-naming)
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
   size_t saved_length = 0;
   for (auto& slice : buffer_->getRawSlices()) {

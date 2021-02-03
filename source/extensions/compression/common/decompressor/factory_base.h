@@ -17,7 +17,8 @@ public:
                                      Server::Configuration::FactoryContext& context) override {
     return createDecompressorFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
-                                                             context.messageValidationVisitor()));
+                                                             context.messageValidationVisitor()),
+        context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -31,7 +32,8 @@ protected:
 
 private:
   virtual Envoy::Compression::Decompressor::DecompressorFactoryPtr
-  createDecompressorFactoryFromProtoTyped(const ConfigProto&) PURE;
+  createDecompressorFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                          Server::Configuration::FactoryContext& context) PURE;
 
   const std::string name_;
 };

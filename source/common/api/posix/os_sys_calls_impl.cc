@@ -73,6 +73,83 @@ bool OsSysCallsImpl::supportsMmsg() const {
 #endif
 }
 
+bool OsSysCallsImpl::supportsUdpGro() const {
+#if !defined(__linux__)
+  return false;
+#else
+  static const bool is_supported = [] {
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int val = 1;
+    bool result = (0 == ::setsockopt(fd, IPPROTO_UDP, UDP_GRO, &val, sizeof(val)));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+}
+
+bool OsSysCallsImpl::supportsUdpGso() const {
+#if !defined(__linux__)
+  return false;
+#else
+  static const bool is_supported = [] {
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int optval;
+    socklen_t optlen = sizeof(optval);
+    bool result = (0 <= ::getsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &optval, &optlen));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+}
+
+bool OsSysCallsImpl::supportsIpTransparent() const {
+#if !defined(__linux__) || !defined(IPV6_TRANSPARENT)
+  return false;
+#else
+  // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
+  // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv4/ip_sockglue.c?id=f5715aea4564f233767ea1d944b2637a5fd7cd2e
+  //
+  // The linux kernel supports IPV6_TRANSPARENT by following patch(starting from v2.6.37) :
+  // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv6/ipv6_sockglue.c?id=6c46862280c5f55eda7750391bc65cd7e08c7535
+  //
+  // So, almost recent linux kernel supports both IP_TRANSPARENT and IPV6_TRANSPARENT options.
+  //
+  // And these socket options need CAP_NET_ADMIN capability to be applied.
+  // The CAP_NET_ADMIN capability should be applied by root user before call this function.
+  static const bool is_supported = [] {
+    // Check ipv4 case
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int val = 1;
+    bool result = (0 == ::setsockopt(fd, IPPROTO_IP, IP_TRANSPARENT, &val, sizeof(val)));
+    ::close(fd);
+    if (!result) {
+      return false;
+    }
+    // Check ipv6 case
+    fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    val = 1;
+    result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};
@@ -163,6 +240,45 @@ SysCallIntResult OsSysCallsImpl::listen(os_fd_t sockfd, int backlog) {
 SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size_t length) {
   const ssize_t rc = ::write(sockfd, buffer, length);
   return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSocketResult OsSysCallsImpl::duplicate(os_fd_t oldfd) {
+  const int rc = ::dup(oldfd);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+  os_fd_t rc;
+
+#if defined(__linux__)
+  rc = ::accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
+  // If failed with EINVAL try without flags
+  if (rc >= 0 || errno != EINVAL) {
+    return {rc, rc != -1 ? 0 : errno};
+  }
+#endif
+
+  rc = ::accept(sockfd, addr, addrlen);
+  if (rc >= 0) {
+    setsocketblocking(rc, false);
+  }
+
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
+                                                [[maybe_unused]] EnvoyTcpInfo* tcp_info) {
+#ifdef TCP_INFO
+  struct tcp_info unix_tcp_info;
+  socklen_t len = sizeof(unix_tcp_info);
+  auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
+  if (!SOCKET_FAILURE(result)) {
+    tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
+  }
+  return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
+#endif
+
+  return {false, EOPNOTSUPP};
 }
 
 } // namespace Api

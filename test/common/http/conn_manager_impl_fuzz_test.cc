@@ -19,10 +19,10 @@
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -34,9 +34,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -62,7 +63,8 @@ public:
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
-  FuzzConfig()
+  FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
+                 HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
       : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "", fake_stats_),
@@ -74,6 +76,7 @@ public:
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
     request_id_extension_ = RequestIDExtensionFactory::defaultInstance(random_);
+    forward_client_cert_ = fromClientCert(forward_client_cert);
   }
 
   void newStream() {
@@ -87,8 +90,42 @@ public:
           callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
           callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
         }));
-    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+        .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+          decoder_filter_->callbacks_ = &callbacks;
+          callbacks.streamInfo().setResponseCodeDetails("");
+        }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
+        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                   FilterChainFactoryCallbacks& callbacks) -> bool {
+          filter_factory_.createFilterChain(callbacks);
+          return true;
+        }));
+  }
+
+  Http::ForwardClientCertType
+  fromClientCert(envoy::extensions::filters::network::http_connection_manager::v3::
+                     HttpConnectionManager::ForwardClientCertDetails forward_client_cert) {
+    switch (forward_client_cert) {
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SANITIZE:
+      return Http::ForwardClientCertType::Sanitize;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        FORWARD_ONLY:
+      return Http::ForwardClientCertType::ForwardOnly;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        APPEND_FORWARD:
+      return Http::ForwardClientCertType::AppendForward;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SANITIZE_SET:
+      return Http::ForwardClientCertType::SanitizeSet;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ALWAYS_FORWARD_ONLY:
+      return Http::ForwardClientCertType::AlwaysForwardOnly;
+    default:
+      return Http::ForwardClientCertType::Sanitize;
+    }
   }
 
   // Http::ConnectionManagerConfig
@@ -117,6 +154,9 @@ public:
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
+  std::chrono::milliseconds requestHeadersTimeout() const override {
+    return request_headers_timeout_;
+  }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   Router::RouteConfigProvider* routeConfigProvider() override {
     if (use_srds_) {
@@ -154,10 +194,13 @@ public:
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  bool streamErrorOnInvalidHttpMessaging() const override {
+    return stream_error_on_invalid_http_messaging_;
+  }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
-  bool shouldStripMatchingPort() const override { return false; }
+  Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
@@ -166,7 +209,7 @@ public:
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
@@ -192,15 +235,17 @@ public:
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
+  std::chrono::milliseconds request_headers_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   bool use_remote_address_{true};
-  Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
+  Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
   Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
+  bool stream_error_on_invalid_http_messaging_ = false;
   bool preserve_external_request_id_{false};
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -218,7 +263,12 @@ public:
   // course, it's the codecs must be robust to wire-level violations. We
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
-  enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
+  enum class StreamState {
+    PendingHeaders,
+    PendingNonInformationalHeaders,
+    PendingDataOrTrailers,
+    Closed
+  };
 
   FuzzStream(ConnectionManagerImpl& conn_manager, FuzzConfig& config,
              const HeaderMap& request_headers,
@@ -272,8 +322,6 @@ public:
       return Http::FilterHeadersStatus::Continue;
     case test::common::http::HeaderStatus::HEADER_STOP_ITERATION:
       return Http::FilterHeadersStatus::StopIteration;
-    case test::common::http::HeaderStatus::HEADER_CONTINUE_AND_END_STREAM:
-      return Http::FilterHeadersStatus::ContinueAndEndStream;
     case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_BUFFER:
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_WATERMARK:
@@ -413,21 +461,31 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
+        // for coalescing.
+        state = StreamState::PendingNonInformationalHeaders;
       }
       break;
     }
     case test::common::http::ResponseAction::kHeaders: {
-      if (state == StreamState::PendingHeaders) {
+      if (state == StreamState::PendingHeaders ||
+          state == StreamState::PendingNonInformationalHeaders) {
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
+        uint64_t status;
         try {
-          Utility::getResponseStatus(*headers);
+          status = Utility::getResponseStatus(*headers);
         } catch (const CodecClientException&) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
-        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);
+        // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
+        // guaranteed by the codec parsers. See include/envoy/http/filter.h.
+        if (CodeUtility::is1xx(status) && status != enumToInt(Http::Code::SwitchingProtocols)) {
+          headers->setReferenceKey(Headers::get().Status, "200");
+        }
+        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream, "details");
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
@@ -490,17 +548,21 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   } catch (const ProtoValidationException& e) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
+  } catch (const Envoy::ProtobufMessage::DeprecatedProtoFieldException& e) {
+    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
+    return;
   }
 
-  FuzzConfig config;
+  FuzzConfig config(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
-  NiceMock<Runtime::MockRandomGenerator> random;
-  Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
-  Http::ContextImpl http_context(*symbol_table);
+  NiceMock<Random::MockRandomGenerator> random;
+  Stats::SymbolTableImpl symbol_table;
+  Http::ContextImpl http_context(symbol_table);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
@@ -508,13 +570,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(filter_callbacks.connection_, close(_))
       .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
-  filter_callbacks.connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
-  filter_callbacks.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, nullptr, config.time_system_);
+                                     cluster_manager, overload_manager, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;
@@ -550,6 +612,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     }
   }
 
+  filter_callbacks.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   filter_callbacks.connection_.dispatcher_.clearDeferredDeleteList();
 }
 

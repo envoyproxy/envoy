@@ -58,8 +58,10 @@ public:
   /**
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
+   * @param lds_resources_locator xds::core::v3::ResourceLocator for listener collection.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                                 const xds::core::v3::ResourceLocator* lds_resources_locator) PURE;
 
   /**
    * Creates a socket.
@@ -71,7 +73,7 @@ public:
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     Network::Address::SocketType socket_type,
+                     Network::Socket::Type socket_type,
                      const Network::Socket::OptionsSharedPtr& options,
                      const ListenSocketCreationParams& params) PURE;
 
@@ -131,6 +133,16 @@ public:
     All,
   };
 
+  // The types of listeners to be returned from listeners(ListenerState).
+  // An enum instead of enum class so the underlying type is an int and bitwise operations can be
+  // used without casting.
+  enum ListenerState : uint8_t {
+    ACTIVE = 1 << 0,
+    WARMING = 1 << 1,
+    DRAINING = 1 << 2,
+    ALL = ACTIVE | WARMING | DRAINING
+  };
+
   virtual ~ListenerManager() = default;
 
   /**
@@ -157,15 +169,21 @@ public:
    * during server initialization because the listener manager is created prior to several core
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
+   * @param lds_resources_locator xds::core::v3::ResourceLocator for listener collection.
    */
-  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
+  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                            const xds::core::v3::ResourceLocator* lds_resources_locator) PURE;
 
   /**
-   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
-   * loaded listeners. Note that this routine returns references to the existing listeners. The
-   * references are only valid in the context of the current call stack and should not be stored.
+   * @param state the type of listener to be returned (defaults to ACTIVE), states can be OR'd
+   * together to return multiple different types
+   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of currently known
+   * listeners in the requested state. Note that this routine returns references to the existing
+   * listeners. The references are only valid in the context of the current call stack and should
+   * not be stored.
    */
-  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() PURE;
+  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>>
+  listeners(ListenerState state = ListenerState::ACTIVE) PURE;
 
   /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.
@@ -184,8 +202,9 @@ public:
   /**
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param callback supplies the callback to complete server initialization.
    */
-  virtual void startWorkers(GuardDog& guard_dog) PURE;
+  virtual void startWorkers(GuardDog& guard_dog, std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
@@ -221,7 +240,20 @@ public:
    * @return the server's API Listener if it exists, nullopt if it does not.
    */
   virtual ApiListenerOptRef apiListener() PURE;
+
+  /*
+   * @return TRUE if the worker has started or FALSE if not.
+   */
+  virtual bool isWorkerStarted() PURE;
 };
+
+// overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a
+// combination of flags, such as listeners(ListenerState::WARMING|ListenerState::ACTIVE)
+constexpr ListenerManager::ListenerState operator|(const ListenerManager::ListenerState lhs,
+                                                   const ListenerManager::ListenerState rhs) {
+  return static_cast<ListenerManager::ListenerState>(static_cast<uint8_t>(lhs) |
+                                                     static_cast<uint8_t>(rhs));
+}
 
 } // namespace Server
 } // namespace Envoy

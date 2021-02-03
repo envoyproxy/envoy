@@ -53,7 +53,8 @@ When decompression is *applied*:
 
 - The *content-encoding* header is modified to remove the decompression that was applied.
 
-.. _decompressor-statistics:
+- *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* trailers are added to
+  the request/response to relay information about decompression.
 
 Using different decompressors for requests and responses
 --------------------------------------------------------
@@ -95,6 +96,8 @@ multiple decompressor filters enabled only for requests or responses. For instan
             default_value: false
             runtime_key: request_decompressor_enabled
 
+.. _decompressor-statistics:
+
 Statistics
 ----------
 
@@ -110,3 +113,6 @@ with the following:
   not_decompressed, Counter, Number of request/responses not compressed.
   total_uncompressed_bytes, Counter, The total uncompressed bytes of all the request/responses that were marked for decompression.
   total_compressed_bytes, Counter, The total compressed bytes of all the request/responses that were marked for decompression.
+
+Additional stats for the decompressor library are rooted at
+<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.decompressor_library.

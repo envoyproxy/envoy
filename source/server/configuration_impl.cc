@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
@@ -53,6 +54,21 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  if (bootstrap.has_stats_flush_interval() &&
+      bootstrap.stats_flush_case() !=
+          envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
+    throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+  }
+
+  flush_interval_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
+
+  if (bootstrap.stats_flush_case() == envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin) {
+    flush_on_admin_ = bootstrap.stats_flush_on_admin();
+  }
+}
+
 void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
@@ -82,20 +98,26 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
 
-  stats_flush_interval_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
+  initializeWatchdogs(bootstrap, server);
+  initializeStatsConfig(bootstrap, server);
+}
 
-  const auto& watchdog = bootstrap.watchdog();
-  watchdog_miss_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, miss_timeout, 200));
-  watchdog_megamiss_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, megamiss_timeout, 1000));
-  watchdog_kill_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0));
-  watchdog_multikill_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
+void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server) {
+  ENVOY_LOG(info, "loading stats configuration");
 
-  initializeStatsSinks(bootstrap, server);
+  // stats_config_ should be set before populating the sinks so that it is available
+  // from the ServerFactoryContext when creating the stats sinks.
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+
+  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
+    // Generate factory and translate stats sink custom config.
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
+
+    stats_config_->addSink(factory.createStatsSink(*message, server.serverFactoryContext()));
+  }
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& configuration,
@@ -124,21 +146,53 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   // is no longer validated in this step.
 }
 
-void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                    Instance& server) {
-  ENVOY_LOG(info, "loading stats sink configuration");
+void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                   Instance& server) {
+  if (bootstrap.has_watchdog() && bootstrap.has_watchdogs()) {
+    throw EnvoyException("Only one of watchdog or watchdogs should be set!");
+  }
 
-  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
-    // Generate factory and translate stats sink custom config
-    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
-
-    stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
+  if (bootstrap.has_watchdog()) {
+    main_thread_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+    worker_watchdog_ = std::make_unique<WatchdogImpl>(bootstrap.watchdog(), server);
+  } else {
+    main_thread_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.watchdogs().main_thread_watchdog(), server);
+    worker_watchdog_ =
+        std::make_unique<WatchdogImpl>(bootstrap.watchdogs().worker_watchdog(), server);
   }
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog,
+                           Instance& server) {
+  miss_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, miss_timeout, 200));
+  megamiss_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, megamiss_timeout, 1000));
+
+  uint64_t kill_timeout = PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0);
+  const uint64_t max_kill_timeout_jitter =
+      PROTOBUF_GET_MS_OR_DEFAULT(watchdog, max_kill_timeout_jitter, 0);
+
+  // Adjust kill timeout if we have skew enabled.
+  if (kill_timeout > 0 && max_kill_timeout_jitter > 0) {
+    // Increments the kill timeout with a random value in (0, max_skew].
+    // We shouldn't have overflow issues due to the range of Duration.
+    // This won't be entirely uniform, depending on how large max_skew
+    // is relation to uint64.
+    kill_timeout += (server.api().randomGenerator().random() % max_kill_timeout_jitter) + 1;
+  }
+
+  kill_timeout_ = std::chrono::milliseconds(kill_timeout);
+  multikill_timeout_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
+  multikill_threshold_ = PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
+  actions_ = watchdog.actions();
+}
+
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                         const Options& options)
+    : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =
@@ -164,6 +218,14 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     }
   } else {
     Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
+  }
+  if (enable_deprecated_v2_api_) {
+    auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
+    enabled_deprecated_v2_api_layer->set_name("enabled_deprecated_v2_api (auto-injected)");
+    auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
+    ProtobufWkt::Value val;
+    val.set_bool_value(true);
+    (*static_layer->mutable_fields())["envoy.reloadable_features.enable_deprecated_v2_api"] = val;
   }
 }
 

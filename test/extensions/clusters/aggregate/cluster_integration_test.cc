@@ -9,7 +9,6 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -30,25 +29,31 @@ const int FirstUpstreamIndex = 2;
 const int SecondUpstreamIndex = 3;
 
 const std::string& config() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: false
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_cds_cluster
       endpoints:
@@ -64,7 +69,7 @@ static_resources:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
         clusters:
         - cluster_1
         - cluster_2
@@ -78,7 +83,7 @@ static_resources:
       filters:
         name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.filters.http.router
@@ -108,7 +113,8 @@ static_resources:
                 match:
                   prefix: "/aggregatecluster"
               domains: "*"
-)EOF");
+)EOF",
+                                                  Platform::null_device_path));
 }
 
 class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -119,11 +125,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     use_lds_ = false;
@@ -133,16 +135,12 @@ public:
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
 
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
-                                                  timeSystem(), enable_half_close_));
-    fake_upstreams_[FirstUpstreamIndex]->set_allow_unexpected_disconnects(false);
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
-                                                  timeSystem(), enable_half_close_));
-    fake_upstreams_[SecondUpstreamIndex]->set_allow_unexpected_disconnects(false);
-    cluster1_ = ConfigHelper::buildCluster(
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
-    cluster2_ = ConfigHelper::buildCluster(
+    cluster2_ = ConfigHelper::buildStaticCluster(
         SecondClusterName, fake_upstreams_[SecondUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
 
@@ -169,7 +167,6 @@ public:
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 
   envoy::config::cluster::v3::Cluster cluster1_;
@@ -199,7 +196,7 @@ TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -218,7 +215,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
 
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_2 is here.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -230,22 +227,22 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   // A request for aggregate cluster should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "42");
+      Config::TypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "43");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
   testRouterHeaderOnlyRequestAndResponse(nullptr, SecondUpstreamIndex, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "43", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
 
@@ -279,8 +276,11 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
   waitForNextUpstreamRequest(FirstUpstreamIndex);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
+
   waitForNextUpstreamRequest(SecondUpstreamIndex);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 

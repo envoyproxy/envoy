@@ -73,18 +73,6 @@ public:
    */
   static void sigHandler(int sig, siginfo_t* info, void* context);
 
-  /**
-   * Add this handler to the list of functions which will be called if Envoy
-   * receives a fatal signal.
-   */
-  static void registerFatalErrorHandler(const FatalErrorHandlerInterface& handler);
-
-  /**
-   * Removes this handler from the list of functions which will be called if Envoy
-   * receives a fatal signal.
-   */
-  static void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler);
-
 private:
   /**
    * Allocate this many bytes on each side of the area used for alt stack.
@@ -142,7 +130,6 @@ private:
   char* altstack_{};
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
   stack_t previous_altstack_;
-  std::list<const FatalErrorHandlerInterface*> fatal_error_handlers_;
 };
 
 } // namespace Envoy

@@ -44,12 +44,15 @@ std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
 // This class is created iff a test is run with the special runtime override flag.
 class RuntimeManagingListener : public ::testing::EmptyTestEventListener {
 public:
-  RuntimeManagingListener(std::string& runtime_override) : runtime_override_(runtime_override) {}
+  RuntimeManagingListener(std::string& runtime_override, bool disable = false)
+      : runtime_override_(runtime_override), disable_(disable) {}
 
   // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      if (!Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_)) {
+      bool reset = disable_ ? Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_)
+                            : Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_);
+      if (!reset) {
         // If the entry was already in the hash map, don't remove it OnTestEnd.
         runtime_override_.clear();
       }
@@ -59,10 +62,14 @@ public:
   // As each test ends, clean up the RuntimeFeaturesDefaults state.
   void OnTestEnd(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      Runtime::RuntimeFeaturesPeer::removeFeature(runtime_override_);
+      disable_ ? Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_)
+               : Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_);
     }
   }
   std::string runtime_override_;
+  // This marks whether the runtime feature was enabled by default and needs to be overridden to
+  // false.
+  bool disable_;
 };
 
 } // namespace
@@ -94,15 +101,28 @@ int TestRunner::RunTests(int argc, char** argv) {
   // Before letting TestEnvironment latch argv and argc, remove any runtime override flag.
   // This allows doing test overrides of Envoy runtime features without adding
   // test flags to the Envoy production command line.
-  const std::regex PATTERN{"--runtime-feature-override-for-tests=(.*)", std::regex::optimize};
-  std::string runtime_override = findAndRemove(PATTERN, argc, argv);
-  if (!runtime_override.empty()) {
+  const std::regex ENABLE_PATTERN{"--runtime-feature-override-for-tests=(.*)",
+                                  std::regex::optimize};
+  std::string runtime_override_enable = findAndRemove(ENABLE_PATTERN, argc, argv);
+  if (!runtime_override_enable.empty()) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
-                        "Running with runtime feature override {}", runtime_override);
+                        "Running with runtime feature override enable {}", runtime_override_enable);
     // Set up a listener which will create a global runtime and set the feature
     // to true for the duration of each test instance.
     ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
-    listeners.Append(new RuntimeManagingListener(runtime_override));
+    listeners.Append(new RuntimeManagingListener(runtime_override_enable));
+  }
+  const std::regex DISABLE_PATTERN{"--runtime-feature-disable-for-tests=(.*)",
+                                   std::regex::optimize};
+  std::string runtime_override_disable = findAndRemove(DISABLE_PATTERN, argc, argv);
+  if (!runtime_override_disable.empty()) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
+                        "Running with runtime feature override disable {}",
+                        runtime_override_disable);
+    // Set up a listener which will create a global runtime and set the feature
+    // to false for the duration of each test instance.
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new RuntimeManagingListener(runtime_override_disable, true));
   }
 
 #ifdef ENVOY_CONFIG_COVERAGE
@@ -120,7 +140,8 @@ int TestRunner::RunTests(int argc, char** argv) {
   Thread::MutexBasicLockable lock;
 
   Server::Options& options = TestEnvironment::getOptions();
-  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false);
+  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false,
+                                options.enableFineGrainLogging());
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
@@ -131,7 +152,17 @@ int TestRunner::RunTests(int argc, char** argv) {
     file_logger = std::make_unique<Logger::FileSinkDelegate>(
         TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
   }
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+  // Fuzz tests may run Envoy tests in fuzzing mode to generate corpora. In this case, we do not
+  // want to fail building the fuzz test because of a failed test run, which can happen when testing
+  // functionality in fuzzing test mode. Dependencies (like RE2) change behavior when in fuzzing
+  // mode, so we do not want to rely on a behavior test when generating a corpus.
+  (void)RUN_ALL_TESTS();
+  return 0;
+#else
   return RUN_ALL_TESTS();
+#endif
 }
 
 } // namespace Envoy

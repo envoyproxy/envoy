@@ -26,13 +26,13 @@ public:
   ~FlagRegistry() = default;
 
   // Return singleton instance.
-  static FlagRegistry& GetInstance();
+  static FlagRegistry& getInstance();
 
   // Reset all registered flags to their default values.
-  void ResetFlags() const;
+  void resetFlags() const;
 
   // Look up a flag by name.
-  Flag* FindFlag(const std::string& name) const;
+  Flag* findFlag(const std::string& name) const;
 
 private:
   FlagRegistry();
@@ -48,10 +48,10 @@ public:
   virtual ~Flag() = default;
 
   // Set flag value from given string, returning true iff successful.
-  virtual bool SetValueFromString(const std::string& value_str) = 0;
+  virtual bool setValueFromString(const std::string& value_str) = 0;
 
   // Reset flag to default value.
-  virtual void ResetValue() = 0;
+  virtual void resetValue() = 0;
 
   // Return flag name.
   std::string name() const { return name_; }
@@ -70,15 +70,15 @@ public:
   TypedFlag(const char* name, T default_value, const char* help)
       : Flag(name, help), value_(default_value), default_value_(default_value) {}
 
-  bool SetValueFromString(const std::string& value_str) override;
+  bool setValueFromString(const std::string& value_str) override;
 
-  void ResetValue() override {
+  void resetValue() override {
     absl::MutexLock lock(&mutex_);
     value_ = default_value_;
   }
 
   // Set flag value.
-  void SetValue(T value) {
+  void setValue(T value) {
     absl::MutexLock lock(&mutex_);
     value_ = value;
   }
@@ -91,20 +91,34 @@ public:
 
 private:
   mutable absl::Mutex mutex_;
-  T value_ GUARDED_BY(mutex_);
+  T value_ ABSL_GUARDED_BY(mutex_);
   T default_value_;
 };
 
 // SetValueFromString specializations
-template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<int32_t>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<double>::SetValueFromString(const std::string& value_str);
-template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& value_str);
+template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<int32_t>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<int64_t>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<double>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<std::string>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<unsigned long>::setValueFromString(const std::string& value_str);
+template <> bool TypedFlag<unsigned long long>::setValueFromString(const std::string& value_str);
 
 // Flag declarations
-#define QUICHE_FLAG(type, flag, value, help) extern TypedFlag<type>* FLAGS_##flag;
-#include "extensions/quic_listeners/quiche/platform/flags_list.h"
-#undef QUICHE_FLAG
+#define QUIC_FLAG(flag, ...) extern TypedFlag<bool>* flag;
+#include "quiche/quic/core/quic_flags_list.h"
+QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
+QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
+QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
+QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+#undef QUIC_FLAG
+
+#define QUIC_PROTOCOL_FLAG(type, flag, ...) extern TypedFlag<type>* FLAGS_##flag;
+#include "quiche/quic/core/quic_protocol_flags_list.h"
+#undef QUIC_PROTOCOL_FLAG
 
 } // namespace quiche

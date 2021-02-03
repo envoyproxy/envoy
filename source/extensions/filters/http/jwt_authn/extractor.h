@@ -2,7 +2,6 @@
 
 #include <map>
 #include <string>
-#include <unordered_set>
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"
@@ -30,7 +29,7 @@ public:
   virtual const std::string& token() const PURE;
 
   // Check if an issuer has specified the location.
-  virtual bool isIssuerSpecified(const std::string& issuer) const PURE;
+  virtual bool isIssuerAllowed(const std::string& issuer) const PURE;
 
   // Remove the token from the headers
   virtual void removeJwt(Http::HeaderMap& headers) const PURE;

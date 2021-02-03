@@ -343,7 +343,7 @@ ActiveMessage& ConnectionManager::createActiveMessage(RemotingCommandPtr& reques
   ENVOY_CONN_LOG(trace, "ConnectionManager#createActiveMessage. Code: {}, opaque: {}",
                  read_callbacks_->connection(), request->code(), request->opaque());
   ActiveMessagePtr active_message = std::make_unique<ActiveMessage>(*this, std::move(request));
-  active_message->moveIntoList(std::move(active_message), active_message_list_);
+  LinkedList::moveIntoList(std::move(active_message), active_message_list_);
   return **active_message_list_.begin();
 }
 

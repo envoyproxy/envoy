@@ -1,0 +1,22 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+        headers {
+          key: ":status"
+          value: "162"
+        }
+      }
+    }
+  }
+}

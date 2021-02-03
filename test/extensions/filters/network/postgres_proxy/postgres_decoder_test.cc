@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
   MOCK_METHOD(void, incNotices, (NoticeType), (override));
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
+  MOCK_METHOD(void, processQuery, (const std::string&), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -40,7 +41,7 @@ protected:
 
   // fields often used
   Buffer::OwnedImpl data_;
-  char buf_[256];
+  char buf_[256]{};
   std::string payload_;
 };
 
@@ -75,12 +76,36 @@ class PostgresProxyNoticeTest
 TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   decoder_->setStartup(true);
 
-  // Start with length.
-  data_.writeBEInt<uint32_t>(12);
-  // Add 8 bytes of some data.
-  data_.add(buf_, 8);
+  buf_[0] = '\0';
+  // Startup message has the following structure:
+  // Length (4 bytes) - payload and length field
+  // version (4 bytes)
+  // Attributes: key/value pairs separated by '\0'
+  data_.writeBEInt<uint32_t>(53);
+  // Add version code
+  data_.writeBEInt<uint32_t>(0x00030000);
+  // user-postgres key-pair
+  data_.add("user"); // 4 bytes
+  data_.add(buf_, 1);
+  data_.add("postgres"); // 8 bytes
+  data_.add(buf_, 1);
+  // database-test-db key-pair
+  data_.add("database"); // 8 bytes
+  data_.add(buf_, 1);
+  data_.add("testdb"); // 6 bytes
+  data_.add(buf_, 1);
+  // Some other attribute
+  data_.add("attribute"); // 9 bytes
+  data_.add(buf_, 1);
+  data_.add("blah"); // 4 bytes
+  data_.add(buf_, 1);
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
+  // Verify parsing attributes
+  ASSERT_THAT(decoder_->getAttributes().at("user"), "postgres");
+  ASSERT_THAT(decoder_->getAttributes().at("database"), "testdb");
+  // This attribute should not be found
+  ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 
   // Now feed normal message with 1bytes as command.
   data_.add("P");
@@ -89,6 +114,40 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   data_.add("AB");
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
+}
+
+// Test verifies that when Startup message does not carry
+// "database" attribute, it is derived from "user".
+TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
+  decoder_->setStartup(true);
+
+  buf_[0] = '\0';
+  // Startup message has the following structure:
+  // Length (4 bytes) - payload and length field
+  // version (4 bytes)
+  // Attributes: key/value pairs separated by '\0'
+  data_.writeBEInt<uint32_t>(37);
+  // Add version code
+  data_.writeBEInt<uint32_t>(0x00030000);
+  // user-postgres key-pair
+  data_.add("user"); // 4 bytes
+  data_.add(buf_, 1);
+  data_.add("postgres"); // 8 bytes
+  data_.add(buf_, 1);
+  // database-test-db key-pair
+  // Some other attribute
+  data_.add("attribute"); // 9 bytes
+  data_.add(buf_, 1);
+  data_.add("blah"); // 4 bytes
+  data_.add(buf_, 1);
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
+
+  // Verify parsing attributes
+  ASSERT_THAT(decoder_->getAttributes().at("user"), "postgres");
+  ASSERT_THAT(decoder_->getAttributes().at("database"), "postgres");
+  // This attribute should not be found
+  ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 }
 
 // Test processing messages which map 1:1 with buffer.
@@ -173,16 +232,19 @@ TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
 TEST_F(PostgresProxyDecoderTest, Unknown) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
-  EXPECT_CALL(callbacks_, incMessagesUnknown()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesUnknown());
   createPostgresMsg(data_, "=", "some not important string which will be ignored anyways");
   decoder_->onData(data_, true);
 }
 
 // Test if each frontend command calls incMessagesFrontend() method.
 TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
-  EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
-  createPostgresMsg(data_, GetParam(), "Some message just to create payload");
+  EXPECT_CALL(callbacks_, incMessagesFrontend());
+  createPostgresMsg(data_, GetParam(), "SELECT 1;");
   decoder_->onData(data_, true);
+
+  // Make sure that decoder releases memory used during message processing.
+  ASSERT_TRUE(decoder_->getMessage().empty());
 }
 
 // Run the above test for each frontend message.
@@ -200,15 +262,52 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
 
   // Now set the decoder to be in_transaction state.
   decoder_->getSession().setInTransaction(true);
-  EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(1);
+  EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "X");
   decoder_->onData(data_, true);
   ASSERT_FALSE(decoder_->getSession().inTransaction());
 }
 
+// Query message should invoke filter's callback message
+TEST_F(PostgresProxyFrontendDecoderTest, QueryMessage) {
+  EXPECT_CALL(callbacks_, processQuery);
+  createPostgresMsg(data_, "Q", "SELECT * FROM whatever;");
+  decoder_->onData(data_, true);
+}
+
+// Parse message has optional Query name which may be in front of actual
+// query statement. This test verifies that both formats are processed
+// correctly.
+TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
+  std::string query = "SELECT * FROM whatever;";
+  std::string query_name, query_params;
+
+  // Should be called twice with the same query.
+  EXPECT_CALL(callbacks_, processQuery(query)).Times(2);
+
+  // Set params to be zero.
+  query_params.reserve(2);
+  query_params += '\0';
+  query_params += '\0';
+
+  // Message without optional query name.
+  query_name.reserve(1);
+  query_name += '\0';
+  createPostgresMsg(data_, "P", query_name + query + query_params);
+  decoder_->onData(data_, true);
+
+  // Message with optional name query_name
+  query_name.clear();
+  query_name.reserve(5);
+  query_name += "P0_8";
+  query_name += '\0';
+  createPostgresMsg(data_, "P", query_name + query + query_params);
+  decoder_->onData(data_, true);
+}
+
 // Test if each backend command calls incMessagesBackend()) method.
 TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
-  EXPECT_CALL(callbacks_, incMessagesBackend()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesBackend());
   createPostgresMsg(data_, GetParam(), "Some not important message");
   decoder_->onData(data_, false);
 }
@@ -264,7 +363,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "COMMIT");
   decoder_->onData(data_, false);
@@ -276,7 +375,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK");
   decoder_->onData(data_, false);
@@ -410,6 +509,93 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 // 80877104 is GSS code
 INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEncrDecoderTest,
                          ::testing::Values(80877103, 80877104));
+
+class FakeBuffer : public Buffer::Instance {
+public:
+  MOCK_METHOD(void, addDrainTracker, (std::function<void()>), (override));
+  MOCK_METHOD(void, add, (const void*, uint64_t), (override));
+  MOCK_METHOD(void, addBufferFragment, (Buffer::BufferFragment&), (override));
+  MOCK_METHOD(void, add, (absl::string_view), (override));
+  MOCK_METHOD(void, add, (const Instance&), (override));
+  MOCK_METHOD(void, prepend, (absl::string_view), (override));
+  MOCK_METHOD(void, prepend, (Instance&), (override));
+  MOCK_METHOD(void, commit, (Buffer::RawSlice*, uint64_t), (override));
+  MOCK_METHOD(void, copyOut, (size_t, uint64_t, void*), (const, override));
+  MOCK_METHOD(void, drain, (uint64_t), (override));
+  MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (absl::optional<uint64_t>), (const, override));
+  MOCK_METHOD(Buffer::RawSlice, frontSlice, (), (const, override));
+  MOCK_METHOD(Buffer::SliceDataPtr, extractMutableFrontSlice, (), (override));
+  MOCK_METHOD(uint64_t, length, (), (const, override));
+  MOCK_METHOD(void*, linearize, (uint32_t), (override));
+  MOCK_METHOD(void, move, (Instance&), (override));
+  MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
+  MOCK_METHOD(uint64_t, reserve, (uint64_t, Buffer::RawSlice*, uint64_t), (override));
+  MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
+  MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
+  MOCK_METHOD(std::string, toString, (), (const, override));
+  MOCK_METHOD(void, setWatermarks, (uint32_t), (override));
+  MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
+  MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
+};
+
+// Test verifies that decoder calls Buffer::linearize method
+// for messages which have associated 'action'.
+TEST_F(PostgresProxyDecoderTest, Linearize) {
+  testing::NiceMock<FakeBuffer> fake_buf;
+  uint8_t body[] = "test\0";
+
+  decoder_->setStartup(false);
+
+  // Simulate that decoder reads message which needs processing.
+  // Query 'Q' message's body is just string.
+  // Message header is 5 bytes and body will contain string "test\0".
+  EXPECT_CALL(fake_buf, length).WillRepeatedly(testing::Return(10));
+  // The decoder will first ask for 1-byte message type
+  // Then for length and finally for message body.
+  EXPECT_CALL(fake_buf, copyOut)
+      .WillOnce([](size_t start, uint64_t size, void* data) {
+        ASSERT_THAT(start, 0);
+        ASSERT_THAT(size, 1);
+        *(static_cast<char*>(data)) = 'Q';
+      })
+      .WillOnce([](size_t start, uint64_t size, void* data) {
+        ASSERT_THAT(start, 1);
+        ASSERT_THAT(size, 4);
+        *(static_cast<uint32_t*>(data)) = htonl(9);
+      })
+      .WillRepeatedly([=](size_t start, uint64_t size, void* data) {
+        ASSERT_THAT(start, 0);
+        ASSERT_THAT(size, 5);
+        memcpy(data, body, 5);
+      });
+
+  // It should call "Buffer::linearize".
+  EXPECT_CALL(fake_buf, linearize).WillOnce([&](uint32_t) -> void* { return body; });
+
+  decoder_->onData(fake_buf, false);
+
+  // Simulate that decoder reads message which does not need processing.
+  // BindComplete message has type '2' and empty body.
+  // Total message length is equal to length of header (5 bytes).
+  EXPECT_CALL(fake_buf, length).WillRepeatedly(testing::Return(5));
+  // The decoder will first ask for 1-byte message type and next for length.
+  EXPECT_CALL(fake_buf, copyOut)
+      .WillOnce([](size_t start, uint64_t size, void* data) {
+        ASSERT_THAT(start, 0);
+        ASSERT_THAT(size, 1);
+        *(static_cast<char*>(data)) = '2';
+      })
+      .WillOnce([](size_t start, uint64_t size, void* data) {
+        ASSERT_THAT(start, 1);
+        ASSERT_THAT(size, 4);
+        *(static_cast<uint32_t*>(data)) = htonl(4);
+      });
+
+  // Make sure that decoder does not call linearize.
+  EXPECT_CALL(fake_buf, linearize).Times(0);
+
+  decoder_->onData(fake_buf, false);
+}
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

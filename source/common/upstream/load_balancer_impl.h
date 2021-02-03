@@ -1,16 +1,20 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
+#include <memory>
 #include <queue>
 #include <set>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
 
 namespace Envoy {
@@ -58,7 +62,7 @@ protected:
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
-  bool isHostSetInPanic(const HostSet& host_set);
+  bool isHostSetInPanic(const HostSet& host_set) const;
 
   /**
    * Method is called when all host sets are in panic mode.
@@ -68,7 +72,7 @@ protected:
   void recalculateLoadInTotalPanic();
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                   Runtime::RandomGenerator& random,
+                   Random::RandomGenerator& random,
                    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the healthy_per_priority_load_ and
@@ -77,7 +81,8 @@ protected:
   // degraded_per_priority_load_, only degraded hosts should be selected from that host set.
   //
   // @return host set to use and which availability to target.
-  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
+  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context,
+                                                      uint64_t hash) const;
 
   uint32_t percentageLoad(uint32_t priority) const {
     return per_priority_load_.healthy_priority_load_.get()[priority];
@@ -86,10 +91,25 @@ protected:
     return per_priority_load_.degraded_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
+  uint64_t random(bool peeking) {
+    if (peeking) {
+      stashed_random_.push_back(random_.random());
+      return stashed_random_.back();
+    } else {
+      if (!stashed_random_.empty()) {
+        auto random = stashed_random_.front();
+        stashed_random_.pop_front();
+        return random;
+      } else {
+        return random_.random();
+      }
+    }
+  }
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  std::deque<uint64_t> stashed_random_;
+  Random::RandomGenerator& random_;
   const uint32_t default_healthy_panic_percent_;
   // The priority-ordered set of hosts to use for load balancing.
   const PrioritySet& priority_set_;
@@ -101,7 +121,8 @@ public:
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
                                           HealthyAndDegradedLoad& priority_load,
                                           HealthyAvailability& per_priority_health,
-                                          DegradedAvailability& per_priority_degraded);
+                                          DegradedAvailability& per_priority_degraded,
+                                          uint32_t& total_healthy_hosts);
   void recalculatePerPriorityPanic();
 
 protected:
@@ -134,6 +155,8 @@ protected:
   DegradedAvailability per_priority_degraded_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
+  // The total count of healthy hosts across all priority levels.
+  uint32_t total_healthy_hosts_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
@@ -171,7 +194,7 @@ protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
   ZoneAwareLoadBalancerBase(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
   ~ZoneAwareLoadBalancerBase() override;
 
@@ -224,7 +247,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
-      // This is only used for std::unordered_map keys, so we don't need a deterministic hash.
+      // This is only used for absl::node_hash_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -236,12 +259,12 @@ protected:
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
    */
-  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context);
+  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context, uint64_t hash) const;
 
   /**
    * Index into priority_set via hosts source descriptor.
    */
-  const HostVector& hostSourceToHosts(HostsSource hosts_source);
+  const HostVector& hostSourceToHosts(HostsSource hosts_source) const;
 
 private:
   enum class LocalityRoutingState {
@@ -269,7 +292,7 @@ private:
    * Try to select upstream hosts from the same locality.
    * @param host_set the last host set returned by chooseHostSet()
    */
-  uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set);
+  uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set) const;
 
   /**
    * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
@@ -351,10 +374,11 @@ class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterStats& stats, Runtime::Loader& runtime,
-                      Runtime::RandomGenerator& random,
+                      Random::RandomGenerator& random,
                       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancerBase
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
@@ -367,6 +391,8 @@ protected:
 
   void initialize();
 
+  virtual void refresh(uint32_t priority);
+
   // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
   // multiple load balancers on the same host) will send requests to
@@ -375,14 +401,15 @@ protected:
   const uint64_t seed_;
 
 private:
-  void refresh(uint32_t priority);
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
+  virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
+                                                const HostsSource& source) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
 
   // Scheduler for each valid HostsSource.
-  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  absl::node_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
 };
 
 /**
@@ -393,7 +420,7 @@ class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random,
+                         Random::RandomGenerator& random,
                          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                             common_config) {
@@ -406,10 +433,25 @@ private:
     // already exists. Note that host sources will never be removed, but given how uncommon this
     // is it probably doesn't matter.
     rr_indexes_.insert({source, seed_});
+    // If the list of hosts changes, the order of picks change. Discard the
+    // index.
+    peekahead_index_ = 0;
   }
   double hostWeight(const Host& host) override { return host.weight(); }
+  HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
+                                        const HostsSource& source) override {
+    auto i = rr_indexes_.find(source);
+    if (i == rr_indexes_.end()) {
+      return nullptr;
+    }
+    return hosts_to_use[(i->second + (peekahead_index_)++) % hosts_to_use.size()];
+  }
+
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
+    if (peekahead_index_ > 0) {
+      --peekahead_index_;
+    }
     // To avoid storing the RR index in the base class, we end up using a second map here with
     // host source as the key. This means that each LB decision will require two map lookups in
     // the unweighted case. We might consider trying to optimize this in the future.
@@ -417,7 +459,8 @@ private:
     return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
   }
 
-  std::unordered_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
+  uint64_t peekahead_index_{};
+  absl::node_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**
@@ -437,11 +480,12 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
+                                 Logger::Loggable<Logger::Id::upstream> {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
           least_request_config)
@@ -450,26 +494,73 @@ public:
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
-                : 2) {
+                : 2),
+        active_request_bias_runtime_(
+            least_request_config.has_value() && least_request_config->has_active_request_bias()
+                ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
+                                                    runtime)
+                : nullptr) {
     initialize();
+  }
+
+protected:
+  void refresh(uint32_t priority) override {
+    active_request_bias_ =
+        active_request_bias_runtime_ != nullptr ? active_request_bias_runtime_->value() : 1.0;
+
+    if (active_request_bias_ < 0.0) {
+      ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
+                active_request_bias_runtime_->runtimeKey());
+      active_request_bias_ = 1.0;
+    }
+
+    EdfLoadBalancerBase::refresh(priority);
   }
 
 private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) override {
-    // Here we scale host weight by the number of active requests at the time we do the pick. We
-    // always add 1 to avoid division by 0. It might be possible to do better by picking two hosts
-    // off of the schedule, and selecting the one with fewer active requests at the time of
-    // selection.
-    // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
-    // be the only/best way of doing this. Essentially, it makes weight and active requests equally
-    // important. Are they equally important in practice? There is no right answer here and we might
-    // want to iterate on this as we gain more experience.
-    return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    // This method is called to calculate the dynamic weight as following when all load balancing
+    // weights are not equal:
+    //
+    // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
+    //
+    // `active_request_bias` can be configured via runtime and its value is cached in
+    // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
+    // calculated.
+    //
+    // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
+    // host weight without considering the number of active requests at the time we do the pick.
+    //
+    // When `active_request_bias > 0.0` we scale the host weight by the number of active
+    // requests at the time we do the pick. We always add 1 to avoid division by 0.
+    //
+    // It might be possible to do better by picking two hosts off of the schedule, and selecting the
+    // one with fewer active requests at the time of selection.
+    if (active_request_bias_ == 0.0) {
+      return host.weight();
+    }
+
+    if (active_request_bias_ == 1.0) {
+      return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    }
+
+    return static_cast<double>(host.weight()) /
+           std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
   }
+  HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
+                                        const HostsSource& source) override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+
   const uint32_t choice_count_;
+
+  // The exponent used to calculate host weights can be configured via runtime. We cache it for
+  // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
+  // whenever a `HostSet` is updated.
+  double active_request_bias_{};
+
+  const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
 };
 
 /**
@@ -478,14 +569,17 @@ private:
 class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                     ClusterStats& stats, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random,
+                     ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                   common_config) {}
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
+
+protected:
+  HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
 };
 
 /**
@@ -496,7 +590,8 @@ public:
   SubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
                      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
                          LbSubsetSelectorFallbackPolicy fallback_policy,
-                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
+                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
+                     bool single_host_per_subset);
 
   // SubsetSelector
   const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
@@ -506,12 +601,14 @@ public:
     return fallback_policy_;
   }
   const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+  bool singleHostPerSubset() const override { return single_host_per_subset_; }
 
 private:
   const std::set<std::string> selector_keys_;
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
       LbSubsetSelectorFallbackPolicy fallback_policy_;
   const std::set<std::string> fallback_keys_subset_;
+  const bool single_host_per_subset_;
 };
 
 /**
@@ -530,7 +627,8 @@ public:
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
-            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
+            subset.single_host_per_subset()));
       }
     }
   }

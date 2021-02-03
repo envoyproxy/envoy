@@ -5,6 +5,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/common/assert.h"
+#include "common/http/headers.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
 
@@ -14,6 +15,9 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle(Http::CustomHeaders::get().Referer);
 
 HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
@@ -40,7 +44,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
 
   tls_slot_->set([this](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), GrpcCommon::GrpcAccessLoggerType::HTTP, scope_));
+        config_.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 }
 
@@ -86,8 +90,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   if (request_headers.UserAgent() != nullptr) {
     request_properties->set_user_agent(std::string(request_headers.getUserAgentValue()));
   }
-  if (request_headers.Referer() != nullptr) {
-    request_properties->set_referer(std::string(request_headers.getRefererValue()));
+  if (request_headers.getInline(referer_handle.handle()) != nullptr) {
+    request_properties->set_referer(
+        std::string(request_headers.getInlineValue(referer_handle.handle())));
   }
   if (request_headers.ForwardedFor() != nullptr) {
     request_properties->set_forwarded_for(std::string(request_headers.getForwardedForValue()));
@@ -110,9 +115,11 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = request_properties->mutable_request_headers();
 
     for (const auto& header : request_headers_to_log_) {
-      const Http::HeaderEntry* entry = request_headers.get(header);
-      if (entry != nullptr) {
-        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
+      const auto entry = request_headers.get(header);
+      if (!entry.empty()) {
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
+        // values.
+        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
   }
@@ -131,9 +138,11 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_headers();
 
     for (const auto& header : response_headers_to_log_) {
-      const Http::HeaderEntry* entry = response_headers.get(header);
-      if (entry != nullptr) {
-        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
+      const auto entry = response_headers.get(header);
+      if (!entry.empty()) {
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
+        // values.
+        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
   }
@@ -142,9 +151,11 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_trailers();
 
     for (const auto& header : response_trailers_to_log_) {
-      const Http::HeaderEntry* entry = response_trailers.get(header);
-      if (entry != nullptr) {
-        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
+      const auto entry = response_trailers.get(header);
+      if (!entry.empty()) {
+        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
+        // values.
+        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
   }

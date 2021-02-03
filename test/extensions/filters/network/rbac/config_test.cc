@@ -4,7 +4,7 @@
 
 #include "extensions/filters/network/rbac/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"

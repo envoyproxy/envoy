@@ -2,6 +2,7 @@
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
+#include "common/router/context_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -11,8 +12,9 @@
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -29,34 +31,34 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class AggregateClusterUpdateTest : public testing::Test {
+class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AggregateClusterUpdateTest()
-      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
+      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()),
+        router_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, http_context_, grpc_context_);
+        *factory_.api_, http_context_, grpc_context_, router_context_);
     cluster_manager_->initializeSecondaryClusters(bootstrap);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
-    cluster_ = cluster_manager_->get("aggregate_cluster");
+    cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::MockAdmin> admin_;
-  Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  NiceMock<Upstream::TestClusterManagerFactory> factory_;
   Upstream::ThreadLocalCluster* cluster_;
 
-  Event::SimulatedTimeSystem time_system_;
-  NiceMock<Upstream::TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
+  Router::ContextImpl router_context_;
 
   const std::string default_yaml_config_ = R"EOF(
  static_resources:
@@ -67,7 +69,7 @@ public:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
         clusters:
         - primary
         - secondary
@@ -88,7 +90,7 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
-  auto primary = cluster_manager_->get("primary");
+  auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   auto host = cluster_->loadBalancer().chooseHost(nullptr);
   EXPECT_NE(nullptr, host);
@@ -97,7 +99,7 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
 
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
-  auto secondary = cluster_manager_->get("secondary");
+  auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
   host = cluster_->loadBalancer().chooseHost(nullptr);
   EXPECT_NE(nullptr, host);
@@ -105,7 +107,7 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("tertiary"), ""));
-  auto tertiary = cluster_manager_->get("tertiary");
+  auto tertiary = cluster_manager_->getThreadLocalCluster("tertiary");
   EXPECT_NE(nullptr, tertiary);
   host = cluster_->loadBalancer().chooseHost(nullptr);
   EXPECT_NE(nullptr, host);
@@ -113,7 +115,7 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
   EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
-  EXPECT_EQ(nullptr, cluster_manager_->get("primary"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("primary"));
   host = cluster_->loadBalancer().chooseHost(nullptr);
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("secondary", host->cluster().name());
@@ -121,7 +123,7 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ(3, cluster_manager_->activeClusters().size());
 
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
-  primary = cluster_manager_->get("primary");
+  primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   host = cluster_->loadBalancer().chooseHost(nullptr);
   EXPECT_NE(nullptr, host);
@@ -132,19 +134,22 @@ TEST_F(AggregateClusterUpdateTest, BasicFlow) {
 TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   initialize(default_yaml_config_);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
-  auto primary = cluster_manager_->get("primary");
+  auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
-  auto secondary = cluster_manager_->get("secondary");
+  auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host1 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host1 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80", simTime());
   host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host2 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80");
+  Upstream::HostSharedPtr host2 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80", simTime());
   host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host3 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80");
+  Upstream::HostSharedPtr host3 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80", simTime());
   Upstream::Cluster& cluster = cluster_manager_->activeClusters().find("primary")->second;
   cluster.prioritySet().updateHosts(
       0,
@@ -154,11 +159,14 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
       nullptr, {host1, host2, host3}, {}, 100);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host4 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80");
+  Upstream::HostSharedPtr host4 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80", simTime());
   host4->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host5 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.5:80");
+  Upstream::HostSharedPtr host5 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.5:80", simTime());
   host5->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host6 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.6:80");
+  Upstream::HostSharedPtr host6 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.6:80", simTime());
   Upstream::Cluster& cluster1 = cluster_manager_->activeClusters().find("secondary")->second;
   cluster1.prioritySet().updateHosts(
       0,
@@ -189,14 +197,17 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   }
 
   EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
-  EXPECT_EQ(nullptr, cluster_manager_->get("primary"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("primary"));
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host7 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.7:80");
+  Upstream::HostSharedPtr host7 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.7:80", simTime());
   host7->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host8 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.8:80");
+  Upstream::HostSharedPtr host8 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.8:80", simTime());
   host8->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host9 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.9:80");
+  Upstream::HostSharedPtr host9 =
+      Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.9:80", simTime());
   cluster1.prioritySet().updateHosts(
       1,
       Upstream::HostSetImpl::partitionHosts(
@@ -253,7 +264,7 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
         clusters:
         - primary
         - secondary
@@ -261,13 +272,13 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
 
   auto bootstrap = parseBootstrapFromV2Yaml(config);
   cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
-      bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-      factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_, *api_,
-      http_context_, grpc_context_);
+      bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.local_info_,
+      log_manager_, factory_.dispatcher_, admin_, validation_context_, *factory_.api_,
+      http_context_, grpc_context_, router_context_);
   cluster_manager_->initializeSecondaryClusters(bootstrap);
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
-  cluster_ = cluster_manager_->get("aggregate_cluster");
-  auto primary = cluster_manager_->get("primary");
+  cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
+  auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   auto host = cluster_->loadBalancer().chooseHost(nullptr);
   EXPECT_NE(nullptr, host);
@@ -275,11 +286,14 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   EXPECT_EQ("127.0.0.1:80", host->address()->asString());
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host1 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host1 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80", simTime());
   host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host2 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80");
+  Upstream::HostSharedPtr host2 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80", simTime());
   host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host3 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80");
+  Upstream::HostSharedPtr host3 =
+      Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80", simTime());
   Upstream::Cluster& cluster = cluster_manager_->activeClusters().find("primary")->second;
   cluster.prioritySet().updateHosts(
       0,

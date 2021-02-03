@@ -71,8 +71,12 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 Http::Code StatsHandler::handlerStats(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream& admin_stream) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
   Http::Code rc = Http::Code::OK;
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
@@ -121,13 +125,11 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
-    // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
-    // multimap here. This makes sure that duplicate histograms get output. When shared storage is
-    // implemented this can be switched back to a normal map.
-    std::multimap<std::string, std::string> all_histograms;
+    std::map<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (shouldShowMetric(*histogram, used_only, regex)) {
-        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+        auto insert = all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+        ASSERT(insert.second); // No duplicates expected.
       }
     }
     for (const auto& histogram : all_histograms) {
@@ -140,7 +142,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
+  const Http::Utility::QueryParams params =
+      Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {

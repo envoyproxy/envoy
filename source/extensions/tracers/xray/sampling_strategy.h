@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
-#include "envoy/runtime/runtime.h"
+#include "envoy/common/random_generator.h"
 
 #include "common/common/macros.h"
 
@@ -25,7 +25,7 @@ struct SamplingRequest {
  */
 class SamplingStrategy {
 public:
-  explicit SamplingStrategy(Runtime::RandomGenerator& rng) : rng_(rng) {}
+  explicit SamplingStrategy(Random::RandomGenerator& rng) : rng_(rng) {}
   virtual ~SamplingStrategy() = default;
 
   /**
@@ -38,7 +38,7 @@ protected:
   uint64_t random() const { return rng_.random(); }
 
 private:
-  Runtime::RandomGenerator& rng_;
+  Random::RandomGenerator& rng_;
 };
 
 using SamplingStrategyPtr = std::unique_ptr<SamplingStrategy>;

@@ -13,7 +13,7 @@ size_t PausableAckQueue::size() const { return storage_.size(); }
 
 bool PausableAckQueue::empty() {
   for (const auto& entry : storage_) {
-    if (!paused_[entry.type_url_]) {
+    if (pauses_[entry.type_url_] == 0) {
       return false;
     }
   }
@@ -22,7 +22,7 @@ bool PausableAckQueue::empty() {
 
 const UpdateAck& PausableAckQueue::front() {
   for (const auto& entry : storage_) {
-    if (!paused_[entry.type_url_]) {
+    if (pauses_[entry.type_url_] == 0) {
       return entry;
     }
   }
@@ -32,7 +32,7 @@ const UpdateAck& PausableAckQueue::front() {
 
 UpdateAck PausableAckQueue::popFront() {
   for (auto it = storage_.begin(); it != storage_.end(); ++it) {
-    if (!paused_[it->type_url_]) {
+    if (pauses_[it->type_url_] == 0) {
       UpdateAck ret = *it;
       storage_.erase(it);
       return ret;
@@ -44,23 +44,22 @@ UpdateAck PausableAckQueue::popFront() {
 
 void PausableAckQueue::pause(const std::string& type_url) {
   // It's ok to pause a subscription that doesn't exist yet.
-  auto& pause_entry = paused_[type_url];
-  ASSERT(!pause_entry);
-  pause_entry = true;
+  auto& pause_entry = pauses_[type_url];
+  ++pause_entry;
 }
 
 void PausableAckQueue::resume(const std::string& type_url) {
-  auto& pause_entry = paused_[type_url];
-  ASSERT(pause_entry);
-  pause_entry = false;
+  auto& pause_entry = pauses_[type_url];
+  ASSERT(pause_entry > 0);
+  --pause_entry;
 }
 
 bool PausableAckQueue::paused(const std::string& type_url) const {
-  auto entry = paused_.find(type_url);
-  if (entry == paused_.end()) {
+  auto entry = pauses_.find(type_url);
+  if (entry == pauses_.end()) {
     return false;
   }
-  return entry->second;
+  return entry->second > 0;
 }
 
 } // namespace Config

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -28,6 +29,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
+#include "common/router/context_impl.h"
 #include "common/router/upstream_request.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
@@ -37,29 +39,9 @@ namespace Envoy {
 namespace Router {
 
 /**
- * All router filter stats. @see stats_macros.h
- */
-// clang-format off
-#define ALL_ROUTER_STATS(COUNTER)                                                                  \
-  COUNTER(passthrough_internal_redirect_bad_location)                                              \
-  COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
-  COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
-  COUNTER(passthrough_internal_redirect_no_route)                                                  \
-  COUNTER(passthrough_internal_redirect_predicate)                                                 \
-  COUNTER(no_route)                                                                                \
-  COUNTER(no_cluster)                                                                              \
-  COUNTER(rq_redirect)                                                                             \
-  COUNTER(rq_direct_response)                                                                      \
-  COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)
-// clang-format on
-
-/**
  * Struct definition for all router filter stats. @see stats_macros.h
  */
-struct FilterStats {
-  ALL_ROUTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STATS_STRUCT(FilterStats, StatNames, ALL_ROUTER_STATS);
 
 /**
  * Router filter utilities split out for ease of testing.
@@ -178,21 +160,20 @@ public:
  */
 class FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
+  FilterConfig(Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-               Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
+               Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
-               TimeSource& time_source, Http::Context& http_context)
-      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
-        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
+               TimeSource& time_source, Http::Context& http_context,
+               Router::Context& router_context)
+      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
+        stats_(router_context.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
-        stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
-        zone_name_(stat_name_pool_.add(local_info_.zoneName())),
-        empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
+        zone_name_(local_info_.zoneStatName()), shadow_writer_(std::move(shadow_writer)),
         time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
@@ -202,15 +183,15 @@ public:
     }
   }
 
-  FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
+  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                     context.runtime(), context.random(), std::move(shadow_writer),
+                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
                      config.respect_expected_rq_timeout(), config.strict_check_headers(),
-                     context.api().timeSource(), context.httpContext()) {
+                     context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -225,7 +206,7 @@ public:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
@@ -235,8 +216,6 @@ public:
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
-  Stats::StatNamePool stat_name_pool_;
-  Stats::StatName retry_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
 
@@ -297,7 +276,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
+      : config_(config), final_upstream_request_(nullptr),
+        downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
@@ -323,7 +303,8 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->streamInfo().downstreamRemoteAddress().get(), *downstream_headers_,
+            callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
+            *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
             },
@@ -418,7 +399,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->remoteAddress()->asString() + conn->localAddress()->asString();
+    value = conn->addressProvider().remoteAddress()->asString() +
+            conn->addressProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
@@ -471,18 +453,18 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr
-  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
+                                         Http::RequestHeaderMap& request_headers,
+                                         const Upstream::ClusterInfo& cluster,
+                                         const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                         Random::RandomGenerator& random,
+                                         Event::Dispatcher& dispatcher, TimeSource& time_source,
+                                         Upstream::ResourcePriority priority) PURE;
 
-  using HttpOrTcpPool =
-      absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*>;
-  HttpOrTcpPool createConnPool(Upstream::HostDescriptionConstSharedPtr& host);
-  UpstreamRequestPtr createUpstreamRequest(Filter::HttpOrTcpPool conn_pool);
+  std::unique_ptr<GenericConnPool>
+  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
+  UpstreamRequestPtr createUpstreamRequest();
 
-  Http::ConnectionPool::Instance* getHttpConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
@@ -546,6 +528,7 @@ private:
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
+  bool downstream_100_continue_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
@@ -566,7 +549,8 @@ private:
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
                                  const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 TimeSource& time_source,
                                  Upstream::ResourcePriority priority) override;
 };
 

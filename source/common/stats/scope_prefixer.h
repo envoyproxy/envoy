@@ -13,10 +13,9 @@ public:
   ScopePrefixer(StatName prefix, Scope& scope);
   ~ScopePrefixer() override;
 
-  ScopePtr createScopeFromStatName(StatName name);
-
   // Scope
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
@@ -49,12 +48,39 @@ public:
   HistogramOptConstRef findHistogram(StatName name) const override;
   TextReadoutOptConstRef findTextReadout(StatName name) const override;
 
-  const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
-  SymbolTable& symbolTable() override { return scope_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const final { return scope_.constSymbolTable(); }
+  SymbolTable& symbolTable() final { return scope_.symbolTable(); }
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+
 private:
+  template <class StatType> bool iterHelper(const IterateFn<StatType>& fn) const {
+    // We determine here what's in the scope by looking at name
+    // prefixes. Strictly speaking this is not correct, as a stat name can be in
+    // different scopes. But there is no data in `ScopePrefixer` to resurrect
+    // actual membership of a stat in a scope, so we go by name matching. Note
+    // that `ScopePrefixer` is not used in `ThreadLocalStore`, which has
+    // accurate maps describing which stats are in which scopes.
+    //
+    // TODO(jmarantz): In the scope of this limited implementation, it would be
+    // faster to match on the StatName prefix. This would be possible if
+    // SymbolTable exposed a split() method.
+    std::string prefix_str = scope_.symbolTable().toString(prefix_.statName());
+    if (!prefix_str.empty() && !absl::EndsWith(prefix_str, ".")) {
+      prefix_str += ".";
+    }
+    IterateFn<StatType> filter_scope = [&fn,
+                                        &prefix_str](const RefcountPtr<StatType>& stat) -> bool {
+      return !absl::StartsWith(stat->name(), prefix_str) || fn(stat);
+    };
+    return scope_.iterate(filter_scope);
+  }
+
   Scope& scope_;
   StatNameStorage prefix_;
 };

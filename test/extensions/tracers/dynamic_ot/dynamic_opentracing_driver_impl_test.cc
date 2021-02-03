@@ -70,6 +70,9 @@ TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
   }
 }
 
+// This test fails under gcc, please see https://github.com/envoyproxy/envoy/issues/7647
+// for more details.
+#ifndef GCC_COMPILER
 TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
@@ -87,6 +90,7 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   EXPECT_NE(spans_json, nullptr);
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
+#endif
 
 } // namespace
 } // namespace DynamicOt

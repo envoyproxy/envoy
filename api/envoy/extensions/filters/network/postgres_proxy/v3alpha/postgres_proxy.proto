@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.postgres_proxy.v3alpha;
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -22,4 +24,9 @@ message PostgresProxy {
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_postgres_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Controls whether SQL statements received in Frontend Query messages
+  // are parsed. Parsing is required to produce Postgres proxy filter
+  // metadata. Defaults to true.
+  google.protobuf.BoolValue enable_sql_parsing = 2;
 }

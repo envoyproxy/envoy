@@ -24,7 +24,8 @@ runtime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>` bootstrap configu
 layering. Runtime settings in later layers override earlier layers. A typical configuration might
 be:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.LayeredRuntime
 
   layers:
   - name: static_layer_0
@@ -247,8 +248,10 @@ envoy.deprecated_features:full_fieldname or envoy.deprecated_features:full_enum_
 to true. For example, for a deprecated field
 ``Foo.Bar.Eep`` set ``envoy.deprecated_features:Foo.bar.Eep`` to
 ``true``. There is a production example using static runtime to allow both fail-by-default fields here:
-:repo:`configs/using_deprecated_config.v2.yaml`
-Use of these override is **strongly discouraged** so please use with caution and switch to the new fields
+:repo:`configs/using_deprecated_config.yaml`. The disallowed mode can also be overridden in runtime
+configuration by setting ``envoy.features.enable_all_deprecated_feature`` to ``true``, which allows
+the use of all deprecated fields.
+Use of these overrides is **strongly discouraged** so please use with caution and switch to the new fields
 as soon as possible. Fatal-by-default configuration indicates that the removal of the old code paths is
 imminent. It is far better for both Envoy users and for Envoy contributors if any bugs or feature gaps
 with the new code paths are flushed out ahead of time, rather than after the code is removed!

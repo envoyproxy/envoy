@@ -41,7 +41,7 @@ public:
 // Verify filter functionality when signing works.
 TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), sign(_)).Times(1);
+  EXPECT_CALL(*(filter_config_->signer_), sign(_));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -52,7 +52,7 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   setup();
   filter_config_->host_rewrite_ = "foo";
-  EXPECT_CALL(*(filter_config_->signer_), sign(_)).Times(1);
+  EXPECT_CALL(*(filter_config_->signer_), sign(_));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -70,6 +70,18 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
+}
+
+// Verify FilterConfigImpl's getters.
+TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
+  Stats::IsolatedStoreImpl stats;
+  auto signer = std::make_unique<Common::Aws::MockSigner>();
+  const auto* signer_ptr = signer.get();
+  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo");
+
+  EXPECT_EQ(signer_ptr, &config.signer());
+  EXPECT_EQ(0UL, config.stats().signing_added_.value());
+  EXPECT_EQ("foo", config.hostRewrite());
 }
 
 } // namespace

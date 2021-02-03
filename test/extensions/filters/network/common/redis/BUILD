@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
@@ -7,6 +5,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -18,6 +18,7 @@ envoy_cc_mock(
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//test/test_common:printers_lib",
     ],
 )
 
@@ -55,8 +56,22 @@ envoy_cc_test(
         "//source/extensions/filters/network/common/redis:client_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "fault_test",
+    srcs = ["fault_test.cc"],
+    deps = [
+        ":redis_mocks",
+        "//source/common/common:assert_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )

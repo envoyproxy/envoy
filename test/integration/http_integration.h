@@ -7,18 +7,22 @@
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 
 namespace Envoy {
 
+using ::Envoy::Http::Http2::Http2Frame;
+
 /**
  * HTTP codec client used during integration testing.
  */
 class IntegrationCodecClient : public Http::CodecClientProd {
 public:
-  IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
+  IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                         Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
@@ -38,7 +42,8 @@ public:
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers);
-  bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent lastConnectionEvent() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
@@ -60,7 +65,7 @@ private:
     CodecCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent_.saw_goaway_ = true; }
+    void onGoAway(Http::GoAwayErrorCode) override { parent_.saw_goaway_ = true; }
 
     IntegrationCodecClient& parent_;
   };
@@ -101,11 +106,14 @@ public:
   ~HttpIntegrationTest() override;
 
 protected:
-  void useAccessLog(absl::string_view format = "");
+  void useAccessLog(absl::string_view format = "",
+                    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
-  virtual IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn);
+  virtual IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
   // Makes a http connection object with asserting a connected state.
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
@@ -140,6 +148,11 @@ protected:
   void waitForNextUpstreamRequest(
       uint64_t upstream_index = 0,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
+
+  absl::optional<uint64_t>
+  waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
+                                std::chrono::milliseconds connection_wait_timeout,
+                                FakeHttpConnectionPtr& fake_upstream_connection);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
@@ -195,6 +208,7 @@ protected:
   void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,
                         Http::TestRequestTrailerMapImpl request_trailers, uint32_t size,
                         uint32_t max_size);
+  void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
                                uint32_t max_count = 100);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
@@ -207,9 +221,10 @@ protected:
   void testGrpcRetry();
 
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
-                                    const std::string& via = "");
-  void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
-                                    bool with_encoder_filter = false);
+                                    const std::string& via = "", bool disconnect_after_100 = false);
+  void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
+                            bool with_encoder_filter = false,
+                            bool with_multiple_1xx_headers = false);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
@@ -244,5 +259,22 @@ protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   std::string access_log_name_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
+
+// Helper class for integration tests using raw HTTP/2 frames
+class Http2RawFrameIntegrationTest : public HttpIntegrationTest {
+public:
+  Http2RawFrameIntegrationTest(Network::Address::IpVersion version)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, version) {}
+
+protected:
+  void startHttp2Session();
+  Http2Frame readFrame();
+  void sendFrame(const Http2Frame& frame);
+  virtual void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
+};
+
 } // namespace Envoy

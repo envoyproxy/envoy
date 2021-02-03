@@ -1,9 +1,12 @@
-FROM frolvlad/alpine-glibc
-
+FROM frolvlad/alpine-glibc:alpine-3.12_glibc-2.31
 RUN mkdir -p /etc/envoy
 
-ADD build_release_stripped/envoy /usr/local/bin/envoy
-ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
+ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
+RUN apk add --no-cache shadow su-exec \
+        && addgroup -S envoy && adduser --no-create-home -S envoy -G envoy
+
+ARG ENVOY_BINARY_SUFFIX=_stripped
+ADD linux/amd64/build_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
 
 EXPOSE 10000
 

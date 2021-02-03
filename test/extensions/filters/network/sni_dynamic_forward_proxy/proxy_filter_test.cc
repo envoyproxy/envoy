@@ -6,7 +6,8 @@
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/basic_resource_limit.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 
 using testing::AtLeast;
@@ -21,9 +22,10 @@ namespace NetworkFilters {
 namespace SniDynamicForwardProxy {
 namespace {
 
-using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
+using LoadDnsCacheEntryStatus =
+    Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 using MockLoadDnsCacheEntryResult =
-    Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
+    Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
 
 class SniDynamicProxyFilterTest
     : public testing::Test,
@@ -40,10 +42,6 @@ public:
     // Allow for an otherwise strict mock.
     ON_CALL(callbacks_, connection()).WillByDefault(ReturnRef(connection_));
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
-
-    // Configure max pending to 1 so we can test circuit breaking.
-    // TODO(lizan): implement circuit breaker in SNI dynamic forward proxy
-    cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
   }
 
   ~SniDynamicProxyFilterTest() override {
@@ -62,6 +60,7 @@ public:
   std::unique_ptr<ProxyFilter> filter_;
   Network::MockReadFilterCallbacks callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
 };
 
 // No SNI handling.
@@ -72,6 +71,10 @@ TEST_F(SniDynamicProxyFilterTest, NoSNI) {
 
 TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
+  Upstream::ResourceAutoIncDec* circuit_breakers_{
+      new Upstream::ResourceAutoIncDec(pending_requests_)};
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
+      .WillOnce(Return(circuit_breakers_));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
@@ -86,6 +89,10 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
 
 TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
+  Upstream::ResourceAutoIncDec* circuit_breakers_{
+      new Upstream::ResourceAutoIncDec(pending_requests_)};
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
+      .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr}));
 
@@ -95,8 +102,19 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
 // Cache overflow.
 TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
+  Upstream::ResourceAutoIncDec* circuit_breakers_{
+      new Upstream::ResourceAutoIncDec(pending_requests_)};
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
+      .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr}));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+}
+
+TEST_F(SniDynamicProxyFilterTest, CircuitBreakerInvoked) {
+  EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }

@@ -83,12 +83,17 @@ message Action {
     MutateAndMove mutate_and_move = 12;
     Append append = 11;
     google.protobuf.Empty copy = 7;
-    string lookup = 8;
     string remove = 9;
     string remove_prefix = 10;
   }
 }
 
+message Config {
+  uint32 lazy_map_min_size = 1;
+}
+
 message HeaderMapImplFuzzTestCase {
   repeated Action actions = 1;
+  // Optional threshold value configuration for the lazy header-map.
+  Config config = 2;
 }

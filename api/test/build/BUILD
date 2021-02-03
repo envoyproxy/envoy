@@ -1,6 +1,6 @@
-licenses(["notice"])  # Apache 2
-
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
+
+licenses(["notice"])  # Apache 2
 
 api_cc_test(
     name = "build_test",
@@ -23,11 +23,9 @@ api_go_test(
     deps = [
         "//envoy/api/v2:pkg_go_proto",
         "//envoy/api/v2/auth:pkg_go_proto",
-        "//envoy/config/bootstrap/v2:pkg_go_proto",
         "//envoy/service/accesslog/v2:pkg_go_proto",
         "//envoy/service/discovery/v2:pkg_go_proto",
         "//envoy/service/metrics/v2:pkg_go_proto",
         "//envoy/service/ratelimit/v2:pkg_go_proto",
-        "//envoy/service/trace/v2:pkg_go_proto",
     ],
 )

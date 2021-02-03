@@ -31,18 +31,21 @@ public:
   virtual bool onRdsUpdate(const envoy::config::route::v3::RouteConfiguration& rc,
                            const std::string& version_info) PURE;
 
+  using VirtualHostRefVector =
+      std::vector<std::reference_wrapper<const envoy::config::route::v3::VirtualHost>>;
+
   /**
    * Called on updates via VHDS.
-   * @param added_resources supplies Resources (each containing a VirtualHost) that have been
-   * added.
+   * @param added_vhosts supplies VirtualHosts that have been added.
+   * @param added_resource_ids set of resources IDs (names + aliases) added.
    * @param removed_resources supplies names of VirtualHosts that have been removed.
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
    */
-  virtual bool onVhdsUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& version_info) PURE;
+  virtual bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
+                            const std::set<std::string>& added_resource_ids,
+                            const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                            const std::string& version_info) PURE;
 
   /**
    * @return std::string& the name of RouteConfiguration.
@@ -75,7 +78,7 @@ public:
   virtual absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const PURE;
 
   /**
-   * @return envoy::api::v2::RouteConfiguration& current RouteConfiguration.
+   * @return envoy::config::route::v3::RouteConfiguration& current RouteConfiguration.
    */
   virtual const envoy::config::route::v3::RouteConfiguration& routeConfiguration() PURE;
 

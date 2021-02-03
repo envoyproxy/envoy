@@ -16,6 +16,7 @@ TEST(Status, Ok) {
   EXPECT_FALSE(isBufferFloodError(status));
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
+  EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
 }
 
 TEST(Status, CodecProtocolError) {
@@ -28,6 +29,7 @@ TEST(Status, CodecProtocolError) {
   EXPECT_FALSE(isBufferFloodError(status));
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
+  EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
 }
 
 TEST(Status, BufferFloodError) {
@@ -40,6 +42,7 @@ TEST(Status, BufferFloodError) {
   EXPECT_TRUE(isBufferFloodError(status));
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_FALSE(isCodecClientError(status));
+  EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
 }
 
 TEST(Status, PrematureResponseError) {
@@ -53,6 +56,7 @@ TEST(Status, PrematureResponseError) {
   EXPECT_TRUE(isPrematureResponseError(status));
   EXPECT_EQ(Http::Code::ProxyAuthenticationRequired, getPrematureResponseHttpCode(status));
   EXPECT_FALSE(isCodecClientError(status));
+  EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
 }
 
 TEST(Status, CodecClientError) {
@@ -65,6 +69,53 @@ TEST(Status, CodecClientError) {
   EXPECT_FALSE(isBufferFloodError(status));
   EXPECT_FALSE(isPrematureResponseError(status));
   EXPECT_TRUE(isCodecClientError(status));
+  EXPECT_FALSE(isInboundFramesWithEmptyPayloadError(status));
+}
+
+TEST(Status, InboundFramesWithEmptyPayload) {
+  auto status = inboundFramesWithEmptyPayloadError();
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("Too many consecutive frames with an empty payload", status.message());
+  EXPECT_EQ("InboundFramesWithEmptyPayloadError: Too many consecutive frames with an empty payload",
+            toString(status));
+  EXPECT_EQ(StatusCode::InboundFramesWithEmptyPayload, getStatusCode(status));
+  EXPECT_FALSE(isCodecProtocolError(status));
+  EXPECT_FALSE(isBufferFloodError(status));
+  EXPECT_FALSE(isPrematureResponseError(status));
+  EXPECT_FALSE(isCodecClientError(status));
+  EXPECT_TRUE(isInboundFramesWithEmptyPayloadError(status));
+}
+
+TEST(Status, ReturnIfError) {
+
+  auto outer = [](Status (*inner)()) {
+    RETURN_IF_ERROR(inner());
+    return bufferFloodError("boom");
+  };
+
+  auto result = outer([]() { return okStatus(); });
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ("boom", result.message());
+  EXPECT_TRUE(isBufferFloodError(result));
+  result = outer([]() { return codecClientError("foobar"); });
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(isCodecClientError(result));
+  EXPECT_EQ("foobar", result.message());
+
+  // Check that passing a `Status` object directly into the RETURN_IF_ERROR works.
+  auto direct_status = [](const Status& status) {
+    RETURN_IF_ERROR(status);
+    return bufferFloodError("baz");
+  };
+  result = direct_status(codecClientError("foobar"));
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(isCodecClientError(result));
+  EXPECT_EQ("foobar", result.message());
+
+  result = direct_status(okStatus());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ("baz", result.message());
+  EXPECT_TRUE(isBufferFloodError(result));
 }
 
 } // namespace Http

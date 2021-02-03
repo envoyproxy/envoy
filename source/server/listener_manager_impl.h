@@ -67,10 +67,12 @@ public:
   createListenerFilterMatcher(const envoy::config::listener::v3::ListenerFilter& listener_filter);
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
+  LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
-        lds_config, server_.clusterManager(), server_.initManager(), server_.stats(),
-        server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor());
+        lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
+        server_.stats(), server_.listenerManager(),
+        server_.messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
@@ -89,7 +91,7 @@ public:
   }
 
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                              Network::Address::SocketType socket_type,
+                                              Network::Socket::Type socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               const ListenSocketCreationParams& params) override;
 
@@ -182,18 +184,21 @@ public:
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, bool added_via_api) override;
-  void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
+  void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
+                    const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     ASSERT(lds_api_ == nullptr);
-    lds_api_ = factory_.createLdsApi(lds_config);
+    lds_api_ = factory_.createLdsApi(lds_config, lds_resources_locator);
   }
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>>
+  listeners(ListenerState state = ListenerState::ACTIVE) override;
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
-  void startWorkers(GuardDog& guard_dog) override;
+  void startWorkers(GuardDog& guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType stop_listeners_type) override;
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
+  bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
@@ -210,6 +215,8 @@ private:
   bool addOrUpdateListenerInternal(const envoy::config::listener::v3::Listener& config,
                                    const std::string& version_info, bool added_via_api,
                                    const std::string& name);
+  bool removeListenerInternal(const std::string& listener_name, bool dynamic_listeners_only);
+
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
@@ -295,7 +302,7 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
-  std::list<WorkerPtr> workers_;
+  std::vector<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopePtr scope_;
@@ -318,15 +325,14 @@ public:
       ListenerComponentFactory& listener_component_factory,
       Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
-  std::shared_ptr<Network::DrainableFilterChain>
+  Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::shared_ptr<Network::DrainableFilterChain>
-  buildFilterChainInternal(const envoy::config::listener::v3::FilterChain& filter_chain,
-                           std::unique_ptr<Configuration::FilterChainFactoryContext>&&
-                               filter_chain_factory_context) const;
+  Network::DrainableFilterChainSharedPtr buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;

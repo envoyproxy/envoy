@@ -12,6 +12,7 @@
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
 #include "common/profiler/profiler.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -117,8 +118,6 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer;
-  symbol_table_creator_test_peer.setUseFakeSymbolTables(false);
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -225,6 +224,24 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
+
+  // Test that a specific bucket config is applied. Buckets 1-4 (inclusive) are set in initialize().
+  for (int i = 1; i <= 4; i++) {
+    EXPECT_THAT(
+        response->body(),
+        HasSubstr(fmt::format("envoy_cluster_upstream_cx_connect_ms_bucket{{envoy_cluster_name="
+                              "\"cluster_0\",le=\"{}\"}} 0\n",
+                              i)));
+  }
+
+  // Test that other histograms use the default buckets.
+  for (double bucket : Stats::HistogramSettingsImpl::defaultBuckets()) {
+    EXPECT_THAT(
+        response->body(),
+        HasSubstr(fmt::format("envoy_cluster_upstream_cx_length_ms_bucket{{envoy_cluster_name="
+                              "\"cluster_0\",le=\"{0:.32g}\"}} 0\n",
+                              bucket)));
+  }
 
   EXPECT_EQ("200", request("admin", "GET", "/stats/prometheus", response));
   EXPECT_THAT(
@@ -358,6 +375,29 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
+  EXPECT_EQ("application/json", ContentType(response));
+  json = Json::Factory::loadFromString(response->body());
+  index = 0;
+  const std::string expected_types_eds[] = {
+      "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
+
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types_eds[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
+  // Validate we can parse as proto.
+  envoy::admin::v3::ConfigDump config_dump_with_eds;
+  TestUtility::loadFromJson(response->body(), config_dump_with_eds);
+  EXPECT_EQ(7, config_dump_with_eds.configs_size());
+
   // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
@@ -426,8 +466,8 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   // Check that the added callback was invoked.
   EXPECT_EQ(test, false);
 
-  // Small test to cover new statsFlushInterval() on Instance.h.
-  EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
+  // Small test to cover new the flush interval on the statsConfig in Instance.h.
+  EXPECT_EQ(test_server_->server().statsConfig().flushInterval(), std::chrono::milliseconds(5000));
 }
 
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
@@ -522,6 +562,7 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
 }
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeRequests)) {
+  v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
       ".*requests.*");
   initialize();
@@ -537,6 +578,7 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
 }
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeMultipleExact)) {
+  v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
       ".*live");

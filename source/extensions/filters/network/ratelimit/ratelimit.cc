@@ -9,6 +9,8 @@
 #include "common/common/fmt.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -49,7 +51,8 @@ Network::FilterStatus Filter::onNewConnection() {
     config_->stats().active_.inc();
     config_->stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance());
+    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance(),
+                   filter_callbacks_->connection().streamInfo());
     calling_limit_ = false;
   }
 
@@ -69,8 +72,15 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::ResponseHeaderMapPtr&&,
-                      Http::RequestHeaderMapPtr&&) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
+                      Filters::Common::RateLimit::DescriptorStatusListPtr&&,
+                      Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&, const std::string&,
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    filter_callbacks_->connection().streamInfo().setDynamicMetadata(
+        NetworkFilterNames::get().RateLimit, *dynamic_metadata);
+  }
+
   status_ = Status::Complete;
   config_->stats().active_.dec();
 

@@ -2,9 +2,11 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/network/socket.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -30,16 +32,16 @@ public:
    * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
-   * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
-   * @param event_logger supplies the event_logger.
+   * @param log_manager supplies the log_manager.
    * @param validation_visitor message validation visitor instance.
+   * @param api reference to the Api object
    * @return a health checker.
    */
   static HealthCheckerSharedPtr
   create(const envoy::config::core::v3::HealthCheck& health_check_config,
-         Upstream::Cluster& cluster, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-         Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
+         Upstream::Cluster& cluster, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
+         AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
@@ -50,7 +52,7 @@ class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
   /**
    * Utility class checking if given http status matches configured expectations.
@@ -104,6 +106,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -117,14 +120,27 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
+    class HttpConnectionCallbackImpl : public Http::ConnectionCallbacks {
+    public:
+      HttpConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Http::ConnectionCallbacks
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
+
+    private:
+      HttpActiveHealthCheckSession& parent_;
+    };
+
     ConnectionCallbackImpl connection_callback_impl_{*this};
+    HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::Address::InstanceConstSharedPtr local_address_;
+    Network::SocketAddressProviderSharedPtr local_address_provider_;
     bool expect_reset_{};
+    bool reuse_connection_ = false;
+    bool request_in_flight_ = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
@@ -149,6 +165,7 @@ private:
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
+  Random::RandomGenerator& random_generator_;
 };
 
 /**
@@ -221,7 +238,7 @@ class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   TcpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                       Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                       Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct TcpActiveHealthCheckSession;
@@ -286,7 +303,7 @@ class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -323,7 +340,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
-    void onGoAway();
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -341,7 +358,7 @@ private:
     public:
       HttpConnectionCallbackImpl(GrpcActiveHealthCheckSession& parent) : parent_(parent) {}
       // Http::ConnectionCallbacks
-      void onGoAway() override { parent_.onGoAway(); }
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
 
     private:
       GrpcActiveHealthCheckSession& parent_;
@@ -358,6 +375,9 @@ private:
     // e.g. remote reset. In this case healthcheck status has already been reported, only state
     // cleanup is required.
     bool expect_reset_ = false;
+    // If true, we received a GOAWAY (NO_ERROR code) and are deferring closing the connection
+    // until the active probe completes.
+    bool received_no_error_goaway_ = false;
   };
 
   virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
@@ -370,6 +390,10 @@ private:
     return envoy::data::core::v3::GRPC;
   }
 
+protected:
+  Random::RandomGenerator& random_generator_;
+
+private:
   const Protobuf::MethodDescriptor& service_method_;
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;

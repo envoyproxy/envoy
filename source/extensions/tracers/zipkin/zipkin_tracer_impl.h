@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -7,6 +8,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
@@ -75,6 +77,13 @@ public:
 
   void setSampled(bool sampled) override;
 
+  // TODO(#11622): Implement baggage storage for zipkin spans
+  void setBaggage(absl::string_view, absl::string_view) override;
+  std::string getBaggage(absl::string_view) override;
+
+  // TODO: This method is unimplemented for Zipkin.
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+
   /**
    * @return a reference to the Zipkin::Span object.
    */
@@ -99,7 +108,7 @@ public:
   Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
          Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
+         const LocalInfo::LocalInfo& localinfo, Random::RandomGenerator& random_generator,
          TimeSource& time_source);
 
   /**
@@ -119,6 +128,7 @@ public:
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
+  const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
 
@@ -135,6 +145,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   std::string cluster_;
+  std::string hostname_;
   ZipkinTracerStats tracer_stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
@@ -201,6 +212,7 @@ public:
   // The callbacks below record Zipkin-span-related stats.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   /**
    * Creates a heap-allocated ZipkinReporter.

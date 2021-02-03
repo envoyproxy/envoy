@@ -16,7 +16,7 @@ namespace Dynamo {
 
 /**
  * Basic json request/response format:
- * http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Appendix.CurrentAPI.html
+ * https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Operations_Amazon_DynamoDB.html
  */
 const Http::LowerCaseString RequestParser::X_AMZ_TARGET("X-AMZ-TARGET");
 
@@ -49,7 +49,10 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     "TransactionCanceledException",
     "TransactionInProgressException",
     "UnrecognizedClientException",
-    "ValidationException"};
+    "ValidationException",
+    // Errors not listed in the error handling section of DynamoDB developer guide, but observed in runtime
+    "InvalidSignatureException", // https://github.com/aws/aws-sdk-go/issues/2598#issuecomment-526398896
+};
 // clang-format on
 
 const std::vector<std::string> RequestParser::BATCH_OPERATIONS{"BatchGetItem", "BatchWriteItem"};
@@ -62,10 +65,12 @@ const std::vector<std::string> RequestParser::TRANSACT_ITEM_OPERATIONS{"Conditio
 std::string RequestParser::parseOperation(const Http::HeaderMap& header_map) {
   std::string operation;
 
-  const Http::HeaderEntry* x_amz_target = header_map.get(X_AMZ_TARGET);
-  if (x_amz_target) {
+  const auto x_amz_target = header_map.get(X_AMZ_TARGET);
+  if (!x_amz_target.empty()) {
     // Normally x-amz-target contains Version.Operation, e.g., DynamoDB_20160101.GetItem
-    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().getStringView(), ".");
+    // AWS is trusted. Using the first value is fine.
+    auto version_and_operation =
+        StringUtil::splitToken(x_amz_target[0]->value().getStringView(), ".");
     if (version_and_operation.size() == 2) {
       operation = std::string{version_and_operation[1]};
     }

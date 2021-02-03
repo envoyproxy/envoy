@@ -17,6 +17,11 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+ClusterCircuitBreakersStats clusterCircuitBreakersStats(Stats::Store& store) {
+  return {
+      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, POOL_GAUGE(store), h, tr, GENERATE_STATNAME_STRUCT)};
+}
+
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Stats::MockGauge> gauge;
@@ -26,9 +31,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0,
-      ClusterCircuitBreakersStats{
-          ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))},
-      absl::nullopt, absl::nullopt);
+      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt);
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -83,8 +86,7 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::IsolatedStoreImpl store;
 
-  auto stats = ClusterCircuitBreakersStats{
-      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
+  auto stats = clusterCircuitBreakersStats(store);
   ResourceManagerImpl resource_manager(runtime,
                                        "circuit_breakers.runtime_resource_manager_test.default.", 1,
                                        2, 1, 0, 3, stats, absl::nullopt, absl::nullopt);
@@ -149,8 +151,7 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::IsolatedStoreImpl store;
 
-  auto stats = ClusterCircuitBreakersStats{
-      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
+  auto stats = clusterCircuitBreakersStats(store);
 
   // Test retry budgets disable remaining_retries gauge (it should always be 0).
   ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,

@@ -2,6 +2,7 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -11,7 +12,6 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/span_context_extractor.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -35,6 +35,10 @@ void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
 void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
   span_.log(timestamp, event);
 }
+
+// TODO(#11622): Implement baggage storage for zipkin spans
+void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
+std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
 void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
@@ -68,15 +72,17 @@ Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
 Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-               const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator,
+               const LocalInfo::LocalInfo& local_info, Random::RandomGenerator& random_generator,
                TimeSource& time_source)
     : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_,
+  Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = zipkin_config.collector_cluster();
+  hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
+                                                          : zipkin_config.collector_cluster();
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
@@ -177,26 +183,22 @@ void ReporterImpl::flushSpans() {
     Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
-    message->headers().setHost(driver_.cluster());
+    message->headers().setHost(driver_.hostname());
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 
-    Buffer::InstancePtr body = std::make_unique<Buffer::OwnedImpl>();
-    body->add(request_body);
-    message->body() = std::move(body);
+    message->body().add(request_body);
 
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
 
-    if (collector_cluster_.exists()) {
+    if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          driver_.clusterManager()
-              .httpAsyncClientForCluster(collector_cluster_.info()->name())
-              .send(std::move(message), *this,
-                    Http::AsyncClient::RequestOptions().setTimeout(
-                        std::chrono::milliseconds(timeout)));
+          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+              std::move(message), *this,
+              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
       if (request) {
         active_requests_.add(*request);
       }

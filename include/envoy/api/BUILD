@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "api_interface",
     hdrs = ["api.h"],
     deps = [
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/server:process_context_interface",

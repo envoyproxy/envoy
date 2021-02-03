@@ -1,12 +1,12 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/regex.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -63,11 +63,10 @@ public:
    * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
    */
   struct Descriptor {
-    Descriptor(const std::string& name, const std::string& regex, const std::string& substr = "")
-        : name_(name), regex_(regex), substr_(substr) {}
     const std::string name_;
     const std::string regex_;
     const std::string substr_;
+    const Regex::Type re_type_;
   };
 
   // Cluster name tag
@@ -96,6 +95,8 @@ public:
   const std::string RATELIMIT_PREFIX = "envoy.ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
+  // Stats prefix for the UDP Proxy network filter
+  const std::string UDP_PREFIX = "envoy.udp_prefix";
   // Downstream cluster for the Fault http filter
   const std::string FAULT_DOWNSTREAM_CLUSTER = "envoy.fault_downstream_cluster";
   // Operation name for the Dynamo http filter
@@ -128,7 +129,7 @@ public:
   const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
 private:
-  void addRegex(const std::string& name, const std::string& regex, const std::string& substr = "");
+  void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;

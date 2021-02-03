@@ -6,8 +6,10 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
-#include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
+#include "test/test_common/utility.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Event {
@@ -23,14 +25,11 @@ public:
   ~SimulatedTimeSystemHelper() override;
 
   // TimeSystem
-  SchedulerPtr createScheduler(Scheduler& base_scheduler) override;
+  SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
-  void advanceTimeWait(const Duration& duration) override;
-  void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  void advanceTimeWaitImpl(const Duration& duration) override;
+  void advanceTimeAsyncImpl(const Duration& duration) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -63,11 +62,16 @@ public:
 private:
   class SimulatedScheduler;
   class Alarm;
-  friend class Alarm; // Needed to reference mutex for thread annotations.
-  struct CompareAlarms {
-    bool operator()(const Alarm* a, const Alarm* b) const;
-  };
-  using AlarmSet = std::set<Alarm*, CompareAlarms>;
+
+  void registerScheduler(SimulatedScheduler* scheduler) {
+    absl::MutexLock lock(&mutex_);
+    schedulers_.insert(scheduler);
+  }
+
+  void unregisterScheduler(SimulatedScheduler* scheduler) {
+    absl::MutexLock lock(&mutex_);
+    schedulers_.erase(scheduler);
+  }
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -78,37 +82,27 @@ private:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  MonotonicTime alarmTimeLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void alarmActivateLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  // The simulation keeps a unique ID for each alarm to act as a deterministic
-  // tie-breaker for alarm-ordering.
-  int64_t nextIndex();
-
-  // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeAlarmLockHeld(Alarm*) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  // Keeps track of how many alarms have been activated but not yet called,
-  // which helps waitFor() determine when to give up and declare a timeout.
-  void incPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
+  // Keeps track of the number of simulated schedulers that have pending monotonic time updates.
+  // Used by advanceTimeWait() to determine when the time updates have finished propagating.
+  void incPending() {
+    absl::MutexLock lock(&mutex_);
+    ++pending_updates_;
+  }
   void decPending() {
     absl::MutexLock lock(&mutex_);
-    --pending_alarms_;
+    --pending_updates_;
   }
-  void waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
-  MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
-  SystemTime system_time_ GUARDED_BY(mutex_);
-  AlarmSet alarms_ GUARDED_BY(mutex_);
-  uint64_t index_ GUARDED_BY(mutex_);
+  MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
+  SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
+  TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
+  std::set<SimulatedScheduler*> schedulers_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  uint32_t pending_alarms_ GUARDED_BY(mutex_);
-  Thread::OnlyOneThread only_one_thread_;
+  uint32_t pending_updates_ ABSL_GUARDED_BY(mutex_);
 };
 
 // Represents a simulated time system, where time is advanced by calling

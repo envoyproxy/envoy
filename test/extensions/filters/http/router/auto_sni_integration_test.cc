@@ -23,7 +23,10 @@ public:
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
-      cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
 
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       auto* validation_context =
@@ -38,9 +41,7 @@ public:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
@@ -69,35 +70,34 @@ TEST_P(AutoSniIntegrationTest, BasicAutoSniTest) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ = sendRequestAndWaitForResponse(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
       0, default_response_headers_, 0);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ("localhost",
-               SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
 TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ = sendRequestAndWaitForResponse(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "127.0.0.1"}},
       0, default_response_headers_, 0);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
 TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {
@@ -113,11 +113,10 @@ TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());
 
-  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ("example.com",
-               SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ("example.com", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 }
 
 } // namespace

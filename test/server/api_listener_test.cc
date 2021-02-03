@@ -6,7 +6,10 @@
 #include "server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/worker.h"
+#include "test/mocks/server/worker_factory.h"
 #include "test/server/utility.h"
 #include "test/test_common/utility.h"
 
@@ -37,7 +40,7 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     stat_prefix: hcm
     route_config:
       name: api_router
@@ -52,8 +55,9 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
-
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
@@ -78,7 +82,7 @@ api_listener:
         path: eds path
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
@@ -97,7 +101,7 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     stat_prefix: hcm
     route_config:
       name: api_router
@@ -112,8 +116,9 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
-
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());

@@ -23,7 +23,9 @@
 #include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
@@ -62,7 +64,7 @@ namespace {
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
-  std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
+  absl::node_hash_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
       custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
   for (const auto& it : options.custom_settings_parameters()) {
@@ -144,10 +146,29 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  auto ret = initializeAndValidateOptions(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  }
+  return ret;
+}
+
+envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
+
+  if (!options.has_override_stream_error_on_invalid_http_message()) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        options.stream_error_on_invalid_http_messaging());
+  }
 
   if (!options_clone.has_hpack_table_size()) {
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
@@ -207,6 +228,30 @@ namespace Http {
 
 static const char kDefaultPath[] = "/";
 
+// If http_parser encounters an IP address [address] as the host it will set the offset and
+// length to point to 'address' rather than '[address]'. Fix this by adjusting the offset
+// and length to include the brackets.
+// @param absolute_url the absolute URL. This is usually of the form // http://host/path
+//        but may be host:port for CONNECT requests
+// @param offset the offset for the first character of the host. For IPv6 hosts
+//        this will point to the first character inside the brackets and will be
+//        adjusted to point at the brackets
+// @param len the length of the host-and-port field. For IPv6 hosts this will
+//        not include the brackets and will be adjusted to do so.
+bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64_t& len) {
+  // According to https://tools.ietf.org/html/rfc3986#section-3.2.2 the only way a hostname
+  // may begin with '[' is if it's an ipv6 address.
+  if (offset == 0 || *(absolute_url.data() + offset - 1) != '[') {
+    return false;
+  }
+  // Start one character sooner and end one character later.
+  offset--;
+  len += 2;
+  // HTTP parser ensures that any [ has a closing ]
+  ASSERT(absolute_url.length() >= offset + len);
+  return true;
+}
+
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
@@ -223,20 +268,27 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
                               u.field_data[UF_SCHEMA].len);
 
-  uint16_t authority_len = u.field_data[UF_HOST].len;
+  uint64_t authority_len = u.field_data[UF_HOST].len;
   if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
     authority_len = authority_len + u.field_data[UF_PORT].len + 1;
   }
-  host_and_port_ =
-      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  uint64_t authority_beginning = u.field_data[UF_HOST].off;
+  const bool is_ipv6 = maybeAdjustForIpv6(absolute_url, authority_beginning, authority_len);
+  host_and_port_ = absl::string_view(absolute_url.data() + authority_beginning, authority_len);
+  if (is_ipv6 && !parseAuthority(host_and_port_).is_ip_address_) {
+    return false;
+  }
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
-  // must start with
-  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
-  if (path_len > 0) {
-    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
-    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
+  // must start with. Determine if there's a non-zero path, and if so determine
+  // the length of the path, query params etc.
+  uint64_t path_etc_len = absolute_url.length() - (authority_beginning + hostAndPort().length());
+  if (path_etc_len > 0) {
+    uint64_t path_beginning = authority_beginning + hostAndPort().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_etc_len);
   } else if (!is_connect) {
+    ASSERT((u.field_set & (1 << UF_PATH)) == 0);
     path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
   return true;
@@ -272,14 +324,26 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   }
 
   start++;
-  return parseParameters(url, start);
+  return parseParameters(url, start, /*decode_params=*/false);
+}
+
+Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    QueryParams params;
+    return params;
+  }
+
+  start++;
+  return parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0);
+  return parseParameters(body, 0, /*decode_params=*/true);
 }
 
-Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
+Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
+                                              bool decode_params) {
   QueryParams params;
 
   while (start < data.size()) {
@@ -291,8 +355,10 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(data, start, start + equal),
-                     StringUtil::subspan(data, start + equal + 1, end));
+      const auto param_name = StringUtil::subspan(data, start, start + equal);
+      const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                     decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
       params.emplace(StringUtil::subspan(data, start, end), "");
     }
@@ -315,50 +381,41 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
 
-  struct State {
-    std::string key_;
-    std::string ret_;
-  };
+  std::string ret;
 
-  State state;
-  state.key_ = key;
+  headers.iterateReverse([&key, &ret](const HeaderEntry& header) -> HeaderMap::Iterate {
+    // Find the cookie headers in the request (typically, there's only one).
+    if (header.key() == Http::Headers::get().Cookie.get()) {
 
-  headers.iterateReverse(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // Find the cookie headers in the request (typically, there's only one).
-        if (header.key() == Http::Headers::get().Cookie.get()) {
-
-          // Split the cookie header into individual cookies.
-          for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-            // Find the key part of the cookie (i.e. the name of the cookie).
-            size_t first_non_space = s.find_first_not_of(" ");
-            size_t equals_index = s.find('=');
-            if (equals_index == absl::string_view::npos) {
-              // The cookie is malformed if it does not have an `=`. Continue
-              // checking other cookies in this header.
-              continue;
-            }
-            const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-            State* state = static_cast<State*>(context);
-            // If the key matches, parse the value from the rest of the cookie string.
-            if (k == state->key_) {
-              absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-              // Cookie values may be wrapped in double quotes.
-              // https://tools.ietf.org/html/rfc6265#section-4.1.1
-              if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-                v = v.substr(1, v.size() - 2);
-              }
-              state->ret_ = std::string{v};
-              return HeaderMap::Iterate::Break;
-            }
-          }
+      // Split the cookie header into individual cookies.
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+        // Find the key part of the cookie (i.e. the name of the cookie).
+        size_t first_non_space = s.find_first_not_of(" ");
+        size_t equals_index = s.find('=');
+        if (equals_index == absl::string_view::npos) {
+          // The cookie is malformed if it does not have an `=`. Continue
+          // checking other cookies in this header.
+          continue;
         }
-        return HeaderMap::Iterate::Continue;
-      },
-      &state);
+        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+        // If the key matches, parse the value from the rest of the cookie string.
+        if (k == key) {
+          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
 
-  return state.ret_;
+          // Cookie values may be wrapped in double quotes.
+          // https://tools.ietf.org/html/rfc6265#section-4.1.1
+          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+            v = v.substr(1, v.size() - 2);
+          }
+          ret = std::string{v};
+          return HeaderMap::Iterate::Break;
+        }
+      }
+    }
+    return HeaderMap::Iterate::Continue;
+  });
+
+  return ret;
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
@@ -417,6 +474,7 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   ret.accept_http_10_ = config.accept_http_10();
   ret.default_host_for_http_10_ = config.default_host_for_http_10();
   ret.enable_trailers_ = config.enable_trailers();
+  ret.allow_chunked_length_ = config.allow_chunked_length();
 
   if (config.header_key_format().has_proper_case_words()) {
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
@@ -427,13 +485,36 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   return ret;
 }
 
+Http1Settings
+Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
+                            const Protobuf::BoolValue& hcm_stream_error) {
+  Http1Settings ret = parseHttp1Settings(config);
+
+  if (config.has_override_stream_error_on_invalid_http_message()) {
+    // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
+    // stream_error_on_invalid_http_message
+    ret.stream_error_on_invalid_http_message_ =
+        config.override_stream_error_on_invalid_http_message().value();
+  } else {
+    // fallback to HCM value
+    ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
+  }
+
+  return ret;
+}
+
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
+  absl::string_view details;
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
   sendLocalReply(
       is_reset,
-      Utility::EncodeFunctions{nullptr,
+      Utility::EncodeFunctions{nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream);
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
                                },
                                [&](Buffer::Instance& data, bool end_stream) -> void {
                                  callbacks.encodeData(data, end_stream);
@@ -454,6 +535,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
       {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
 
+  if (encode_functions.modify_headers_) {
+    encode_functions.modify_headers_(*response_headers);
+  }
   if (encode_functions.rewrite_) {
     encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
   }
@@ -469,15 +553,31 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
+      // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
+      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      if (body_text[body_text.length() - 1] == '\n') {
+        body_text = body_text.substr(0, body_text.length() - 1);
+      }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
+    // The `modify_headers` function may have added content-length, remove it.
+    response_headers->removeContentLength();
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
     return;
   }
 
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
-    response_headers->setReferenceContentType(content_type);
+    // If the `rewrite` function has changed body_text or content-type is not set, set it.
+    // This allows `modify_headers` function to set content-type for the body. For example,
+    // router.direct_response is calling sendLocalReply and may need to set content-type for
+    // the body.
+    if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
+      response_headers->setReferenceContentType(content_type);
+    }
+  } else {
+    response_headers->removeContentLength();
+    response_headers->removeContentType();
   }
 
   if (local_reply_data.is_head_request_) {
@@ -486,7 +586,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   }
 
   encode_functions.encode_headers_(std::move(response_headers), body_text.empty());
-  // encode_headers()) may have changed the referenced is_reset so we need to test it
+  // encode_headers() may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
     encode_functions.encode_data_(buffer, true);
@@ -576,7 +676,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = nullptr;
+    HeaderMap::GetResult nominated_header;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -603,8 +703,10 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       nominated_header = headers.get(lcs_header_to_remove);
     }
 
-    if (nominated_header) {
-      auto nominated_header_value_sv = nominated_header->value().getStringView();
+    if (!nominated_header.empty()) {
+      // NOTE: The TE header is an inline header, so by definition if we operate on it there can
+      // only be a single value. In all other cases we remove the nominated header.
+      auto nominated_header_value_sv = nominated_header[0]->value().getStringView();
 
       const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
 
@@ -615,6 +717,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
       }
 
       if (is_te_header) {
+        ASSERT(nominated_header.size() == 1);
         for (const auto& header_value :
              StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
@@ -700,6 +803,14 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
+std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
+  if (file_path.size() >= 3 && file_path[1] == ':' && file_path[2] == '/' &&
+      std::isalpha(file_path[0])) {
+    return std::string(file_path);
+  }
+  return absl::StrCat("/", file_path);
+}
+
 RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);
@@ -739,6 +850,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -828,7 +941,9 @@ void Utility::traversePerFilterConfigGeneric(
   }
 }
 
-std::string Utility::PercentEncoding::encode(absl::string_view value) {
+std::string Utility::PercentEncoding::encode(absl::string_view value,
+                                             absl::string_view reserved_chars) {
+  absl::flat_hash_set<char> reserved_char_set{reserved_chars.begin(), reserved_chars.end()};
   for (size_t i = 0; i < value.size(); ++i) {
     const char& ch = value[i];
     // The escaping characters are defined in
@@ -837,22 +952,23 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || ch == '%') {
-      return PercentEncoding::encode(value, i);
+    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+      return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
   return std::string(value);
 }
 
-std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index) {
+std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index,
+                                             const absl::flat_hash_set<char>& reserved_char_set) {
   std::string encoded;
   if (index > 0) {
-    absl::StrAppend(&encoded, value.substr(0, index - 1));
+    absl::StrAppend(&encoded, value.substr(0, index));
   }
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || ch == '%') {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));

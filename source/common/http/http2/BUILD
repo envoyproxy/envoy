@@ -1,12 +1,22 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
+
+envoy_cc_library(
+    name = "codec_stats_lib",
+    hdrs = ["codec_stats.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:thread_lib",
+    ],
+)
 
 envoy_cc_library(
     name = "codec_lib",
@@ -19,8 +29,10 @@ envoy_cc_library(
         "abseil_algorithm",
     ],
     deps = [
+        ":codec_stats_lib",
         ":metadata_decoder_lib",
         ":metadata_encoder_lib",
+        ":protocol_constraints_lib",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
@@ -28,14 +40,13 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:thread_lib",
+        "//source/common/common:statusor_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_helper_lib",
         "//source/common/http:codes_lib",
@@ -101,5 +112,21 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "protocol_constraints_lib",
+    srcs = ["protocol_constraints.cc"],
+    hdrs = ["protocol_constraints.h"],
+    external_deps = [
+        "nghttp2",
+    ],
+    deps = [
+        ":codec_stats_lib",
+        "//include/envoy/network:connection_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/http:status_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

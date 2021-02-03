@@ -4,7 +4,8 @@
 
 #include "extensions/tracers/dynamic_ot/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/tracer_factory.h"
+#include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/environment.h"
 
 #include "fmt/printf.h"
@@ -23,7 +24,8 @@ namespace {
 
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("fake_cluster")))
       .WillRepeatedly(
           Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
   ON_CALL(*context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
@@ -34,7 +36,8 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
       R"EOF(
   http:
     name: envoy.tracers.dynamic_ot
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.DynamicOtConfig
       library: %s
       config:
         output_file: fake_file

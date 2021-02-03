@@ -6,10 +6,12 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/network/socket_interface.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -82,12 +84,12 @@ Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
   return parent_context_.httpContext();
 }
 
-const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const {
-  return parent_context_.localInfo();
+Router::Context& PerFilterChainFactoryContextImpl::routerContext() {
+  return parent_context_.routerContext();
 }
 
-Envoy::Runtime::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
-  return parent_context_.random();
+const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const {
+  return parent_context_.localInfo();
 }
 
 Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
@@ -143,27 +145,31 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
-void FilterChainManagerImpl::addFilterChain(
+void FilterChainManagerImpl::addFilterChains(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+  absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,
+                      MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",
-                                       address_->asString()));
+                                       address_->asString(), filter_chain->name()));
     }
-    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                       "the same matching rules are defined",
-                                       address_->asString()));
+    const auto& matching_iter = filter_chains.find(filter_chain_match);
+    if (matching_iter != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
+                                       "the same matching rules defined as '{}'",
+                                       address_->asString(), filter_chain->name(),
+                                       matching_iter->second));
     }
-    filter_chains.insert(filter_chain_match);
+    filter_chains.insert({filter_chain_match, filter_chain->name()});
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
@@ -182,8 +188,7 @@ void FilterChainManagerImpl::addFilterChain(
 
     // Reject partial wildcards, we don't match on them.
     for (const auto& server_name : filter_chain_match.server_names()) {
-      if (server_name.find('*') != std::string::npos &&
-          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+      if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': partial wildcards are not supported in "
                         "\"server_names\"",
@@ -207,11 +212,47 @@ void FilterChainManagerImpl::addFilterChain(
         filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(), filter_chain_impl);
+
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   convertIPsToTries();
+  copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
+                                  context_creator);
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);
+}
+
+void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
+    FilterChainFactoryBuilder& filter_chain_factory_builder,
+    FilterChainFactoryContextCreator& context_creator) {
+  // Default filter chain is built exactly once.
+  ASSERT(!default_filter_chain_message_.has_value());
+
+  // Save the default filter chain message. This message could be used in next listener update.
+  if (default_filter_chain == nullptr) {
+    return;
+  }
+  default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
+
+  // Origin filter chain manager could be empty if the current is the ancestor.
+  const auto* origin = getOriginFilterChainManager();
+  if (origin == nullptr) {
+    default_filter_chain_ =
+        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    return;
+  }
+
+  // Copy from original filter chain manager, or build new filter chain if the default filter chain
+  // is not equivalent to the one in the original filter chain manager.
+  MessageUtil eq;
+  if (origin->default_filter_chain_message_.has_value() &&
+      eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
+    default_filter_chain_ = origin->default_filter_chain_;
+  } else {
+    default_filter_chain_ =
+        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+  }
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -360,11 +401,11 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
                                                                          const T& data) {
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
-    if (Network::SocketInterface::ipFamilySupported(AF_INET)) {
+    if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
     }
-    if (Network::SocketInterface::ipFamilySupported(AF_INET6)) {
+    if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
     }
@@ -378,28 +419,37 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  const auto& address = socket.localAddress();
+  const auto& address = socket.addressProvider().localAddress();
 
+  const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
   if (address->type() == Network::Address::Type::Ip) {
     const auto port_match = destination_ports_map_.find(address->ip()->port());
     if (port_match != destination_ports_map_.end()) {
-      return findFilterChainForDestinationIP(*port_match->second.second, socket);
+      best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
+      if (best_match_filter_chain != nullptr) {
+        return best_match_filter_chain;
+      } else {
+        // There is entry for specific port but none of the filter chain matches. Instead of
+        // matching catch-all port 0, the fallback filter chain is returned.
+        return default_filter_chain_.get();
+      }
     }
   }
-
-  // Match on catch-all port 0.
+  // Match on catch-all port 0 if there is no specific port sub tree.
   const auto port_match = destination_ports_map_.find(0);
   if (port_match != destination_ports_map_.end()) {
-    return findFilterChainForDestinationIP(*port_match->second.second, socket);
+    best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
   }
-
-  return nullptr;
+  return best_match_filter_chain != nullptr
+             ? best_match_filter_chain
+             // Neither exact port nor catch-all port matches. Use fallback filter chain.
+             : default_filter_chain_.get();
 }
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.localAddress();
+  auto address = socket.addressProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -520,7 +570,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.remoteAddress();
+  auto address = socket.addressProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -553,46 +603,48 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
 }
 
 void FilterChainManagerImpl::convertIPsToTries() {
-  for (auto& port : destination_ports_map_) {
+  for (auto& [destination_port, destination_ips_pair] : destination_ports_map_) {
+    UNREFERENCED_PARAMETER(destination_port);
     // These variables are used as we build up the destination CIDRs used for the trie.
-    auto& destination_ips_pair = port.second;
-    auto& destination_ips_map = destination_ips_pair.first;
+    auto& [destination_ips_map, destination_ips_trie] = destination_ips_pair;
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
         destination_ips_list;
     destination_ips_list.reserve(destination_ips_map.size());
 
-    for (const auto& entry : destination_ips_map) {
-      destination_ips_list.push_back(makeCidrListEntry(entry.first, entry.second));
+    for (const auto& [destination_ip, server_names_map_ptr] : destination_ips_map) {
+      destination_ips_list.push_back(makeCidrListEntry(destination_ip, server_names_map_ptr));
 
       // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
       // We need to get access to all of the source IP strings so that we can convert them into
       // a trie like we did for the destination IPs above.
-      for (auto& server_names_entry : *entry.second) {
-        for (auto& transport_protocols_entry : server_names_entry.second) {
-          for (auto& application_protocols_entry : transport_protocols_entry.second) {
-            for (auto& source_array_entry : application_protocols_entry.second) {
-              auto& source_ips_map = source_array_entry.first;
+      for (auto& [server_name, transport_protocols_map] : *server_names_map_ptr) {
+        UNREFERENCED_PARAMETER(server_name);
+        for (auto& [transport_protocol, application_protocols_map] : transport_protocols_map) {
+          UNREFERENCED_PARAMETER(transport_protocol);
+          for (auto& [application_protocol, source_arrays] : application_protocols_map) {
+            UNREFERENCED_PARAMETER(application_protocol);
+            for (auto& [source_ips_map, source_ips_trie] : source_arrays) {
               std::vector<
                   std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
                   source_ips_list;
               source_ips_list.reserve(source_ips_map.size());
 
-              for (auto& source_ip : source_ips_map) {
-                source_ips_list.push_back(makeCidrListEntry(source_ip.first, source_ip.second));
+              for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
+                source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
               }
 
-              source_array_entry.second = std::make_unique<SourceIPsTrie>(source_ips_list, true);
+              source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
             }
           }
         }
       }
     }
 
-    destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
+    destination_ips_trie = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
   }
 }
 
-std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
+Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
@@ -608,8 +660,7 @@ std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExist
   return nullptr;
 }
 
-std::unique_ptr<Configuration::FilterChainFactoryContext>
-FilterChainManagerImpl::createFilterChainFactoryContext(
+Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
@@ -629,11 +680,11 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
 Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
+Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
 bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Runtime::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
 Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }

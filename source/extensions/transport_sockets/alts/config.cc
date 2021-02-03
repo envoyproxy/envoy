@@ -13,6 +13,7 @@
 #include "extensions/transport_sockets/alts/grpc_tsi.h"
 #include "extensions/transport_sockets/alts/tsi_socket.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -26,9 +27,18 @@ using GrpcAltsCredentialsOptionsPtr =
 
 namespace {
 
+// TODO: gRPC v1.30.0-pre1 defines the equivalent function grpc_alts_set_rpc_protocol_versions
+// that should be called directly when available.
+void grpcAltsSetRpcProtocolVersions(grpc_gcp_rpc_protocol_versions* rpc_versions) {
+  grpc_gcp_rpc_protocol_versions_set_max(rpc_versions, GRPC_PROTOCOL_VERSION_MAX_MAJOR,
+                                         GRPC_PROTOCOL_VERSION_MAX_MINOR);
+  grpc_gcp_rpc_protocol_versions_set_min(rpc_versions, GRPC_PROTOCOL_VERSION_MIN_MAJOR,
+                                         GRPC_PROTOCOL_VERSION_MIN_MINOR);
+}
+
 // Returns true if the peer's service account is found in peers, otherwise
 // returns false and fills out err with an error message.
-bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& peers,
+bool doValidate(const tsi_peer& peer, const absl::node_hash_set<std::string>& peers,
                 std::string& err) {
   for (size_t i = 0; i < peer.property_count; ++i) {
     const std::string name = std::string(peer.properties[i].name);
@@ -48,8 +58,8 @@ bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& pee
 HandshakeValidator
 createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
   const auto& peer_service_accounts = config.peer_service_accounts();
-  const std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
-                                              peer_service_accounts.cend());
+  const absl::node_hash_set<std::string> peers(peer_service_accounts.cbegin(),
+                                               peer_service_accounts.cend());
   HandshakeValidator validator;
   // Skip validation if peers is empty.
   if (!peers.empty()) {
@@ -108,13 +118,15 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     } else {
       options = GrpcAltsCredentialsOptionsPtr(grpc_alts_credentials_server_options_create());
     }
+    grpcAltsSetRpcProtocolVersions(&options->rpc_versions);
     const char* target_name = is_upstream ? "" : nullptr;
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
     // in this use case. The validation will be performed by TsiSocket with the validator.
-    tsi_result status =
-        alts_tsi_handshaker_create(options.get(), target_name, handshaker_service.c_str(),
-                                   is_upstream, nullptr /* interested_parties */, &handshaker);
+    // Leaving the max frame size as 0 (unspecified) sets the default max frame size of 128 KiB.
+    tsi_result status = alts_tsi_handshaker_create(
+        options.get(), target_name, handshaker_service.c_str(), is_upstream,
+        nullptr /* interested_parties */, &handshaker, 0 /* default max frame size */);
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {

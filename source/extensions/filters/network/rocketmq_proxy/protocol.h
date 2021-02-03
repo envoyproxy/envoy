@@ -244,7 +244,7 @@ enum class ResponseCode : uint32_t {
   SystemError = 1,
   SystemBusy = 2,
   RequestCodeNotSupported = 3,
-  SlaveNotAvailable = 11,
+  ReplicaNotAvailable = 11,
 };
 
 /**

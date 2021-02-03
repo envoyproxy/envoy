@@ -2,13 +2,11 @@
 
 #include "extensions/common/tap/admin.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/admin_stream.h"
+#include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
-
-using testing::_;
-using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -16,19 +14,26 @@ namespace Common {
 namespace Tap {
 namespace {
 
+using ::testing::_;
+using ::testing::DoAll;
+using ::testing::Return;
+using ::testing::SaveArg;
+
 class MockExtensionConfig : public ExtensionConfig {
 public:
   MOCK_METHOD(const absl::string_view, adminId, ());
   MOCK_METHOD(void, clearTapConfig, ());
   MOCK_METHOD(void, newTapConfig,
-              (envoy::config::tap::v3::TapConfig && proto_config, Sink* admin_streamer));
+              (const envoy::config::tap::v3::TapConfig& proto_config, Sink* admin_streamer));
 };
 
 class AdminHandlerTest : public testing::Test {
 public:
-  AdminHandlerTest() {
+  void setup(Network::Address::Type socket_type = Network::Address::Type::Ip) {
+    ON_CALL(admin_.socket_, addressType()).WillByDefault(Return(socket_type));
     EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true))
         .WillOnce(DoAll(SaveArg<2>(&cb_), Return(true)));
+    EXPECT_CALL(admin_, socket());
     handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_);
   }
 
@@ -48,7 +53,7 @@ public:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -56,8 +61,18 @@ tap_config:
 )EOF";
 };
 
+// Make sure warn if using a pipe address for the admin handler.
+TEST_F(AdminHandlerTest, AdminWithPipeSocket) {
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Admin tapping (via /tap) is unreliable when the admin endpoint is a pipe and the connection "
+      "is HTTP/1. Either use an IP address or connect using HTTP/2.",
+      setup(Network::Address::Type::Pipe));
+}
+
 // Request with no config body.
 TEST_F(AdminHandlerTest, NoBody) {
+  setup();
   EXPECT_CALL(admin_stream_, getRequestBody());
   EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
   EXPECT_EQ("/tap requires a JSON/YAML body", response_.toString());
@@ -65,6 +80,7 @@ TEST_F(AdminHandlerTest, NoBody) {
 
 // Request with a config body that doesn't parse/verify.
 TEST_F(AdminHandlerTest, BadBody) {
+  setup();
   Buffer::OwnedImpl bad_body("hello");
   EXPECT_CALL(admin_stream_, getRequestBody()).WillRepeatedly(Return(&bad_body));
   EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
@@ -73,6 +89,7 @@ TEST_F(AdminHandlerTest, BadBody) {
 
 // Request that references an unknown config ID.
 TEST_F(AdminHandlerTest, UnknownConfigId) {
+  setup();
   Buffer::OwnedImpl body(admin_request_yaml_);
   EXPECT_CALL(admin_stream_, getRequestBody()).WillRepeatedly(Return(&body));
   EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
@@ -82,6 +99,7 @@ TEST_F(AdminHandlerTest, UnknownConfigId) {
 
 // Request while there is already an active tap session.
 TEST_F(AdminHandlerTest, RequestTapWhileAttached) {
+  setup();
   MockExtensionConfig extension_config;
   handler_->registerConfig(extension_config, "test_config_id");
 

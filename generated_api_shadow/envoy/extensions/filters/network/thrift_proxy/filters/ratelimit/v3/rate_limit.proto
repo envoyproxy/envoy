@@ -25,7 +25,7 @@ message RateLimit {
       "envoy.config.filter.thrift.rate_limit.v2alpha1.RateLimit";
 
   // The rate limit domain to use in the rate limit service request.
-  string domain = 1 [(validate.rules).string = {min_bytes: 1}];
+  string domain = 1 [(validate.rules).string = {min_len: 1}];
 
   // Specifies the rate limit configuration stage. Each configured rate limit filter performs a
   // rate limit check using descriptors configured in the

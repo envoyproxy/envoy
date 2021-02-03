@@ -3,7 +3,7 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -42,6 +42,7 @@ TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
       envoy::extensions::filters::http::cache::v3alpha::CacheConfig());
   EXPECT_THROW(factory_.createFilterFactoryFromProto(config_, "stats", context_), EnvoyException);
 }
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/thread.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/inlined_vector.h"
@@ -26,7 +27,7 @@ public:
   // This is intentionally left as an implicit conversion from string_view to
   // make call-sites easier to read, e.g.
   //    Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
-  DynamicName(absl::string_view str) : absl::string_view(str) {}
+  explicit DynamicName(absl::string_view str) : absl::string_view(str) {}
 };
 
 /**
@@ -62,6 +63,35 @@ public:
    * @return The value of the tag, if found.
    */
   static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
+
+  /**
+   * Creates a nested scope from a vector of tokens which are used to create the
+   * name. The tokens can be specified as DynamicName or StatName. For
+   * tokens specified as DynamicName, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also scopeFromStatNames, which is slightly faster but does not allow
+   * passing DynamicName(string)s as names.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param elements The vector of mixed DynamicName and StatName
+   * @return A scope named using the joined elements.
+   */
+  static ScopePtr scopeFromElements(Scope& scope, const ElementVec& elements);
+
+  /**
+   * Creates a nested scope from a vector of StatNames which are used to create the
+   * name.
+   *
+   * See also scopeFromElements, which is slightly slower but allows
+   * passing DynamicName(string)s as names.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param elements The vector of mixed DynamicName and StatName
+   * @return A scope named using the joined elements.
+   */
+  static ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
 
   /**
    * Creates a counter from a vector of tokens which are used to create the
@@ -204,6 +234,56 @@ public:
    */
   static TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                                StatNameTagVectorOptConstRef tags = absl::nullopt);
+};
+
+/**
+ * Holds a reference to a stat by name. Note that the stat may not be created
+ * yet at the time CachedReference is created. Calling get() then does a lazy
+ * lookup, potentially returning absl::nullopt if the stat doesn't exist yet.
+ * StatReference works whether the name was constructed symbolically, or with
+ * StatNameDynamicStorage.
+ *
+ * Lookups are very slow, taking time proportional to the size of the scope,
+ * holding mutexes during the lookup. However once the lookup succeeds, the
+ * result is cached atomically, and further calls to get() are thus fast and
+ * mutex-free. The implementation may be faster for stats that are named
+ * symbolically.
+ *
+ * CachedReference is valid for the lifetime of the Scope. When the Scope
+ * becomes invalid, CachedReferences must also be dropped as they will hold
+ * pointers into the scope.
+ */
+template <class StatType> class CachedReference {
+public:
+  CachedReference(Scope& scope, absl::string_view name) : scope_(scope), name_(std::string(name)) {}
+
+  /**
+   * Finds the named stat, if it exists, returning it as an optional.
+   */
+  absl::optional<std::reference_wrapper<StatType>> get() {
+    StatType* stat = stat_.get([this]() -> StatType* {
+      StatType* stat = nullptr;
+      IterateFn<StatType> check_stat = [this,
+                                        &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
+        if (shared_stat->name() == name_) {
+          stat = shared_stat.get();
+          return false; // Stop iteration.
+        }
+        return true;
+      };
+      scope_.iterate(check_stat);
+      return stat;
+    });
+    if (stat == nullptr) {
+      return absl::nullopt;
+    }
+    return *stat;
+  }
+
+private:
+  Scope& scope_;
+  const std::string name_;
+  Thread::AtomicPtr<StatType, Thread::AtomicPtrAllocMode::DoNotDelete> stat_;
 };
 
 } // namespace Stats

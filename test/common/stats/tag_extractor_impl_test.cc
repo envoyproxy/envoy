@@ -15,7 +15,21 @@ namespace Envoy {
 namespace Stats {
 
 TEST(TagExtractorTest, TwoSubexpressions) {
-  TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
+  TagExtractorStdRegexImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
+  EXPECT_EQ("cluster_name", tag_extractor.name());
+  std::string name = "cluster.test_cluster.upstream_cx_total";
+  TagVector tags;
+  IntervalSetImpl<size_t> remove_characters;
+  ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
+  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
+  EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
+  ASSERT_EQ(1, tags.size());
+  EXPECT_EQ("test_cluster", tags.at(0).value_);
+  EXPECT_EQ("cluster_name", tags.at(0).name_);
+}
+
+TEST(TagExtractorTest, RE2Variants) {
+  TagExtractorRe2Impl tag_extractor("cluster_name", "^cluster\\.(([^\\.]+)\\.).*");
   EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
   TagVector tags;
@@ -29,7 +43,7 @@ TEST(TagExtractorTest, TwoSubexpressions) {
 }
 
 TEST(TagExtractorTest, SingleSubexpression) {
-  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
   std::string name = "listener.80.downstream_cx_total";
   TagVector tags;
   IntervalSetImpl<size_t> remove_characters;
@@ -42,24 +56,26 @@ TEST(TagExtractorTest, SingleSubexpression) {
 }
 
 TEST(TagExtractorTest, substrMismatch) {
-  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.", ".foo.");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.",
+                                         ".foo.");
   EXPECT_TRUE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
 }
 
 TEST(TagExtractorTest, noSubstrMismatch) {
-  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.");
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
 }
 
 TEST(TagExtractorTest, EmptyName) {
-  EXPECT_THROW_WITH_MESSAGE(TagExtractorImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"),
-                            EnvoyException, "tag_name cannot be empty");
+  EXPECT_THROW_WITH_MESSAGE(
+      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"), EnvoyException,
+      "tag_name cannot be empty");
 }
 
 TEST(TagExtractorTest, BadRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("cluster_name", "+invalid"),
+  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid"),
                           EnvoyException, "Invalid regex '\\+invalid':");
 }
 
@@ -306,8 +322,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   client_ssl.name_ = tag_names.CLIENTSSL_PREFIX;
   client_ssl.value_ = "clientssl_prefix";
 
-  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_white_list",
-                         "auth.clientssl.auth_ip_white_list", {client_ssl});
+  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_allowlist",
+                         "auth.clientssl.auth_ip_allowlist", {client_ssl});
 
   // TCP Prefix
   Tag tcp_prefix;
@@ -316,6 +332,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("tcp.tcp_prefix.downstream_flow_control_resumed_reading_total",
                          "tcp.downstream_flow_control_resumed_reading_total", {tcp_prefix});
+
+  // UDP Prefix
+  Tag udp_prefix;
+  udp_prefix.name_ = tag_names.UDP_PREFIX;
+  udp_prefix.value_ = "udp_prefix";
+
+  regex_tester.testRegex("udp.udp_prefix.downstream_flow_control_resumed_reading_total",
+                         "udp.downstream_flow_control_resumed_reading_total", {udp_prefix});
 
   // Fault Downstream Cluster
   Tag fault_connection_manager;
@@ -353,7 +377,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
-    tag_extractor = TagExtractorImpl::createTagExtractor("foo", regex);
+    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex);
     return tag_extractor->prefixToken();
   };
 
@@ -368,7 +392,7 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 }
 
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("no such default tag", ""),
+  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("no such default tag", ""),
                           EnvoyException, "^No regex specified for tag specifier and no default");
 }
 

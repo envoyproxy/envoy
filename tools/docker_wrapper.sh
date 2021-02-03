@@ -14,6 +14,7 @@ if [ "${RUN_REMOTE}" == "yes" ]; then
   echo "Using docker environment from ${DOCKER_ENV}:"
   cat "${DOCKER_ENV}"
 fi
+# shellcheck disable=SC1090
 . "${DOCKER_ENV}"
 
 CONTAINER_NAME="envoy-test-runner"
@@ -27,28 +28,27 @@ function cleanup() {
 
 trap cleanup EXIT
 
-cat > ${ENVFILE} <<EOF
+cat > "${ENVFILE}" <<EOF
 TEST_WORKSPACE=/tmp/workspace
 TEST_SRCDIR=/tmp/src
 ENVOY_IP_TEST_VERSIONS=v4only
 EOF
 
-CMDLINE="set -a && . /env && env && /test $@"
+CMDLINE="set -a && . /env && env && /test $*"
 LIB_PATHS="/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/ /lib64/"
 
 
 if [ "${RUN_REMOTE}" != "yes" ]; then
   # We're running locally. If told to, mount the library directories locally.
-  LIB_MOUNTS=""
+  LIB_MOUNTS=()
   if [ "${LOCAL_MOUNT}" == "yes" ]
   then
     for path in $LIB_PATHS; do
-      LIB_MOUNTS="${LIB_MOUNTS} -v ${path}:${path}:ro"
+      LIB_MOUNTS+=(-v "${path}:${path}:ro")
       done
   fi
 
-  # Note: we don't quote LIB_MOUNTS on purpose; we want it to expand.
-  docker run --rm --privileged  -v "${TEST_PATH}:/test" ${LIB_MOUNTS} -i -v "${ENVFILE}:/env" \
+  docker run --rm --privileged  -v "${TEST_PATH}:/test" "${LIB_MOUNTS[@]}" -i -v "${ENVFILE}:/env" \
     "${IMAGE}" bash -c "${CMDLINE}"
 else
   # In this case, we need to create the container, then make new layers on top of it, since we

@@ -6,6 +6,8 @@ import "google/protobuf/empty.proto";
 
 import "test/fuzz/common.proto";
 
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+
 // Structured input for conn_manager_impl_fuzz_test.
 
 message NewStream {
@@ -17,7 +19,7 @@ message NewStream {
 enum HeaderStatus {
   HEADER_CONTINUE = 0;
   HEADER_STOP_ITERATION = 1;
-  HEADER_CONTINUE_AND_END_STREAM = 2;
+  reserved 2;
   HEADER_STOP_ALL_ITERATION_AND_BUFFER = 3;
   HEADER_STOP_ALL_ITERATION_AND_WATERMARK = 4;
 }
@@ -99,4 +101,6 @@ message Action {
 
 message ConnManagerImplTestCase {
   repeated Action actions = 1;
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      .ForwardClientCertDetails forward_client_cert = 2;
 }

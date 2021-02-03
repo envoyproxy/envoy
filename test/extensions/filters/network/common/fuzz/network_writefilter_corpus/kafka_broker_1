@@ -1,0 +1,110 @@
+config {
+  name: "envoy.filters.network.kafka_broker"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker"
+    value: "\n}\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 268435
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\312\312\312\312\312\312\312\312\312\312\312\312\315\312\312\312\312\312\312\312\312\312\312"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "-"
+  }
+}
+actions {
+  on_write {
+    data: "\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312\312"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "-"
+  }
+}
+actions {
+  on_write {
+    data: "-"
+  }
+}
+actions {
+  on_write {
+    data: "\n\002\315\265"
+  }
+}
+actions {
+  on_write {
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\020\000\000\000"
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "p"
+  }
+}
+actions {
+  on_write {
+    data: "-"
+  }
+}
+actions {
+  on_write {
+    data: "-"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+  }
+}

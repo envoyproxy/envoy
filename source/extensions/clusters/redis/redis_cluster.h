@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -113,10 +114,13 @@ public:
       values[1].asString() = "SLOTS";
       asArray().swap(values);
     }
+
     static ClusterSlotsRequest instance_;
   };
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  TimeSource& timeSource() const { return time_source_; }
 
 private:
   friend class RedisClusterTest;
@@ -144,7 +148,8 @@ private:
   class RedisHost : public Upstream::HostImpl {
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
+              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
+              TimeSource& time_source)
         : Upstream::HostImpl(
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -152,13 +157,14 @@ private:
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
-          master_(master) {}
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
+              time_source),
+          primary_(primary) {}
 
-    bool isMaster() const { return master_; }
+    bool isPrimary() const { return primary_; }
 
   private:
-    const bool master_;
+    const bool primary_;
   };
 
   // Resolves the discovery endpoint.
@@ -221,12 +227,12 @@ private:
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
-    // For any readPolicy other than Master, the RedisClientFactory will send a READONLY command
+    // For any readPolicy other than Primary, the RedisClientFactory will send a READONLY command
     // when establishing a new connection. Since we're only using this for making the "cluster
     // slots" commands, the READONLY command is not relevant in this context. We're setting it to
-    // Master to avoid the additional READONLY command.
+    // Primary to avoid the additional READONLY command.
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
@@ -246,7 +252,7 @@ private:
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
-    std::unordered_map<std::string, RedisDiscoveryClientPtr> client_map_;
+    absl::node_hash_map<std::string, RedisDiscoveryClientPtr> client_map_;
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
 
@@ -269,13 +275,14 @@ private:
   Network::DnsLookupFamily dns_lookup_family_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
+  const std::string auth_username_;
   const std::string auth_password_;
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.tap.v3;
 
+import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/route/v3/route_components.proto";
@@ -28,7 +29,17 @@ message TapConfig {
 
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.
-  MatchPredicate match_config = 1 [(validate.rules).message = {required: true}];
+  // Exactly one of :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` and
+  // :ref:`match_config <envoy_api_field_config.tap.v3.TapConfig.match_config>` must be set. If both
+  // are set, the :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` will be used.
+  MatchPredicate match_config = 1 [deprecated = true];
+
+  // The match configuration. If the configuration matches the data source being tapped, a tap will
+  // occur, with the result written to the configured output.
+  // Exactly one of :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` and
+  // :ref:`match_config <envoy_api_field_config.tap.v3.TapConfig.match_config>` must be set. If both
+  // are set, the :ref:`match <envoy_api_field_config.tap.v3.TapConfig.match>` will be used.
+  common.matcher.v3.MatchPredicate match = 4;
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.
@@ -47,7 +58,7 @@ message TapConfig {
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
-// [#next-free-field: 9]
+// [#next-free-field: 11]
 message MatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.MatchPredicate";
@@ -89,6 +100,12 @@ message MatchPredicate {
 
     // HTTP response trailers match configuration.
     HttpHeadersMatch http_response_trailers_match = 8;
+
+    // HTTP request generic body match configuration.
+    HttpGenericBodyMatch http_request_generic_body_match = 9;
+
+    // HTTP response generic body match configuration.
+    HttpGenericBodyMatch http_response_generic_body_match = 10;
   }
 }
 
@@ -99,6 +116,36 @@ message HttpHeadersMatch {
 
   // HTTP headers to match.
   repeated route.v3.HeaderMatcher headers = 1;
+}
+
+// HTTP generic body match configuration.
+// List of text strings and hex strings to be located in HTTP body.
+// All specified strings must be found in the HTTP body for positive match.
+// The search may be limited to specified number of bytes from the body start.
+//
+// .. attention::
+//
+//   Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+//   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+//   to scan only part of the http body.
+message HttpGenericBodyMatch {
+  message GenericTextMatch {
+    oneof rule {
+      option (validate.required) = true;
+
+      // Text string to be located in HTTP body.
+      string string_match = 1 [(validate.rules).string = {min_len: 1}];
+
+      // Sequence of bytes to be located in HTTP body.
+      bytes binary_match = 2 [(validate.rules).bytes = {min_len: 1}];
+    }
+  }
+
+  // Limits search to specified number of bytes - default zero (no limit - match entire captured buffer).
+  uint32 bytes_limit = 1;
+
+  // List of patterns to match.
+  repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Tap output configuration.
@@ -195,6 +242,7 @@ message OutputSink {
 
     // [#not-implemented-hide:]
     // GrpcService to stream data to. The format argument must be PROTO_BINARY.
+    // [#comment: TODO(samflattery): remove cleanup in uber_per_filter.cc once implemented]
     StreamingGrpcSink streaming_grpc = 4;
   }
 }
@@ -213,7 +261,7 @@ message FilePerTapSink {
   // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
-  string path_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string path_prefix = 1 [(validate.rules).string = {min_len: 1}];
 }
 
 // [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC

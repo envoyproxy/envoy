@@ -3,18 +3,12 @@ services:
 
   front-envoy:
     build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy-zipkin.yaml:/etc/front-envoy.yaml
+      context: .
+      dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
-    expose:
-      - "80"
-      - "8001"
     ports:
-      - "8000:80"
-      - "8001:8001"
+      - "8000:8000"
 
   service1:
     build:
@@ -28,8 +22,6 @@ services:
           - service1
     environment:
       - SERVICE_NAME=1
-    expose:
-      - "80"
 
   service2:
     build:
@@ -43,8 +35,6 @@ services:
           - service2
     environment:
       - SERVICE_NAME=2
-    expose:
-      - "80"
 
   zipkin:
     image: openzipkin/zipkin
@@ -52,8 +42,6 @@ services:
       envoymesh:
         aliases:
           - zipkin
-    expose:
-      - "9411"
     ports:
       - "9411:9411"
 

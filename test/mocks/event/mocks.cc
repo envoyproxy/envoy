@@ -5,6 +5,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -24,6 +25,12 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   }));
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
+
+  ON_CALL(buffer_factory_, create_(_, _, _))
+      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                               std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
+      }));
 }
 
 MockDispatcher::~MockDispatcher() = default;
@@ -48,7 +55,24 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
       .RetiresOnSaturation();
 }
 
-MockTimer::~MockTimer() = default;
+MockTimer::~MockTimer() {
+  if (timer_destroyed_) {
+    *timer_destroyed_ = true;
+  }
+}
+
+MockSchedulableCallback::~MockSchedulableCallback() = default;
+
+MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)
+    : dispatcher_(dispatcher) {
+  EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
+      .RetiresOnSaturation();
+  ON_CALL(*this, scheduleCallbackCurrentIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, scheduleCallbackNextIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, cancel()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+}
 
 MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
   EXPECT_CALL(*dispatcher, listenForSignal_(_, _))

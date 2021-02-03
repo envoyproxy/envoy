@@ -1,0 +1,44 @@
+config {
+  name: "envoy.filters.network.client_ssl_auth"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth"
+    value: "\n%envoy.filters.network.client_ssl_auth\022\0011"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 4
+  }
+}
+actions {
+  on_data {
+    data: "u\360"
+  }
+}
+actions {
+  on_data {
+    data: "u\360"
+  }
+}
+actions {
+  on_data {
+    data: "u\360"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 4
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_new_connection {
+  }
+}

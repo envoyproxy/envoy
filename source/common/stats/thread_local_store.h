@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/tag.h"
@@ -58,7 +59,7 @@ public:
   void recordValue(uint64_t value) override;
 
   // Stats::Metric
-  SymbolTable& symbolTable() override { return symbol_table_; }
+  SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
 
 private:
@@ -73,15 +74,16 @@ private:
 
 using TlsHistogramSharedPtr = RefcountPtr<ThreadLocalHistogramImpl>;
 
-class TlsScope;
+class ThreadLocalStoreImpl;
 
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
-  ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
-                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags);
+  ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
+                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
+                      ConstSupportedBuckets& supported_buckets, uint64_t id);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -106,47 +108,36 @@ public:
   const std::string bucketSummary() const override;
 
   // Stats::Metric
-  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() override;
   bool used() const override;
 
   // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+  void incRefCount() override;
+  bool decRefCount() override;
+  uint32_t use_count() const override { return ref_count_; }
+
+  // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
+  void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
+  bool shuttingDown() const { return shutting_down_; }
 
 private:
-  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Histogram::Unit unit_;
-  Store& parent_;
-  TlsScope& tls_scope_;
+  ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
+  std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
-  RefcountHelper refcount_helper_;
+  std::atomic<bool> shutting_down_{false};
+  std::atomic<uint32_t> ref_count_{0};
+  const uint64_t id_; // Index into TlsCache::histogram_cache_.
 };
 
 using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
-
-/**
- * Class used to create ThreadLocalHistogram in the scope.
- */
-class TlsScope : public Scope {
-public:
-  ~TlsScope() override = default;
-
-  // TODO(ramaraochavali): Allow direct TLS access for the advanced consumers.
-  /**
-   * @return a ThreadLocalHistogram within the scope's namespace.
-   * @param name name of the histogram with scope prefix attached.
-   * @param parent the parent histogram.
-   */
-  virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
-};
 
 /**
  * Store implementation with thread local caching. For design details see
@@ -168,6 +159,7 @@ public:
     return default_scope_->counterFromString(name);
   }
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
@@ -241,6 +233,11 @@ public:
     return absl::nullopt;
   }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -253,17 +250,30 @@ public:
     tag_producer_ = std::move(tag_producer);
   }
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
+  void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
   void mergeHistograms(PostMergeCb merge_cb) override;
+
+  Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
    */
   Thread::ThreadSynchronizer& sync() { return sync_; }
 
+  /**
+   * @return a set of well known tag names; used to reduce symbol table churn.
+   */
+  const StatNameSet& wellKnownTags() const { return *well_known_tags_; }
+
+  bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
+  void releaseHistogramCrossThread(uint64_t histogram_id);
+
 private:
+  friend class ThreadLocalStoreTestingPeer;
+
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {
@@ -275,9 +285,18 @@ private:
     StatRefMap<Gauge> gauges_;
     StatRefMap<TextReadout> text_readouts_;
 
-    // The histogram objects are not shared with the central cache, and don't
-    // require taking a lock when decrementing their ref-count.
-    StatNameHashMap<TlsHistogramSharedPtr> histograms_;
+    // Histograms also require holding a mutex while decrementing reference
+    // counts. The only difference from other stats is that the histogram_set_
+    // lives in the ThreadLocalStore object, rather than in
+    // AllocatorImpl. Histograms are removed from that set when all scopes
+    // referencing the histogram are dropped. Each ParentHistogram has a unique
+    // index, which is not re-used during the process lifetime.
+    //
+    // There is also a tls_histogram_cache_ in the TlsCache object, which is
+    // not tied to a scope. It maps from parent histogram's unique index to
+    // a TlsHistogram. This enables continuity between same-named histograms
+    // in same-named scopes. That scenario is common when re-creating scopes in
+    // response to xDS.
     StatNameHashMap<ParentHistogramSharedPtr> parent_histograms_;
 
     // We keep a TLS cache of rejected stat names. This costs memory, but
@@ -302,8 +321,8 @@ private:
   };
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
-  struct ScopeImpl : public TlsScope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
+  struct ScopeImpl : public Scope {
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -315,19 +334,23 @@ private:
     Histogram& histogramFromStatNameWithTags(const StatName& name,
                                              StatNameTagVectorOptConstRef tags,
                                              Histogram::Unit unit) override;
-    Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
-    const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
-    SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+    ScopePtr scopeFromStatName(StatName name) override {
+      SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+      return parent_.scopeFromStatName(StatName(joined.get()));
+    }
+    const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
+    SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
     Counter& counterFromString(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
+
     Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName(), import_mode);
@@ -342,6 +365,28 @@ private:
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
+
+    template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
+      for (auto& iter : map) {
+        if (!fn(iter.second)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    bool iterate(const IterateFn<Counter>& fn) const override {
+      return iterHelper(fn, central_cache_->counters_);
+    }
+    bool iterate(const IterateFn<Gauge>& fn) const override {
+      return iterHelper(fn, central_cache_->gauges_);
+    }
+    bool iterate(const IterateFn<Histogram>& fn) const override {
+      return iterHelper(fn, central_cache_->histograms_);
+    }
+    bool iterate(const IterateFn<TextReadout>& fn) const override {
+      return iterHelper(fn, central_cache_->text_readouts_);
+    }
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
@@ -375,6 +420,9 @@ private:
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
+    template <class StatType>
+    using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
      * not check the TLS or rejects, and does not create a stat if it does not
@@ -385,7 +433,7 @@ private:
      * @return a reference to the stat, if it exists.
      */
     template <class StatType>
-    absl::optional<std::reference_wrapper<const StatType>>
+    StatTypeOptConstRef<StatType>
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
@@ -398,6 +446,7 @@ private:
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
     void eraseScope(uint64_t scope_id);
+    void eraseHistogram(uint64_t histogram);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
@@ -407,10 +456,24 @@ private:
     // store. See the overview for more information. This complexity is required for lockless
     // operation in the fast path.
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
+
+    // Maps from histogram ID (monotonically increasing) to a TLS histogram.
+    absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> tls_histogram_cache_;
   };
+
+  template <class StatFn> bool iterHelper(StatFn fn) const {
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      if (!scope->iterate(fn)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
+  void clearHistogramFromCaches(uint64_t histogram_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -419,16 +482,19 @@ private:
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
+  TlsCache& tlsCache() { return **tls_cache_; }
 
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  ThreadLocal::SlotPtr tls_;
+  using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
+  ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
+  HistogramSettingsConstPtr histogram_settings_;
   std::atomic<bool> threading_ever_initialized_{};
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
@@ -439,6 +505,15 @@ private:
   NullHistogramImpl null_histogram_;
   NullTextReadoutImpl null_text_readout_;
 
+  Thread::ThreadSynchronizer sync_;
+  std::atomic<uint64_t> next_scope_id_{};
+  uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
+
+  StatNameSetPtr well_known_tags_;
+
+  mutable Thread::MutexBasicLockable hist_mutex_;
+  StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
   // are held by reference in code that expects them to be there, we can't
@@ -447,14 +522,13 @@ private:
   // It seems like it would be better to have each client that expects a stat
   // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
   // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_;
-  std::vector<GaugeSharedPtr> deleted_gauges_;
-  std::vector<HistogramSharedPtr> deleted_histograms_;
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_;
-
-  Thread::ThreadSynchronizer sync_;
-  std::atomic<uint64_t> next_scope_id_{};
+  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(lock_);
+  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
+  std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
 };
+
+using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
 
 } // namespace Stats
 } // namespace Envoy

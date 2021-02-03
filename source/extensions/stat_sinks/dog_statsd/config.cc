@@ -11,21 +11,28 @@
 #include "extensions/stat_sinks/common/statsd/statsd.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
 
-Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
-                                                     Server::Instance& server) {
+Stats::SinkPtr
+DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
+                                      Server::Configuration::ServerFactoryContext& server) {
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::DogStatsdSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
   Network::Address::InstanceConstSharedPtr address =
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
+  absl::optional<uint64_t> max_bytes;
+  if (sink_config.has_max_bytes_per_datagram()) {
+    max_bytes = sink_config.max_bytes_per_datagram().value();
+  }
   return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                         true, sink_config.prefix());
+                                                         true, sink_config.prefix(), max_bytes);
 }
 
 ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {

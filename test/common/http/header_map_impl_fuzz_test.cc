@@ -7,6 +7,7 @@
 #include "test/common/http/header_map_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/strings/ascii.h"
 
@@ -16,7 +17,15 @@ namespace Envoy {
 
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {
-  auto header_map = std::make_unique<Http::HeaderMapImpl>();
+  TestScopedRuntime runtime;
+  // Set the lazy header-map threshold if found.
+  if (input.has_config()) {
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.http.headermap.lazy_map_min_size",
+          absl::StrCat(input.config().lazy_map_min_size())}});
+  }
+
+  auto header_map = Http::RequestHeaderMapImpl::create();
   std::vector<std::unique_ptr<Http::LowerCaseString>> lower_case_strings;
   std::vector<std::unique_ptr<std::string>> strings;
   uint64_t set_integer;
@@ -85,14 +94,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     }
     case test::common::http::Action::kGet: {
       const auto& get = action.get();
-      const auto* header_entry =
+      const auto header_entry =
           header_map->get(Http::LowerCaseString(replaceInvalidCharacters(get.key())));
-      if (header_entry != nullptr) {
+      for (size_t i = 0; i < header_entry.size(); i++) {
         // Do some read-only stuff.
-        (void)strlen(std::string(header_entry->key().getStringView()).c_str());
-        (void)strlen(std::string(header_entry->value().getStringView()).c_str());
-        header_entry->key().empty();
-        header_entry->value().empty();
+        (void)strlen(std::string(header_entry[i]->key().getStringView()).c_str());
+        (void)strlen(std::string(header_entry[i]->value().getStringView()).c_str());
+        header_entry[i]->key().empty();
+        header_entry[i]->value().empty();
       }
       break;
     }
@@ -149,13 +158,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       break;
     }
     case test::common::http::Action::kCopy: {
-      header_map = Http::createHeaderMap<Http::HeaderMapImpl>(*header_map);
-      break;
-    }
-    case test::common::http::Action::kLookup: {
-      const Http::HeaderEntry* header_entry;
-      header_map->lookup(Http::LowerCaseString(replaceInvalidCharacters(action.lookup())),
-                         &header_entry);
+      header_map = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*header_map);
       break;
     }
     case test::common::http::Action::kRemove: {
@@ -178,20 +181,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     // Exercise some read-only accessors.
     header_map->size();
     header_map->byteSize();
-    header_map->iterate(
-        [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
-          header.key();
-          header.value();
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        nullptr);
-    header_map->iterateReverse(
-        [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
-          header.key();
-          header.value();
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        nullptr);
+    header_map->iterate([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      header.key();
+      header.value();
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    header_map->iterateReverse([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      header.key();
+      header.value();
+      return Http::HeaderMap::Iterate::Continue;
+    });
   }
 }
 

@@ -34,7 +34,7 @@ PerfAnnotationContext::PerfAnnotationContext() = default;
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
-  CategoryDescription key((std::string(category)), (std::string(description)));
+  CategoryDescription key = {std::string(category), std::string(description)};
   {
 #if PERF_THREAD_SAFE
     Thread::LockGuard lock(mutex_);
@@ -112,8 +112,8 @@ std::string PerfAnnotationContext::toString() {
     columns[4].push_back(nanoseconds_string(stats.min_));
     columns[5].push_back(nanoseconds_string(stats.max_));
     const CategoryDescription& category_description = p->first;
-    columns[6].push_back(category_description.first);
-    columns[7].push_back(category_description.second);
+    columns[6].push_back(category_description.category);
+    columns[7].push_back(category_description.description);
     for (size_t i = 0; i < num_columns; ++i) {
       widths[i] = std::max(widths[i], columns[i].back().size());
     }

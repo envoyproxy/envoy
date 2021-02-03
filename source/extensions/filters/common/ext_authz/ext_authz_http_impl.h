@@ -99,6 +99,15 @@ public:
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
 
   /**
+   * Returns a list of matchers used for selecting the authorization response headers that
+   * should be sent to the upstream server. The same header keys will be appended, instead of
+   * be replaced.
+   */
+  const MatcherSharedPtr& upstreamHeaderToAppendMatchers() const {
+    return upstream_header_to_append_matchers_;
+  }
+
+  /**
    * Returns the name used for tracing.
    */
   const std::string& tracingName() { return tracing_name_; }
@@ -110,19 +119,15 @@ public:
 
 private:
   static MatcherSharedPtr
-  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                    bool enable_case_sensitive_string_matcher);
+  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr
-  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                   bool enable_case_sensitive_string_matcher);
-  static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                     bool enable_case_sensitive_string_matcher);
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
 
-  const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
+  const MatcherSharedPtr upstream_header_to_append_matchers_;
   const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
@@ -144,8 +149,7 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
-                             TimeSource& time_source);
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config);
   ~RawHttpClientImpl() override;
 
   // ExtAuthz::Client
@@ -157,15 +161,16 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& message) override;
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span& span,
+                                    const Http::ResponseHeaderMap* response_headers) override;
 
 private:
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
+
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
-  TimeSource& time_source_;
-  Tracing::SpanPtr span_;
 };
 
 } // namespace ExtAuthz

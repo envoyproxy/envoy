@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
@@ -59,9 +60,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
     // do nothing but create the event
-    ASSERT(file_event_ == nullptr);
-    file_event_ = cb.dispatcher().createFileEvent(
-        socket.ioHandle().fd(),
+    cb.socket().ioHandle().initializeFileEvent(
+        cb.dispatcher(),
         [this](uint32_t events) {
           ENVOY_LOG(trace, "http inspector event: {}", events);
           // inspector is always peeking and can never determine EOF.
@@ -72,11 +72,11 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
           const ParseState parse_state = onRead();
           switch (parse_state) {
           case ParseState::Error:
-            file_event_.reset();
+            cb_->socket().ioHandle().resetFileEvents();
             cb_->continueFilterChain(false);
             break;
           case ParseState::Done:
-            file_event_.reset();
+            cb_->socket().ioHandle().resetFileEvents();
             // Do not skip following listener filters.
             cb_->continueFilterChain(true);
             break;
@@ -85,28 +85,27 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
               // Parser fails to determine http but the end of stream is reached. Fallback to
               // non-http.
               done(false);
-              file_event_.reset();
+              cb_->socket().ioHandle().resetFileEvents();
               cb_->continueFilterChain(true);
             }
             // do nothing but wait for the next event
             break;
           }
         },
-        Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
     return Network::FilterStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 ParseState Filter::onRead() {
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Network::ConnectionSocket& socket = cb_->socket();
-  const Api::SysCallSizeResult result =
-      os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
+  auto result = cb_->socket().ioHandle().recv(buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
-  if (result.rc_ == -1 && result.errno_ == EAGAIN) {
-    return ParseState::Continue;
-  } else if (result.rc_ < 0) {
+  if (!result.ok()) {
+    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      return ParseState::Continue;
+    }
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }
@@ -181,16 +180,16 @@ void Filter::done(bool success) {
     absl::string_view protocol;
     if (protocol_ == Http::Headers::get().ProtocolStrings.Http10String) {
       config_->stats().http10_found_.inc();
-      protocol = "http/1.0";
+      protocol = Http::Utility::AlpnNames::get().Http10;
     } else if (protocol_ == Http::Headers::get().ProtocolStrings.Http11String) {
       config_->stats().http11_found_.inc();
-      protocol = "http/1.1";
+      protocol = Http::Utility::AlpnNames::get().Http11;
     } else {
       ASSERT(protocol_ == "HTTP/2");
       config_->stats().http2_found_.inc();
       // h2 HTTP/2 over TLS, h2c HTTP/2 over TCP
       // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
-      protocol = "h2c";
+      protocol = Http::Utility::AlpnNames::get().Http2c;
     }
 
     cb_->socket().setRequestedApplicationProtocols({protocol});

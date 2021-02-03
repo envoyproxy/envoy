@@ -72,7 +72,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
 
   if (kevent(queue_, &event, 1, nullptr, 0, nullptr) == -1 || event.flags & EV_ERROR) {
     throw EnvoyException(
-        fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));
+        fmt::format("unable to add filesystem watch for file {}: {}", path, errorDetails(errno)));
   }
 
   ENVOY_LOG(debug, "added watch for file: '{}' fd: {}", path, watch_fd);

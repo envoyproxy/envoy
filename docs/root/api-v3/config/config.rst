@@ -1,3 +1,5 @@
+.. _api-v3_config:
+
 Extensions
 ==========
 
@@ -19,3 +21,7 @@ Extensions
   trace/trace
   internal_redirect/internal_redirect
   endpoint/endpoint
+  upstream/upstream
+  wasm/wasm
+  watchdog/watchdog
+  descriptors/descriptors

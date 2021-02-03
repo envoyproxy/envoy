@@ -10,61 +10,32 @@
 #include "envoy/config/route/v3/route.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here.
 namespace Envoy {
-static std::string AdsIntegrationConfig(const std::string& api_type) {
-  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
-  return fmt::format(R"EOF(
-dynamic_resources:
-  lds_config:
-    ads: {{}}
-  cds_config:
-    ads: {{}}
-  ads_config:
-    api_type: {}
-    set_node_on_first_message_only: false
-static_resources:
-  clusters:
-    name: dummy_cluster
-    connect_timeout:
-      seconds: 5
-    type: STATIC
-    load_assignment:
-      cluster_name: dummy_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {{}}
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-)EOF",
-                     api_type);
-}
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest();
+  AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
+                     envoy::config::core::v3::ApiVersion transport_api_version =
+                         envoy::config::core::v3::ApiVersion::AUTO);
+  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
 
   void TearDown() override;
 
-  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name,
+                                                   const std::string& lb_policy = "ROUND_ROBIN");
+
+  envoy::config::cluster::v3::Cluster buildTlsCluster(const std::string& name);
 
   envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name);
 
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name);
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildTlsClusterLoadAssignment(const std::string& name);
 
   envoy::config::listener::v3::Listener buildListener(const std::string& name,
                                                       const std::string& route_config,
@@ -86,6 +57,11 @@ public:
   envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
+
+  // If API version is v2, fatal-by-default is disabled unless fatal_by_default_v2_override_ is set.
+  envoy::config::core::v3::ApiVersion api_version_;
+  // Set to force fatal-by-default v2 even if API version is v2.
+  bool fatal_by_default_v2_override_{false};
 };
 
 } // namespace Envoy

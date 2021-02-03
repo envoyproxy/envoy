@@ -2,10 +2,10 @@
 
 #include <chrono>
 #include <cstdint>
+#include <ios>
 #include <set>
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/interval_set.h"
@@ -18,6 +18,14 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+/**
+ * Retrieve string description of error code
+ * @param int error code
+ * @return const std::string error detail description
+ */
+const std::string errorDetails(int error_code);
+
 /**
  * Utility class for formatting dates given an absl::FormatTime style format string.
  */
@@ -101,6 +109,32 @@ public:
   // TimeSource
   SystemTime systemTime() override { return std::chrono::system_clock::now(); }
   MonotonicTime monotonicTime() override { return std::chrono::steady_clock::now(); }
+};
+
+/**
+ * Class used for creating non-memory allocating std::ostream.
+ */
+class MutableMemoryStreamBuffer : public std::streambuf {
+public:
+  MutableMemoryStreamBuffer(char* base, size_t size);
+};
+
+/**
+ * std::ostream class that serializes writes into the provided buffer.
+ */
+class OutputBufferStream : private MutableMemoryStreamBuffer, public std::ostream {
+public:
+  OutputBufferStream(char* data, size_t size);
+
+  /**
+   * @return the number of bytes written prior to the "put" pointer into the buffer.
+   */
+  int bytesWritten() const;
+
+  /**
+   * @return a string view of the written bytes.
+   */
+  absl::string_view contents() const;
 };
 
 /**
@@ -610,6 +644,15 @@ template <class Value> struct TrieLookupTable {
   }
 
   TrieEntry<Value> root_;
+};
+
+/**
+ * A global utility class to take care of all the exception throwing behaviors in header files.
+ * Its functions simply forward the throwing into .cc file.
+ */
+class ExceptionUtil {
+public:
+  [[noreturn]] static void throwEnvoyException(const std::string& message);
 };
 
 // Mix-in class for allocating classes with variable-sized inlined storage.

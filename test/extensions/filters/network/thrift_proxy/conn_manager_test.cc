@@ -16,8 +16,7 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -237,6 +236,26 @@ public:
     }
   }
 
+  void writeVoidFramedBinaryMessage(Buffer::Instance& buffer, int32_t seq_id) {
+    Buffer::OwnedImpl msg;
+    ProtocolPtr proto =
+        NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
+    MessageMetadata metadata;
+    metadata.setMethodName("name");
+    metadata.setMessageType(MessageType::Reply);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
+    proto->writeStructBegin(msg, "");
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0);
+    proto->writeStructEnd(msg);
+    proto->writeMessageEnd(msg);
+
+    TransportPtr transport =
+        NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
+    transport->encodeFrame(buffer, metadata, msg);
+  }
+
   void writeFramedBinaryTApplicationException(Buffer::Instance& buffer, int32_t seq_id) {
     Buffer::OwnedImpl msg;
     ProtocolPtr proto =
@@ -304,7 +323,7 @@ public:
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
@@ -329,7 +348,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -367,7 +386,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_EQ(&filter_callbacks_.connection_, callbacks->connection());
 
   // Resume processing.
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->continueDecoding();
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -442,7 +461,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
         EXPECT_EQ(write_buffer_.toString(), buffer.toString());
       }));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
@@ -542,7 +561,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
                     });
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
@@ -561,7 +580,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
                     });
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
@@ -577,7 +596,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
@@ -593,7 +612,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
@@ -636,7 +655,7 @@ route_config:
   EXPECT_NE(nullptr, route->routeEntry());
   EXPECT_EQ("cluster", route->routeEntry()->clusterName());
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -660,7 +679,41 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
+  initializeFilter();
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeVoidFramedBinaryMessage(write_buffer_, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -702,7 +755,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
         EXPECT_EQ(response_buffer.toString(), buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -736,7 +789,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -771,7 +824,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -806,7 +859,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -848,7 +901,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   callbacks->startUpstreamResponse(transport, proto);
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, true));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -890,7 +943,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -926,7 +979,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1196,7 +1249,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
         EXPECT_EQ(8, buffer.drainBEInt<int32_t>());
         EXPECT_EQ("response", buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1240,7 +1293,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
         EXPECT_EQ(8, buffer.drainBEInt<int32_t>());
         EXPECT_EQ("response", buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1275,7 +1328,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
         return FilterStatus::StopIteration;
       }));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false)).Times(0);
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Remote closes the connection.
   filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
@@ -1313,9 +1366,9 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
       }));
   EXPECT_CALL(*decoder_filter_, transportBegin(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
-        const Http::HeaderEntry* header = metadata->headers().get(key);
-        EXPECT_NE(nullptr, header);
-        EXPECT_EQ("value", header->value().getStringView());
+        const auto header = metadata->headers().get(key);
+        EXPECT_FALSE(header.empty());
+        EXPECT_EQ("value", header[0]->value().getStringView());
         return FilterStatus::Continue;
       }));
 
@@ -1360,6 +1413,230 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+}
+
+// TODO(caitong93): use TEST_P to avoid duplicating test cases
+TEST_F(ThriftConnectionManagerTest, PayloadPassthroughOnDataHandlesThriftCall) {
+  const std::string yaml = R"EOF(
+transport: FRAMED
+protocol: BINARY
+stat_prefix: test
+payload_passthrough: true
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0, buffer_.length());
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, PayloadPassthroughOnDataHandlesThriftOneWay) {
+  const std::string yaml = R"EOF(
+stat_prefix: test
+payload_passthrough: true
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndExceptionResponse) {
+  const std::string yaml = R"EOF(
+stat_prefix: test
+payload_passthrough: true
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeFramedBinaryTApplicationException(write_buffer_, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndErrorResponse) {
+  const std::string yaml = R"EOF(
+stat_prefix: test
+payload_passthrough: true
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeFramedBinaryIDLException(write_buffer_, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  // In payload_passthrough mode, Envoy cannot detect response error.
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRequestAndInvalidResponse) {
+  const std::string yaml = R"EOF(
+stat_prefix: test
+payload_passthrough: true
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  // Call is not valid in a response
+  writeFramedBinaryMessage(write_buffer_, MessageType::Call, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, PayloadPassthroughRouting) {
+  const std::string yaml = R"EOF(
+transport: FRAMED
+protocol: BINARY
+payload_passthrough: true
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster: cluster
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
+
+  Router::RouteConstSharedPtr route = callbacks->route();
+  EXPECT_NE(nullptr, route);
+  EXPECT_NE(nullptr, route->routeEntry());
+  EXPECT_EQ("cluster", route->routeEntry()->clusterName());
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }

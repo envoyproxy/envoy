@@ -1,0 +1,30 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}

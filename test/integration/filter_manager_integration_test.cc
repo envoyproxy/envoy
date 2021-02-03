@@ -410,11 +410,6 @@ public:
 
   void SetUp() override { addAuxiliaryFilter(config_helper_); }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
 protected:
   // Returns configuration for a given auxiliary filter
   std::string filterConfig(const std::string& auxiliary_filter_name) override {
@@ -455,7 +450,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBe
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   tcp_client->waitForData("hello");
 
   tcp_client->close();
@@ -473,12 +468,12 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
 
   std::string access_log =
       absl::StrCat("NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(access_log));
-  tcp_client->close();
+  tcp_client->waitForDisconnect();
 }
 
 /**
@@ -497,14 +492,14 @@ INSTANTIATE_TEST_SUITE_P(
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
-  enable_half_close_ = true;
+  enableHalfClose(true);
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
 
   std::string observed_data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(5, &observed_data));
@@ -513,14 +508,14 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
   ASSERT_TRUE(fake_upstream_connection->write("hi"));
   tcp_client->waitForData("hi");
 
-  tcp_client->write(" world!", true);
+  ASSERT_TRUE(tcp_client->write(" world!", true));
   observed_data.clear();
   ASSERT_TRUE(fake_upstream_connection->waitForData(12, &observed_data));
   EXPECT_EQ("hello world!", observed_data);
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   ASSERT_TRUE(fake_upstream_connection->write("there!", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   tcp_client->waitForData("there!");
   tcp_client->waitForDisconnect();

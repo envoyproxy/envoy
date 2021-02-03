@@ -80,6 +80,11 @@ public:
   virtual void shutdown() PURE;
 
   /**
+   * Return the base id used to generate a domain socket name.
+   */
+  virtual uint32_t baseId() PURE;
+
+  /**
    * Return the hot restart compatibility version so that operations code can decide whether to
    * perform a full or hot restart.
    */
@@ -94,6 +99,15 @@ public:
    * @return Thread::BasicLockable& a lock for access logs.
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
+};
+
+/**
+ * HotRestartDomainSocketInUseException is thrown during HotRestart construction only when the
+ * underlying domain socket is in use.
+ */
+class HotRestartDomainSocketInUseException : public EnvoyException {
+public:
+  HotRestartDomainSocketInUseException(const std::string& what) : EnvoyException(what) {}
 };
 
 } // namespace Server

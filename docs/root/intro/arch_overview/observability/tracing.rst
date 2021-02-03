@@ -19,8 +19,8 @@ sources of latency. Envoy supports three features related to system wide tracing
   providers, that are divided into two subgroups:
 
   - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
-    `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
-    `Datadog <https://datadoghq.com>`_.
+    `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_),
+    `Datadog <https://datadoghq.com>`_ and `SkyWalking <http://skywalking.apache.org/>`_.
   - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
 
 Support for other tracing providers would not be difficult to add.
@@ -82,6 +82,10 @@ Alternatively the trace context can be manually propagated by the service:
   :ref:`config_http_conn_man_headers_x-datadog-parent-id`,
   :ref:`config_http_conn_man_headers_x-datadog-sampling-priority`).
 
+* When using the SkyWalking tracer, Envoy relies on the service to propagate the
+  SkyWalking-specific HTTP headers (
+  :ref:`config_http_conn_man_headers_sw8`).
+
 What data each trace contains
 -----------------------------
 An end-to-end trace is comprised of one or more spans. A
@@ -113,3 +117,17 @@ request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
 the trace ID configuration (Zipkin and Datadog). See
 :ref:`v3 API reference <envoy_v3_api_msg_config.trace.v3.Tracing>`
 for more information on how to setup tracing in Envoy.
+
+Baggage
+-----------------------------
+Baggage provides a mechanism for data to be available throughout the entirety of a trace.
+While metadata such as tags are usually communicated to collectors out-of-band, baggage data is injected into the actual
+request context and available to applications during the duration of the request. This enables metadata to transparently
+travel from the beginning of the request throughout your entire mesh without relying on application-specific modifications for
+propagation. See `OpenTracing's documentation <https://opentracing.io/docs/overview/tags-logs-baggage/>`_ for more information about baggage.
+
+Tracing providers have varying level of support for getting and setting baggage:
+
+* Lightstep (and any OpenTracing-compliant tracer) can read/write baggage
+* Zipkin support is not yet implemented
+* X-Ray and OpenCensus don't support baggage

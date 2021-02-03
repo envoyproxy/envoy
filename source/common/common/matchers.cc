@@ -78,6 +78,12 @@ StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatch
       throw EnvoyException("ignore_case has no effect for safe_regex.");
     }
     regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
+  } else if (matcher.match_pattern_case() ==
+             envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains) {
+    if (matcher_.ignore_case()) {
+      // Cache the lowercase conversion of the Contains matcher for future use
+      lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
+    }
   }
 }
 
@@ -100,6 +106,10 @@ bool StringMatcherImpl::match(const absl::string_view value) const {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
     return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
                                   : absl::EndsWith(value, matcher_.suffix());
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
+    return matcher_.ignore_case()
+               ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
+               : absl::StrContains(value, matcher_.contains());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
     FALLTHRU;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:

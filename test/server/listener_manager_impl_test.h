@@ -12,7 +12,12 @@
 #include "server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/guard_dog.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/worker.h"
+#include "test/mocks/server/worker_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -48,11 +53,15 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest()) {}
+  ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    ON_CALL(server_.validation_context_, staticValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor));
+    ON_CALL(server_.validation_context_, dynamicValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor));
     manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
                                                      enable_dispatcher_stats_);
 
@@ -172,7 +181,7 @@ protected:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    ON_CALL(*socket_, localAddress()).WillByDefault(ReturnRef(local_address_));
+    socket_->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
     ON_CALL(*socket_, detectedTransportProtocol())
@@ -185,7 +194,7 @@ protected:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    ON_CALL(*socket_, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+    socket_->address_provider_->setRemoteAddress(remote_address_);
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
@@ -199,8 +208,7 @@ protected:
                            ListenSocketCreationParams expected_creation_params = {true, true}) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
         .WillOnce(Invoke([this, expected_num_options, &expected_state](
-                             const Network::Address::InstanceConstSharedPtr&,
-                             Network::Address::SocketType,
+                             const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
                              const Network::Socket::OptionsSharedPtr& options,
                              const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
@@ -271,11 +279,20 @@ protected:
     return scoped_runtime;
   }
 
+  ABSL_MUST_USE_RESULT
+  auto enableTlsInspectorInjectionForThisTest() {
+    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.disable_tls_inspector_injection", "false"}});
+    return scoped_runtime;
+  }
+
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
@@ -287,6 +304,7 @@ protected:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
+  NiceMock<testing::MockFunction<void()>> callback_;
 };
 
 } // namespace Server

@@ -1,5 +1,4 @@
-licenses(["notice"])  # Apache 2
-
+load("@rules_python//python:defs.bzl", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
@@ -7,6 +6,8 @@ load(
     "envoy_package",
     "envoy_py_test_binary",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -41,7 +42,9 @@ envoy_cc_binary(
         "//source/common/common:assert_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/test_common:test_version_linkstamp",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )

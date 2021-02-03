@@ -1,14 +1,14 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/http_integration.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
-
-using Envoy::Http::Http2::Http2Frame;
 
 namespace Envoy {
 class Http2IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -47,17 +47,21 @@ public:
 class Http2MetadataIntegrationTest : public Http2IntegrationTest {
 public:
   void SetUp() override {
+    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http2_protocol_options()
+              ->set_allow_metadata(true);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 
   void testRequestMetadataWithStopAllFilter();
@@ -67,25 +71,4 @@ public:
   void runHeaderOnlyTest(bool send_request_body, size_t body_size);
 };
 
-class Http2FloodMitigationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public HttpIntegrationTest {
-public:
-  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
-    config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
-  }
-
-protected:
-  void startHttp2Session();
-  void floodServer(const Http2Frame& frame, const std::string& flood_stat);
-  void floodServer(absl::string_view host, absl::string_view path,
-                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
-  Http2Frame readFrame();
-  void sendFame(const Http2Frame& frame);
-  void setNetworkConnectionBufferSize();
-  void beginSession();
-
-  IntegrationTcpClientPtr tcp_client_;
-};
 } // namespace Envoy

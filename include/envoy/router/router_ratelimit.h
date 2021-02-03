@@ -5,35 +5,31 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"
 
 namespace Envoy {
 namespace Router {
+
 /**
- * Base interface for generic rate limit action.
+ * Base interface for generic rate limit override action.
  */
-class RateLimitAction {
+class RateLimitOverrideAction {
 public:
-  virtual ~RateLimitAction() = default;
+  virtual ~RateLimitOverrideAction() = default;
 
   /**
-   * Potentially append a descriptor entry to the end of descriptor.
-   * @param route supplies the target route for the request.
+   * Potentially populate the descriptors 'limit' property with a RateLimitOverride instance
    * @param descriptor supplies the descriptor to optionally fill.
-   * @param local_service_cluster supplies the name of the local service cluster.
-   * @param headers supplies the header for the request.
-   * @param remote_address supplies the trusted downstream address for the connection.
-   * @return true if the RateLimitAction populated the descriptor.
+   * @param metadata supplies the dynamic metadata for the request.
+   * @return true if RateLimitOverride was set in the descriptor.
    */
-  virtual bool populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
-                                  const std::string& local_service_cluster,
-                                  const Http::HeaderMap& headers,
-                                  const Network::Address::Instance& remote_address) const PURE;
+  virtual bool populateOverride(RateLimit::Descriptor& descriptor,
+                                const envoy::config::core::v3::Metadata* metadata) const PURE;
 };
 
-using RateLimitActionPtr = std::unique_ptr<RateLimitAction>;
+using RateLimitOverrideActionPtr = std::unique_ptr<RateLimitOverrideAction>;
 
 /**
  * Rate limit configuration.
@@ -54,17 +50,27 @@ public:
 
   /**
    * Potentially populate the descriptor array with new descriptors to query.
-   * @param route supplies the target route for the request.
    * @param descriptors supplies the descriptor array to optionally fill.
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
-   * @param remote_address supplies the trusted downstream address for the connection.
+   * @param info stream info associated with the request
    */
-  virtual void populateDescriptors(const RouteEntry& route,
-                                   std::vector<RateLimit::Descriptor>& descriptors,
+  virtual void populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
                                    const std::string& local_service_cluster,
-                                   const Http::HeaderMap& headers,
-                                   const Network::Address::Instance& remote_address) const PURE;
+                                   const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& info) const PURE;
+
+  /**
+   * Potentially populate the local descriptor array with new descriptors to query.
+   * @param descriptors supplies the descriptor array to optionally fill.
+   * @param local_service_cluster supplies the name of the local service cluster.
+   * @param headers supplies the header for the request.
+   * @param info stream info associated with the request
+   */
+  virtual void populateLocalDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                        const std::string& local_service_cluster,
+                                        const Http::RequestHeaderMap& headers,
+                                        const StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**

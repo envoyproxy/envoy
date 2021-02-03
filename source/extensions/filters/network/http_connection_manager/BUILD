@@ -1,22 +1,24 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # L4 network filter that implements HTTP protocol handling and filtering. This filter internally
 # drives all of the L7 HTTP filters.
 # Public docs: docs/root/configuration/http_conn_man/http_conn_man.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
+    # This is core Envoy config.
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -31,6 +33,7 @@ envoy_cc_extension(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/filter/http:filter_config_discovery_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:request_id_extension_lib",
@@ -46,6 +49,7 @@ envoy_cc_extension(
         "//source/common/tracing:http_tracer_config_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

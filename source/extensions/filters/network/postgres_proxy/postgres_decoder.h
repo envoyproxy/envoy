@@ -6,6 +6,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/common/sqlutils/sqlutils.h"
+#include "extensions/filters/network/postgres_proxy/postgres_message.h"
 #include "extensions/filters/network/postgres_proxy/postgres_session.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -39,6 +41,8 @@ public:
 
   enum class ErrorType { Error, Fatal, Panic, Unknown };
   virtual void incErrors(ErrorType) PURE;
+
+  virtual void processQuery(const std::string&) PURE;
 };
 
 // Postgres message decoder.
@@ -48,6 +52,15 @@ public:
 
   virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
+
+  const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
+    return attributes_;
+  }
+
+protected:
+  // Decoder attributes extracted from Startup message.
+  // It can be username, database name, client app type, etc.
+  Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes attributes_;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -59,11 +72,7 @@ public:
   bool onData(Buffer::Instance& data, bool frontend) override;
   PostgresSession& getSession() override { return session_; }
 
-  void setMessage(std::string message) { message_ = message; }
   std::string getMessage() { return message_; }
-
-  void setMessageLength(uint32_t message_len) { message_len_ = message_len; }
-  uint32_t getMessageLength() { return message_len_; }
 
   void setStartup(bool startup) { startup_ = startup; }
   void initialize();
@@ -71,24 +80,31 @@ public:
   bool encrypted() const { return encrypted_; }
 
 protected:
-  // Message action defines the Decoder's method which will be invoked
+  // MsgAction defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
   using MsgAction = std::function<void(DecoderImpl*)>;
 
-  // MsgProcessor has two fields:
+  // MsgBodyReader is a function which returns a pointer to a Message
+  // class which is able to read the Postgres message body.
+  // The Postgres message body structure depends on the message type.
+  using MsgBodyReader = std::function<std::unique_ptr<Message>()>;
+
+  // MessageProcessor has the following fields:
   // first - string with message description
-  // second - vector of Decoder's methods which are invoked when the message
+  // second - function which instantiates a Message object of specific type
+  // which is capable of parsing the message's body.
+  // third - vector of Decoder's methods which are invoked when the message
   // is processed.
-  using MsgProcessor = std::pair<std::string, std::vector<MsgAction>>;
+  using MessageProcessor = std::tuple<std::string, MsgBodyReader, std::vector<MsgAction>>;
 
   // Frontend and Backend messages.
   using MsgGroup = struct {
     // String describing direction (Frontend or Backend).
     std::string direction_;
     // Hash map indexed by messages' 1st byte points to handlers used for processing messages.
-    absl::flat_hash_map<char, MsgProcessor> messages_;
+    absl::flat_hash_map<char, MessageProcessor> messages_;
     // Handler used for processing messages not found in hash map.
-    MsgProcessor unknown_;
+    MessageProcessor unknown_;
   };
 
   // Hash map binding keyword found in a message to an
@@ -105,7 +121,7 @@ protected:
     MsgAction unknown_;
   };
 
-  bool parseMessage(Buffer::Instance& data);
+  bool parseHeader(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
   void decodeBackendStatements();
@@ -113,10 +129,18 @@ protected:
   void decodeBackendNoticeResponse();
   void decodeFrontendTerminate();
   void decodeErrorNotice(MsgParserDict& types);
+  void onQuery();
+  void onParse();
+  void onStartup();
 
   void incMessagesUnknown() { callbacks_->incMessagesUnknown(); }
   void incSessionsEncrypted() { callbacks_->incSessionsEncrypted(); }
   void incSessionsUnencrypted() { callbacks_->incSessionsUnencrypted(); }
+
+  // Helper method generating currently processed message in
+  // displayable format.
+  const std::string genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
+                                    uint32_t message_len);
 
   DecoderCallbacks* callbacks_{};
   PostgresSession session_{};
@@ -137,7 +161,7 @@ protected:
   // Startup message message which does not start with 1 byte TYPE.
   // It starts with message length and must be therefore handled
   // differently.
-  MsgProcessor first_;
+  MessageProcessor first_;
 
   // hash map for dispatching backend transaction messages
   KeywordProcessor BE_statements_;

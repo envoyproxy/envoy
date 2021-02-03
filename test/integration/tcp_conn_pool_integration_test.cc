@@ -24,8 +24,9 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     UNREFERENCED_PARAMETER(end_stream);
 
-    Tcp::ConnectionPool::Instance* pool = cluster_manager_.tcpConnPoolForCluster(
-        "cluster_0", Upstream::ResourcePriority::Default, nullptr);
+    Tcp::ConnectionPool::Instance* pool =
+        cluster_manager_.getThreadLocalCluster("cluster_0")
+            ->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
     ASSERT(pool != nullptr);
 
     requests_.emplace_back(*this, data);
@@ -117,18 +118,12 @@ public:
     filter_chains:
       - filters:
         - name: envoy.test.router
-          config:
+          typed_config:
       )EOF");
   }
 
   // Initializer for individual tests.
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  // Destructor for individual tests.
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 
 private:
   TestFilterConfigFactory config_factory_;
@@ -144,7 +139,7 @@ TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   std::string response("response");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request);
+  ASSERT_TRUE(tcp_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -164,7 +159,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
   // send request 1
-  tcp_client->write(request1);
+  ASSERT_TRUE(tcp_client->write(request1));
   FakeRawConnectionPtr fake_upstream_connection1;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
   std::string data;
@@ -172,7 +167,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   EXPECT_EQ(request1, data);
 
   // send request 2
-  tcp_client->write(request2);
+  ASSERT_TRUE(tcp_client->write(request2));
   FakeRawConnectionPtr fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));

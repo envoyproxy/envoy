@@ -8,6 +8,7 @@
 #include "common/common/lock_guard.h"
 #include "common/event/real_time_system.h"
 #include "common/event/timer_impl.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Event {
@@ -46,151 +47,309 @@ private:
 };
 } // namespace
 
-// Our simulated alarm inherits from TimerImpl so that the same dispatching
-// mechanism used in RealTimeSystem timers is employed for simulated alarms.
-class SimulatedTimeSystemHelper::Alarm : public Timer {
-public:
-  Alarm(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler, TimerCb cb,
-        Dispatcher& dispatcher)
-      : base_timer_(base_scheduler.createTimer([this, cb] { runAlarm(cb); }, dispatcher)),
-        time_system_(time_system), index_(time_system.nextIndex()), armed_(false), pending_(false) {
-  }
-
-  ~Alarm() override;
-
-  // Timer
-  void disableTimer() override;
-  void enableTimer(const std::chrono::milliseconds& duration,
-                   const ScopeTrackedObject* scope) override {
-    enableHRTimer(duration, scope);
-  };
-  void enableHRTimer(const std::chrono::microseconds& duration,
-                     const ScopeTrackedObject* scope) override;
-  bool enabled() override {
-    absl::MutexLock lock(&time_system_.mutex_);
-    return armed_ || base_timer_->enabled();
-  }
-
-  void disableTimerLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);
-
-  void setTimeLockHeld(MonotonicTime time) EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
-    time_ = time;
-  }
-
-  /**
-   * Activates the timer so it will be run the next time the libevent loop is run,
-   * typically via Dispatcher::run().
-   */
-  void activateLockHeld(const ScopeTrackedObject* scope = nullptr)
-      EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
-    ASSERT(armed_);
-    armed_ = false;
-    if (pending_) {
-      return;
-    }
-    pending_ = true;
-    time_system_.incPendingLockHeld();
-
-    // We don't want to activate the alarm under lock, as it will make a
-    // libevent call, and libevent itself uses locks:
-    // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
-    // See class comment for UnlockGuard for details on saving
-    // time_system_.mutex_ prior to running libevent, which may delete this.
-    UnlockGuard unlocker(time_system_.mutex_);
-    std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
-    base_timer_->enableTimer(duration, scope);
-  }
-
-  MonotonicTime time() const EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
-    ASSERT(armed_);
-    return time_;
-  }
-
-  SimulatedTimeSystemHelper& timeSystem() { return time_system_; }
-  uint64_t index() const { return index_; }
-
-private:
-  friend SimulatedTimeSystemHelper::CompareAlarms;
-
-  void runAlarm(TimerCb cb) {
-    {
-      absl::MutexLock lock(&time_system_.mutex_);
-      pending_ = false;
-    }
-    // Capture time_system_ in a local in case the alarm gets deleted in the callback.
-    SimulatedTimeSystemHelper& time_system = time_system_;
-    cb();
-    time_system.decPending();
-  }
-
-  TimerPtr base_timer_;
-  SimulatedTimeSystemHelper& time_system_;
-  MonotonicTime time_ GUARDED_BY(time_system_.mutex_);
-  const uint64_t index_;
-  bool armed_ GUARDED_BY(time_system_.mutex_);
-  bool pending_ GUARDED_BY(time_system_.mutex_);
-};
-
-// Compare two alarms, based on wakeup time and insertion order. Returns true if
-// a comes before b.
-bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const
-    EXCLUSIVE_LOCKS_REQUIRED(a->time_system_.mutex_, b->time_system_.mutex_) {
-  if (a != b) {
-    if (a->time() < b->time()) {
-      return true;
-    } else if (a->time() == b->time() && a->index() < b->index()) {
-      return true;
-    }
-  }
-  return false;
-};
-
 // Each timer is maintained and ordered by a common TimeSystem, but is
 // associated with a scheduler. The scheduler creates the timers with a libevent
 // context, so that the timer callbacks can be executed via Dispatcher::run() in
 // the expected thread.
 class SimulatedTimeSystemHelper::SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler)
-      : time_system_(time_system), base_scheduler_(base_scheduler) {}
-  TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override {
-    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, base_scheduler_, cb,
-                                                              dispatcher);
-  };
+  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, CallbackScheduler& cb_scheduler)
+      : time_system_(time_system), cb_scheduler_(cb_scheduler),
+        thread_factory_(Thread::threadFactoryForTest()),
+        run_alarms_cb_(cb_scheduler.createSchedulableCallback([this] { runReadyAlarms(); })),
+        monotonic_time_(time_system_.monotonicTime()), system_time_(time_system_.systemTime()) {
+    time_system_.registerScheduler(this);
+  }
+  ~SimulatedScheduler() override { time_system_.unregisterScheduler(this); }
+
+  // From Scheduler.
+  TimerPtr createTimer(const TimerCb& cb, Dispatcher& /*dispatcher*/) override;
+
+  // Implementation of SimulatedTimeSystemHelper::Alarm methods.
+  bool isEnabled(Alarm& alarm) ABSL_LOCKS_EXCLUDED(mutex_);
+  void enableAlarm(Alarm& alarm, const std::chrono::microseconds duration)
+      ABSL_LOCKS_EXCLUDED(mutex_);
+  void disableAlarm(Alarm& alarm) ABSL_LOCKS_EXCLUDED(mutex_) {
+    absl::MutexLock lock(&mutex_);
+    disableAlarmLockHeld(alarm);
+    // Wait until alarm processing for the current thread completes when disabling from outside the
+    // event loop thread. This helps avoid data races when deleting Alarm objects from outside the
+    // event loop thread.
+    if (running_cbs_ && !thread_advancing_time_.isEmpty() &&
+        thread_advancing_time_ != thread_factory_.currentThreadId()) {
+      waitForNoRunningCallbacksLockHeld();
+    }
+  }
+
+  // Called by SimulatedTimeSystemHelper::setMonotonicTime to update the time associated with each
+  // of the simulated schedulers and associated alarms.
+  void updateTime(MonotonicTime monotonic_time, SystemTime system_time)
+      ABSL_LOCKS_EXCLUDED(mutex_) {
+    bool inc_pending = false;
+    {
+      absl::MutexLock lock(&mutex_);
+      // Wait until the event loop associated with this scheduler is not executing callbacks so time
+      // does not change in the middle of a callback.
+      waitForNoRunningCallbacksLockHeld();
+      monotonic_time_ = monotonic_time;
+      system_time_ = system_time;
+      if (!pending_dec_ && (!registered_alarms_.empty() || !triggered_alarms_.empty())) {
+        // Selectively increment the pending updates counter only on dispatchers that have active
+        // alarms to allow advanceTimeWait to work but avoid getting stuck if some of the event
+        // loops associated with some of the registered simulated schedulers is not currently
+        // active.
+        inc_pending = true;
+        pending_dec_ = true;
+      }
+    }
+    if (inc_pending) {
+      time_system_.incPending();
+    }
+
+    if (!run_alarms_cb_->enabled()) {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.activate_timers_next_event_loop")) {
+        run_alarms_cb_->scheduleCallbackNextIteration();
+      } else {
+        run_alarms_cb_->scheduleCallbackCurrentIteration();
+      }
+    }
+  }
 
 private:
+  void waitForNoRunningCallbacksLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    mutex_.Await(absl::Condition(
+        +[](bool* running_cbs) -> bool { return !*running_cbs; }, &running_cbs_));
+  }
+
+  void disableAlarmLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
+  // Collect expired alarms and execute associated callbacks.
+  void runReadyAlarms() ABSL_LOCKS_EXCLUDED(mutex_);
+
+  struct AlarmRegistration {
+    AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm& alarm)
+        : time_(time), randomness_(randomness), alarm_(alarm) {}
+
+    MonotonicTime time_;
+    // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
+    // non-deterministic execution of real alarms scheduled for the same wall time.
+    uint64_t randomness_;
+    Alarm& alarm_;
+
+    friend bool operator<(const AlarmRegistration& lhs, const AlarmRegistration& rhs) {
+      if (lhs.time_ != rhs.time_) {
+        return lhs.time_ < rhs.time_;
+      }
+      if (lhs.randomness_ != rhs.randomness_) {
+        return lhs.randomness_ < rhs.randomness_;
+      }
+      // Out of paranoia, use pointer comparison on the alarms as a final tie-breaker but also
+      // ASSERT that this branch isn't hit in debug modes since in practice the randomness_
+      // associated with two registrations should never be equal.
+      ASSERT(false, "Alarm registration randomness_ for two alarms should never be equal.");
+      return &lhs.alarm_ < &rhs.alarm_;
+    }
+  };
+
+  class AlarmSet {
+  public:
+    bool empty() const { return sorted_alarms_.empty(); }
+
+    const AlarmRegistration& next() const {
+      ASSERT(!empty());
+      return *sorted_alarms_.begin();
+    }
+
+    void add(AlarmRegistration registration) {
+      auto insert_result = sorted_alarms_.insert(registration);
+      ASSERT(insert_result.second);
+      alarm_registrations_map_.emplace(&registration.alarm_, insert_result.first);
+
+      // Sanity check that the parallel data structures used for alarm registration have the same
+      // number of entries.
+      ASSERT(sorted_alarms_.size() == alarm_registrations_map_.size());
+    }
+
+    bool remove(Alarm& alarm) {
+      auto it = alarm_registrations_map_.find(&alarm);
+      if (it == alarm_registrations_map_.end()) {
+        return false;
+      }
+      sorted_alarms_.erase(it->second);
+      alarm_registrations_map_.erase(it);
+
+      // Sanity check that the parallel data structures used for alarm registration have the same
+      // number of entries.
+      ASSERT(sorted_alarms_.size() == alarm_registrations_map_.size());
+      return true;
+    }
+
+    bool contains(Alarm& alarm) const {
+      return alarm_registrations_map_.find(&alarm) != alarm_registrations_map_.end();
+    }
+
+  private:
+    std::set<AlarmRegistration> sorted_alarms_;
+    absl::flat_hash_map<Alarm*, std::set<AlarmRegistration>::const_iterator>
+        alarm_registrations_map_;
+  };
+
   SimulatedTimeSystemHelper& time_system_;
-  Scheduler& base_scheduler_;
+  CallbackScheduler& cb_scheduler_;
+  Thread::ThreadFactory& thread_factory_;
+  SchedulableCallbackPtr run_alarms_cb_;
+
+  absl::Mutex mutex_;
+  bool running_cbs_ ABSL_GUARDED_BY(mutex_) = false;
+  AlarmSet registered_alarms_ ABSL_GUARDED_BY(mutex_);
+  AlarmSet triggered_alarms_ ABSL_GUARDED_BY(mutex_);
+
+  MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
+  SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
+
+  // Id of the thread where the event loop is running.
+  Thread::ThreadId thread_advancing_time_ ABSL_GUARDED_BY(mutex_);
+  // True if the SimulatedTimeSystemHelper is waiting for the scheduler to process expired alarms
+  // and call decPending after an update to monotonic time.
+  bool pending_dec_ ABSL_GUARDED_BY(mutex_) = false;
+  // Used to randomize the ordering of alarms scheduled for the same time when the runtime feature
+  // envoy.reloadable_features.activate_timers_next_event_loop is enabled. This mimics the trigger
+  // order of real timers scheduled for the same absolute time is non-deterministic.
+  // Each simulated scheduler has it's own TestRandomGenerator with the same seed to improve test
+  // failure reproducibility when running against a specific seed by minimizing cross scheduler
+  // interactions.
+  TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
+  uint64_t legacy_next_idx_ ABSL_GUARDED_BY(mutex_) = 0;
 };
 
-SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
-  if (armed_) {
-    disableTimer();
+// Our simulated alarm inherits from TimerImpl so that the same dispatching
+// mechanism used in RealTimeSystem timers is employed for simulated alarms.
+class SimulatedTimeSystemHelper::Alarm : public Timer {
+public:
+  Alarm(SimulatedScheduler& simulated_scheduler, SimulatedTimeSystemHelper& time_system,
+        CallbackScheduler& /*cb_scheduler*/, TimerCb cb)
+      : cb_(cb), simulated_scheduler_(simulated_scheduler), time_system_(time_system) {}
+
+  ~Alarm() override;
+
+  // Timer
+  void disableTimer() override;
+  void enableTimer(const std::chrono::milliseconds duration,
+                   const ScopeTrackedObject* scope) override {
+    enableHRTimer(duration, scope);
+  };
+  void enableHRTimer(const std::chrono::microseconds duration,
+                     const ScopeTrackedObject* scope) override;
+  bool enabled() override { return simulated_scheduler_.isEnabled(*this); }
+
+  SimulatedTimeSystemHelper& timeSystem() { return time_system_; }
+
+  void runAlarm() { cb_(); }
+
+private:
+  TimerCb cb_;
+  SimulatedScheduler& simulated_scheduler_;
+  SimulatedTimeSystemHelper& time_system_;
+};
+
+TimerPtr SimulatedTimeSystemHelper::SimulatedScheduler::createTimer(const TimerCb& cb,
+                                                                    Dispatcher& /*dispatcher*/) {
+  return std::make_unique<SimulatedTimeSystemHelper::Alarm>(*this, time_system_, cb_scheduler_, cb);
+}
+
+bool SimulatedTimeSystemHelper::SimulatedScheduler::isEnabled(Alarm& alarm) {
+  absl::MutexLock lock(&mutex_);
+  return registered_alarms_.contains(alarm) || triggered_alarms_.contains(alarm);
+}
+
+void SimulatedTimeSystemHelper::SimulatedScheduler::enableAlarm(
+    Alarm& alarm, const std::chrono::microseconds duration) {
+  {
+    absl::MutexLock lock(&mutex_);
+    if (duration.count() == 0 && triggered_alarms_.contains(alarm)) {
+      return;
+    } else if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.activate_timers_next_event_loop")) {
+      disableAlarmLockHeld(alarm);
+      registered_alarms_.add({monotonic_time_ + duration, random_source_.random(), alarm});
+    } else {
+      disableAlarmLockHeld(alarm);
+      AlarmSet& alarm_set = (duration.count() != 0) ? registered_alarms_ : triggered_alarms_;
+      alarm_set.add({monotonic_time_ + duration, ++legacy_next_idx_, alarm});
+    }
+  }
+
+  if (duration.count() == 0) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.activate_timers_next_event_loop")) {
+      run_alarms_cb_->scheduleCallbackNextIteration();
+    } else {
+      run_alarms_cb_->scheduleCallbackCurrentIteration();
+    }
   }
 }
+
+void SimulatedTimeSystemHelper::SimulatedScheduler::disableAlarmLockHeld(Alarm& alarm) {
+  if (triggered_alarms_.contains(alarm)) {
+    ASSERT(!registered_alarms_.contains(alarm));
+    triggered_alarms_.remove(alarm);
+  } else {
+    ASSERT(!triggered_alarms_.contains(alarm));
+    registered_alarms_.remove(alarm);
+  }
+}
+
+void SimulatedTimeSystemHelper::SimulatedScheduler::runReadyAlarms() {
+  bool dec_pending = false;
+  {
+    absl::MutexLock lock(&mutex_);
+    if (pending_dec_) {
+      dec_pending = true;
+      pending_dec_ = false;
+    }
+    if (thread_advancing_time_.isEmpty()) {
+      thread_advancing_time_ = thread_factory_.currentThreadId();
+    } else {
+      ASSERT(thread_advancing_time_ == thread_factory_.currentThreadId());
+    }
+    auto monotonic_time = monotonic_time_;
+    while (!registered_alarms_.empty()) {
+      const AlarmRegistration& alarm_registration = registered_alarms_.next();
+      MonotonicTime alarm_time = alarm_registration.time_;
+      if (alarm_time > monotonic_time) {
+        break;
+      }
+      triggered_alarms_.add(alarm_registration);
+      registered_alarms_.remove(alarm_registration.alarm_);
+    }
+
+    ASSERT(!running_cbs_);
+    running_cbs_ = true;
+    while (!triggered_alarms_.empty()) {
+      Alarm& alarm = triggered_alarms_.next().alarm_;
+      triggered_alarms_.remove(alarm);
+      UnlockGuard unlocker(mutex_);
+      alarm.runAlarm();
+    }
+    ASSERT(running_cbs_);
+    ASSERT(monotonic_time == monotonic_time_);
+    running_cbs_ = false;
+  }
+  if (dec_pending) {
+    time_system_.decPending();
+  }
+}
+
+SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() { simulated_scheduler_.disableAlarm(*this); }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
-  absl::MutexLock lock(&time_system_.mutex_);
-  disableTimerLockHeld();
-}
-
-void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
-  if (armed_) {
-    time_system_.removeAlarmLockHeld(this);
-    armed_ = false;
-  }
+  simulated_scheduler_.disableAlarm(*this);
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
-    const std::chrono::microseconds& duration, const ScopeTrackedObject* scope) {
-  absl::MutexLock lock(&time_system_.mutex_);
-  disableTimerLockHeld();
-  armed_ = true;
-  if (duration.count() == 0) {
-    activateLockHeld(scope);
-  } else {
-    time_system_.addAlarmLockHeld(this, duration);
-  }
+    const std::chrono::microseconds duration, const ScopeTrackedObject* /*scope*/) {
+  simulated_scheduler_.enableAlarm(*this, duration);
 }
 
 // It would be very confusing if there were more than one simulated time system
@@ -202,10 +361,10 @@ static int instance_count = 0;
 
 // When we initialize our simulated time, we'll start the current time based on
 // the real current time. But thereafter, real-time will not be used, and time
-// will march forward only by calling.advanceTimeAsync().
+// will march forward only by calling advanceTimeAndRun() or advanceTimeWait().
 SimulatedTimeSystemHelper::SimulatedTimeSystemHelper()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
-      system_time_(real_time_source_.systemTime()), index_(0), pending_alarms_(0) {
+      system_time_(real_time_source_.systemTime()), pending_updates_(0) {
   ++instance_count;
   ASSERT(instance_count <= 1);
 }
@@ -224,7 +383,7 @@ MonotonicTime SimulatedTimeSystemHelper::monotonicTime() {
   return monotonic_time_;
 }
 
-void SimulatedTimeSystemHelper::advanceTimeAsync(const Duration& duration) {
+void SimulatedTimeSystemHelper::advanceTimeAsyncImpl(const Duration& duration) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
@@ -232,7 +391,7 @@ void SimulatedTimeSystemHelper::advanceTimeAsync(const Duration& duration) {
   setMonotonicTimeLockHeld(monotonic_time);
 }
 
-void SimulatedTimeSystemHelper::advanceTimeWait(const Duration& duration) {
+void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
@@ -241,120 +400,33 @@ void SimulatedTimeSystemHelper::advanceTimeWait(const Duration& duration) {
   waitForNoPendingLockHeld();
 }
 
-void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   mutex_.Await(absl::Condition(
-      +[](const uint32_t* pending_alarms) -> bool { return *pending_alarms == 0; },
-      &pending_alarms_));
+      +[](const uint32_t* pending_updates) -> bool { return *pending_updates == 0; },
+      &pending_updates_));
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
-    Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-    const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-  only_one_thread_.checkOneThread();
-
-  // TODO(#10568): This real-time polling delay should not be necessary. Without
-  // it, test/extensions/filters/http/cache:cache_filter_integration_test fails
-  // about 40% of the time.
-  const Duration real_time_poll_delay(
-      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
-  const MonotonicTime end_time = monotonicTime() + duration;
-
-  bool timeout_not_reached = true;
-  while (timeout_not_reached) {
-    // First check to see if the condition is already satisfied without advancing sim time.
-    if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
-      return Thread::CondVar::WaitStatus::NoTimeout;
-    }
-
-    // This function runs with the caller-provided mutex held. We need to
-    // hold this->mutex_ while accessing the timer-queue and blocking on
-    // callbacks completing. To avoid potential deadlock we must drop
-    // the caller's mutex before taking ours. We also must care to avoid
-    // break/continue/return/throw during this non-RAII lock operation.
-    mutex.unlock();
-    {
-      absl::MutexLock lock(&mutex_);
-      if (monotonic_time_ < end_time) {
-        MonotonicTime next_wakeup = end_time;
-        if (!alarms_.empty()) {
-          // If there's another alarm pending, sleep forward to it.
-          Alarm* alarm = (*alarms_.begin());
-          next_wakeup = std::min(alarmTimeLockHeld(alarm), next_wakeup);
-        }
-        setMonotonicTimeLockHeld(next_wakeup);
-        waitForNoPendingLockHeld();
-      } else {
-        // If we reached our end_time, break the loop and return timeout. We
-        // don't break immediately as we have to drop mutex_ and re-take mutex,
-        // and it's cleaner to have a linear flow to the end of the loop.
-        timeout_not_reached = false;
-      }
-    }
-    mutex.lock();
-  }
-  return Thread::CondVar::WaitStatus::Timeout;
-}
-
-MonotonicTime SimulatedTimeSystemHelper::alarmTimeLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
-  // We disable thread-safety analysis as the compiler can't detect that
-  // alarm_->timeSystem() == this, so we must be holding the right mutex.
-  ASSERT(&(alarm->timeSystem()) == this);
-  return alarm->time();
-}
-
-void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm* alarm) NO_THREAD_SAFETY_ANALYSIS {
-  // We disable thread-safety analysis as the compiler can't detect that
-  // alarm_->timeSystem() == this, so we must be holding the right mutex.
-  ASSERT(&(alarm->timeSystem()) == this);
-  alarm->activateLockHeld();
-}
-
-int64_t SimulatedTimeSystemHelper::nextIndex() {
-  absl::MutexLock lock(&mutex_);
-  return index_++;
-}
-
-void SimulatedTimeSystemHelper::addAlarmLockHeld(
-    Alarm* alarm, const std::chrono::microseconds& duration) NO_THREAD_SAFETY_ANALYSIS {
-  ASSERT(&(alarm->timeSystem()) == this);
-  alarm->setTimeLockHeld(monotonic_time_ + duration);
-  alarms_.insert(alarm);
-}
-
-void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm* alarm) { alarms_.erase(alarm); }
-
-SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_scheduler) {
-  return std::make_unique<SimulatedScheduler>(*this, base_scheduler);
+SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& /*base_scheduler*/,
+                                                        CallbackScheduler& cb_scheduler) {
+  return std::make_unique<SimulatedScheduler>(*this, cb_scheduler);
 }
 
 void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time) {
+  only_one_thread_.checkOneThread();
   // We don't have a MutexLock construct that allows temporarily
   // dropping the lock to run a callback. The main issue here is that we must
   // be careful not to be holding mutex_ when an exception can be thrown.
   // That can only happen here in alarm->activate(), which is run with the mutex
   // released.
   if (monotonic_time >= monotonic_time_) {
-    // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
-    // iteration gives you wakeup order. Also note that alarms may be added
-    // or removed during the call to activate() so it would not be correct to
-    // range-iterate over the set.
-    while (!alarms_.empty()) {
-      AlarmSet::iterator pos = alarms_.begin();
-      Alarm* alarm = *pos;
-      MonotonicTime alarm_time = alarmTimeLockHeld(alarm);
-      if (alarm_time > monotonic_time) {
-        break;
-      }
-      ASSERT(alarm_time >= monotonic_time_);
-      system_time_ +=
-          std::chrono::duration_cast<SystemTime::duration>(alarm_time - monotonic_time_);
-      monotonic_time_ = alarm_time;
-      alarms_.erase(pos);
-      alarmActivateLockHeld(alarm);
-    }
     system_time_ +=
         std::chrono::duration_cast<SystemTime::duration>(monotonic_time - monotonic_time_);
     monotonic_time_ = monotonic_time;
+    for (SimulatedScheduler* scheduler : schedulers_) {
+      UnlockGuard unlocker(mutex_);
+      scheduler->updateTime(monotonic_time_, system_time_);
+    }
   }
 }
 

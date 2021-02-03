@@ -1,15 +1,15 @@
-licenses(["notice"])  # Apache 2
-
-# Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+# Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "metrics_service_grpc_lib",
@@ -47,6 +47,7 @@ envoy_cc_extension(
     deps = [
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/metrics_service:metrics_proto_descriptors_lib",
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",

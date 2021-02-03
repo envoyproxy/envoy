@@ -6,12 +6,14 @@
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -56,6 +58,100 @@ rules:
                   filter_state) == nullptr);
 }
 
+TEST(HttpJwtAuthnFilterConfigTest, FindByMatchDisabled) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filter_conf->findVerifier(
+                  Http::TestRequestHeaderMapImpl{
+                      {":path", "/path1"},
+                  },
+                  filter_state) == nullptr);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, FindByMatchWrongRequirementName) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+  requirement_name: rr
+requirement_map:
+  r1:
+    provider_name: provider1
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(FilterConfigImpl::create(proto_config, "", context), EnvoyException,
+                            "Wrong requirement_name: rr. It should be one of [r1]");
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, FindByMatchRequirementName) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+  provider2:
+    issuer: issuer2
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+  requirement_name: r1
+- match:
+    path: /path2
+  requirement_name: r2
+requirement_map:
+  r1:
+    provider_name: provider1
+  r2:
+    provider_name: provider2
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  EXPECT_TRUE(filter_conf->findVerifier(
+                  Http::TestRequestHeaderMapImpl{
+                      {":path", "/path1"},
+                  },
+                  filter_state) != nullptr);
+  EXPECT_TRUE(filter_conf->findVerifier(
+                  Http::TestRequestHeaderMapImpl{
+                      {":path", "/path2"},
+                  },
+                  filter_state) != nullptr);
+}
+
 TEST(HttpJwtAuthnFilterConfigTest, VerifyTLSLifetime) {
   const char config[] = R"(
 providers:
@@ -72,7 +168,7 @@ rules:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   // Make sure that the thread callbacks are not invoked inline.
-  server_context.thread_local_.defer_data = true;
+  server_context.thread_local_.defer_data_ = true;
   {
     // Scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.
@@ -156,6 +252,63 @@ filter_state_rules:
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(Http::TestRequestHeaderMapImpl(), filter_state4) !=
               nullptr);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, FindByRequiremenMap) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+  provider2:
+    issuer: issuer2
+    local_jwks:
+      inline_string: jwks
+requirement_map:
+  r1:
+    provider_name: provider1
+  r2:
+    provider_name: provider2
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+
+  PerRouteConfig per_route;
+  const Verifier* verifier;
+  std::string error_msg;
+
+  per_route.Clear();
+  per_route.set_disabled(true);
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_EQ(verifier, nullptr);
+  EXPECT_EQ(error_msg, EMPTY_STRING);
+
+  per_route.Clear();
+  per_route.set_requirement_name("r1");
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_NE(verifier, nullptr);
+  EXPECT_EQ(error_msg, EMPTY_STRING);
+
+  per_route.Clear();
+  per_route.set_requirement_name("r2");
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_NE(verifier, nullptr);
+  EXPECT_EQ(error_msg, EMPTY_STRING);
+
+  per_route.Clear();
+  per_route.set_requirement_name("wrong-name");
+  std::tie(verifier, error_msg) =
+      filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
+  EXPECT_EQ(verifier, nullptr);
+  EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name. It should be one of [r1,r2]");
 }
 
 } // namespace

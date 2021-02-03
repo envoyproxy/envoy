@@ -15,6 +15,9 @@ namespace Tracers {
 namespace Common {
 namespace Ot {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    ot_span_context_handle(Http::CustomHeaders::get().OtSpanContext);
+
 namespace {
 class OpenTracingHTTPHeadersWriter : public opentracing::HTTPHeadersWriter {
 public:
@@ -45,41 +48,37 @@ public:
   // opentracing::HTTPHeadersReader
   opentracing::expected<opentracing::string_view>
   LookupKey(opentracing::string_view key) const override {
-    const Http::HeaderEntry* entry;
-    Http::HeaderMap::Lookup lookup_result =
-        request_headers_.lookup(Http::LowerCaseString{key}, &entry);
-    switch (lookup_result) {
-    case Http::HeaderMap::Lookup::Found:
-      return opentracing::string_view{entry->value().getStringView().data(),
-                                      entry->value().getStringView().length()};
-    case Http::HeaderMap::Lookup::NotFound:
+    const auto entry = request_headers_.get(Http::LowerCaseString{key});
+    if (!entry.empty()) {
+      // This is an implicitly untrusted header, so only the first value is used.
+      return opentracing::string_view{entry[0]->value().getStringView().data(),
+                                      entry[0]->value().getStringView().length()};
+    } else {
       return opentracing::make_unexpected(opentracing::key_not_found_error);
-    case Http::HeaderMap::Lookup::NotSupported:
-      return opentracing::make_unexpected(opentracing::lookup_key_not_supported_error);
     }
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
-    request_headers_.iterate(headerMapCallback, static_cast<void*>(&f));
+    request_headers_.iterate(headerMapCallback(f));
     return {};
   }
 
 private:
   const Http::RequestHeaderMap& request_headers_;
 
-  static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
-                                                    void* context) {
-    auto* callback = static_cast<OpenTracingCb*>(context);
-    opentracing::string_view key{header.key().getStringView().data(),
-                                 header.key().getStringView().length()};
-    opentracing::string_view value{header.value().getStringView().data(),
-                                   header.value().getStringView().length()};
-    if ((*callback)(key, value)) {
-      return Http::HeaderMap::Iterate::Continue;
-    } else {
-      return Http::HeaderMap::Iterate::Break;
-    }
+  static Http::HeaderMap::ConstIterateCb headerMapCallback(OpenTracingCb callback) {
+    return [callback =
+                std::move(callback)](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      opentracing::string_view key{header.key().getStringView().data(),
+                                   header.key().getStringView().length()};
+      opentracing::string_view value{header.value().getStringView().data(),
+                                     header.value().getStringView().length()};
+      if (callback(key, value)) {
+        return Http::HeaderMap::Iterate::Continue;
+      } else {
+        return Http::HeaderMap::Iterate::Break;
+      }
+    };
   }
 };
 } // namespace
@@ -104,6 +103,14 @@ void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
   finish_options_.log_records.emplace_back(std::move(record));
 }
 
+void OpenTracingSpan::setBaggage(absl::string_view key, absl::string_view value) {
+  span_->SetBaggageItem({key.data(), key.length()}, {value.data(), value.length()});
+}
+
+std::string OpenTracingSpan::getBaggage(absl::string_view key) {
+  return span_->BaggageItem({key.data(), key.length()});
+}
+
 void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.
@@ -116,7 +123,8 @@ void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
       return;
     }
     const std::string current_span_context = oss.str();
-    request_headers.setOtSpanContext(
+    request_headers.setInline(
+        ot_span_context_handle.handle(),
         Base64::encode(current_span_context.c_str(), current_span_context.length()));
   } else {
     // Inject the context using the tracer's standard HTTP header format.
@@ -155,10 +163,11 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;
   std::unique_ptr<opentracing::SpanContext> parent_span_ctx;
-  if (propagation_mode == PropagationMode::SingleHeader && request_headers.OtSpanContext()) {
+  if (propagation_mode == PropagationMode::SingleHeader &&
+      request_headers.getInline(ot_span_context_handle.handle())) {
     opentracing::expected<std::unique_ptr<opentracing::SpanContext>> parent_span_ctx_maybe;
-    std::string parent_context =
-        Base64::decode(std::string(request_headers.getOtSpanContextValue()));
+    std::string parent_context = Base64::decode(
+        std::string(request_headers.getInlineValue(ot_span_context_handle.handle())));
 
     if (!parent_context.empty()) {
       InputConstMemoryStream istream{parent_context.data(), parent_context.size()};

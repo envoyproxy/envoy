@@ -13,7 +13,7 @@ TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Re
 # Testing expected matches
 for t in "${TESTS[@]}"
 do
-  TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details")
+  "${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details"
 done
 
 # Testing coverage flag passes
@@ -48,14 +48,14 @@ if [[ "${COVERAGE_OUTPUT}" != *"Failed to meet coverage requirement: 100%"* ]] ;
 fi
 
 # Test the yaml test file support
-TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.yaml" "--details")
+"${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.yaml" "--details"
 
 # Test the proto text test file support
-TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details")
+"${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details"
 
 # Bad config file
 echo "testing bad config output"
-BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml") 2>&1) ||
+BAD_CONFIG_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Redirect.golden.proto.json" "-t" "${PATH_CONFIG}/TestRoutes.yaml" 2>&1) ||
   echo "${BAD_CONFIG_OUTPUT:-no-output}"
 if [[ "${BAD_CONFIG_OUTPUT}" != *"Protobuf message (type envoy.config.route.v3.RouteConfiguration reason INVALID_ARGUMENT:tests: Cannot find field.) has unknown fields"* ]]; then
   exit 1
@@ -81,6 +81,26 @@ fi
 FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--only-show-failures" 2>&1) ||
   echo "${FAILURE_OUTPUT:-no-output}"
 if [[ "${FAILURE_OUTPUT}" != *"Test_2"*"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]] || [[ "${FAILURE_OUTPUT}" == *"Test_1"* ]]; then
+  exit 1
+fi
+
+# Failure test case to examine error strings
+echo "testing error strings"
+FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/TestRoutesFailures.golden.proto.json" "--only-show-failures" 2>&1) ||
+  echo "${FAILURE_OUTPUT:-no-output}"
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [content-type: text/plain], actual: NOT [content-type: text/plain], test type: response_header_matches.exact_match"; then
+  exit 1
+fi
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "actual: [content-length: 25], test type: response_header_matches.range_match"; then
+  exit 1
+fi
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [x-ping-response: pong], actual: [x-ping-response: yes], test type: response_header_matches.exact_match"; then
+  exit 1
+fi
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [has(x-ping-response):false], actual: [has(x-ping-response):true], test type: response_header_matches.present_match"; then
+  exit 1
+fi
+if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [has(x-pong-response):true], actual: [has(x-pong-response):false], test type: response_header_matches.present_match"; then
   exit 1
 fi
 

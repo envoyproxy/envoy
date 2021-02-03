@@ -20,6 +20,7 @@
 // BM_LookupsNoEvictions       45662 ns        45662 ns        15329
 // BM_LookupsAllEvictions      83015 ns        83015 ns         8435
 
+#include "common/common/random_generator.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/recent_lookups.h"
 
@@ -30,7 +31,7 @@ class RecentLookupsSpeedTest {
 public:
   RecentLookupsSpeedTest(uint64_t lookup_variants, uint64_t capacity) {
     recent_lookups_.setCapacity(capacity);
-    Envoy::Runtime::RandomGeneratorImpl random;
+    Envoy::Random::RandomGeneratorImpl random;
     lookups_.reserve(lookup_variants);
     for (size_t i = 0; i < lookup_variants; ++i) {
       lookups_.push_back(absl::StrCat("lookup #", random.random()));
@@ -39,7 +40,8 @@ public:
 
   void test(benchmark::State& state) {
     for (auto _ : state) {
-      Envoy::Runtime::RandomGeneratorImpl random;
+      UNREFERENCED_PARAMETER(_);
+      Envoy::Random::RandomGeneratorImpl random;
       for (uint64_t i = 0; i < lookups_.size(); ++i) {
         recent_lookups_.lookup(lookups_[random.random() % lookups_.size()]);
       }
@@ -51,32 +53,20 @@ private:
   Envoy::Stats::RecentLookups recent_lookups_;
 };
 
-static void BM_LookupsMixed(benchmark::State& state) {
+static void bmLookupsMixed(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 500);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsMixed);
+BENCHMARK(bmLookupsMixed)->Unit(::benchmark::kMillisecond);
 
-static void BM_LookupsNoEvictions(benchmark::State& state) {
+static void bmLookupsNoEvictions(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 1000);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsNoEvictions);
+BENCHMARK(bmLookupsNoEvictions)->Unit(::benchmark::kMillisecond);
 
-static void BM_LookupsAllEvictions(benchmark::State& state) {
+static void bmLookupsAllEvictions(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 10);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsAllEvictions);
-
-int main(int argc, char** argv) {
-  Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logger_context(spdlog::level::warn,
-                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-  benchmark::Initialize(&argc, argv);
-
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}
+BENCHMARK(bmLookupsAllEvictions)->Unit(::benchmark::kMillisecond);

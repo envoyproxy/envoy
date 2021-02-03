@@ -137,7 +137,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create());
     QueryMessageInfo info(q);
-    EXPECT_EQ(0, info.max_time());
+    EXPECT_EQ(0, info.maxTime());
   }
 
   {
@@ -145,7 +145,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 1212));
     QueryMessageInfo info(q);
-    EXPECT_EQ(1212, info.max_time());
+    EXPECT_EQ(1212, info.maxTime());
   }
 
   {
@@ -153,7 +153,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt64("$maxTimeMS", 1212));
     QueryMessageInfo info(q);
-    EXPECT_EQ(1212, info.max_time());
+    EXPECT_EQ(1212, info.maxTime());
   }
 
   {
@@ -161,7 +161,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt64("maxTimeMS", 2400));
     QueryMessageInfo info(q);
-    EXPECT_EQ(2400, info.max_time());
+    EXPECT_EQ(2400, info.maxTime());
   }
 }
 
@@ -189,13 +189,18 @@ TEST(QueryMessageInfoTest, Command) {
     EXPECT_THROW((QueryMessageInfo(q)), EnvoyException);
   }
 
-  {
+  std::vector<std::pair<std::string, std::string>> test_cases = {
+      {"collstats", "collStats"},         {"dbstats", "dbStats"},
+      {"findandmodify", "findAndModify"}, {"getlasterror", "getLastError"},
+      {"ismaster", "isMaster"},
+  };
+  for (const auto& test : test_cases) {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.$cmd");
     q.query(Bson::DocumentImpl::create()->addDocument(
-        "$query", Bson::DocumentImpl::create()->addInt32("ismaster", 1)));
+        "$query", Bson::DocumentImpl::create()->addInt32(test.first, 1)));
     QueryMessageInfo info(q);
-    EXPECT_EQ("ismaster", info.command());
+    EXPECT_EQ(test.second, info.command());
   }
 }
 

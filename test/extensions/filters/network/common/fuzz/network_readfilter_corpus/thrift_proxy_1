@@ -1,0 +1,20 @@
+config {
+  name: "envoy.filters.network.thrift_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy"
+    value: "\nYtype.googleapis.com/envoy.extensions.filters.network.thrift_proxy.vLLLLLLLLL3.ThriftProxy\020\003\030\003\"\231\002\022\226\002\n\003\n\001A\022\216\002\032\201\002\n\361\001\n\010@\000\000\000\000\000\000\000\022\344\001\nc\n_*]\032[\nPtype.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy\022\007\020\002\"\003\n\001A\022\000\n}\nyenvoy.filters.network.thrift_prox\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177y\022\000\n\013\n\000\022\007\n\005\n\001#\022\0002\010A\177\177\177\177\177\177\177"
+  }
+}
+
+actions {
+  on_new_connection {
+  }
+}
+
+
+actions {
+  on_data {
+    data: "\0\0\0\144\17\377\0\0\0\0\0\1\0\1\0\2\1\2\0\0"
+  }
+}
+

@@ -23,10 +23,14 @@
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a MissingFieldException.
-#define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
-  ((message).has_##field_name() ? (message).field_name().value()                                   \
-                                : throw MissingFieldException(#field_name, (message)))
 
+#define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
+  ([](const auto& msg) {                                                                           \
+    if (!msg.has_##field_name()) {                                                                 \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
+    }                                                                                              \
+    return msg.field_name().value();                                                               \
+  }((message)))
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
 // default value.
 #define PROTOBUF_GET_MS_OR_DEFAULT(message, field_name, default_value)                             \
@@ -48,14 +52,22 @@
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
-  ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
-                                : throw MissingFieldException(#field_name, (message)))
+  ([](const auto& msg) {                                                                           \
+    if (!msg.has_##field_name()) {                                                                 \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
+    }                                                                                              \
+    return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
+  }((message)))
 
 // Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_SECONDS_REQUIRED(message, field_name)                                         \
-  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
-                                : throw MissingFieldException(#field_name, (message)))
+  ([](const auto& msg) {                                                                           \
+    if (!msg.has_##field_name()) {                                                                 \
+      ::Envoy::ProtoExceptionUtil::throwMissingFieldException(#field_name, msg);                   \
+    }                                                                                              \
+    return DurationUtil::durationToSeconds(msg.field_name());                                      \
+  }((message)))
 
 namespace Envoy {
 namespace ProtobufPercentHelper {
@@ -85,16 +97,19 @@ uint64_t fractionalPercentDenominatorToInt(
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
 
-// Convert an envoy::api::v2::core::Percent to a double or a default.
+// Convert an envoy::type::v3::Percent to a double or a default.
 // @param message supplies the proto message containing the field.
 // @param field_name supplies the field name in the message.
 // @param default_value supplies the default if the field is not present.
 #define PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(message, field_name, default_value)                  \
-  (!std::isnan((message).field_name().value())                                                     \
-       ? (message).has_##field_name() ? (message).field_name().value() : default_value             \
-       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
-
-// Convert an envoy::api::v2::core::Percent to a rounded integer or a default.
+  ([](const auto& msg) -> double {                                                                 \
+    if (std::isnan(msg.field_name().value())) {                                                    \
+      ::Envoy::ExceptionUtil::throwEnvoyException(                                                 \
+          fmt::format("Value not in the range of 0..100 range."));                                 \
+    }                                                                                              \
+    return (msg).has_##field_name() ? (msg).field_name().value() : default_value;                  \
+  }((message)))
+// Convert an envoy::type::v3::Percent to a rounded integer or a default.
 // @param message supplies the proto message containing the field.
 // @param field_name supplies the field name in the message.
 // @param max_value supplies the maximum allowed integral value (e.g., 100, 10000, etc.).
@@ -104,22 +119,29 @@ uint64_t fractionalPercentDenominatorToInt(
 // Issue: https://github.com/envoyproxy/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
-  (!std::isnan((message).field_name().value())                                                     \
-       ? (message).has_##field_name()                                                              \
-             ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)    \
-             : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value)              \
-       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
+  ([](const auto& msg) {                                                                           \
+    if (std::isnan(msg.field_name().value())) {                                                    \
+      ::Envoy::ExceptionUtil::throwEnvoyException(                                                 \
+          fmt::format("Value not in the range of 0..100 range."));                                 \
+    }                                                                                              \
+    return (msg).has_##field_name()                                                                \
+               ? ProtobufPercentHelper::convertPercent((msg).field_name().value(), max_value)      \
+               : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value);           \
+  }((message)))
 
 namespace Envoy {
+
+/**
+ * Exception class for rejecting a deprecated major version.
+ */
+class DeprecatedMajorVersionException : public EnvoyException {
+public:
+  DeprecatedMajorVersionException(const std::string& message) : EnvoyException(message) {}
+};
 
 class MissingFieldException : public EnvoyException {
 public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
-};
-
-class TypeUtil {
-public:
-  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
 };
 
 class RepeatedPtrUtil {
@@ -144,17 +166,17 @@ public:
   // Based on MessageUtil::hash() defined below.
   template <class ProtoType>
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
-    // message doesn't hash to different values.
     std::string text;
     {
-      // For memory safety, the StringOutputStream needs to be destroyed before
-      // we read the string.
-      Protobuf::io::StringOutputStream string_stream(&text);
-      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-      coded_stream.SetSerializationDeterministic(true);
+      Protobuf::TextFormat::Printer printer;
+      printer.SetExpandAny(true);
+      printer.SetUseFieldNumber(true);
+      printer.SetSingleLineMode(true);
+      printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
-        message.SerializeToCodedStream(&coded_stream);
+        std::string text_message;
+        printer.PrintToString(message, &text_message);
+        absl::StrAppend(&text, text_message);
       }
     }
     return HashUtil::xxHash64(text);
@@ -183,6 +205,17 @@ public:
 class ProtoValidationException : public EnvoyException {
 public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
+};
+
+/**
+ * utility functions to call when throwing exceptions in header files
+ */
+class ProtoExceptionUtil {
+public:
+  static void throwMissingFieldException(const std::string& field_name,
+                                         const Protobuf::Message& message);
+  static void throwProtoValidationException(const std::string& validation_error,
+                                            const Protobuf::Message& message);
 };
 
 class MessageUtil {
@@ -256,14 +289,15 @@ public:
 
     std::string err;
     if (!Validate(message, &err)) {
-      throw ProtoValidationException(err, API_RECOVER_ORIGINAL(message));
+      ProtoExceptionUtil::throwProtoValidationException(err, API_RECOVER_ORIGINAL(message));
     }
   }
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromYaml(yaml, message, validation_visitor);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      bool avoid_boosting = false) {
+    loadFromYaml(yaml, message, validation_visitor, !avoid_boosting);
     validate(message, validation_visitor);
   }
 
@@ -302,9 +336,14 @@ public:
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
+  static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
+    unpackTo(message, typed_message);
+  };
+
+  template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
-    unpackTo(message, typed_message);
+    anyConvert(message, typed_message);
     return typed_message;
   };
 
@@ -316,13 +355,45 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
+  static inline void anyConvertAndValidate(const ProtobufWkt::Any& message,
+                                           MessageType& typed_message,
+                                           ProtobufMessage::ValidationVisitor& validation_visitor) {
+    anyConvert<MessageType>(message, typed_message);
+    validate(typed_message, validation_visitor);
+  };
+
+  template <class MessageType>
   static inline MessageType
   anyConvertAndValidate(const ProtobufWkt::Any& message,
                         ProtobufMessage::ValidationVisitor& validation_visitor) {
-    MessageType typed_message = anyConvert<MessageType>(message);
-    validate(typed_message, validation_visitor);
+    MessageType typed_message;
+    anyConvertAndValidate<MessageType>(message, typed_message, validation_visitor);
     return typed_message;
   };
+
+  /**
+   * Invoke when a version upgrade (e.g. v2 -> v3) is detected. This may warn or throw
+   * depending on where we are in the major version deprecation cycle.
+   * @param desc description of upgrade to include in warning or exception.
+   * @param reject should a DeprecatedMajorVersionException be thrown on failure?
+   */
+  static void onVersionUpgradeDeprecation(absl::string_view desc, bool reject = true);
+
+  /**
+   * Obtain a string field from a protobuf message dynamically.
+   *
+   * @param message message to extract from.
+   * @param field_name field name.
+   *
+   * @return std::string with field value.
+   */
+  static inline std::string getStringField(const Protobuf::Message& message,
+                                           const std::string& field_name) {
+    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+    const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
+    const Protobuf::Reflection* reflection = message.GetReflection();
+    return reflection->GetString(message, name_field);
+  }
 
   /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
@@ -434,6 +505,14 @@ public:
    * @return wrapped string.
    */
   static ProtobufWkt::Value stringValue(const std::string& str);
+
+  /**
+   * Wrap optional std::string into ProtobufWkt::Value string value.
+   * If the argument contains a null optional, return ProtobufWkt::NULL_VALUE.
+   * @param str string to be wrapped.
+   * @return wrapped string.
+   */
+  static ProtobufWkt::Value optionalStringValue(const absl::optional<std::string>& str);
 
   /**
    * Wrap boolean into ProtobufWkt::Value boolean value.

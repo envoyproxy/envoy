@@ -1,0 +1,23 @@
+config {
+  stat_prefix: "\361\261\261\261\361\261\261\261\361\261\261\261\361\261\261\261\361\261\261\261\361\261\261\261\321\261"
+  failure_mode_allow: true
+  include_peer_certificate: true
+}
+actions {
+  on_data {
+    result {
+      check_status_ok {
+      }
+    }
+    data: "123"
+  }
+}
+actions {
+  remote_close {
+  }
+}
+actions {
+  local_close {
+  }
+}
+

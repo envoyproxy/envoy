@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -27,7 +27,9 @@ envoy_cc_test(
         "//include/envoy/upstream:host_description_interface",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

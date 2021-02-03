@@ -2,8 +2,8 @@
 
 set -e
 
-# BoringSSL build as described in the Security Policy for BoringCrypto module (2018-10-25):
-# https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3318.pdf
+# BoringSSL build as described in the Security Policy for BoringCrypto module (2020-07-02):
+# https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf
 
 # This works only on Linux-x86_64.
 if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
@@ -16,16 +16,16 @@ ROOT=$$(dirname $(rootpath boringssl/BUILDING.md))/..
 pushd $$ROOT
 
 # Build tools requirements:
-# - Clang compiler version 6.0.1 (https://releases.llvm.org/download.html)
-# - Go programming language version 1.10.3 (https://golang.org/dl/)
-# - Ninja build system version 1.8.2 (https://github.com/ninja-build/ninja/releases)
+# - Clang compiler version 7.0.1 (https://releases.llvm.org/download.html)
+# - Go programming language version 1.12.7 (https://golang.org/dl/)
+# - Ninja build system version 1.9.0 (https://github.com/ninja-build/ninja/releases)
 
 # Override $$PATH for build tools, to avoid picking up anything else.
 export PATH="$$(dirname `which cmake`):/usr/bin:/bin"
 
-# Clang 6.0.1
-VERSION=6.0.1
-SHA256=7ea204ecd78c39154d72dfc0d4a79f7cce1b2264da2551bb2eef10e266d54d91
+# Clang 7.0.1
+VERSION=7.0.1
+SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
 PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
 
 curl -sLO https://releases.llvm.org/"$$VERSION"/clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz \
@@ -41,26 +41,27 @@ if [[ `clang --version | head -1 | awk '{print $$3}'` != "$$VERSION" ]]; then
   exit 1
 fi
 
-# Go 1.10.3
-VERSION=1.10.3
-SHA256=fa1b0e45d3b647c252f51f5e1204aba049cde4af177ef9f2181f43004f901035
+# Go 1.12.7
+VERSION=1.12.7
+SHA256=66d83bfb5a9ede000e33c6579a91a29e6b101829ad41fffb5c5bb6c900e109d9
 PLATFORM="linux-amd64"
 
 curl -sLO https://dl.google.com/go/go"$$VERSION"."$$PLATFORM".tar.gz \
   && echo "$$SHA256" go"$$VERSION"."$$PLATFORM".tar.gz | sha256sum --check
 tar xf go"$$VERSION"."$$PLATFORM".tar.gz
 
+export GOPATH="$$PWD/gopath"
 export GOROOT="$$PWD/go"
-export PATH="$$GOROOT/bin:$$PATH"
+export PATH="$$GOPATH/bin:$$GOROOT/bin:$$PATH"
 
 if [[ `go version | awk '{print $$3}'` != "go$$VERSION" ]]; then
   echo "ERROR: Go version doesn't match."
   exit 1
 fi
 
-# Ninja 1.8.2
-VERSION=1.8.2
-SHA256=d2fea9ff33b3ef353161ed906f260d565ca55b8ca0568fa07b1d2cab90a84a07
+# Ninja 1.9.0
+VERSION=1.9.0
+SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
 PLATFORM="linux"
 
 curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \

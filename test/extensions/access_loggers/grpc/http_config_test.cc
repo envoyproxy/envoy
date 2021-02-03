@@ -7,7 +7,7 @@
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -40,6 +40,7 @@ public:
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
     common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
+    common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     TestUtility::jsonConvert(http_grpc_access_log_, *message_);
   }
 

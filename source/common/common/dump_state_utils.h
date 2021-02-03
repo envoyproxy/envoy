@@ -14,17 +14,34 @@ namespace Envoy {
 #define DUMP_OPTIONAL_MEMBER(member)                                                               \
   ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
 
+#define DUMP_NULLABLE_MEMBER(member, value)                                                        \
+  ", " #member ": " << ((member) != nullptr ? value : "null")
+
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
 #define DUMP_DETAILS(member)                                                                       \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
-    if ((member) != nullptr) {                                                                     \
+    if (member) {                                                                                  \
       os << "\n";                                                                                  \
       (member)->dumpState(os, indent_level + 1);                                                   \
     } else {                                                                                       \
       os << spaces << "null\n";                                                                    \
+    }                                                                                              \
+  } while (false)
+
+// Macro assumes local member variables
+// os (ostream)
+// indent_level (int)
+#define DUMP_OPT_REF_DETAILS(member)                                                               \
+  do {                                                                                             \
+    os << spaces << #member ": ";                                                                  \
+    if ((member).has_value()) {                                                                    \
+      os << "\n";                                                                                  \
+      (member)->get().dumpState(os, indent_level + 1);                                             \
+    } else {                                                                                       \
+      os << spaces << "empty\n";                                                                   \
     }                                                                                              \
   } while (false)
 

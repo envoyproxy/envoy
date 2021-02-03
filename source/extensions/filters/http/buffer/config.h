@@ -30,6 +30,8 @@ private:
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
+DECLARE_FACTORY(BufferFilterFactory);
+
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

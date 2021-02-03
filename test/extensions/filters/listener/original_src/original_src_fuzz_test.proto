@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.extensions.filters.listener.original_src;
+
+import "envoy/extensions/filters/listener/original_src/v3/original_src.proto";
+import "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.proto";
+import "validate/validate.proto";
+
+message OriginalSrcTestCase {
+  envoy.extensions.filters.listener.original_src.v3.OriginalSrc config = 1
+      [(validate.rules).message.required = true];
+  test.extensions.filters.listener.FilterFuzzTestCase fuzzed = 2
+      [(validate.rules).message.required = true];
+}

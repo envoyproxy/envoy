@@ -21,12 +21,15 @@ public:
 
   void initializeFilter(const std::string& config) {
     config_helper_.addFilter(config);
+    config_helper_.addRuntimeOverride("envoy.deprecated_features.allow_deprecated_gzip_http_filter",
+                                      "true");
+    config_helper_.enableDeprecatedV2Api();
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
 
-  void doRequestAndCompression(Http::TestHeaderMapImpl&& request_headers,
-                               Http::TestHeaderMapImpl&& response_headers) {
+  void doRequestAndCompression(Http::TestRequestHeaderMapImpl&& request_headers,
+                               Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(response_headers.get_("content-length"), &content_length));
     const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
@@ -36,9 +39,12 @@ public:
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    ASSERT_TRUE(response->headers().ContentEncoding() != nullptr);
-    EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip,
-              response->headers().getContentEncodingValue());
+    ASSERT_FALSE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+    EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+              response->headers()
+                  .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                  ->value()
+                  .getStringView());
     ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
               response->headers().getTransferEncodingValue());
@@ -50,8 +56,8 @@ public:
     EXPECT_TRUE(TestUtility::buffersEqual(expected_response, decompressed_response));
   }
 
-  void doRequestAndNoCompression(Http::TestHeaderMapImpl&& request_headers,
-                                 Http::TestHeaderMapImpl&& response_headers) {
+  void doRequestAndNoCompression(Http::TestRequestHeaderMapImpl&& request_headers,
+                                 Http::TestResponseHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(response_headers.get_("content-length"), &content_length));
     auto response =
@@ -60,7 +66,7 @@ public:
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
+    ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
     ASSERT_EQ(content_length, response->body().size());
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
   }
@@ -83,7 +89,7 @@ public:
   const std::string full_config{R"EOF(
       name: gzip
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.gzip.v2.Gzip
+        "@type": type.googleapis.com/envoy.extensions.filters.http.gzip.v3.Gzip
         memory_level: 3
         window_bits: 10
         compression_level: best
@@ -100,7 +106,9 @@ public:
 
   const uint64_t window_bits{15 | 16};
 
-  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{};
+  Stats::IsolatedStoreImpl stats_store_;
+  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{stats_store_,
+                                                                                  "test"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
@@ -204,7 +212,10 @@ TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(UpstreamResponseAlreadyEncod
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_EQ("br", response->headers().getContentEncodingValue());
+  ASSERT_EQ("br", response->headers()
+                      .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                      ->value()
+                      .getStringView());
   EXPECT_EQ(128U, response->body().size());
 }
 
@@ -228,7 +239,7 @@ TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(NotEnoughContentLength)) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
   EXPECT_EQ(10U, response->body().size());
 }
 
@@ -251,7 +262,7 @@ TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(EmptyResponse)) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("204", response->headers().getStatusValue());
-  ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
   EXPECT_EQ(0U, response->body().size());
 }
 
@@ -306,14 +317,17 @@ TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigChunkedR
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_EQ("gzip", response->headers().getContentEncodingValue());
+  ASSERT_EQ("gzip", response->headers()
+                        .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                        ->value()
+                        .getStringView());
   ASSERT_EQ("chunked", response->headers().getTransferEncodingValue());
 }
 
 /**
  * Verify Vary header values are preserved.
  */
-TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigVeryHeader)) {
+TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigVaryHeader)) {
   initializeFilter(default_config);
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
@@ -330,7 +344,11 @@ TEST_P(GzipIntegrationTest, DEPRECATED_FEATURE_TEST(AcceptanceFullConfigVeryHead
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_EQ("gzip", response->headers().getContentEncodingValue());
-  ASSERT_EQ("Cookie, Accept-Encoding", response->headers().getVaryValue());
+  ASSERT_EQ("gzip", response->headers()
+                        .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                        ->value()
+                        .getStringView());
+  ASSERT_EQ("Cookie, Accept-Encoding",
+            response->headers().get(Http::CustomHeaders::get().Vary)[0]->value().getStringView());
 }
 } // namespace Envoy

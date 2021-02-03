@@ -5,6 +5,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/post_io_action.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -12,18 +14,9 @@
 namespace Envoy {
 namespace Network {
 
+class TransportSocketFactory;
 class Connection;
 enum class ConnectionEvent;
-
-/**
- * Action that should occur on a connection after I/O.
- */
-enum class PostIoAction {
-  // Close the connection.
-  Close,
-  // Keep the connection open.
-  KeepOpen
-};
 
 /**
  * Result of each I/O event.
@@ -72,10 +65,10 @@ public:
   virtual bool shouldDrainReadBuffer() PURE;
 
   /**
-   * Mark read buffer ready to read in the event loop. This is used when yielding following
-   * shouldDrainReadBuffer().
+   * Mark the transport socket as readable in order to force a read in a future iteration of the
+   * event loop. This is used when yielding following shouldDrainReadBuffer().
    */
-  virtual void setReadBufferReady() PURE;
+  virtual void setTransportSocketIsReadable() PURE;
 
   /**
    * Raise a connection event to the connection. This can be used by a secure socket (e.g. TLS)
@@ -153,6 +146,13 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
+
+  /**
+   * Instructs a transport socket to start using secure transport.
+   * Note: Not all transport sockets support such operation.
+   * @return boolean indicating if the transport socket was able to start secure transport.
+   */
+  virtual bool startSecureTransport() PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -180,16 +180,39 @@ public:
   virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
 
   /**
+   * The application protocols to use when negotiating an upstream connection. When an application
+   * protocol override is provided, it will *always* be used.
    * @return the optional overridden application protocols.
    */
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
 
   /**
-   * @param vector of bytes to which the option should append hash key data that will be used
-   *        to separate connections based on the option. Any data already in the key vector must
-   *        not be modified.
+   * The application protocol(s) to use when negotiating an upstream connection and no other
+   * application protocol has been configured. Both
+   * TransportSocketOptions::applicationProtocolListOverride and application protocols configured
+   * in the CommonTlsContext on the Cluster will take precedence.
+   *
+   * Note that this option is intended for intermediate code (e.g. the HTTP connection pools) to
+   * specify a default ALPN when no specific values are specified elsewhere. As such, providing a
+   * value here might not make sense prior to load balancing.
+   * @return the optional fallback(s) for application protocols, for when they are not specified in
+   *         the TLS configuration.
    */
-  virtual void hashKey(std::vector<uint8_t>& key) const PURE;
+  virtual const std::vector<std::string>& applicationProtocolFallback() const PURE;
+
+  /**
+   * @return optional PROXY protocol address information.
+   */
+  virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
+
+  /**
+   * @param key supplies a vector of bytes to which the option should append hash key data that will
+   *        be used to separate connections based on the option. Any data already in the key vector
+   *        must not be modified.
+   * @param factory supplies the factor which will be used for creating the transport socket.
+   */
+  virtual void hashKey(std::vector<uint8_t>& key,
+                       const Network::TransportSocketFactory& factory) const PURE;
 };
 
 // TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
@@ -213,6 +236,17 @@ public:
    */
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
+
+  /**
+   * @return bool whether the transport socket will use proxy protocol options.
+   */
+  virtual bool usesProxyProtocolOptions() const PURE;
+
+  /**
+   * Returns true if the transport socket created by this factory supports some form of ALPN
+   * negotiation.
+   */
+  virtual bool supportsAlpn() const { return false; }
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

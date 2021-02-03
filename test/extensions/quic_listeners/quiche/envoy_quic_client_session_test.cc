@@ -1,14 +1,16 @@
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
@@ -16,6 +18,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "test/mocks/event/mocks.h"
@@ -46,9 +49,9 @@ public:
                                 Network::ConnectionSocketPtr&& connection_socket)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket)) {
-    SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+    SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
   MOCK_METHOD(void, SendConnectionClosePacket, (quic::QuicErrorCode, const std::string&));
@@ -62,9 +65,9 @@ public:
   TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
                              std::unique_ptr<quic::ProofVerifyContext> verify_context,
                              quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler)
+                             ProofHandler* proof_handler, bool has_application_state)
       : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler) {}
+                                     proof_handler, has_application_state) {}
 
   bool encryption_established() const override { return true; }
 };
@@ -84,7 +87,7 @@ public:
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
     return std::make_unique<TestQuicCryptoClientStream>(
         server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
-        crypto_config(), this);
+        crypto_config(), this, true);
   }
 };
 
@@ -94,7 +97,8 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -122,6 +126,8 @@ public:
 
   void SetUp() override {
     envoy_quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
+    envoy_quic_session_.OnConfigNegotiated();
     envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
     envoy_quic_session_.setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
@@ -146,7 +152,8 @@ public:
     std::string host("www.abc.com");
     Http::TestRequestHeaderMapImpl request_headers{
         {":authority", host}, {":method", "GET"}, {":path", "/"}};
-    stream.encodeHeaders(request_headers, true);
+    const auto result = stream.encodeHeaders(request_headers, true);
+    ASSERT(result.ok());
     return stream;
   }
 
@@ -204,6 +211,19 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
   stream.OnStreamReset(rst1);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+
+  EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+    envoy_quic_session_.OnHttp3GoAway(4u);
+  } else {
+    quic::QuicGoAwayFrame goaway;
+    quic_connection_->OnGoAwayFrame(goaway);
+  }
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {

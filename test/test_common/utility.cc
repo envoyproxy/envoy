@@ -25,12 +25,15 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
+#include "common/config/resource_name.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
+#include "common/http/header_utility.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
@@ -63,30 +66,29 @@ uint64_t TestRandomGenerator::random() { return generator_(); }
 
 bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
                                             const Http::HeaderMap& rhs) {
-  if (lhs.size() != rhs.size()) {
-    return false;
-  }
-
-  struct State {
-    const Http::HeaderMap& lhs;
-    bool equal;
-  };
-
-  State state{lhs, true};
-  rhs.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        State* state = static_cast<State*>(context);
-        const Http::HeaderEntry* entry =
-            state->lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
-        if (entry == nullptr || (entry->value() != header.value().getStringView())) {
-          state->equal = false;
-          return Http::HeaderMap::Iterate::Break;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &state);
-
-  return state.equal;
+  absl::flat_hash_set<std::string> lhs_keys;
+  absl::flat_hash_set<std::string> rhs_keys;
+  lhs.iterate([&lhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const std::string key{header.key().getStringView()};
+    lhs_keys.insert(key);
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  rhs.iterate([&lhs, &rhs, &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const std::string key{header.key().getStringView()};
+    // Compare with canonicalized multi-value headers. This ensures we respect order within
+    // a header.
+    const auto lhs_entry =
+        Http::HeaderUtility::getAllOfHeaderAsString(lhs, Http::LowerCaseString(key));
+    const auto rhs_entry =
+        Http::HeaderUtility::getAllOfHeaderAsString(rhs, Http::LowerCaseString(key));
+    ASSERT(rhs_entry.result());
+    if (lhs_entry.result() != rhs_entry.result()) {
+      return Http::HeaderMap::Iterate::Break;
+    }
+    rhs_keys.insert(key);
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return lhs_keys.size() == rhs_keys.size();
 }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
@@ -121,6 +123,25 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   return true;
 }
 
+bool TestUtility::rawSlicesEqual(const Buffer::RawSlice* lhs, const Buffer::RawSlice* rhs,
+                                 size_t num_slices) {
+  for (size_t slice = 0; slice < num_slices; slice++) {
+    auto rhs_slice = rhs[slice];
+    auto lhs_slice = lhs[slice];
+    if (rhs_slice.len_ != lhs_slice.len_) {
+      return false;
+    }
+    auto rhs_slice_data = static_cast<const uint8_t*>(rhs_slice.mem_);
+    auto lhs_slice_data = static_cast<const uint8_t*>(lhs_slice.mem_);
+    for (size_t offset = 0; offset < rhs_slice.len_; offset++) {
+      if (rhs_slice_data[offset] != lhs_slice_data[offset]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                                  uint64_t seed) {
   const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
@@ -146,39 +167,66 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
-void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
-                                   Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
+                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout,
+                                              Event::Dispatcher* dispatcher) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
+    if (dispatcher != nullptr) {
+      dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+    }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
-                                   Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
+                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
-                                 Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name,
+                                            uint64_t value, Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
-                                 Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name,
+                                            uint64_t value, Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
 std::list<Network::DnsResponse>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
   std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
-
     ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
@@ -199,30 +247,6 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
     }
   }
   return file_names;
-}
-
-std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
-  if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
-        .cluster_name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().Runtime) {
-    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
-  }
-  throw EnvoyException(
-      absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
@@ -306,29 +330,27 @@ bool TestUtility::gaugesZeroed(
 }
 
 void ConditionalInitializer::setReady() {
-  Thread::LockGuard lock(mutex_);
+  absl::MutexLock lock(&mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
-  cv_.notifyAll();
 }
 
 void ConditionalInitializer::waitReady() {
-  Thread::LockGuard lock(mutex_);
+  absl::MutexLock lock(&mutex_);
   if (ready_) {
     ready_ = false;
     return;
   }
 
-  cv_.wait(mutex_);
+  mutex_.Await(absl::Condition(&ready_));
   EXPECT_TRUE(ready_);
   ready_ = false;
 }
 
 void ConditionalInitializer::wait() {
-  Thread::LockGuard lock(mutex_);
-  while (!ready_) {
-    cv_.wait(mutex_);
-  }
+  absl::MutexLock lock(&mutex_);
+  mutex_.Await(absl::Condition(&ready_));
+  EXPECT_TRUE(ready_);
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
@@ -339,18 +361,17 @@ class TestImplProvider {
 protected:
   Event::GlobalTimeSystem global_time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> mock_random_generator_;
 };
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
-           Filesystem::Instance& file_system)
-      : Impl(thread_factory, stats_store, global_time_system_, file_system) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system,
-           Filesystem::Instance& file_system)
-      : Impl(thread_factory, default_stats_store_, time_system, file_system) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
-      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+           Stats::Store* stats_store = nullptr, Event::TimeSystem* time_system = nullptr,
+           Random::RandomGenerator* random = nullptr)
+      : Impl(thread_factory, stats_store ? *stats_store : default_stats_store_,
+             time_system ? *time_system : global_time_system_, file_system,
+             random ? *random : mock_random_generator_) {}
 };
 
 ApiPtr createApiForTest() {
@@ -358,19 +379,33 @@ ApiPtr createApiForTest() {
                                     Filesystem::fileSystemForTest());
 }
 
+ApiPtr createApiForTest(Filesystem::Instance& filesystem) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), filesystem);
+}
+
+ApiPtr createApiForTest(Random::RandomGenerator& random) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    nullptr, nullptr, &random);
+}
+
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store,
-                                    Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    &stat_store);
+}
+
+ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    &stat_store, nullptr, &random);
 }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system,
-                                    Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    nullptr, &time_system);
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system,
-                                Filesystem::fileSystemForTest());
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+                                    &stat_store, &time_system);
 }
 
 } // namespace Api

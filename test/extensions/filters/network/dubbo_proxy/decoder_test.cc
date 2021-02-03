@@ -38,8 +38,8 @@ public:
             Invoke([=](Buffer::Instance&,
                        MessageMetadataSharedPtr metadata) -> std::pair<ContextSharedPtr, bool> {
               auto context = std::make_shared<ContextImpl>();
-              context->set_header_size(16);
-              context->set_body_size(body_size);
+              context->setHeaderSize(16);
+              context->setBodySize(body_size);
               metadata->setMessageType(type);
 
               return std::pair<ContextSharedPtr, bool>(context, true);
@@ -66,7 +66,7 @@ public:
 };
 
 TEST_F(DubboDecoderStateMachineTest, EmptyData) {
-  EXPECT_CALL(protocol_, decodeHeader(_, _)).Times(1);
+  EXPECT_CALL(protocol_, decodeHeader(_, _));
   EXPECT_CALL(delegate_, newStream(_, _)).Times(0);
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
 
@@ -93,13 +93,13 @@ TEST_F(DubboDecoderStateMachineTest, RequestMessageCallbacks) {
 
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
 
-  EXPECT_EQ(active_stream_->metadata_->message_type(), MessageType::Request);
+  EXPECT_EQ(active_stream_->metadata_->messageType(), MessageType::Request);
 }
 
 TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
@@ -108,20 +108,20 @@ TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
 
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
 
-  EXPECT_EQ(active_stream_->metadata_->message_type(), MessageType::Response);
+  EXPECT_EQ(active_stream_->metadata_->messageType(), MessageType::Response);
 }
 
 TEST_F(DubboDecoderStateMachineTest, SerializeRpcInvocationException) {
   initHandler();
   initProtocolDecoder(MessageType::Request, 0);
 
-  EXPECT_CALL(delegate_, newStream(_, _)).Times(1);
+  EXPECT_CALL(delegate_, newStream(_, _));
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
@@ -141,7 +141,7 @@ TEST_F(DubboDecoderStateMachineTest, SerializeRpcResultException) {
   initHandler();
   initProtocolDecoder(MessageType::Response, 0);
 
-  EXPECT_CALL(delegate_, newStream(_, _)).Times(1);
+  EXPECT_CALL(delegate_, newStream(_, _));
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
@@ -194,8 +194,8 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->set_header_size(16);
-        context->set_body_size(10);
+        context->setHeaderSize(16);
+        context->setBodySize(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _))
@@ -228,14 +228,14 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->set_header_size(16);
-        context->set_body_size(10);
+        context->setHeaderSize(16);
+        context->setBodySize(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   ResponseDecoder decoder(protocol_, response_callbacks_);
 
@@ -251,14 +251,14 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->set_header_size(16);
-        context->set_body_size(10);
+        context->setHeaderSize(16);
+        context->setBodySize(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   buffer_underflow = false;
   EXPECT_EQ(decoder.onData(buffer, buffer_underflow), FilterStatus::Continue);

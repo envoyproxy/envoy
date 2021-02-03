@@ -5,7 +5,7 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/common/tap/tap_matcher.h"
+#include "extensions/common/matcher/matcher.h"
 
 #include "absl/strings/string_view.h"
 
@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using Matcher = Envoy::Extensions::Common::Matcher::Matcher;
 
 using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v3::TraceWrapper>;
 inline TraceWrapperPtr makeTraceWrapper() {
@@ -98,7 +100,7 @@ public:
    *        specifies that output type. May not be used if the configuration does not specify
    *        admin output. May be nullptr if admin is not used to supply the config.
    */
-  virtual void newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,
+  virtual void newTapConfig(const envoy::config::tap::v3::TapConfig& proto_config,
                             Sink* admin_streamer) PURE;
 };
 
@@ -139,6 +141,13 @@ public:
   virtual const Matcher& rootMatcher() const PURE;
 
   /**
+   * Non-const version of rootMatcher method.
+   */
+  Matcher& rootMatcher() {
+    return const_cast<Matcher&>(static_cast<const TapConfig&>(*this).rootMatcher());
+  }
+
+  /**
    * Return whether the tap session should run in streaming or buffering mode.
    */
   virtual bool streaming() const PURE;
@@ -158,8 +167,9 @@ public:
    * @return a new configuration given a raw tap service config proto. See
    * ExtensionConfig::newTapConfig() for param info.
    */
-  virtual TapConfigSharedPtr createConfigFromProto(envoy::config::tap::v3::TapConfig&& proto_config,
-                                                   Sink* admin_streamer) PURE;
+  virtual TapConfigSharedPtr
+  createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
+                        Sink* admin_streamer) PURE;
 };
 
 using TapConfigFactoryPtr = std::unique_ptr<TapConfigFactory>;

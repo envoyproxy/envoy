@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/init/manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -58,12 +60,13 @@ private:
 
 using LocalAsyncDataProviderPtr = std::unique_ptr<LocalAsyncDataProvider>;
 
-class RemoteAsyncDataProvider : public Config::DataFetcher::RemoteDataFetcherCallback,
+class RemoteAsyncDataProvider : public Event::DeferredDeletable,
+                                public Config::DataFetcher::RemoteDataFetcherCallback,
                                 public Logger::Loggable<Logger::Id::config> {
 public:
   RemoteAsyncDataProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                           const envoy::config::core::v3::RemoteDataSource& source,
-                          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                          Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                           bool allow_empty, AsyncDataSourceCb&& callback);
 
   ~RemoteAsyncDataProvider() override {

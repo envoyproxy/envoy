@@ -1,15 +1,15 @@
-licenses(["notice"])  # Apache 2
-
-# tap wrapper around a transport socket.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+# tap wrapper around a transport socket.
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "tap_config_interface",
@@ -42,6 +42,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:extension_config_base",
+        "//source/extensions/transport_sockets/common:passthrough_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],
 )
@@ -50,6 +51,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(#9953) clean up.
+    extra_visibility = [
+        "//test/common/access_log:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "alpha",
     deps = [

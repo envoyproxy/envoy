@@ -2,6 +2,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -14,9 +16,48 @@
 
 namespace Envoy {
 
+static void
+insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  ::envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
+  auto rule = proxy_protocol.add_rules();
+  rule->set_tlv_type(0x02);
+  rule->mutable_on_tlv_present()->set_key("PP2TypeAuthority");
+
+  auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+  auto* ppv_filter = listener->add_listener_filters();
+  ppv_filter->set_name("envoy.listener.proxy_protocol");
+  ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
+}
+
+ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
+    : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+  config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
+  useListenerAccessLog(
+      "%DYNAMIC_METADATA(envoy.filters.listener.proxy_protocol:PP2TypeAuthority)%");
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
+    constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                  0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
+                                  0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 0x00, 0x00, 0x01, 0xff, 0x02,
+                                  0x00, 0x07, 0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+    Buffer::OwnedImpl buf(buffer, sizeof(buffer));
+    conn->write(buf, false);
+    return conn;
+  };
+
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  cleanupUpstreamAndDownstream();
+  const std::string log_line = waitForAccessLog(listener_access_log_name_);
+  EXPECT_EQ(log_line, "\"foo.com\"");
+}
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -112,11 +153,11 @@ TEST_P(ProxyProtoIntegrationTest, AccessLog) {
 
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   const std::string log_line = waitForAccessLog(access_log_name_);
-  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ");
+  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ", false, true);
 
   ASSERT_EQ(2, tokens.size());
   EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(GetParam()));
-  EXPECT_EQ(tokens[1], "1.2.3.4:12345\n");
+  EXPECT_EQ(tokens[1], "1.2.3.4:12345");
 }
 
 TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
@@ -178,6 +219,61 @@ TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
   };
 
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+}
+
+ProxyProtoTcpIntegrationTest::ProxyProtoTcpIntegrationTest()
+    : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
+  config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
+  config_helper_.renameListener("tcp_proxy");
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoTcpIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// This tests that the StreamInfo contains the correct addresses.
+TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6"));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "remote=%DOWNSTREAM_REMOTE_ADDRESS% local=%DOWNSTREAM_LOCAL_ADDRESS%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello", false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  std::string log_result;
+  // Access logs only get flushed to disk periodically, so poll until the log is non-empty
+  do {
+    log_result = api_->fileSystem().fileReadToEnd(access_log_path);
+  } while (log_result.empty());
+
+  EXPECT_EQ(log_result, "remote=1.2.3.4:12345 local=254.254.254.254:1234");
 }
 
 } // namespace Envoy

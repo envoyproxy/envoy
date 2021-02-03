@@ -34,22 +34,24 @@ public:
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override;
+  SliceDataPtr extractMutableFrontSlice() override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
-  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   void postProcess() override { checkLowWatermark(); }
+  void appendSliceForTest(const void* data, uint64_t size) override;
+  void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
+  void setWatermarks(uint32_t watermark) override { setWatermarks(watermark / 2, watermark); }
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
-  uint32_t highWatermark() const { return high_watermark_; }
+  uint32_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.
-  bool highWatermarkTriggered() const { return above_high_watermark_called_; }
+  bool highWatermarkTriggered() const override { return above_high_watermark_called_; }
 
-private:
-  void checkHighAndOverflowWatermarks();
+protected:
+  virtual void checkHighAndOverflowWatermarks();
   void checkLowWatermark();
 
+private:
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;

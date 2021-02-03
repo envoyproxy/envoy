@@ -8,6 +8,8 @@
 
 #include <atomic>
 
+#include "common/common/utility.h"
+
 namespace quic {
 
 namespace {
@@ -25,8 +27,8 @@ QuicLogEmitter::QuicLogEmitter(QuicLogLevel level) : level_(level), saved_errno_
 
 QuicLogEmitter::~QuicLogEmitter() {
   if (is_perror_) {
-    // TODO(wub): Change to a thread-safe version of strerror.
-    stream_ << ": " << strerror(saved_errno_) << " [" << saved_errno_ << "]";
+    // TODO(wub): Change to a thread-safe version of errorDetails.
+    stream_ << ": " << Envoy::errorDetails(saved_errno_) << " [" << saved_errno_ << "]";
   }
   std::string content = stream_.str();
   if (!content.empty() && content.back() == '\n') {

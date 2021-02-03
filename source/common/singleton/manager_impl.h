@@ -1,11 +1,11 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "envoy/singleton/manager.h"
 #include "envoy/thread/thread.h"
 
 #include "common/common/non_copyable.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Singleton {
@@ -24,7 +24,7 @@ public:
   InstanceSharedPtr get(const std::string& name, SingletonFactoryCb cb) override;
 
 private:
-  std::unordered_map<std::string, std::weak_ptr<Instance>> singletons_;
+  absl::node_hash_map<std::string, std::weak_ptr<Instance>> singletons_;
   Thread::ThreadFactory& thread_factory_;
   const Thread::ThreadId run_tid_;
 };

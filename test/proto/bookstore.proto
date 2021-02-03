@@ -96,6 +96,11 @@ service Bookstore {
       get: "/indexStream"
     };
   }
+  rpc GetRoot(google.protobuf.Empty) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/"
+    };
+  }
   rpc PostBody(EchoBodyRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/postBody"
@@ -114,10 +119,70 @@ service Bookstore {
       body: "nested.content"
     };
   }
+
+  rpc EchoRawBody(google.api.HttpBody) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/echoRawBody"
+      additional_bindings: {post: "/echoRawBody"}
+    };
+  }
+
+  rpc EchoNestedBody(EchoNestedRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/echoNestedBody"
+      body: "nested1.body"
+    };
+  }
+  rpc EchoResponseBodyPath(google.protobuf.Empty) returns (EchoBodyRequest) {
+    option (google.api.http) = {
+      get: "/echoResponseBodyPath"
+      response_body: "nested.content"
+    };
+  }
   rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
     option (google.api.http) = {
       post: "/echoStruct"
       body: "content"
+    };
+  }
+  // To test grpc transcoding with an unknown field.
+  // This could happen when the grpc server is using a updated proto with a new field,
+  // but Envoy transcoding config is still using the old version.
+  rpc GetBigBook(google.protobuf.Empty) returns (OldBigBook) {
+    option (google.api.http) = {
+      get: "/bigbook"
+    };
+  }
+  rpc PostWildcard(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/wildcard/{arg=**}"
+    };
+  }
+}
+
+service ServiceWithResponseBody {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      response_body: "content"
+    };
+  }
+}
+
+service ServiceWithInvalidRequestBodyPath {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      body: "unknown.field"
+    };
+  }
+}
+
+service ServiceWithInvalidResponseBodyPath {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      response_body: "unknown.field"
     };
   }
 }
@@ -233,6 +298,14 @@ message EchoBodyRequest {
   Nested nested = 3;
 }
 
+message EchoNestedRequest {
+  message Nested {
+    google.api.HttpBody body = 1;
+  }
+  Nested nested1 = 1;
+  Nested nested2 = 2;
+}
+
 // Request and Response message for EchoStructReqResp method.
 message EchoStructReqResp {
   // The content of request.
@@ -248,7 +321,29 @@ message DeepNestedBody {
       }
       Nested nested = 100000000;
     }
+    message Extra {
+      int32 field = 1;
+    }
     Nested nested = 1000000;
+    Extra extra = 50;
+  }
+  message Extra {
+    string field = 1;
   }
   Nested nested = 1;
+  Extra extra = 2;
+}
+
+// gRPC server is using BigBook, but envoy transcoder filter is using
+// OldBigBook with missing `field1`.
+message BigBook {
+  string field1 = 1;
+  string field2 = 2;
+  string field3 = 3;
+}
+
+// The BigBook message with missing `field1`.
+message OldBigBook {
+  string field2 = 2;
+  string field3 = 3;
 }

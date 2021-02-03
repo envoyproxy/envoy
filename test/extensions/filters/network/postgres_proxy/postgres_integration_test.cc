@@ -19,7 +19,7 @@ class PostgresIntegrationTest : public testing::TestWithParam<Network::Address::
     return fmt::format(
         TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
             "test/extensions/filters/network/postgres_proxy/postgres_test_config.yaml")),
-        Network::Test::getLoopbackAddressString(GetParam()),
+        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getAnyAddressString(GetParam()));
   }
@@ -28,11 +28,6 @@ public:
   PostgresIntegrationTest() : BaseIntegrationTest(GetParam(), postgresConfig()){};
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
-
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, PostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
@@ -57,7 +52,7 @@ TEST_P(PostgresIntegrationTest, Login) {
   data.writeBEInt<uint32_t>(12);
   // Add 8 bytes of some data.
   data.add(buf, 8);
-  tcp_client->write(data.toString());
+  ASSERT_TRUE(tcp_client->write(data.toString()));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.toString().length(), &rcvd));
   data.drain(data.length());
 

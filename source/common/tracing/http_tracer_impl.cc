@@ -169,10 +169,11 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
-    span.setTag(Tracing::Tags::get().HttpProtocol,
-                Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol()));
+    span.setTag(
+        Tracing::Tags::get().HttpProtocol,
+        Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-    const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
+    const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();
@@ -211,8 +212,9 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
                                              const Http::ResponseTrailerMap* response_trailers,
                                              const StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
-  span.setTag(Tracing::Tags::get().HttpProtocol,
-              Formatter::SubstitutionFormatUtils::protocolToString(stream_info.protocol()));
+  span.setTag(
+      Tracing::Tags::get().HttpProtocol,
+      Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
   if (stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamAddress,
@@ -320,8 +322,9 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   if (!ctx.request_headers) {
     return default_value_;
   }
-  const Http::HeaderEntry* entry = ctx.request_headers->get(name_);
-  return entry ? entry->value().getStringView() : default_value_;
+  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
+  const auto entry = ctx.request_headers->get(name_);
+  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,

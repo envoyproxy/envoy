@@ -5,7 +5,7 @@
 #include "extensions/filters/http/original_src/original_src.h"
 #include "extensions/filters/http/original_src/original_src_config_factory.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

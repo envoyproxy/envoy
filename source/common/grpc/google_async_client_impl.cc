@@ -10,6 +10,7 @@
 #include "common/grpc/common.h"
 #include "common/grpc/google_grpc_creds_impl.h"
 #include "common/grpc/google_grpc_utils.h"
+#include "common/router/header_parser.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/support/proto_buffer_reader.h"
@@ -21,7 +22,8 @@ static constexpr int DefaultBufferLimitBytes = 1024 * 1024;
 }
 
 GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
-    : completion_thread_(api.threadFactory().createThread([this] { completionThread(); })) {}
+    : completion_thread_(api.threadFactory().createThread([this] { completionThread(); },
+                                                          Thread::Options{"GrpcGoogClient"})) {}
 
 GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   // Force streams to shutdown and invoke TryCancel() to start the drain of
@@ -78,15 +80,24 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              const envoy::config::core::v3::GrpcService& config,
                                              Api::Api& api, const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
-      initial_metadata_(config.initial_metadata()), scope_(scope),
+      scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)) {
+          config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
+      metadata_parser_(
+          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
   std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
+  // Get state with try_to_connect = true to try connection at channel creation.
+  // This is for initializing gRPC channel at channel creation. This GetState(true) is used to poke
+  // the gRPC lb at channel creation, it doesn't have any effect no matter it succeeds or fails. But
+  // it helps on initialization. Otherwise, the channel establishment still happens at the first
+  // request, no matter when we create the channel.
+  channel->GetState(true);
   stub_ = stub_factory.createStub(channel);
+  scope_->counterFromStatName(stat_names.google_grpc_client_creation_).inc();
   // Initialize client stats.
   // TODO(jmarantz): Capture these names in async_client_manager_impl.cc and
   // pass in a struct of StatName objects so we don't have to take locks here.
@@ -111,14 +122,14 @@ AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name
                                              const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new GoogleAsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
-  std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
+  GoogleAsyncStreamImplPtr grpc_stream{async_request};
 
   grpc_stream->initialize(true);
   if (grpc_stream->callFailed()) {
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return async_request;
 }
 
@@ -134,7 +145,7 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return active_streams_.front().get();
 }
 
@@ -165,21 +176,14 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
           : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
-  for (const auto& header_value : parent_.initial_metadata_) {
-    ctxt_.AddMetadata(header_value.key(), header_value.value());
-  }
-  // Due to the different HTTP header implementations, we effectively double
-  // copy headers here.
-  Http::RequestHeaderMapImpl initial_metadata;
-  callbacks_.onCreateInitialMetadata(initial_metadata);
-  initial_metadata.iterate(
-      [](const Http::HeaderEntry& header, void* ctxt) {
-        auto* client_context = static_cast<grpc::ClientContext*>(ctxt);
-        client_context->AddMetadata(std::string(header.key().getStringView()),
-                                    std::string(header.value().getStringView()));
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &ctxt_);
+  auto initial_metadata = Http::RequestHeaderMapImpl::create();
+  parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
+  callbacks_.onCreateInitialMetadata(*initial_metadata);
+  initial_metadata->iterate([this](const Http::HeaderEntry& header) {
+    ctxt_.AddMetadata(std::string(header.key().getStringView()),
+                      std::string(header.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  });
   // Invoke stub call.
   rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
                                    &parent_.tls_.completionQueue());
@@ -206,9 +210,8 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
-  callbacks_.onReceiveTrailingMetadata(trailing_metadata
-                                           ? std::move(trailing_metadata)
-                                           : std::make_unique<Http::ResponseTrailerMapImpl>());
+  callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
+                                                         : Http::ResponseTrailerMapImpl::create());
   callbacks_.onRemoteClose(grpc_status, message);
 }
 
@@ -311,7 +314,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ASSERT(call_initialized_);
     rw_->Read(&read_buf_, &read_tag_);
     ++inflight_tags_;
-    Http::ResponseHeaderMapPtr initial_metadata = std::make_unique<Http::ResponseHeaderMapImpl>();
+    Http::ResponseHeaderMapPtr initial_metadata = Http::ResponseHeaderMapImpl::create();
     metadataTranslate(ctxt_.GetServerInitialMetadata(), *initial_metadata);
     callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
     break;
@@ -345,8 +348,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
-    Http::ResponseTrailerMapPtr trailing_metadata =
-        std::make_unique<Http::ResponseTrailerMapImpl>();
+    Http::ResponseTrailerMapPtr trailing_metadata = Http::ResponseTrailerMapImpl::create();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
     notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
                       std::move(trailing_metadata), status_.error_message());
@@ -382,7 +384,7 @@ void GoogleAsyncStreamImpl::deferredDelete() {
   // Hence, it is safe here to create a unique_ptr to this and transfer
   // ownership to dispatcher_.deferredDelete(). After this call, no further
   // methods may be invoked on this object.
-  dispatcher_.deferredDelete(std::unique_ptr<GoogleAsyncStreamImpl>(this));
+  dispatcher_.deferredDelete(GoogleAsyncStreamImplPtr(this));
 }
 
 void GoogleAsyncStreamImpl::cleanup() {

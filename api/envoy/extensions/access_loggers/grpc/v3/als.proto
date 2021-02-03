@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.grpc.v3;
 
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -53,7 +54,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message CommonGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.CommonGrpcAccessLogConfig";
@@ -61,10 +62,15 @@ message CommonGrpcAccessLogConfig {
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier
   // <envoy_api_msg_service.accesslog.v3.StreamAccessLogsMessage.Identifier>`. This allows the
   // access log server to differentiate between different access logs coming from the same Envoy.
-  string log_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string log_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The gRPC service for the access log service.
   config.core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+
+  // API version for access logs service transport protocol. This describes the access logs service
+  // gRPC endpoint and version of messages used on the wire.
+  config.core.v3.ApiVersion transport_api_version = 6
+      [(validate.rules).enum = {defined_only: true}];
 
   // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to

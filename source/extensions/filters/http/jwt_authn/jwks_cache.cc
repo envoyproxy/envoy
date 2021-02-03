@@ -1,7 +1,6 @@
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
-#include <unordered_map>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
@@ -10,6 +9,7 @@
 #include "common/config/datasource.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
@@ -108,26 +108,36 @@ public:
   }
 
   JwksData* findByIssuer(const std::string& issuer) override {
-    const auto it = issuer_ptr_map_.find(issuer);
+    JwksData* data = findIssuerMap(issuer);
+    if (!data && !issuer.empty()) {
+      // The first empty issuer from JwtProvider can be used.
+      return findIssuerMap(Envoy::EMPTY_STRING);
+    }
+    return data;
+  }
+
+  JwksData* findByProvider(const std::string& provider) override {
+    const auto& it = jwks_data_map_.find(provider);
+    if (it != jwks_data_map_.end()) {
+      return &it->second;
+    }
+    // Verifier::innerCreate function makes sure that all provider names are defined.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+private:
+  JwksData* findIssuerMap(const std::string& issuer) {
+    const auto& it = issuer_ptr_map_.find(issuer);
     if (it == issuer_ptr_map_.end()) {
       return nullptr;
     }
     return it->second;
   }
 
-  JwksData* findByProvider(const std::string& provider) override {
-    const auto it = jwks_data_map_.find(provider);
-    if (it == jwks_data_map_.end()) {
-      return nullptr;
-    }
-    return &it->second;
-  }
-
-private:
   // The Jwks data map indexed by provider.
-  std::unordered_map<std::string, JwksDataImpl> jwks_data_map_;
+  absl::node_hash_map<std::string, JwksDataImpl> jwks_data_map_;
   // The Jwks data pointer map indexed by issuer.
-  std::unordered_map<std::string, JwksData*> issuer_ptr_map_;
+  absl::node_hash_map<std::string, JwksData*> issuer_ptr_map_;
 };
 
 } // namespace

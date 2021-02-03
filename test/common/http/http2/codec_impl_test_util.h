@@ -5,6 +5,8 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 
+#include "test/mocks/common.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http2 {
@@ -54,23 +56,25 @@ protected:
   }
 
 private:
-  std::unordered_map<int32_t, uint32_t> settings_;
+  absl::node_hash_map<int32_t, uint32_t> settings_;
 };
 
 class TestServerConnectionImpl : public TestCodecStatsProvider,
-                                 public ServerConnectionImpl,
-                                 public TestCodecSettingsProvider {
+                                 public TestCodecSettingsProvider,
+                                 public ServerConnectionImpl {
 public:
   TestServerConnectionImpl(
       Network::Connection& connection, ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-      uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+      Random::RandomGenerator& random, uint32_t max_request_headers_kb,
+      uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action)
       : TestCodecStatsProvider(scope),
-        ServerConnectionImpl(connection, callbacks, http2CodecStats(), http2_options,
+        ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
                              headers_with_underscores_action) {}
+
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
 
@@ -80,21 +84,21 @@ protected:
 };
 
 class TestClientConnectionImpl : public TestCodecStatsProvider,
-                                 public ClientConnectionImpl,
-                                 public TestCodecSettingsProvider {
+                                 public TestCodecSettingsProvider,
+                                 public ClientConnectionImpl {
 public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+                           Random::RandomGenerator& random, uint32_t max_request_headers_kb,
+                           uint32_t max_request_headers_count,
                            Nghttp2SessionFactory& http2_session_factory)
       : TestCodecStatsProvider(scope),
-        ClientConnectionImpl(connection, callbacks, http2CodecStats(), http2_options,
+        ClientConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
                              http2_session_factory) {}
 
   nghttp2_session* session() { return session_; }
-
   // Submits an H/2 METADATA frame to the peer.
   // Returns true on success, false otherwise.
   virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {

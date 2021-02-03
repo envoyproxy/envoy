@@ -4,6 +4,7 @@
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Ge;
 using testing::HasSubstr;
@@ -18,7 +19,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   // Setup a context that returns null cert details.
@@ -27,7 +28,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
-      server_.sslContextManager().createSslClientContext(store, cfg));
+      server_.sslContextManager().createSslClientContext(store, cfg, nullptr));
 
   const std::string expected_empty_json = R"EOF({
  "certificates": [
@@ -47,7 +48,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 }
 
 TEST_P(AdminInstanceTest, Memory) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
@@ -65,7 +66,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
@@ -75,7 +76,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   }
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
@@ -85,7 +86,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
     EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
   }
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
@@ -96,11 +97,13 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
-  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([] {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  EXPECT_CALL(server_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([&local_info] {
     Server::CommandLineOptionsPtr command_line_options =
         std::make_unique<envoy::admin::v3::CommandLineOptions>();
     command_line_options->set_restart_epoch(2);
-    command_line_options->set_service_cluster("cluster");
+    command_line_options->set_service_cluster(local_info.clusterName());
     return command_line_options;
   }));
   NiceMock<Init::MockManager> initManager;
@@ -108,7 +111,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
@@ -122,11 +125,17 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::LIVE);
     EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
-    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
+              server_info_proto.node().cluster());
+    EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+    EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+    EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+    EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
   }
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
@@ -139,10 +148,16 @@ TEST_P(AdminInstanceTest, GetRequest) {
     TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::PRE_INITIALIZING);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
-    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
+              server_info_proto.node().cluster());
+    EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+    EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+    EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+    EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
   }
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
@@ -155,11 +170,19 @@ TEST_P(AdminInstanceTest, GetRequest) {
   TestUtility::loadFromJson(body, server_info_proto);
   EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::INITIALIZING);
   EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
-  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
+            server_info_proto.node().cluster());
+  EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+  EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+  EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+  EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
-  Http::ResponseHeaderMapImpl response_headers;
+  // Load TestScopedRuntime to suppress warnings related to runtime features.
+  TestScopedRuntime scoped_runtime;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
                            admin_.request("/healthcheck/fail", "POST", response_headers, body)));

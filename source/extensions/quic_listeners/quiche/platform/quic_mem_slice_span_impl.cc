@@ -10,7 +10,8 @@
 
 namespace quic {
 
-quiche::QuicheStringPiece QuicMemSliceSpanImpl::GetData(size_t index) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+absl::string_view QuicMemSliceSpanImpl::GetData(size_t index) {
   Envoy::Buffer::RawSliceVector slices = buffer_->getRawSlices(/*max_slices=*/index + 1);
   ASSERT(slices.size() > index);
   return {reinterpret_cast<char*>(slices[index].mem_), slices[index].len_};

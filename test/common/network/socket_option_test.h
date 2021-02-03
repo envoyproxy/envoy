@@ -25,7 +25,7 @@ namespace {
 class SocketOptionTest : public testing::Test {
 public:
   SocketOptionTest() {
-    socket_.local_address_.reset();
+    socket_.address_provider_->setLocalAddress(nullptr);
 
     EXPECT_CALL(os_sys_calls_, socket(_, _, _))
         .Times(AnyNumber())
@@ -65,8 +65,8 @@ public:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{[this]() {
     // Before injecting OsSysCallsImpl, make sure validateIpv{4,6}Supported is called so the static
     // bool is initialized without requiring to mock ::socket and ::close.
-    std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
-    std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
+    (void)std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
+    (void)std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
     return &os_sys_calls_;
   }()};
 

@@ -11,7 +11,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
@@ -22,7 +22,8 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -54,7 +55,7 @@ static Http::ResponseMessagePtr makeSuccessResponse() {
   std::unique_ptr<Protobuf::Message> collector_response =
       lightstep::Transporter::MakeCollectorResponse();
   EXPECT_NE(collector_response, nullptr);
-  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
+  msg->body().add(*Grpc::Common::serializeToGrpcFrame(*collector_response));
   return msg;
 }
 
@@ -73,8 +74,9 @@ public:
     opts->component_name = "component";
 
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-    ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillByDefault(ReturnRef(cm_.async_client_));
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
@@ -88,8 +90,8 @@ public:
   void setupValidDriver(int min_flush_spans = LightStepDriver::DefaultMinFlushSpans,
                         Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+    cm_.initializeClusters({"fake_cluster"}, {});
+    ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
@@ -117,14 +119,14 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 
@@ -149,8 +151,6 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -162,9 +162,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
-
+    cm_.initializeClusters({"fake_cluster"}, {});
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -175,10 +173,8 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+    ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -190,10 +186,6 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 }
 
 TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
   const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -204,22 +196,25 @@ TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
   opts->access_token = "sample_token";
   opts->component_name = "component";
 
-  ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-      .WillByDefault(ReturnRef(cm_.async_client_));
+  ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+      .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
   auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
 
-  tls_.defer_data = true;
+  tls_.defer_data_ = true;
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
                                               std::move(opts), propagation_mode, grpc_context_);
   tls_.call();
 }
 
 TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
@@ -233,11 +228,11 @@ TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   setupValidDriver(2);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -302,8 +297,8 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("fake_cluster");
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -325,8 +320,8 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -346,11 +341,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -374,11 +369,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -403,11 +398,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 TEST_F(LightStepDriverTest, FlushOneFailure) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -450,11 +445,11 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 TEST_F(LightStepDriverTest, FlushWithActiveReport) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -495,11 +490,11 @@ TEST_F(LightStepDriverTest, FlushWithActiveReport) {
 TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -543,11 +538,11 @@ TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
 TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
@@ -580,11 +575,11 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
 TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
@@ -618,24 +613,24 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
     // Supply bogus context, that will be simply ignored.
     const std::string invalid_context = "notvalidcontext";
-    request_headers_.setOtSpanContext(invalid_context);
+    request_headers_.setCopy(Http::CustomHeaders::get().OtSpanContext, invalid_context);
     stats_.counter("tracing.opentracing.span_context_extraction_error").reset();
     driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
                        {Tracing::Reason::Sampling, true});
     EXPECT_EQ(1U, stats_.counter("tracing.opentracing.span_context_extraction_error").value());
 
-    std::string injected_ctx(request_headers_.getOtSpanContextValue());
+    std::string injected_ctx(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
 
     // Supply empty context.
-    request_headers_.removeOtSpanContext();
+    request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
     Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                start_time_, {Tracing::Reason::Sampling, true});
 
-    EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+    EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
     span->injectContext(request_headers_);
 
-    injected_ctx = std::string(request_headers_.getOtSpanContextValue());
+    injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
 
     // Context can be parsed fine.
@@ -647,9 +642,9 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     // Supply parent context, request_headers has properly populated x-ot-span-context.
     Tracing::SpanPtr span_with_parent = driver_->startSpan(
         config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
-    request_headers_.removeOtSpanContext();
+    request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
     span_with_parent->injectContext(request_headers_);
-    injected_ctx = std::string(request_headers_.getOtSpanContextValue());
+    injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
   }
 }
@@ -666,10 +661,6 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
   envoy::config::trace::v3::LightstepConfig lightstep_config;
   TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1000));
@@ -679,14 +670,17 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1));
 
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   setup(lightstep_config, true);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
-  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
   span->injectContext(request_headers_);
-  EXPECT_TRUE(request_headers_.has("x-ot-span-context"));
+  EXPECT_TRUE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
   EXPECT_TRUE(request_headers_.has("ot-tracer-traceid"));
   EXPECT_TRUE(request_headers_.has("x-b3-traceid"));
   EXPECT_TRUE(request_headers_.has("traceparent"));
@@ -709,11 +703,33 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   childViaHeaders->injectContext(base1);
   childViaSpawn->injectContext(base2);
 
-  std::string base1_context = Base64::decode(std::string(base1.getOtSpanContextValue()));
-  std::string base2_context = Base64::decode(std::string(base2.getOtSpanContextValue()));
+  std::string base1_context =
+      Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));
+  std::string base2_context =
+      Base64::decode(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)));
 
   EXPECT_FALSE(base1_context.empty());
   EXPECT_FALSE(base2_context.empty());
+}
+
+TEST_F(LightStepDriverTest, GetAndSetBaggage) {
+  setupValidDriver();
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  std::string key = "key1";
+  std::string value = "value1";
+  span->setBaggage(key, value);
+  EXPECT_EQ(span->getBaggage(key), value);
+}
+
+TEST_F(LightStepDriverTest, GetTraceId) {
+  setupValidDriver();
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
 }
 
 } // namespace

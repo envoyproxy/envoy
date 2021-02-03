@@ -7,13 +7,15 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
-HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch)
+HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
+                                       const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
   initDomainSocketAddress(&parent_address_);
   if (restart_epoch_ != 0) {
-    parent_address_ = createDomainSocketAddress(restart_epoch_ + -1, "parent");
+    parent_address_ =
+        createDomainSocketAddress(restart_epoch_ + -1, "parent", socket_path, socket_mode);
   }
-  bindDomainSocket(restart_epoch_, "child");
+  bindDomainSocket(restart_epoch_, "child", socket_path, socket_mode);
 }
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address) {
@@ -80,12 +82,17 @@ void HotRestartingChild::sendParentTerminateRequest() {
   wrapped_request.mutable_request()->mutable_terminate();
   sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
-  // Once setting parent_terminated_ == true, we can send no more hot restart RPCs, and therefore
-  // receive no more responses, including stats. So, now safe to forget our stat transferral state.
+
+  // Note that the 'generation' counter needs to retain the contribution from
+  // the parent.
+  stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
+
+  // Now it is safe to forget our stat transferral state.
   //
-  // This destruction is actually important far beyond memory efficiency. The scope-based temporary
-  // counter logic relies on the StatMerger getting destroyed once hot restart's stat merging is
-  // all done. (See stat_merger.h for details).
+  // This destruction is actually important far beyond memory efficiency. The
+  // scope-based temporary counter logic relies on the StatMerger getting
+  // destroyed once hot restart's stat merging is all done. (See stat_merger.h
+  // for details).
   stat_merger_.reset();
 }
 
@@ -93,6 +100,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
   if (!stat_merger_) {
     stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
+    hot_restart_generation_stat_name_ = hotRestartGeneration(stats_store).statName();
   }
 
   // Convert the protobuf for serialized dynamic spans into the structure

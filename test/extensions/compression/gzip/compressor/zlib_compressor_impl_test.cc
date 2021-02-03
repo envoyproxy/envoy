@@ -163,13 +163,11 @@ TEST_P(ZlibCompressorImplFactoryTest, CreateCompressorTest) {
 // Exercises death by passing bad initialization params or by calling
 // compress before init.
 TEST_F(ZlibCompressorImplDeathTest, CompressorDeathTest) {
-  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
-  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
-  EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorTestHelper(), "assert failure: result == Z_OK");
-  EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorFlushTestHelper(),
-                             "assert failure: result == Z_OK");
-  EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorFinishTestHelper(),
-                             "assert failure: result == Z_STREAM_END");
+  EXPECT_DEATH(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
+  EXPECT_DEATH(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
+  EXPECT_DEATH(uninitializedCompressorTestHelper(), "assert failure: result == Z_OK");
+  EXPECT_DEATH(uninitializedCompressorFlushTestHelper(), "assert failure: result == Z_OK");
+  EXPECT_DEATH(uninitializedCompressorFinishTestHelper(), "assert failure: result == Z_STREAM_END");
 }
 
 // Exercises compressor's checksum by calling it before init or compress.

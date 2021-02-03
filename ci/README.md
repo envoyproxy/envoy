@@ -1,9 +1,11 @@
 # Developer use of CI Docker images
 
-Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
+There are two available flavors of Envoy Docker images for Linux, based on Ubuntu and Alpine Linux
+and an image based on Windows2019.
 
 ## Ubuntu Envoy image
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
+
+The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8)
 repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
@@ -13,23 +15,31 @@ binary built from the latest tip of master that passed tests.
 
 ## Alpine Envoy image
 
-Minimal images based on Alpine Linux allow for quicker deployment of Envoy. Two Alpine based images are built,
-one with an Envoy binary with debug (`envoyproxy/envoy-alpine-debug`) symbols and one stripped of them (`envoyproxy/envoy-alpine`).
-Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
+Minimal images based on Alpine Linux allow for quicker deployment of Envoy. The Alpine base image is only built with symbols stripped.
+To get the binary with symbols, use the corresponding Ubuntu based debug image. The image is pushed with two different tags:
+`<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
 master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
+
+## Windows 2019 Envoy image
+
+The Windows 2019 based Envoy Docker image at [`envoyproxy/envoy-build-windows2019:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build-windows2019/)
+is used for CI checks, where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh).
+Developers may work with the most recent `envoyproxy/envoy-build-windows2019` image to provide a self-contained environment for building Envoy binaries and
+running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-Currently there are three build images:
+Currently there are three build images for Linux and one for Windows:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 9 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 9 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 10 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 10 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-windows2019` &mdash; based on Windows 2019 LTS with VS 2019 Build Tools.
 
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
-We use the Clang compiler for all CI runs with tests. We have an additional CI run with GCC which builds binary only.
+We use the Clang compiler for all Linux CI runs with tests. We have an additional Linux CI run with GCC which builds binary only.
 
 # C++ standard library
 
@@ -40,18 +50,26 @@ run `./ci/do_ci.sh` as described below.
 
 # Building and running tests as a developer
 
+The `./ci/run_envoy_docker.sh` script can be used to set up a Docker container on Linux and Windows
+to build an Envoy static binary and run tests.
+
+The build image defaults to `envoyproxy/envoy-build-ubuntu` on Linux and
+`envoyproxy/envoy-build-windows2019` on Windows, but you can choose build image by setting
+`IMAGE_NAME` in the environment.
+
+In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before
+invoking the build.
+
+```bash
+IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>'
+```
+
+## On Linux
+
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
 
 ```bash
 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
-```
-
-The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment.
-
-In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
-
-```bash
-IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
 ```
 
 The Envoy binary can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-fastbuild` on the Docker host. You
@@ -114,13 +132,43 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
 * `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
-* `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
+* `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
 * `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
 * `fix_spelling`&mdash; run and enforce `misspell` on entire project.
 * `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.
 * `docs`&mdash; build documentation tree in `generated/docs`.
+
+## On Windows
+
+An example basic invocation to build the Envoy static binary and run tests is:
+
+```bash
+./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
+```
+
+You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well
+as set environment variables to adjust your container build environment as described above.
+
+The Envoy binary can be found in `C:\Windows\Temp\envoy-docker-build\envoy\source\exe` on the Docker host. You
+can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
+generate the binary in `C:\Users\foo\build\envoy\source\exe` you can run:
+
+```bash
+ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+```
+
+Note the quotations around the `ENVOY_DOCKER_BUILD_DIR` value to preserve the backslashes in the
+path.
+
+If you would like to run an interactive session to keep the build container running (to persist your local build environment), run:
+
+```bash
+./ci/run_envoy_docker.sh 'bash'
+```
+
+From an interactive session, you can invoke `bazel` manually or use the `./ci/windows_ci_steps.sh` script to build and run tests.
 
 # Testing changes to the build image as a developer
 
@@ -141,12 +189,11 @@ This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final
 
 # macOS Build Flow
 
-The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
+The macOS CI build is part of the [Azure Pipelines](https://dev.azure.com/cncf/envoy/_build) workflow.
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
-which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
-on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
-build and test Envoy. If Envoy cannot be built (`error: /Library/Developer/CommandLineTools/usr/bin/libtool: no output file specified (specify with -o output)`),
-ensure that Xcode is installed.
+which is pre-installed on the [Azure Pipelines macOS image](https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md).
+The dependencies are cached and re-installed on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
+build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.
 
 # Coverity Scan Build Flow
 

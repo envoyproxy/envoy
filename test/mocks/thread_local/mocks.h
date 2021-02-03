@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
 
 #include "envoy/thread_local/thread_local.h"
 
@@ -51,29 +50,32 @@ public:
 
     ~SlotImpl() override {
       // Do not actually clear slot data during shutdown. This mimics the production code.
-      if (!parent_.shutdown_) {
+      // The defer_delete mimics the slot being deleted on the main thread but the update not yet
+      // getting to a worker.
+      if (!parent_.shutdown_ && !parent_.defer_delete_) {
         EXPECT_LT(index_, parent_.data_.size());
         parent_.data_[index_].reset();
       }
     }
 
     // ThreadLocal::Slot
-    ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
+    ThreadLocalObjectSharedPtr get() override {
+      EXPECT_TRUE(was_set_);
+      return parent_.data_[index_];
+    }
     bool currentThreadRegistered() override { return parent_.registered_; }
-    void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
-    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads(cb, main_callback);
-    }
     void runOnAllThreads(const UpdateCb& cb) override {
-      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); });
+      EXPECT_TRUE(was_set_);
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); });
     }
-    void runOnAllThreads(const UpdateCb& cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); },
-                              main_callback);
+    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& main_callback) override {
+      EXPECT_TRUE(was_set_);
+      parent_.runOnAllThreads([cb, this]() { cb(parent_.data_[index_]); }, main_callback);
     }
 
     void set(InitializeCb cb) override {
-      if (parent_.defer_data) {
+      was_set_ = true;
+      if (parent_.defer_data_) {
         parent_.deferred_data_[index_] = cb;
       } else {
         parent_.data_[index_] = cb(parent_.dispatcher_);
@@ -82,6 +84,7 @@ public:
 
     MockInstance& parent_;
     const uint32_t index_;
+    bool was_set_{}; // set() must be called before other functions.
   };
 
   void call() {
@@ -95,9 +98,10 @@ public:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<ThreadLocalObjectSharedPtr> data_;
   std::vector<Slot::InitializeCb> deferred_data_;
-  bool defer_data{};
+  bool defer_data_{};
   bool shutdown_{};
   bool registered_{true};
+  bool defer_delete_{};
 };
 
 } // namespace ThreadLocal

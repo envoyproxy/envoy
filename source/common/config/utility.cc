@@ -1,7 +1,5 @@
 #include "common/config/utility.h"
 
-#include <unordered_set>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -20,6 +18,7 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -58,25 +57,29 @@ void Utility::translateApiConfigSource(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
 
-void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm, bool allow_added_via_api) {
-  Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
-  if (cluster == nullptr) {
+Upstream::ClusterConstOptRef Utility::checkCluster(absl::string_view error_prefix,
+                                                   absl::string_view cluster_name,
+                                                   Upstream::ClusterManager& cm,
+                                                   bool allow_added_via_api) {
+  const auto cluster = cm.clusters().getCluster(cluster_name);
+  if (!cluster.has_value()) {
     throw EnvoyException(fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
-  if (!allow_added_via_api && cluster->info()->addedViaApi()) {
+  if (!allow_added_via_api && cluster->get().info()->addedViaApi()) {
     throw EnvoyException(fmt::format(
         "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
         error_prefix, cluster_name));
   }
+  return cluster;
 }
 
-void Utility::checkClusterAndLocalInfo(absl::string_view error_prefix,
-                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
-                                       const LocalInfo::LocalInfo& local_info) {
-  checkCluster(error_prefix, cluster_name, cm);
+Upstream::ClusterConstOptRef
+Utility::checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
+                                  Upstream::ClusterManager& cm,
+                                  const LocalInfo::LocalInfo& local_info) {
   checkLocalInfo(error_prefix, local_info);
+  return checkCluster(error_prefix, cluster_name, cm);
 }
 
 void Utility::checkLocalInfo(absl::string_view error_prefix,
@@ -150,6 +153,13 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& pr
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterSet& primary_clusters,
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+  // We don't need to check backing sources for ADS sources, the backing cluster must be verified in
+  // the ads_config.
+  if (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
+      api_config_source.api_type() ==
+          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+    return;
+  }
   Utility::checkApiConfigSourceNames(api_config_source);
 
   const bool is_grpc =
@@ -219,6 +229,11 @@ Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootst
 Stats::StatsMatcherPtr
 Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
+}
+
+Stats::HistogramSettingsConstPtr
+Utility::createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  return std::make_unique<Stats::HistogramSettingsImpl>(bootstrap.stats_config());
 }
 
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(

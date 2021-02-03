@@ -8,7 +8,6 @@
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
-#include "common/stats/symbol_table_creator.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
@@ -45,7 +44,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::TestUtil::TestStore global_store_;
   Stats::TestUtil::TestStore cluster_scope_;
   Http::CodeStatsImpl code_stats_;

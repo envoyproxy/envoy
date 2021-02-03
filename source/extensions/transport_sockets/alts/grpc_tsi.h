@@ -4,19 +4,21 @@
 // compile with -Werror, ignoring those compiler warning since we don't have
 // control on those source codes. This works with GCC and Clang.
 
-#ifndef _MSC_VER
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
 
 #include "grpc/grpc_security.h"
+#include "src/core/lib/transport/transport.h"
 #include "src/core/tsi/alts/handshaker/alts_shared_resource.h"
 #include "src/core/tsi/alts/handshaker/alts_tsi_handshaker.h"
+#include "src/core/tsi/alts/handshaker/transport_security_common_api.h"
 #include "src/core/tsi/transport_security_grpc.h"
 #include "src/core/tsi/transport_security_interface.h"
 
-#ifndef _MSC_VER
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 

@@ -5,10 +5,14 @@
 set -e
 
 # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-ENVOY_FILTER_EXAMPLE_GITSHA="bb2e91fde758446fbccc3f8fedffce1827a47bcb"
+ENVOY_FILTER_EXAMPLE_GITSHA="30e5df3b73aec14ca3b70e4537e0b42f2e9d7fd0"
 ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
-export ENVOY_FILTER_EXAMPLE_TESTS="//:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test"
+# shellcheck disable=SC2034
+ENVOY_FILTER_EXAMPLE_TESTS=(
+    "//:echo2_integration_test"
+    "//http-filter-example:http_filter_integration_test"
+    "//:envoy_binary_test")
 
 if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
   rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
@@ -23,4 +27,4 @@ ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCD
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 cp -f "$(bazel info workspace)"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
-FILTER_WORKSPACE_SET=1
+export FILTER_WORKSPACE_SET=1

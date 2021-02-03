@@ -1,16 +1,16 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # External authorization L7 HTTP filter
 # Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_authz",
@@ -45,6 +45,8 @@ envoy_cc_extension(
         ":ext_authz",
         "//include/envoy/registry",
         "//include/envoy/stats:stats_macros",
+        "//source/common/config:utility_lib",
+        "//source/common/grpc:google_async_client_cache",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//source/extensions/filters/http:well_known_names",

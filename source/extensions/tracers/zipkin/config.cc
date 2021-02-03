@@ -7,7 +7,6 @@
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 namespace Envoy {
@@ -15,7 +14,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase(TracerNames::get().Zipkin) {}
+ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase("envoy.tracers.zipkin") {}
 
 Tracing::HttpTracerSharedPtr ZipkinTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::ZipkinConfig& proto_config,
@@ -24,7 +23,8 @@ Tracing::HttpTracerSharedPtr ZipkinTracerFactory::createHttpTracerTyped(
       proto_config, context.serverFactoryContext().clusterManager(),
       context.serverFactoryContext().scope(), context.serverFactoryContext().threadLocal(),
       context.serverFactoryContext().runtime(), context.serverFactoryContext().localInfo(),
-      context.serverFactoryContext().random(), context.serverFactoryContext().timeSource());
+      context.serverFactoryContext().api().randomGenerator(),
+      context.serverFactoryContext().timeSource());
 
   return std::make_shared<Tracing::HttpTracerImpl>(std::move(zipkin_driver),
                                                    context.serverFactoryContext().localInfo());

@@ -1,7 +1,7 @@
 #include "extensions/filters/listener/http_inspector/http_inspector.h"
 #include "extensions/filters/listener/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/listener_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,7 +29,7 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   Server::Configuration::MockListenerFactoryContext context;
-  EXPECT_CALL(context, scope()).Times(1);
+  EXPECT_CALL(context, scope());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 

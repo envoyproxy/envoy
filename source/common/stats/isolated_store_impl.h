@@ -91,6 +91,15 @@ public:
     return vec;
   }
 
+  bool iterate(const IterateFn<Base>& fn) const {
+    for (auto& stat : stats_) {
+      if (!fn(stat.second)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 private:
   friend class IsolatedStoreImpl;
 
@@ -122,6 +131,7 @@ public:
     return counter;
   }
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
@@ -152,6 +162,13 @@ public:
   }
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     return text_readouts_.find(name);
+  }
+
+  bool iterate(const IterateFn<Counter>& fn) const override { return counters_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return gauges_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return histograms_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return text_readouts_.iterate(fn);
   }
 
   // Stats::Store

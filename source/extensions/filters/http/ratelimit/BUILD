@@ -1,22 +1,23 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # Ratelimit L7 HTTP filter
 # Public docs: docs/root/configuration/http_filters/rate_limit_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
     deps = [
+        ":ratelimit_headers_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
         "//source/common/common:assert_lib",
@@ -30,6 +31,16 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "ratelimit_headers_lib",
+    srcs = ["ratelimit_headers.cc"],
+    hdrs = ["ratelimit_headers.h"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
+    ],
+)
+
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
@@ -38,6 +49,7 @@ envoy_cc_extension(
     deps = [
         ":ratelimit_lib",
         "//include/envoy/registry",
+        "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -13,29 +14,49 @@ public:
    * Wait for a counter to == a given value.
    * @param name counter name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
    */
-  virtual void waitForCounterEq(const std::string& name, uint64_t value) PURE;
+  virtual void
+  waitForCounterEq(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                   Event::Dispatcher* dispatcher = nullptr) PURE;
 
   /**
    * Wait for a counter to >= a given value.
    * @param name counter name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
-  virtual void waitForCounterGe(const std::string& name, uint64_t value) PURE;
+  virtual void
+  waitForCounterGe(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+
+  /**
+   * Wait for a counter to exist.
+   * @param name counter name.
+   */
+  virtual void waitForCounterExists(const std::string& name) PURE;
 
   /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
-  virtual void waitForGaugeGe(const std::string& name, uint64_t value) PURE;
+  virtual void
+  waitForGaugeGe(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
    * Wait for a gauge to == a given value.
    * @param name gauge name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
-  virtual void waitForGaugeEq(const std::string& name, uint64_t value) PURE;
+  virtual void
+  waitForGaugeEq(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
    * Counter lookup. This is not thread safe, since we don't get a consistent

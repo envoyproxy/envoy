@@ -67,7 +67,13 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
+
+sys.path.append(os.path.abspath("./_ext"))
+
+extensions = [
+    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
+    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe'
+]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
     'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
@@ -81,6 +87,9 @@ else:
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+
+copybutton_prompt_text = r"\$ |PS>"
+copybutton_prompt_is_regexp = True
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
@@ -173,6 +182,7 @@ html_theme = 'sphinx_rtd_theme'
 # documentation.
 html_theme_options = {
     'logo_only': True,
+    'includehidden': False,
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -265,3 +275,8 @@ html_style = 'css/envoy.css'
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'envoydoc'
+
+# TODO(phlax): add redirect diff (`rediraffe_branch` setting)
+#  - not sure how diffing will work with master merging in PRs - might need
+#    to be injected dynamically, somehow
+rediraffe_redirects = "redirects.txt"

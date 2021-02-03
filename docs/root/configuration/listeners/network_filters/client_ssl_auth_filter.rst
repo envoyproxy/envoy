@@ -22,7 +22,7 @@ Every configured client TLS authentication filter has statistics rooted at
   update_success, Counter, Total principal update successes
   update_failure, Counter, Total principal update failures
   auth_no_ssl, Counter, Total connections ignored due to no TLS
-  auth_ip_white_list, Counter, Total connections allowed due to the IP white list
+  auth_ip_allowlist, Counter, Total connections allowed due to the IP allowlist
   auth_digest_match, Counter, Total connections allowed due to certificate match
   auth_digest_no_match, Counter, Total connections denied due to no certificate match
   total_principals, Gauge, Total loaded principals

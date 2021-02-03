@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
@@ -9,6 +7,10 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@kafka_pip3//:requirements.bzl", "requirement")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -75,7 +77,8 @@ py_binary(
     main = "serialization/launcher.py",
     deps = [
         "//source/extensions/filters/network/kafka:serialization_composite_generator_lib",
-        "@com_github_pallets_jinja//:jinja2",
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
     ],
 )
 
@@ -249,7 +252,8 @@ py_binary(
     main = "protocol/launcher.py",
     deps = [
         "//source/extensions/filters/network/kafka:kafka_protocol_generator_lib",
-        "@com_github_pallets_jinja//:jinja2",
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
     ],
 )
 

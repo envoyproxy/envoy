@@ -14,7 +14,7 @@ constexpr absl::string_view EnvoyPayloadUrl = "Envoy";
 absl::string_view statusCodeToString(StatusCode code) {
   switch (code) {
   case StatusCode::Ok:
-    return absl::OkStatus().ToString();
+    return "OK";
   case StatusCode::CodecProtocolError:
     return "CodecProtocolError";
   case StatusCode::BufferFloodError:
@@ -23,6 +23,8 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "PrematureResponseError";
   case StatusCode::CodecClientError:
     return "CodecClientError";
+  case StatusCode::InboundFramesWithEmptyPayload:
+    return "InboundFramesWithEmptyPayloadError";
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -104,6 +106,13 @@ Status codecClientError(absl::string_view message) {
   return status;
 }
 
+Status inboundFramesWithEmptyPayloadError() {
+  absl::Status status(absl::StatusCode::kInternal,
+                      "Too many consecutive frames with an empty payload");
+  storePayload(status, EnvoyStatusPayload(StatusCode::InboundFramesWithEmptyPayload));
+  return status;
+}
+
 // Methods for checking and extracting error information
 StatusCode getStatusCode(const Status& status) {
   return status.ok() ? StatusCode::Ok : getPayload(status).status_code_;
@@ -130,6 +139,10 @@ Http::Code getPrematureResponseHttpCode(const Status& status) {
 
 bool isCodecClientError(const Status& status) {
   return getStatusCode(status) == StatusCode::CodecClientError;
+}
+
+bool isInboundFramesWithEmptyPayloadError(const Status& status) {
+  return getStatusCode(status) == StatusCode::InboundFramesWithEmptyPayload;
 }
 
 } // namespace Http

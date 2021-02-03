@@ -68,11 +68,12 @@ protected:
 class RequestEncoderWrapper : public RequestEncoder {
 public:
   // RequestEncoder
-  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
-    inner_.encodeHeaders(headers, end_stream);
+  Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
+    RETURN_IF_ERROR(inner_.encodeHeaders(headers, end_stream));
     if (end_stream) {
       onEncodeComplete();
     }
+    return okStatus();
   }
 
   void encodeData(Buffer::Instance& data, bool end_stream) override {

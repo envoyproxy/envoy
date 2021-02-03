@@ -460,6 +460,16 @@ The integer value indicates the sampling decision that has been made for this tr
 A value of 0 indicates that the trace should not be collected, and a value of 1
 requests that spans are sampled and reported.
 
+.. _config_http_conn_man_headers_sw8:
+
+sw8
+----------
+
+The *sw8* HTTP header is used by the SkyWalking tracer in Envoy. It contains the key
+tracing context for the SkyWalking tracer and is used to establish the relationship between
+the tracing spans of downstream and Envoy. See more on SkyWalking tracing
+`here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
@@ -496,7 +506,7 @@ Supported variable names are:
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
-      :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -571,6 +581,12 @@ Supported variable names are:
   TCP
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_PEER_FINGERPRINT_1%
+  HTTP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+
 %DOWNSTREAM_PEER_SERIAL%
   HTTP
     The serial number of the client certificate used to establish the downstream TLS connection.
@@ -614,6 +630,12 @@ Supported variable names are:
 
     Upstream metadata cannot be added to request headers as the upstream host has not been selected
     when custom request headers are generated.
+
+%DYNAMIC_METADATA(["namespace", "key", ...])%
+    Similar to UPSTREAM_METADATA, populates the header with dynamic metadata available in a request
+    (e.g.: added by filters like the header-to-metadata filter).
+
+    This works both on request and response headers.
 
 %UPSTREAM_REMOTE_ADDRESS%
     Remote address of the upstream host. If the address is an IP address it includes both address

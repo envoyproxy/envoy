@@ -1,42 +1,48 @@
-#!/bin/bash
+#!/bin/bash -E
 
-set -e
+TESTFILTER="${1:-*}"
+FAILED=()
+SRCDIR="${SRCDIR:-$(pwd)}"
 
-verify() {
-  echo $1
-  CONTAINER_ID="$(docker ps -aqf name=$1)"
-  if [ "false" == "$(docker inspect -f {{.State.Running}} ${CONTAINER_ID})" ]
-  then
-    echo "error: $1 not running"
-    exit 1
-  fi
+
+trap_errors () {
+    local frame=0 command line sub file
+    if [[ -n "$example" ]]; then
+        command=" (${example})"
+    fi
+    set +v
+    while read -r line sub file < <(caller "$frame"); do
+        if [[ "$frame" -ne "0" ]]; then
+            FAILED+=("  > ${sub}@ ${file} :${line}")
+        else
+            FAILED+=("${sub}@ ${file} :${line}${command}")
+        fi
+        ((frame++))
+    done
+    set -v
 }
 
-# Test front proxy example
-cd examples/front-proxy
-docker-compose up --build -d
-for CONTAINER_NAME in "frontproxy_front-envoy" "frontproxy_service1" "frontproxy_service2"
-do
-  verify $CONTAINER_NAME
-done
-cd ../
+trap trap_errors ERR
+trap exit 1 INT
 
-# Test grpc bridge example
-# install go
-curl -O https://storage.googleapis.com/golang/go1.13.5.linux-amd64.tar.gz
-tar -xf go1.13.5.linux-amd64.tar.gz
-sudo mv go /usr/local
-export PATH=$PATH:/usr/local/go/bin
-export GOPATH=$HOME/go
-mkdir -p $GOPATH/src/github.com/envoyproxy/envoy/examples/
-cp -r grpc-bridge $GOPATH/src/github.com/envoyproxy/envoy/examples/
-# build example
-cd $GOPATH/src/github.com/envoyproxy/envoy/examples/grpc-bridge
-./script/bootstrap
-./script/build
-# verify example works
-docker-compose up --build -d
-for CONTAINER_NAME in "grpcbridge_python" "grpcbridge_grpc"
-do
-  verify $CONTAINER_NAME
-done
+
+run_examples () {
+    local examples example
+    cd "${SRCDIR}/examples" || exit 1
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" | sort)
+    for example in $examples; do
+        pushd "$example" > /dev/null || return 1
+        ./verify.sh
+        popd > /dev/null || return 1
+    done
+}
+
+run_examples
+
+if [[ "${#FAILED[@]}" -ne "0" ]]; then
+    echo "TESTS FAILED:"
+    for failed in "${FAILED[@]}"; do
+        echo "$failed" >&2
+    done
+    exit 1
+fi

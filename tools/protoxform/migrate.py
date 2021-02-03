@@ -57,8 +57,8 @@ class UpgradeVisitor(visitor.Visitor):
         # We need to deal with envoy.api.* normalization in the v2 API. We won't
         # need this in v3+, so rather than churn docs, we just have this workaround.
         type_desc = self._typedb.types[api_v2_type_name]
-      repl_type = type_desc.next_version_type_name[len(
-          'envoy.'):] if type_desc.next_version_type_name else normalized_type_name
+      repl_type = type_desc.next_version_type_name[
+          len('envoy.'):] if type_desc.next_version_type_name else normalized_type_name
       # TODO(htuch): this should really either go through the type database or
       # via the descriptor pool and annotations, but there are only two of these
       # we need for the initial v2 -> v3 docs cut, so hard coding for now.

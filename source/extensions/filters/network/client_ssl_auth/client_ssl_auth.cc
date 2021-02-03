@@ -14,6 +14,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -24,15 +25,15 @@ namespace ClientSslAuth {
 ClientSslAuthConfig::ClientSslAuthConfig(
     const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-    Stats::Scope& scope, Runtime::RandomGenerator& random)
+    Stats::Scope& scope, Random::RandomGenerator& random)
     : RestApiFetcher(
           cm, config.auth_api_cluster(), dispatcher, random,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
           std::chrono::milliseconds(1000)),
-      tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
+      tls_(tls.allocateSlot()), ip_allowlist_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 
-  if (!cm.get(remote_cluster_name_)) {
+  if (!cm.clusters().hasCluster(remote_cluster_name_)) {
     throw EnvoyException(
         fmt::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
   }
@@ -45,7 +46,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
 ClientSslAuthConfigSharedPtr ClientSslAuthConfig::create(
     const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-    Stats::Scope& scope, Runtime::RandomGenerator& random) {
+    Stats::Scope& scope, Random::RandomGenerator& random) {
   ClientSslAuthConfigSharedPtr new_config(
       new ClientSslAuthConfig(config, tls, cm, dispatcher, scope, random));
   new_config->initialize();
@@ -111,8 +112,9 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipWhiteList().contains(*read_callbacks_->connection().remoteAddress())) {
-    config_->stats().auth_ip_white_list_.inc();
+  if (config_->ipAllowlist().contains(
+          *read_callbacks_->connection().addressProvider().remoteAddress())) {
+    config_->stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;
   }

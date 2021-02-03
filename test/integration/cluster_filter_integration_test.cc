@@ -80,7 +80,7 @@ public:
       : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()), registration_(factory_) {}
 
   void initialize() override {
-    enable_half_close_ = true;
+    enableHalfClose(true);
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
@@ -109,22 +109,22 @@ TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   std::string observed_data;
-  tcp_client->write("test");
+  ASSERT_TRUE(tcp_client->write("test"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(11, &observed_data));
   EXPECT_EQ("please test", observed_data);
 
   observed_data.clear();
-  tcp_client->write(" everything");
+  ASSERT_TRUE(tcp_client->write(" everything"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(22, &observed_data));
   EXPECT_EQ("please test everything", observed_data);
 
   ASSERT_TRUE(fake_upstream_connection->write("yes"));
   tcp_client->waitForData("surely yes");
 
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
 }
 

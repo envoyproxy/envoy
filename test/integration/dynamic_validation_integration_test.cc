@@ -38,8 +38,9 @@ private:
     return Network::FilterFactoryCb();
   }
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
-      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&) override {
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsTyped(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&,
+                             Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return nullptr;
   }
 };

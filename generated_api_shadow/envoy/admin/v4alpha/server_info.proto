@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.admin.v4alpha;
 
+import "envoy/config/core/v4alpha/base.proto";
+
 import "google/protobuf/duration.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -17,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ServerInfo {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.ServerInfo";
 
@@ -52,9 +54,12 @@ message ServerInfo {
 
   // Command line options the server is currently running with.
   CommandLineOptions command_line_options = 6;
+
+  // Populated node identity of this server.
+  config.core.v4alpha.Node node = 7;
 }
 
-// [#next-free-field: 31]
+// [#next-free-field: 37]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v3.CommandLineOptions";
 
@@ -74,12 +79,26 @@ message CommandLineOptions {
     InitOnly = 2;
   }
 
+  enum DrainStrategy {
+    // Gradually discourage connections over the course of the drain period.
+    Gradual = 0;
+
+    // Discourage all connections for the duration of the drain sequence.
+    Immediate = 1;
+  }
+
   reserved 12, 20, 21;
 
   reserved "max_stats", "max_obj_name_len";
 
   // See :option:`--base-id` for details.
   uint64 base_id = 1;
+
+  // See :option:`--use-dynamic-base-id` for details.
+  bool use_dynamic_base_id = 31;
+
+  // See :option:`--base-id-path` for details.
+  string base_id_path = 32;
 
   // See :option:`--concurrency` for details.
   uint32 concurrency = 2;
@@ -135,6 +154,9 @@ message CommandLineOptions {
   // See :option:`--drain-time-s` for details.
   google.protobuf.Duration drain_time = 17;
 
+  // See :option:`--drain-strategy` for details.
+  DrainStrategy drain_strategy = 33;
+
   // See :option:`--parent-shutdown-time-s` for details.
   google.protobuf.Duration parent_shutdown_time = 18;
 
@@ -158,4 +180,13 @@ message CommandLineOptions {
 
   // See :option:`--bootstrap-version` for details.
   uint32 bootstrap_version = 29;
+
+  // See :option:`--enable-fine-grain-logging` for details.
+  bool enable_fine_grain_logging = 34;
+
+  // See :option:`--socket-path` for details.
+  string socket_path = 35;
+
+  // See :option:`--socket-mode` for details.
+  uint32 socket_mode = 36;
 }

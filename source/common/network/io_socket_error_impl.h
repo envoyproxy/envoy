@@ -21,6 +21,11 @@ public:
   // deleter deleteIoError() below to avoid deallocating memory for this error.
   static IoSocketError* getIoSocketEagainInstance();
 
+  // This error is introduced when Envoy create socket for unsupported address. It is either a bug,
+  // or this Envoy instance received config which is not yet supported. This should not be fatal
+  // error.
+  static Api::IoCallUint64Result ioResultSocketInvalidAddress();
+
   // Deallocate memory only if the error is not Again.
   static void deleteIoError(Api::IoError* err);
 

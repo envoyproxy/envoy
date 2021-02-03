@@ -1,0 +1,34 @@
+config {
+  name: "envoy.filters.network.thrift_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy"
+    value: "\nz\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 10
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+  }
+}
+actions {
+  on_data {
+    data: "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.Thrif~tProxy"
+    end_stream: true
+  }
+}

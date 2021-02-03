@@ -31,6 +31,7 @@ namespace Client {
 struct RedirectionValues {
   const std::string ASK = "ASK";
   const std::string MOVED = "MOVED";
+  const std::string CLUSTER_DOWN = "CLUSTERDOWN";
 };
 
 using RedirectionResponse = ConstSingleton<RedirectionValues>;
@@ -87,7 +88,7 @@ public:
   PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
-  void initialize(const std::string& auth_password) override;
+  void initialize(const std::string& auth_username, const std::string& auth_password) override;
 
 private:
   friend class RedisClientImplTest;
@@ -151,7 +152,8 @@ public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                    const Config& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-                   Stats::Scope& scope, const std::string& auth_password) override;
+                   Stats::Scope& scope, const std::string& auth_username,
+                   const std::string& auth_password) override;
 
   static ClientFactoryImpl instance_;
 

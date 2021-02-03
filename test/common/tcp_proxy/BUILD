@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -24,18 +24,22 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
     ],
 )
 

@@ -76,7 +76,7 @@ public:
 
 private:
   mutable absl::Mutex mu_;
-  std::vector<SpanData> spans_ GUARDED_BY(mu_);
+  std::vector<SpanData> spans_ ABSL_GUARDED_BY(mu_);
 };
 
 // Use a Singleton SpanCatcher.
@@ -123,6 +123,13 @@ TEST(OpenCensusTracerTest, Span) {
     child->finishSpan();
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
+
+    // Baggage methods are a noop in opencensus and won't affect events.
+    span->setBaggage("baggage_key", "baggage_value");
+    ASSERT_EQ("", span->getBaggage("baggage_key"));
+
+    // Trace id is automatically created when no parent context exists.
+    ASSERT_NE(span->getTraceIdAsHex(), "");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -170,10 +177,10 @@ MATCHER_P2(ContainHeader, header, expected_value,
            "contains the header " + PrintToString(header) + " with value " +
                PrintToString(expected_value)) {
   const auto found_value = arg.get(Http::LowerCaseString(header));
-  if (found_value == nullptr) {
+  if (found_value.empty()) {
     return false;
   }
-  return found_value->value().getStringView() == expected_value;
+  return found_value[0]->value().getStringView() == expected_value;
 }
 
 // Given incoming headers, test that trace context propagation works and generates all the expected
@@ -213,6 +220,10 @@ void testIncomingHeaders(
                                               {Tracing::Reason::Sampling, false});
     span->injectContext(injected_headers);
     span->finishSpan();
+
+    // Check contents via public API.
+    // Trace id is set via context propagation headers.
+    EXPECT_EQ(span->getTraceIdAsHex(), "404142434445464748494a4b4c4d4e4f");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -221,7 +232,7 @@ void testIncomingHeaders(
   const auto& sd = spans[0];
   ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
 
-  // Check contents.
+  // Check contents by inspecting private span data.
   EXPECT_TRUE(sd.has_remote_parent());
   EXPECT_EQ("6162636465666768", sd.parent_span_id().ToHex());
   EXPECT_EQ("404142434445464748494a4b4c4d4e4f", sd.context().trace_id().ToHex());

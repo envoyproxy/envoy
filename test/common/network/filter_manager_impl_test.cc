@@ -17,10 +17,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -392,6 +392,7 @@ stat_prefix: name
   manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
       rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
 
+  factory_context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   tcp_proxy.set_stat_prefix("name");
   tcp_proxy.set_cluster("fake_cluster");
@@ -403,7 +404,7 @@ stat_prefix: name
   EXPECT_CALL(*rl_client, limit(_, "foo",
                                 testing::ContainerEq(
                                     std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}),
-                                testing::A<Tracing::Span&>()))
+                                testing::A<Tracing::Span&>(), _))
       .WillOnce(WithArgs<0>(
           Invoke([&](Extensions::Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks = &callbacks;
@@ -411,11 +412,11 @@ stat_prefix: name
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
-  EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(&conn_pool));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr);
+                              nullptr, nullptr, "", nullptr);
 
   conn_pool.poolReady(upstream_connection);
 

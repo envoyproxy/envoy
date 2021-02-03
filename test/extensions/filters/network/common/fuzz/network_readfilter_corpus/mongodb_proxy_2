@@ -1,0 +1,143 @@
+config {
+  name: "envoy.filters.network.mongo_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"
+    value: "\n\001\\\032\t\032\002\020\010\"\003\010\200t \001"
+  }
+}
+
+actions {
+  on_data {
+    data: "\120\0\0\0\1\0\0\0\1\0\0\0\324\7\0\0\4\0\0\0\164\145\163\164\56\164\145\163\164\0\24\0\0\0\377\377\377\377\52\0\0\0\2\163\164\162\151\156\147\137\156\145\145\144\137\145\163\143\0\20\0\0\0\173\42\146\157\157\42\72\40\42\142\141\162\12\42\175\0\0"
+  }
+}
+
+actions {
+  on_data {
+    data: "\56\0\0\0\2\0\0\0\2\0\0\0\1\0\0\0\10\0\0\0\40\116\0\0\0\0\0\0\24\0\0\0\2\0\0\0\5\0\0\0\0\5\0\0\0\0"
+  }
+}
+
+
+actions {
+  on_data {
+    data: "\45\0\0\0\3\0\0\0\3\0\0\0\325\7\0\0\0\0\0\0\164\145\163\164\0\24\0\0\0\40\116\0\0\0\0\0\0"
+  }
+}
+
+actions {
+  on_data {
+    data: "\43\0\0\0\4\0\0\0\4\0\0\0\322\7\0\0\10\0\0\0\164\145\163\164\0\5\0\0\0\0\5\0\0\0\0"
+  }
+}
+
+
+
+
+actions {
+  on_data {
+    data: "\50\0\0\0\5\0\0\0\5\0\0\0\327\7\0\0\0\0\0\0\2\0\0\0\40\116\0\0\0\0\0\0\100\234\0\0\0\0\0\0"
+  }
+}
+
+
+
+actions {
+  on_data {
+    data: "\120\0\0\0\17\0\0\0\31\0\0\0\332\7\0\0\124\145\163\164\40\144\141\164\141\142\141\163\145\0\124\145\163\164\40\143\157\155\155\141\156\144\40\156\141\155\145\0\5\0\0\0\0\5\0\0\0\0\26\0\0\0\2\167\157\162\154\144\0\6\0\0\0\150\145\154\154\157\0\0"
+  }
+}
+
+actions {
+  on_data {
+    data: "\60\0\0\0\20\0\0\0\32\0\0\0\333\7\0\0\5\0\0\0\0\5\0\0\0\0\26\0\0\0\2\167\157\162\154\144\0\6\0\0\0\150\145\154\154\157\0\0"
+  }
+}
+
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_data {
+    data: "\004\000\001\000\000\000\000\000\000\001"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_data {
+    data: "<"
+    end_stream: true
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "\004\000"
+  }
+}
+actions {
+  on_data {
+    data: "\004\000"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_data {
+    data: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"
+    end_stream: true
+  }
+}
+actions {
+  on_data {
+    data: "\004\000"
+    end_stream: true
+  }
+}
+actions {
+  on_data {
+    data: "\004\000"
+  }
+}
+actions {
+  on_data {
+    data: "pH\037\000 `\000\000"
+    end_stream: true
+  }
+}
+actions {
+  on_data {
+    data: "\004\000"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_data {
+    data: "="
+    end_stream: true
+  }
+}
+actions {
+  on_data {
+    data: "\004\000"
+    end_stream: true
+  }
+}

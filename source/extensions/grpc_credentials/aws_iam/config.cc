@@ -74,7 +74,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
 
 std::string AwsIamGrpcCredentialsFactory::getRegion(
     const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
-  std::unique_ptr<Common::Aws::RegionProvider> region_provider;
+  Common::Aws::RegionProviderPtr region_provider;
   if (!config.region().empty()) {
     region_provider = std::make_unique<Common::Aws::StaticRegionProvider>(config.region());
   } else {
@@ -129,18 +129,15 @@ AwsIamHeaderAuthenticator::buildMessageToSign(absl::string_view service_url,
 void AwsIamHeaderAuthenticator::signedHeadersToMetadata(
     const Http::HeaderMap& headers, std::multimap<grpc::string, grpc::string>& metadata) {
 
-  headers.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        auto* md = static_cast<std::multimap<grpc::string, grpc::string>*>(context);
-        const auto& key = entry.key().getStringView();
-        // Skip pseudo-headers
-        if (key.empty() || key[0] == ':') {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        md->emplace(key, entry.value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &metadata);
+  headers.iterate([&metadata](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    const auto& key = entry.key().getStringView();
+    // Skip pseudo-headers
+    if (key.empty() || key[0] == ':') {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    metadata.emplace(key, entry.value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 }
 
 REGISTER_FACTORY(AwsIamGrpcCredentialsFactory, Grpc::GoogleGrpcCredentialsFactory);

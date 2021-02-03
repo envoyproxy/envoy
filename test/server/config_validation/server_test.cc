@@ -5,10 +5,11 @@
 #include "server/config_validation/server.h"
 
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace Server {
@@ -130,12 +131,16 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
 // all the example configs) but can't until light validation is implemented, mocking out access to
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
-// as-is.
-INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest,
-                         ::testing::Values("front-proxy_front-envoy.yaml",
-                                           "google_com_proxy.v2.yaml",
-                                           "grpc-bridge_server_envoy-proxy.yaml",
-                                           "front-proxy_service-envoy.yaml"));
+// as-is. (Note, /dev/stdout as an access log file is invalid on Windows, no equivalent /dev/
+// exists.)
+
+auto testing_values = ::testing::Values("front-proxy_front-envoy.yaml", "envoyproxy_io_proxy.yaml",
+#ifndef WIN32
+                                        "grpc-bridge_server_envoy-proxy.yaml",
+#endif
+                                        "front-proxy_service-envoy.yaml");
+
+INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest, testing_values);
 
 // Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.

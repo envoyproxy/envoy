@@ -4,7 +4,8 @@
 
 #include "extensions/filters/network/ratelimit/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,8 +20,10 @@ namespace RateLimitFilter {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::ratelimit::v3::RateLimit(), context),
+  envoy::extensions::filters::network::ratelimit::v3::RateLimit rate_limit;
+  rate_limit.mutable_rate_limit_service()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+  EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(rate_limit, context),
                ProtoValidationException);
 }
 
@@ -34,6 +37,7 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
        value: my_value
   timeout: 2s
   rate_limit_service:
+    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: ratelimit_cluster
@@ -75,12 +79,12 @@ descriptors:
 - entries:
   - key: my_key
     value: my_value
-ip_white_list: '12'
+ip_allowlist: '12'
   )EOF";
 
   envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "ip_white_list: Cannot find field");
+                          "ip_allowlist: Cannot find field");
 }
 
 // Test that the deprecated extension name still functions.
