@@ -884,9 +884,10 @@ void FilterManager::sendLocalReplyViaFilterChain(
                 *this, code, body, content_type);
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  stream_info_, code, body, content_type);
-            // Note that we did a local reply rewrite so that we don't try to do it again in encodeHeaders.
-            // This isn't very clean but we're trying to support local reply rewrites as well as upstream
-            // rewrites, where the match + rewrite logic makes the most sense in encodeHeaders/Data.
+            // Note that we did a local reply rewrite so that we don't try to do it again in
+            // encodeHeaders. This isn't very clean but we're trying to support local reply rewrites
+            // as well as upstream rewrites, where the match + rewrite logic makes the most sense in
+            // encodeHeaders/Data.
             did_rewrite_ = true;
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
@@ -1054,15 +1055,16 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   // See if the response would be written by local_reply_.
   if (!did_rewrite_) {
     do_rewrite_ =
-        local_reply_.match(filter_manager_callbacks_.requestHeaders().ptr(), *filter_manager_callbacks_.responseHeaders(),
-                          filter_manager_callbacks_.responseTrailers().ptr(),
-                          stream_info_);
+        local_reply_.match(filter_manager_callbacks_.requestHeaders().ptr(),
+                           *filter_manager_callbacks_.responseHeaders(),
+                           filter_manager_callbacks_.responseTrailers().ptr(), stream_info_);
   }
 
   bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   const bool original_modified_end_stream = modified_end_stream;
-  ENVOY_STREAM_LOG(debug, "FilterManager::encodeHeaders: end_stream={}, modified_end_stream={}, do_rewrite_={}",
-                   *this, end_stream, modified_end_stream, do_rewrite_);
+  ENVOY_STREAM_LOG(
+      debug, "FilterManager::encodeHeaders: end_stream={}, modified_end_stream={}, do_rewrite_={}",
+      *this, end_stream, modified_end_stream, do_rewrite_);
   if (do_rewrite_) {
     // _This_ actually sets buffered_response_data_ internally.
     rewriteResponse();
@@ -1299,8 +1301,9 @@ void FilterManager::rewriteResponse() {
                    rewritten_code);
   local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), *response_headers,
                        stream_info_, rewritten_code, rewritten_body, rewritten_content_type);
-  ENVOY_STREAM_LOG(trace, "rewriteResponse: local_reply_.rewrite returned body=\"{}\", content_type={}, code={}", *this,
-                   rewritten_body, rewritten_content_type, rewritten_code);
+  ENVOY_STREAM_LOG(
+      trace, "rewriteResponse: local_reply_.rewrite returned body=\"{}\", content_type={}, code={}",
+      *this, rewritten_body, rewritten_content_type, rewritten_code);
 
   buffered_response_data_ = std::make_unique<Buffer::OwnedImpl>(rewritten_body);
   if (!rewritten_body.empty()) {

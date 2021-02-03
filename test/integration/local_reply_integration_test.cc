@@ -487,11 +487,8 @@ body_format:
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "429"}}, true);
   response->waitForHeaders();
@@ -522,11 +519,8 @@ body_format:
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "429"}}, false);
   upstream_request_->encodeData(512, true);
