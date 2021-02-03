@@ -113,7 +113,7 @@ size_t EnvoyQuicClientSession::WriteHeadersOnHeadersStream(
   // watermark buffer, because it is impossible to identify which byte belongs
   // to which stream when the buffered bytes are drained in headers stream.
   // This updater may be in the scope of another one in OnCanWrite(), in such
-  // case, this one doesn't udpate the watermark.
+  // case, this one doesn't update the watermark.
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
   return quic::QuicSpdyClientSession::WriteHeadersOnHeadersStream(id, std::move(headers), fin,
                                                                   precedence, ack_listener);
