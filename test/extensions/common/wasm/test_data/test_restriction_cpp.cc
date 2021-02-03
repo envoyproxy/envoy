@@ -16,8 +16,8 @@ WASM_EXPORT(void, proxy_abi_version_0_2_1, (void)) {}
 WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configuration_size)) {
   (void)(context_id);
   (void)(configuration_size);
-  std::string level_message = "after on_vm_start, before proxy_log";
-  proxy_log(LogLevel::info, level_message.c_str(), level_message.size());
+  std::string log_message = "after proxy_on_vm_start: written by proxy_log";
+  proxy_log(LogLevel::info, log_message.c_str(), log_message.size());
   fprintf(stdout, "WASI write to stdout\n");
   return 1;
 }
