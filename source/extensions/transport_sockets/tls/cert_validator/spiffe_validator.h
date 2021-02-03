@@ -32,8 +32,10 @@ using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 class SPIFFEValidator : public CertValidator {
 public:
-  SPIFFEValidator(TimeSource& time_source) : time_source_(time_source){};
-  SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config, TimeSource& time_source);
+  SPIFFEValidator(SslStats& stats, TimeSource& time_source)
+      : stats_(stats), time_source_(time_source){};
+  SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+                  TimeSource& time_source);
   ~SPIFFEValidator() override = default;
 
   // Tls::CertValidator
@@ -64,6 +66,8 @@ private:
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
   std::string ca_file_name_;
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
+
+  SslStats& stats_;
   TimeSource& time_source_;
 };
 

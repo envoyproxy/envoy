@@ -374,8 +374,11 @@ typed_config:
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
+  Stats::CounterSharedPtr  counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
+  EXPECT_EQ(0, counter->value());
+  counter->reset();
 }
-
 // Server configured on SPIFFE certificate validation for mTLS
 // clientcert.pem's san is "spiffe://lyft.com/frontend-team" so it should be rejected.
 TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected1) {
@@ -399,9 +402,10 @@ typed_config:
   } else {
     makeHttpConnection(std::move(conn))->close();
   }
-  // handshake fails so the handshake counter must be 0
-  Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
-  EXPECT_EQ(0, counter->value());
+
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
+  EXPECT_EQ(1, counter->value());
   counter->reset();
 }
 
@@ -431,9 +435,9 @@ typed_config:
   } else {
     makeHttpConnection(std::move(conn))->close();
   }
-  // handshake fails so the handshake counter must be 0
-  Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
-  EXPECT_EQ(0, counter->value());
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
+  EXPECT_EQ(1, counter->value());
   counter->reset();
 }
 

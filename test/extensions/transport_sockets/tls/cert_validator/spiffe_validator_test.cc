@@ -3,7 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "common/event/real_time_system.h"
+
 #include "extensions/transport_sockets/tls/cert_validator/spiffe_validator.h"
+#include "extensions/transport_sockets/tls/stats.h"
 
 #include "test/extensions/transport_sockets/tls/cert_validator/util.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -29,25 +32,33 @@ using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
 class TestSPIFFEValidator : public testing::Test {
 public:
+  TestSPIFFEValidator() : stats_(generateSslStats(store_)) {}
   void initialize(std::string yaml, TimeSource& time_source) {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(typed_conf);
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), time_source);
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, time_source);
   }
 
   void initialize(std::string yaml) {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(typed_conf);
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), config_->api().timeSource());
+    validator_ =
+        std::make_unique<SPIFFEValidator>(config_.get(), stats_, config_->api().timeSource());
   };
 
-  SPIFFEValidator& validator() { return *validator_; };
+  void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, time_system_); }
+
+  SPIFFEValidator& validator() { return *validator_; }
+  SslStats& stats() { return stats_; }
 
 private:
   TestCertificateValidationContextConfigPtr config_;
   SPIFFEValidatorPtr validator_;
+  Stats::TestUtil::TestStore store_;
+  SslStats stats_;
+  Event::TestRealTimeSystem time_system_;
 };
 
 TEST_F(TestSPIFFEValidator, Constructor) {
@@ -120,31 +131,30 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
   EXPECT_TRUE(SPIFFEValidator::certificatePrecheck(cert.get()));
 }
 
-TEST(SPIFFEValidator, TestInitializeSslContexts) {
-  Event::TestRealTimeSystem time_system;
-  auto validator = SPIFFEValidator(time_system);
+TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
+  initialize();
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator.initializeSslContexts({}, false));
+            validator().initializeSslContexts({}, false));
 }
 
-TEST(SPIFFEValidator, TestGetTrustBundleStore) {
-  Event::TestRealTimeSystem time_system;
-  auto validator = SPIFFEValidator(time_system);
+TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
+  initialize();
+
   // no san
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
-  EXPECT_FALSE(validator.getTrustBundleStore(cert.get()));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // spiffe san
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
 
   // trust bundle not provided
-  EXPECT_FALSE(validator.getTrustBundleStore(cert.get()));
+  EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // trust bundle provided
-  validator.trustBundleStores().emplace("lyft.com", X509StorePtr(X509_STORE_new()));
-  EXPECT_TRUE(validator.getTrustBundleStore(cert.get()));
+  validator().trustBundleStores().emplace("lyft.com", X509StorePtr(X509_STORE_new()));
+  EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSingleTrustDomain) {
@@ -181,6 +191,8 @@ typed_config:
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+
+  EXPECT_EQ(2, stats().fail_verify_error_.value());
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomain) {
@@ -218,11 +230,13 @@ typed_config:
   store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
+
+  EXPECT_EQ(1, stats().fail_verify_error_.value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetCaCertInformation) {
-  Event::TestRealTimeSystem time_system;
-  EXPECT_FALSE(SPIFFEValidator(time_system).getCaCertInformation()); // should be nullptr
+  initialize();
+  EXPECT_FALSE(validator().getCaCertInformation()); // should be nullptr
 
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -233,8 +247,7 @@ typed_config:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
     example.com:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-  )EOF"),
-             time_system);
+  )EOF"));
 
   auto actual = validator().getCaCertInformation();
   EXPECT_TRUE(actual);

@@ -39,8 +39,8 @@ namespace Tls {
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
 SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
-                                 TimeSource& time_source)
-    : time_source_(time_source) {
+                                 SslStats& stats, TimeSource& time_source)
+    : stats_(stats), time_source_(time_source) {
   if (config == nullptr) {
     throw EnvoyException("SPIFFE cert validator connot be initialized from null configuration");
   }
@@ -145,6 +145,7 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
+    stats_.fail_verify_error_.inc();
     return 0;
   }
 
@@ -153,6 +154,7 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
     }
+    stats_.fail_verify_error_.inc();
     return 0;
   }
 
@@ -163,6 +165,9 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     ssl_extended_info->setCertificateValidationStatus(
         ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
                  : Envoy::Ssl::ClientValidationStatus::Failed);
+  }
+  if (!ret) {
+    stats_.fail_verify_error_.inc();
   }
   return ret;
 }
@@ -220,7 +225,7 @@ size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
     return 0;
   }
-  // TODO: with the current interface, we cannot pass the multiple cert information.
+  // TODO(mathetake): with the current interface, we cannot pass the multiple cert information.
   // So temporarily we return the first CA's info here.
   return Utility::getDaysUntilExpiration(ca_certs_[0].get(), time_source_);
 }
@@ -229,7 +234,7 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
   if (ca_certs_.empty()) {
     return nullptr;
   }
-  // TODO: with the current interface, we cannot pass the multiple cert information.
+  // TODO(mathetake): with the current interface, we cannot pass the multiple cert information.
   // So temporarily we return the first CA's info here.
   return Utility::certificateDetails(ca_certs_[0].get(), getCaFileName(), time_source_);
 };
@@ -237,8 +242,8 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
   CertValidatorPtr createCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
-                                       SslStats&, TimeSource& time_source) override {
-    return std::make_unique<SPIFFEValidator>(config, time_source);
+                                       SslStats& stats, TimeSource& time_source) override {
+    return std::make_unique<SPIFFEValidator>(config, stats, time_source);
   }
 
   absl::string_view name() override { return "envoy.tls.cert_validator.spiffe"; }
