@@ -34,6 +34,8 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   Envoy::Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
+  Envoy::Extensions::StatSinks::EnvoyMobileMetricsService::
+      forceRegisterEnvoyMobileMetricsServiceSinkFactory();
   Envoy::Extensions::TransportSockets::RawBuffer::forceRegisterUpstreamRawBufferSocketFactory();
   Envoy::Extensions::TransportSockets::Tls::forceRegisterUpstreamSslSocketFactory();
   Envoy::Extensions::Upstreams::Http::Generic::forceRegisterGenericGenericConnPoolFactory();
