@@ -1050,6 +1050,9 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after proxy_on_vm_start: written by proxy_log")))
             .Times(0);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info,
+                                        Eq("after proxy_on_context_create: written by proxy_log")))
+            .Times(0);
         EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(0);
         return root_context;
       });
@@ -1153,6 +1156,59 @@ TEST_P(WasmCommonTest, AllowWASI) {
                     log_(spdlog::level::info, Eq("after proxy_on_vm_start: written by proxy_log")))
             .Times(0);
         EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout")));
+        return root_context;
+      });
+  wasm->start(plugin);
+}
+
+// test a different callback besides proxy_on_vm_start
+TEST_P(WasmCommonTest, AllowOnContextCreate) {
+  if (GetParam() == "null") {
+    return;
+  }
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  auto name = "";
+  auto root_id = "";
+  auto vm_id = "";
+  auto vm_configuration = "allow_on_context_create";
+  auto plugin_configuration = "";
+  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      name, root_id, vm_id, GetParam(), plugin_configuration, false,
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
+      {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_log", proxy_wasm::SanitizationConfig()}};
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
+      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
+      allowed_capabilities, scope, cluster_manager, *dispatcher);
+
+  // Restrict capabilities, but allow proxy_log
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_context_create"));
+  EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
+
+  EXPECT_NE(wasm, nullptr);
+  auto context = std::make_unique<TestContext>(wasm.get());
+  EXPECT_TRUE(wasm->initialize(code, false));
+
+  // Expect two calls to proxy_log, from proxy_on_vm_start and from proxy_on_context_create
+  wasm->setCreateContextForTesting(
+      nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+        auto root_context = new TestContext(wasm, plugin);
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::info, Eq("after proxy_on_vm_start: written by proxy_log")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::info,
+                                        Eq("after proxy_on_context_create: written by proxy_log")));
         return root_context;
       });
   wasm->start(plugin);
