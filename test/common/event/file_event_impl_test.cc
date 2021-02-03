@@ -74,11 +74,11 @@ TEST_P(FileEventImplActivateTest, Activate) {
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   ReadyWatcher read_event;
-  EXPECT_CALL(read_event, ready()).Times(1);
+  EXPECT_CALL(read_event, ready());
   ReadyWatcher write_event;
-  EXPECT_CALL(write_event, ready()).Times(1);
+  EXPECT_CALL(write_event, ready());
   ReadyWatcher closed_event;
-  EXPECT_CALL(closed_event, ready()).Times(1);
+  EXPECT_CALL(closed_event, ready());
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
@@ -106,7 +106,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
 }
 
 TEST_P(FileEventImplActivateTest, ActivateChaining) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -170,7 +170,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
 }
 
 TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -231,9 +231,9 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
 #ifndef WIN32 // Libevent on Windows doesn't support edge trigger.
 TEST_F(FileEventImplTest, EdgeTrigger) {
   ReadyWatcher read_event;
-  EXPECT_CALL(read_event, ready()).Times(1);
+  EXPECT_CALL(read_event, ready());
   ReadyWatcher write_event;
-  EXPECT_CALL(write_event, ready()).Times(1);
+  EXPECT_CALL(write_event, ready());
 
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
       fds_[0],

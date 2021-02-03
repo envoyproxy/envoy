@@ -57,11 +57,6 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
           wrapTransportSocketOptions(transport_socket_options, protocols), state),
       random_generator_(random_generator) {
   ASSERT(!protocols.empty());
-  // TODO(alyssawilk) the protocol function should probably be an optional and
-  // simply not set if there's more than one and ALPN has not been negotiated.
-  if (!protocols.empty()) {
-    protocol_ = protocols[0];
-  }
 }
 
 HttpConnPoolImplBase::~HttpConnPoolImplBase() { destructAllConnections(); }
@@ -95,7 +90,8 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
   Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
   Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
   callbacks.onPoolReady(new_encoder, client.real_host_description_,
-                        http_client->codec_client_->streamInfo());
+                        http_client->codec_client_->streamInfo(),
+                        http_client->codec_client_->protocol());
 }
 
 } // namespace Http

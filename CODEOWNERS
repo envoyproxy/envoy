@@ -28,6 +28,8 @@ extensions/filters/common/original_src @snowp @klarose
 # compressor used by http compression filters
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
+# external processing filter
+/*/extensions/filters/http/ext_proc @gbrail @htuch
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -42,6 +44,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
 /*/extensions/transport_sockets/common @alyssawilk @wez470
+# starttls transport socket
+/*/extensions/transport_sockets/starttls @cpakulski @lizan
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension
@@ -51,7 +55,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.xray extension
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # tracers.skywalking extension
-/*/extensions/tracers/skywalking @wbpcode @dio @lizan
+/*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
 # postgres_proxy extension
@@ -83,17 +87,17 @@ extensions/filters/common/original_src @snowp @klarose
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly access logger extensions
-/*/extensions/access_loggers/wasm @PiotrSikora @lizan
+/*/extensions/access_loggers/wasm @PiotrSikora @mathetake @lizan
 # webassembly bootstrap extensions
-/*/extensions/bootstrap/wasm @PiotrSikora @lizan
+/*/extensions/bootstrap/wasm @PiotrSikora @mathetake @lizan
 # webassembly http extensions
-/*/extensions/filters/http/wasm @PiotrSikora @lizan
+/*/extensions/filters/http/wasm @PiotrSikora @mathetake @lizan
 # webassembly network extensions
-/*/extensions/filters/network/wasm @PiotrSikora @lizan
+/*/extensions/filters/network/wasm @PiotrSikora @mathetake @lizan
 # webassembly common extension
-/*/extensions/common/wasm @PiotrSikora @lizan
+/*/extensions/common/wasm @PiotrSikora @mathetake @lizan
 # webassembly runtimes
-/*/extensions/wasm_runtime/ @PiotrSikora @lizan
+/*/extensions/wasm_runtime/ @PiotrSikora @mathetake @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
@@ -120,7 +124,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 # webassembly stat-sink extensions
-/*/extensions/stat_sinks/wasm @PiotrSikora @lizan
+/*/extensions/stat_sinks/wasm @PiotrSikora @mathetake @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
@@ -154,3 +158,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
+# HTTP Kill Request
+/*/extensions/filters/http/kill_request @qqustc @htuch
+# Rate limit expression descriptor
+/*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
+# user space socket pair and event
+/*/extensions/io_socket/user_space @lambdai @antoniovicente

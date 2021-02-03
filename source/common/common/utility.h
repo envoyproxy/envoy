@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <ios>
 #include <set>
 #include <sstream>
 #include <string>
@@ -111,6 +112,32 @@ public:
 };
 
 /**
+ * Class used for creating non-memory allocating std::ostream.
+ */
+class MutableMemoryStreamBuffer : public std::streambuf {
+public:
+  MutableMemoryStreamBuffer(char* base, size_t size);
+};
+
+/**
+ * std::ostream class that serializes writes into the provided buffer.
+ */
+class OutputBufferStream : private MutableMemoryStreamBuffer, public std::ostream {
+public:
+  OutputBufferStream(char* data, size_t size);
+
+  /**
+   * @return the number of bytes written prior to the "put" pointer into the buffer.
+   */
+  int bytesWritten() const;
+
+  /**
+   * @return a string view of the written bytes.
+   */
+  absl::string_view contents() const;
+};
+
+/**
  * Class used for creating non-copying std::istream's. See InputConstMemoryStream below.
  */
 class ConstMemoryStreamBuffer : public std::streambuf {
@@ -150,6 +177,24 @@ public:
    * @return uint64_t the number of milliseconds since the epoch.
    */
   static uint64_t nowToMilliseconds(TimeSource& time_source);
+};
+
+/**
+ * Utility routines for working with integers.
+ */
+class IntUtil {
+public:
+  /**
+   * Round `val` up to the next multiple. Examples:
+   *   roundUpToMultiple(3, 8) -> 8
+   *   roundUpToMultiple(9, 8) -> 16
+   *   roundUpToMultiple(8, 8) -> 8
+   */
+  static uint64_t roundUpToMultiple(uint64_t val, uint32_t multiple) {
+    ASSERT(multiple > 0);
+    ASSERT((val + multiple) >= val, "Unsigned overflow");
+    return ((val + multiple - 1) / multiple) * multiple;
+  }
 };
 
 /**
@@ -592,8 +637,8 @@ template <class Value> struct TrieLookupTable {
   }
 
   /**
-   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix, key
-   * length))
+   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix,
+   * key length)).
    * @param key the key used to find.
    * @return the value matching the longest prefix based on the key.
    */
@@ -723,6 +768,19 @@ private:
 
   uint32_t size_;
   char data_[];
+};
+
+class SetUtil {
+public:
+  // Use instead of std::set_difference for unordered absl::flat_hash_set containers.
+  template <typename T>
+  static void setDifference(const absl::flat_hash_set<T>& original_set,
+                            const absl::flat_hash_set<T>& remove_set,
+                            absl::flat_hash_set<T>& result_set) {
+    std::copy_if(original_set.begin(), original_set.end(),
+                 std::inserter(result_set, result_set.begin()),
+                 [&remove_set](const T& v) -> bool { return remove_set.count(v) == 0; });
+  }
 };
 
 } // namespace Envoy

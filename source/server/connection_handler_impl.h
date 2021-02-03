@@ -83,7 +83,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
-  void setListenerRejectFraction(float reject_fraction) override;
+  void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**
@@ -248,13 +248,11 @@ private:
                     bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-                                            listener_.parent_.dispatcher_.timeSource(),
-                                            StreamInfo::FilterState::LifeSpan::Connection)) {
+          iter_(accept_filters_.end()),
+          stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+              listener_.parent_.dispatcher_.timeSource(), socket_->addressProviderSharedPtr(),
+              StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
-      stream_info_->setDownstreamLocalAddress(socket_->localAddress());
-      stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
-      stream_info_->setDownstreamDirectRemoteAddress(socket_->directRemoteAddress());
     }
     ~ActiveTcpSocket() override {
       accept_filters_.clear();
@@ -363,7 +361,7 @@ private:
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
-  float listener_reject_fraction_{0};
+  UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
 
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,

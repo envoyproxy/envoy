@@ -44,7 +44,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
 
   tls_slot_->set([this](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), GrpcCommon::GrpcAccessLoggerType::HTTP, scope_));
+        config_.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 }
 

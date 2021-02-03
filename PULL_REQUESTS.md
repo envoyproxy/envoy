@@ -60,7 +60,7 @@ changes may be in [docs/root](docs/root) and/or inline with the API protos. Plea
 N/A if there were no documentation changes.
 
 Any PRs with structural changes to the dataplane should also update the [Life of a
-Request](docs/root/intro/life_of_a_request.md) documentation as appropriate.
+Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation as appropriate.
 
 ### <a name="relnotes"></a>Release notes
 
@@ -111,3 +111,11 @@ PR description.
 If you mark existing APIs or code as deprecated, when the next release is cut, the
 deprecation script will create and assign an issue to you for
 cleaning up the deprecated code path.
+
+### <a name="api"></a>API Changes
+
+If this PR changes anything in the [api tree](https://github.com/envoyproxy/envoy/tree/master/api),
+please read the [API Review
+Checklist](https://github.com/envoyproxy/envoy/tree/master/api/review_checklist.md)
+and make sure that your changes have addressed all of the considerations listed there.
+Any relevant considerations should be documented under "API Considerations" in the PR description.

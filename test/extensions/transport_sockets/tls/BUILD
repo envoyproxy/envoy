@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -54,6 +56,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -178,4 +181,28 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "tls_throughput_benchmark",
+    srcs = ["tls_throughput_benchmark.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    external_deps = [
+        "benchmark",
+        "ssl",
+    ],
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "tls_throughput_benchmark_test",
+    benchmark_binary = "tls_throughput_benchmark",
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
 )

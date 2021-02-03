@@ -282,29 +282,25 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "quiche=enabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
-    "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
-    "--define" "zlib=ng")
+    "--define" "zlib=ng"
+    "--@envoy//source/extensions/filters/http/kill_request:enabled"
+    "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
 
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
-  if [[ "${TEST_TARGETS[*]}" == "//test/..." ]]; then
-    cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    TEST_TARGETS=("@envoy//test/...")
-  fi
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
+
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
-
-  # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
-  # integration tests with asan.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
@@ -454,7 +450,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   export DOCKER_NO_PULL=1
   umask 027
   chmod -R o-rwx examples/
-  ci/verify_examples.sh
+  ci/verify_examples.sh "*" wasm-cc
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

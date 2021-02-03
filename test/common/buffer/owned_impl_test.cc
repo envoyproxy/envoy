@@ -24,17 +24,6 @@ public:
   bool release_callback_called_ = false;
 
 protected:
-  static void clearReservation(Buffer::RawSlice* iovecs, uint64_t num_iovecs, OwnedImpl& buffer) {
-    for (uint64_t i = 0; i < num_iovecs; i++) {
-      iovecs[i].len_ = 0;
-    }
-    buffer.commit(iovecs, num_iovecs);
-  }
-
-  static void commitReservation(Buffer::RawSlice* iovecs, uint64_t num_iovecs, OwnedImpl& buffer) {
-    buffer.commit(iovecs, num_iovecs);
-  }
-
   static void expectSlices(std::vector<std::vector<int>> buffer_list, OwnedImpl& buffer) {
     const auto& buffer_slices = buffer.describeSlicesForTest();
     ASSERT_EQ(buffer_list.size(), buffer_slices.size());
@@ -742,16 +731,16 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   }
   buffer.addDrainTracker(tracker5.AsStdFunction());
 
-  expectSlices({{16184, 136, 16320},
+  expectSlices({{16184, 200, 16384},
                 {400, 0, 400},
                 {0, 0, 0},
-                {32704, 0, 32704},
-                {4032, 0, 4032},
-                {4032, 0, 4032},
-                {4032, 0, 4032},
-                {4032, 0, 4032},
-                {4032, 0, 4032},
-                {704, 3328, 4032}},
+                {32768, 0, 32768},
+                {4096, 0, 4096},
+                {4096, 0, 4096},
+                {4096, 0, 4096},
+                {4096, 0, 4096},
+                {4096, 0, 4096},
+                {320, 3776, 4096}},
                buffer);
 
   testing::InSequence s;
@@ -770,11 +759,11 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   EXPECT_CALL(tracker5, Call());
   EXPECT_CALL(drain_tracker, Call(4616, 4616));
   EXPECT_CALL(done_tracker, Call());
-  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16384, 4032, 20416},
-                                                                  {16384, 4032, 20416},
-                                                                  {16520, 0, 32704},
-                                                                  {16384, 4032, 20416},
-                                                                  {4616, 3512, 8128}}) {
+  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16384, 0, 16384},
+                                                                  {16384, 0, 16384},
+                                                                  {16584, 0, 32768},
+                                                                  {16384, 0, 16384},
+                                                                  {4616, 3576, 8192}}) {
     const uint32_t write_size = std::min<uint32_t>(LinearizeSize, buffer.length());
     buffer.linearize(write_size);
     expectFirstSlice(expected_first_slice, buffer);
@@ -794,79 +783,88 @@ TEST_F(OwnedImplTest, ReserveCommit) {
 
   {
     Buffer::OwnedImpl buffer;
-    // A zero-byte reservation should fail.
-    static constexpr uint64_t NumIovecs = 16;
-    Buffer::RawSlice iovecs[NumIovecs];
-    uint64_t num_reserved = buffer.reserve(0, iovecs, NumIovecs);
-    EXPECT_EQ(0, num_reserved);
-    clearReservation(iovecs, num_reserved, buffer);
+    // A zero-byte reservation should return an empty reservation.
+    {
+      auto reservation = buffer.reserveSingleSlice(0);
+      EXPECT_EQ(0, reservation.slice().len_);
+      EXPECT_EQ(0, reservation.length());
+    }
     EXPECT_EQ(0, buffer.length());
 
     // Test and commit a small reservation. This should succeed.
-    num_reserved = buffer.reserve(1, iovecs, NumIovecs);
-    EXPECT_EQ(1, num_reserved);
-    // The implementation might provide a bigger reservation than requested.
-    EXPECT_LE(1, iovecs[0].len_);
-    iovecs[0].len_ = 1;
-    commitReservation(iovecs, num_reserved, buffer);
+    {
+      auto reservation = buffer.reserveForRead();
+      reservation.commit(1);
+    }
     EXPECT_EQ(1, buffer.length());
 
     // Request a reservation that fits in the remaining space at the end of the last slice.
-    num_reserved = buffer.reserve(1, iovecs, NumIovecs);
-    EXPECT_EQ(1, num_reserved);
-    EXPECT_LE(1, iovecs[0].len_);
-    iovecs[0].len_ = 1;
-    const void* slice1 = iovecs[0].mem_;
-    clearReservation(iovecs, num_reserved, buffer);
+    const void* slice1;
+    {
+      auto reservation = buffer.reserveSingleSlice(1);
+      EXPECT_EQ(1, reservation.slice().len_);
+      slice1 = reservation.slice().mem_;
+    }
 
     // Request a reservation that is too large to fit in the remaining space at the end of
     // the last slice, and allow the buffer to use only one slice. This should result in the
     // creation of a new slice within the buffer.
-    num_reserved = buffer.reserve(4096 - sizeof(OwnedSlice), iovecs, 1);
-    EXPECT_EQ(1, num_reserved);
-    EXPECT_NE(slice1, iovecs[0].mem_);
-    clearReservation(iovecs, num_reserved, buffer);
+    {
+      auto reservation = buffer.reserveSingleSlice(16384);
+      EXPECT_EQ(16384, reservation.slice().len_);
+      EXPECT_NE(slice1, reservation.slice().mem_);
+    }
 
     // Request the same size reservation, but allow the buffer to use multiple slices. This
     // should result in the buffer creating a second slice and splitting the reservation between the
     // last two slices.
-    num_reserved = buffer.reserve(4096 - sizeof(OwnedSlice), iovecs, NumIovecs);
-    EXPECT_EQ(2, num_reserved);
-    EXPECT_EQ(slice1, iovecs[0].mem_);
-    clearReservation(iovecs, num_reserved, buffer);
-
-    // Request a reservation that too big to fit in the existing slices. This should result
-    // in the creation of a third slice.
-    expectSlices({{1, 4031, 4032}}, buffer);
-    buffer.reserve(4096 - sizeof(OwnedSlice), iovecs, NumIovecs);
-    expectSlices({{1, 4031, 4032}, {0, 4032, 4032}}, buffer);
-    const void* slice2 = iovecs[1].mem_;
-    num_reserved = buffer.reserve(8192, iovecs, NumIovecs);
-    expectSlices({{1, 4031, 4032}, {0, 4032, 4032}, {0, 4032, 4032}}, buffer);
-    EXPECT_EQ(3, num_reserved);
-    EXPECT_EQ(slice1, iovecs[0].mem_);
-    EXPECT_EQ(slice2, iovecs[1].mem_);
-    clearReservation(iovecs, num_reserved, buffer);
+    {
+      expectSlices({{1, 16383, 16384}}, buffer);
+      auto reservation = buffer.reserveForRead();
+      EXPECT_GE(reservation.numSlices(), 2);
+      EXPECT_GE(reservation.length(), 32767);
+      EXPECT_EQ(slice1, reservation.slices()[0].mem_);
+      EXPECT_EQ(16383, reservation.slices()[0].len_);
+      EXPECT_EQ(16384, reservation.slices()[1].len_);
+    }
 
     // Append a fragment to the buffer, and then request a small reservation. The buffer
     // should make a new slice to satisfy the reservation; it cannot safely use any of
     // the previously seen slices, because they are no longer at the end of the buffer.
-    expectSlices({{1, 4031, 4032}}, buffer);
-    buffer.addBufferFragment(fragment);
-    EXPECT_EQ(13, buffer.length());
-    num_reserved = buffer.reserve(1, iovecs, NumIovecs);
-    expectSlices({{1, 4031, 4032}, {12, 0, 12}, {0, 4032, 4032}}, buffer);
-    EXPECT_EQ(1, num_reserved);
-    EXPECT_NE(slice1, iovecs[0].mem_);
-    commitReservation(iovecs, num_reserved, buffer);
+    {
+      expectSlices({{1, 16383, 16384}}, buffer);
+      buffer.addBufferFragment(fragment);
+      EXPECT_EQ(13, buffer.length());
+      auto reservation = buffer.reserveForRead();
+      EXPECT_NE(slice1, reservation.slices()[0].mem_);
+      reservation.commit(1);
+      expectSlices({{1, 16383, 16384}, {12, 0, 12}, {1, 16383, 16384}}, buffer);
+    }
     EXPECT_EQ(14, buffer.length());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    uint64_t default_reservation_length;
+    uint64_t default_slice_length;
+    {
+      auto reservation = buffer.reserveForRead();
+      default_reservation_length = reservation.length();
+      default_slice_length = reservation.slices()[0].len_;
+      reservation.commit(default_slice_length / 2);
+    }
+    {
+      // Test that the Reservation size is capped at the available space in the Reservation
+      // inline storage, including using the end of a previous slice, no matter how big the request
+      // is.
+      auto reservation = buffer.reserveForReadWithLengthForTest(UINT64_MAX);
+      EXPECT_EQ(reservation.length(), default_reservation_length - (default_slice_length / 2));
+    }
   }
 }
 
 TEST_F(OwnedImplTest, ReserveCommitReuse) {
   Buffer::OwnedImpl buffer;
-  static constexpr uint64_t NumIovecs = 2;
-  Buffer::RawSlice iovecs[NumIovecs];
 
   // Reserve 8KB and commit all but a few bytes of it, to ensure that
   // the last slice of the buffer can hold part but not all of the
@@ -874,108 +872,121 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
   // allocate more than the requested 8KB. In case the implementation
   // uses a power-of-two allocator, the subsequent reservations all
   // request 16KB.
-  uint64_t num_reserved = buffer.reserve(8192, iovecs, NumIovecs);
-  EXPECT_EQ(1, num_reserved);
-  iovecs[0].len_ = 8000;
-  buffer.commit(iovecs, 1);
+  {
+    auto reservation = buffer.reserveSingleSlice(8200);
+    reservation.commit(8000);
+  }
   EXPECT_EQ(8000, buffer.length());
 
-  // Reserve 16KB. The resulting reservation should span 2 slices.
+  // Reserve some space. The resulting reservation should span 2 slices.
   // Commit part of the first slice and none of the second slice.
-  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  EXPECT_EQ(2, num_reserved);
-  const void* first_slice = iovecs[0].mem_;
-  iovecs[0].len_ = 1;
-  expectSlices({{8000, 4224, 12224}, {0, 12224, 12224}}, buffer);
-  buffer.commit(iovecs, 1);
-  EXPECT_EQ(8001, buffer.length());
-  EXPECT_EQ(first_slice, iovecs[0].mem_);
-  // The second slice is now released because there's nothing in the second slice.
-  expectSlices({{8001, 4223, 12224}}, buffer);
+  const void* first_slice;
+  {
+    expectSlices({{8000, 4288, 12288}}, buffer);
+    auto reservation = buffer.reserveForRead();
 
-  // Reserve 16KB again.
-  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  expectSlices({{8001, 4223, 12224}, {0, 12224, 12224}}, buffer);
-  EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
-            static_cast<const uint8_t*>(iovecs[0].mem_));
+    // No additional slices are added to the buffer until `commit()` is called
+    // on the reservation.
+    expectSlices({{8000, 4288, 12288}}, buffer);
+    first_slice = reservation.slices()[0].mem_;
+
+    EXPECT_GE(reservation.numSlices(), 2);
+    reservation.commit(1);
+  }
+  EXPECT_EQ(8001, buffer.length());
+  // The second slice is now released because there's nothing in the second slice.
+  expectSlices({{8001, 4287, 12288}}, buffer);
+
+  // Reserve again.
+  {
+    auto reservation = buffer.reserveForRead();
+    EXPECT_GE(reservation.numSlices(), 2);
+    EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
+              static_cast<const uint8_t*>(reservation.slices()[0].mem_));
+  }
+  expectSlices({{8001, 4287, 12288}}, buffer);
 }
 
-TEST_F(OwnedImplTest, ReserveReuse) {
+// Test behavior when the size to commit() is larger than the reservation.
+TEST_F(OwnedImplTest, ReserveOverCommit) {
   Buffer::OwnedImpl buffer;
-  static constexpr uint64_t NumIovecs = 2;
-  Buffer::RawSlice iovecs[NumIovecs];
+  auto reservation = buffer.reserveForRead();
+  const auto reservation_length = reservation.length();
+  const auto excess_length = reservation_length + 1;
+#ifdef NDEBUG
+  reservation.commit(excess_length);
 
-  // Reserve some space and leave it uncommitted.
-  uint64_t num_reserved = buffer.reserve(8192, iovecs, NumIovecs);
-  EXPECT_EQ(1, num_reserved);
-  const void* first_slice = iovecs[0].mem_;
+  // The length should be the Reservation length, not the value passed to commit.
+  EXPECT_EQ(reservation_length, buffer.length());
+#else
+  EXPECT_DEATH(
+      reservation.commit(excess_length),
+      "length <= length_. Details: commit\\(\\) length must be <= size of the Reservation");
+#endif
+}
 
-  // Reserve more space and verify that it begins with the same slice from the last reservation.
-  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(first_slice, iovecs[0].mem_);
-  const void* second_slice = iovecs[1].mem_;
+// Test behavior when the size to commit() is larger than the reservation.
+TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
+  Buffer::OwnedImpl buffer;
+  auto reservation = buffer.reserveSingleSlice(10);
+  const auto reservation_length = reservation.length();
+  const auto excess_length = reservation_length + 1;
+#ifdef NDEBUG
+  reservation.commit(excess_length);
 
-  // Repeat the last reservation and verify that it yields the same slices.
-  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(first_slice, iovecs[0].mem_);
-  EXPECT_EQ(second_slice, iovecs[1].mem_);
-  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}}, buffer);
+  // The length should be the Reservation length, not the value passed to commit.
+  EXPECT_EQ(reservation_length, buffer.length());
+#else
+  EXPECT_DEATH(
+      reservation.commit(excess_length),
+      "length <= slice_.len_. Details: commit\\(\\) length must be <= size of the Reservation");
+#endif
+}
 
-  // Request a larger reservation, verify that the second entry is replaced with a block with a
-  // larger size.
-  num_reserved = buffer.reserve(30000, iovecs, NumIovecs);
-  const void* third_slice = iovecs[1].mem_;
-  EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(first_slice, iovecs[0].mem_);
-  EXPECT_EQ(12224, iovecs[0].len_);
-  EXPECT_NE(second_slice, iovecs[1].mem_);
-  EXPECT_EQ(30000 - iovecs[0].len_, iovecs[1].len_);
-  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}, {0, 20416, 20416}}, buffer);
+// Test functionality of the `freelist` (a performance optimization)
+TEST_F(OwnedImplTest, SliceFreeList) {
+  Buffer::OwnedImpl b1, b2;
+  std::vector<void*> slices;
+  {
+    auto r = b1.reserveForRead();
+    for (auto& slice : absl::MakeSpan(r.slices(), r.numSlices())) {
+      slices.push_back(slice.mem_);
+    }
+    r.commit(1);
+    EXPECT_EQ(slices[0], b1.getRawSlices()[0].mem_);
+  }
 
-  // Repeating a the reservation request for a smaller block returns the previous entry.
-  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(first_slice, iovecs[0].mem_);
-  EXPECT_EQ(second_slice, iovecs[1].mem_);
-  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}, {0, 20416, 20416}}, buffer);
+  {
+    auto r = b2.reserveForRead();
+    EXPECT_EQ(slices[1], r.slices()[0].mem_);
+    r.commit(1);
+    EXPECT_EQ(slices[1], b2.getRawSlices()[0].mem_);
+  }
 
-  // Repeat the larger reservation notice that it doesn't match the prior reservation for 30000
-  // bytes.
-  num_reserved = buffer.reserve(30000, iovecs, NumIovecs);
-  EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(first_slice, iovecs[0].mem_);
-  EXPECT_EQ(12224, iovecs[0].len_);
-  EXPECT_NE(second_slice, iovecs[1].mem_);
-  EXPECT_NE(third_slice, iovecs[1].mem_);
-  EXPECT_EQ(30000 - iovecs[0].len_, iovecs[1].len_);
-  expectSlices({{0, 12224, 12224}, {0, 8128, 8128}, {0, 20416, 20416}, {0, 20416, 20416}}, buffer);
-
-  // Commit the most recent reservation and verify the representation.
-  buffer.commit(iovecs, num_reserved);
-  expectSlices({{12224, 0, 12224}, {0, 8128, 8128}, {0, 20416, 20416}, {17776, 2640, 20416}},
-               buffer);
-
-  // Do another reservation.
-  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
-  EXPECT_EQ(2, num_reserved);
-  expectSlices({{12224, 0, 12224},
-                {0, 8128, 8128},
-                {0, 20416, 20416},
-                {17776, 2640, 20416},
-                {0, 16320, 16320}},
-               buffer);
-
-  // And commit.
-  buffer.commit(iovecs, num_reserved);
-  expectSlices({{12224, 0, 12224},
-                {0, 8128, 8128},
-                {0, 20416, 20416},
-                {20416, 0, 20416},
-                {13744, 2576, 16320}},
-               buffer);
+  b1.drain(1);
+  EXPECT_EQ(0, b1.getRawSlices().size());
+  {
+    auto r = b2.reserveForRead();
+    // slices()[0] is the partially used slice that is already part of this buffer.
+    EXPECT_EQ(slices[2], r.slices()[1].mem_);
+  }
+  {
+    auto r = b1.reserveForRead();
+    EXPECT_EQ(slices[2], r.slices()[0].mem_);
+  }
+  {
+    // This causes an underflow in the `freelist` on creation, and overflows it on deletion.
+    auto r1 = b1.reserveForRead();
+    auto r2 = b2.reserveForRead();
+    for (auto& r1_slice : absl::MakeSpan(r1.slices(), r1.numSlices())) {
+      // r1 reservation does not contain the slice that is a part of b2.
+      EXPECT_NE(r1_slice.mem_, b2.getRawSlices()[0].mem_);
+      for (auto& r2_slice : absl::MakeSpan(r2.slices(), r2.numSlices())) {
+        // The two reservations do not share any slices.
+        EXPECT_NE(r1_slice.mem_, r2_slice.mem_);
+      }
+    }
+  }
 }
 
 TEST_F(OwnedImplTest, Search) {
@@ -1139,13 +1150,9 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   buf.addBufferFragment(frag);
   buf.prepend("bbbbb");
   buf.add("");
-  constexpr uint32_t reserve_slices = 16;
-  Buffer::RawSlice slices[reserve_slices];
-  const uint32_t allocated_slices = buf.reserve(1280, slices, reserve_slices);
-  for (uint32_t i = 0; i < allocated_slices; ++i) {
-    slices[i].len_ = 0;
-  }
-  buf.commit(slices, allocated_slices);
+  expectSlices({{5, 0, 4096}, {0, 0, 0}}, buf);
+  { auto reservation = buf.reserveSingleSlice(1280); }
+  expectSlices({{5, 0, 4096}}, buf);
   os_fd_t pipe_fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
 #ifdef WIN32
@@ -1166,7 +1173,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).rc_, 0);
   ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
-  expectSlices({{5, 0, 4032}, {1953, 2079, 4032}}, buf);
+  expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
 }
 
 TEST_F(OwnedImplTest, ReadReserveAndCommit) {
@@ -1193,7 +1200,7 @@ TEST_F(OwnedImplTest, ReadReserveAndCommit) {
   ASSERT_EQ(result.rc_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).rc_, 0);
   EXPECT_EQ("bbbbbe", buf.toString());
-  expectSlices({{6, 4026, 4032}}, buf);
+  expectSlices({{6, 4090, 4096}}, buf);
 }
 
 TEST(OverflowDetectingUInt64, Arithmetic) {
@@ -1254,6 +1261,13 @@ TEST_F(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
   // Make first slice have 127 of free space (it is actually less as there is small overhead of the
   // OwnedSlice object) And second slice 128 bytes
   TestBufferMove(4096 - 127, 128, 2);
+}
+
+TEST_F(OwnedImplTest, FrontSlice) {
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(0, buffer.frontSlice().len_);
+  buffer.add("a");
+  EXPECT_EQ(1, buffer.frontSlice().len_);
 }
 
 } // namespace

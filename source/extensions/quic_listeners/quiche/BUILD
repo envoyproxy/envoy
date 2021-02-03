@@ -107,6 +107,7 @@ envoy_cc_library(
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
 )
 
@@ -211,6 +212,7 @@ envoy_cc_library(
         ":quic_filter_manager_connection_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_storage_impl_lib",

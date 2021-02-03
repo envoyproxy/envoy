@@ -34,37 +34,46 @@ def envoy_copts(repository, test = False):
         "-DNOIME",
         "-DNOCRYPT",
         # Ignore unguarded gcc pragmas in quiche (unrecognized by MSVC)
-        # TODO(wrowe,sunjayBhatia): Drop this change when fixed in bazel/external/quiche.genrule_cmd
         "-wd4068",
         # Silence incorrect MSVC compiler warnings when converting between std::optional
         # data types (while conversions between primitive types are producing no error)
         "-wd4244",
         # Allow inline functions to be undefined
         "-wd4506",
-        # Allow 'nodiscard' function return values to be discarded
-        # TODO(wrowe,sunjayBhatia): Drop this option when all causes are fixed
-        "-wd4834",
     ]
 
     return select({
                repository + "//bazel:windows_x86_64": msvc_options,
                "//conditions:default": posix_options,
            }) + select({
-               # Bazel adds an implicit -DNDEBUG for opt.
+               # Simplify the amount of symbolic debug info for test binaries, since
+               # debugging info detailing some 1600 test binaries would be wasteful.
+               # targets listed in order from generic to increasing specificity.
+               # Bazel adds an implicit -DNDEBUG for opt targets.
                repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gsplit-dwarf"],
                repository + "//bazel:fastbuild_build": [],
                repository + "//bazel:dbg_build": ["-ggdb3", "-gsplit-dwarf"],
-               repository + "//bazel:windows_opt_build": [],
+               repository + "//bazel:windows_opt_build": [] if test else ["-Z7"],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
                repository + "//bazel:clang_cl_opt_build": [] if test else ["-Z7", "-fstandalone-debug"],
                repository + "//bazel:clang_cl_fastbuild_build": ["-fno-standalone-debug"],
                repository + "//bazel:clang_cl_dbg_build": ["-fstandalone-debug"],
            }) + select({
-               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions", "-Wrange-loop-analysis"],
+               # Toggle expected features and warnings by compiler
+               repository + "//bazel:clang_build": [
+                   "-fno-limit-debug-info",
+                   "-Wgnu-conditional-omitted-operand",
+                   "-Wc++2a-extensions",
+                   "-Wrange-loop-analysis",
+               ],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
-               # TODO: Replace with /Zc:preprocessor for cl.exe versions >= 16.5
-               repository + "//bazel:windows_x86_64": ["-experimental:preprocessor", "-Wv:19.4"],
+               # Allow 'nodiscard' function results values to be discarded for test code only
+               # TODO(envoyproxy/windows-dev): Replace /Zc:preprocessor with /experimental:preprocessor
+               # for msvc versions between 15.8 through 16.4.x. see
+               # https://docs.microsoft.com/en-us/cpp/build/reference/zc-preprocessor
+               repository + "//bazel:windows_x86_64": ["-wd4834", "-Zc:preprocessor", "-Wv:19.4"] if test else ["-Zc:preprocessor", "-Wv:19.4"],
+               repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:no_debug_info": ["-g0"],

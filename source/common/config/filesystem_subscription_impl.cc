@@ -27,13 +27,13 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
 }
 
 // Config::Subscription
-void FilesystemSubscriptionImpl::start(const std::set<std::string>&, const bool) {
+void FilesystemSubscriptionImpl::start(const absl::flat_hash_set<std::string>&) {
   started_ = true;
   // Attempt to read in case there is a file there already.
   refresh();
 }
 
-void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::string>&) {
+void FilesystemSubscriptionImpl::updateResourceInterest(const absl::flat_hash_set<std::string>&) {
   // Bump stats for consistent behavior with other xDS.
   stats_.update_attempt_.inc();
 }
@@ -113,7 +113,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   if (collection_entries_field_descriptor == nullptr ||
       collection_entries_field_descriptor->type() != Protobuf::FieldDescriptor::TYPE_MESSAGE ||
       collection_entries_field_descriptor->message_type()->full_name() !=
-          "udpa.core.v1.CollectionEntry" ||
+          "xds.core.v3.CollectionEntry" ||
       !collection_entries_field_descriptor->is_repeated()) {
     throw EnvoyException(fmt::format("Invalid structure for collection type {} in {}",
                                      collection_type, resource_message.DebugString()));
@@ -123,7 +123,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
       reflection->FieldSize(*collection_message, collection_entries_field_descriptor);
   DecodedResourcesWrapper decoded_resources;
   for (uint32_t i = 0; i < num_entries; ++i) {
-    udpa::core::v1::CollectionEntry collection_entry;
+    xds::core::v3::CollectionEntry collection_entry;
     collection_entry.MergeFrom(reflection->GetRepeatedMessage(
         *collection_message, collection_entries_field_descriptor, i));
     // TODO(htuch): implement indirect collection entries.

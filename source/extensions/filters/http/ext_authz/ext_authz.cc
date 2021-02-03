@@ -72,8 +72,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
                                                // going to invoke check call.
   cluster_ = callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_->check(*this, callbacks_->dispatcher(), check_request_, callbacks_->activeSpan(),
-                 callbacks_->streamInfo());
+  client_->check(*this, check_request_, callbacks_->activeSpan(), callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
@@ -213,8 +212,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     for (const auto& header : response->headers_to_remove) {
       // We don't allow removing any :-prefixed headers, nor Host, as removing
       // them would make the request malformed.
-      if (absl::StartsWithIgnoreCase(absl::string_view(header.get()), ":") ||
-          header == Http::Headers::get().HostLegacy) {
+      if (!Http::HeaderUtility::isRemovableHeader(header.get())) {
         continue;
       }
       ENVOY_STREAM_LOG(trace, "'{}'", *callbacks_, header.get());
@@ -281,14 +279,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Error: {
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
-      if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
-        config_->incCounter(cluster_->statsScope(), config_->ext_authz_timeout_);
-      }
     }
     stats_.error_.inc();
-    if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
-      stats_.timeout_.inc();
-    }
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
       stats_.failure_mode_allowed_.inc();

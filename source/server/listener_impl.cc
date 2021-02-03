@@ -38,15 +38,25 @@ namespace Envoy {
 namespace Server {
 
 namespace {
+bool anyFilterChain(
+    const envoy::config::listener::v3::Listener& config,
+    std::function<bool(const envoy::config::listener::v3::FilterChain&)> predicate) {
+  return (config.has_default_filter_chain() && predicate(config.default_filter_chain())) ||
+         std::any_of(config.filter_chains().begin(), config.filter_chains().end(), predicate);
+}
+
 bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
-  return std::any_of(config.filter_chains().begin(), config.filter_chains().end(),
-                     [](const auto& filter_chain) {
-                       const auto& matcher = filter_chain.filter_chain_match();
-                       return matcher.transport_protocol() == "tls" ||
-                              (matcher.transport_protocol().empty() &&
-                               (!matcher.server_names().empty() ||
-                                !matcher.application_protocols().empty()));
-                     }) &&
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disable_tls_inspector_injection")) {
+    return false;
+  }
+  return anyFilterChain(config,
+                        [](const auto& filter_chain) {
+                          const auto& matcher = filter_chain.filter_chain_match();
+                          return matcher.transport_protocol() == "tls" ||
+                                 (matcher.transport_protocol().empty() &&
+                                  (!matcher.server_names().empty() ||
+                                   !matcher.application_protocols().empty()));
+                        }) &&
          !std::any_of(
              config.listener_filters().begin(), config.listener_filters().end(),
              [](const auto& filter) {
@@ -54,6 +64,19 @@ bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
                           Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector ||
                       filter.name() == "envoy.listener.tls_inspector";
              });
+}
+
+bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
+  // TODO(#14085): `use_proxy_proto` should be deprecated.
+  // Checking only the first or default filter chain is done for backwards compatibility.
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config.filter_chains().empty() ? config.default_filter_chain() : config.filter_chains()[0],
+      use_proxy_proto, false);
+}
+
+bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bind_to_port, true) &&
+         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
 }
 } // namespace
 
@@ -91,7 +114,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   }
 
   if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = socket_->localAddress();
+    local_address_ = socket_->addressProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
             local_address_->asString());
@@ -172,6 +195,7 @@ Event::Dispatcher& ListenerFactoryContextBaseImpl::dispatcher() { return server_
 Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
 bool ListenerFactoryContextBaseImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
 Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.httpContext(); }
+Router::Context& ListenerFactoryContextBaseImpl::routerContext() { return server_.routerContext(); }
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
@@ -227,9 +251,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+      bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
@@ -305,10 +329,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
-    : parent_(parent), address_(origin.address_),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+    : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
@@ -458,21 +481,22 @@ void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_ty
 }
 
 void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
-  if (config_.filter_chains().empty() && (socket_type == Network::Socket::Type::Stream ||
-                                          !udp_listener_factory_->isTransportConnectionless())) {
+  if (config_.filter_chains().empty() && !config_.has_default_filter_chain() &&
+      (socket_type == Network::Socket::Type::Stream ||
+       !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
   } else if (udp_listener_factory_ != nullptr &&
              !udp_listener_factory_->isTransportConnectionless()) {
-    for (auto& filter_chain : config_.filter_chains()) {
-      // Early fail if any filter chain doesn't have transport socket configured.
-      if (!filter_chain.has_transport_socket()) {
-        throw EnvoyException(fmt::format("error adding listener '{}': no transport socket "
-                                         "specified for connection oriented UDP listener",
-                                         address_->asString()));
-      }
+    // Early fail if any filter chain doesn't have transport socket configured.
+    if (anyFilterChain(config_, [](const auto& filter_chain) {
+          return !filter_chain.has_transport_socket();
+        })) {
+      throw EnvoyException(fmt::format("error adding listener '{}': no transport socket "
+                                       "specified for connection oriented UDP listener",
+                                       address_->asString()));
     }
   }
 }
@@ -512,7 +536,7 @@ void ListenerImpl::buildSocketOptions() {
 
 void ListenerImpl::buildOriginalDstListenerFilter() {
   // Add original dst listener filter if 'use_original_dst' flag is set.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, hidden_envoy_deprecated_use_original_dst, false)) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, use_original_dst, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
@@ -528,7 +552,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
   //                   is implemented, this needs to be run after the filter chain has been
   //                   selected.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_.filter_chains()[0], use_proxy_proto, false)) {
+  if (usesProxyProto(config_)) {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
@@ -579,6 +603,9 @@ bool PerListenerFactoryContextImpl::healthCheckFailed() {
 }
 Http::Context& PerListenerFactoryContextImpl::httpContext() {
   return listener_factory_context_base_->httpContext();
+}
+Router::Context& PerListenerFactoryContextImpl::routerContext() {
+  return listener_factory_context_base_->routerContext();
 }
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
@@ -712,10 +739,8 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
-  // See buildProxyProtocolListenerFilter(). Full listener update guarantees at least 1 filter chain
-  // at tcp listener.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_.filter_chains()[0], use_proxy_proto, false) ^
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
+  // See buildProxyProtocolListenerFilter().
+  if (usesProxyProto(config_) ^ usesProxyProto(config)) {
     return false;
   }
 

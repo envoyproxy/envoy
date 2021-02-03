@@ -53,7 +53,12 @@ namespace Wasm {
 
 namespace {
 
+// FilterState prefix for CelState values.
+constexpr absl::string_view CelStateKeyPrefix = "wasm.";
+
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
+using CelState = Filters::Common::Expr::CelState;
+using CelStatePrototype = Filters::Common::Expr::CelStatePrototype;
 
 Http::RequestTrailerMapPtr buildRequestTrailerMapFromPairs(const Pairs& pairs) {
   auto map = Http::RequestTrailerMapImpl::create();
@@ -431,14 +436,13 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   auto part_token = property_tokens.find(name);
   if (part_token == property_tokens.end()) {
     if (info) {
-      std::string key;
-      absl::StrAppend(&key, WasmStateKeyPrefix, name);
-      const WasmState* state;
-      if (info->filterState().hasData<WasmState>(key)) {
-        state = &info->filterState().getDataReadOnly<WasmState>(key);
+      std::string key = absl::StrCat(CelStateKeyPrefix, name);
+      const CelState* state;
+      if (info->filterState().hasData<CelState>(key)) {
+        state = &info->filterState().getDataReadOnly<CelState>(key);
       } else if (info->upstreamFilterState() &&
-                 info->upstreamFilterState()->hasData<WasmState>(key)) {
-        state = &info->upstreamFilterState()->getDataReadOnly<WasmState>(key);
+                 info->upstreamFilterState()->hasData<CelState>(key)) {
+        state = &info->upstreamFilterState()->getDataReadOnly<CelState>(key);
       } else {
         return {};
       }
@@ -708,6 +712,9 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, absl::string_view 
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -769,6 +776,9 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -779,6 +789,9 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, absl::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -790,6 +803,9 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, absl::string_v
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, value);
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -858,11 +874,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
 void Context::onDownstreamConnectionClose(CloseType close_type) {
   ContextBase::onDownstreamConnectionClose(close_type);
   downstream_closed_ = true;
-  // Call close on TCP connection, if upstream connection closed or there was a failure seen in
-  // this connection.
-  if (upstream_closed_ || getRequestStreamInfo()->hasAnyResponseFlag()) {
-    onCloseTCP();
-  }
+  onCloseTCP();
 }
 
 void Context::onUpstreamConnectionClose(CloseType close_type) {
@@ -896,7 +908,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     return WasmResult::BadArgument;
   }
   auto cluster_string = std::string(cluster);
-  if (clusterManager().get(cluster_string) == nullptr) {
+  const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_string);
+  if (thread_local_cluster == nullptr) {
     return WasmResult::BadArgument;
   }
 
@@ -932,9 +945,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
-  auto http_request = clusterManager()
-                          .httpAsyncClientForCluster(cluster_string)
-                          .send(std::move(message), handler, options);
+  auto http_request =
+      thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
     http_request_.erase(token);
     return WasmResult::InternalFailure;
@@ -1114,16 +1126,17 @@ WasmResult Context::setProperty(absl::string_view path, absl::string_view value)
     return WasmResult::NotFound;
   }
   std::string key;
-  absl::StrAppend(&key, WasmStateKeyPrefix, path);
-  WasmState* state;
-  if (stream_info->filterState()->hasData<WasmState>(key)) {
-    state = &stream_info->filterState()->getDataMutable<WasmState>(key);
+  absl::StrAppend(&key, CelStateKeyPrefix, path);
+  CelState* state;
+  if (stream_info->filterState()->hasData<CelState>(key)) {
+    state = &stream_info->filterState()->getDataMutable<CelState>(key);
   } else {
     const auto& it = rootContext()->state_prototypes_.find(path);
-    const WasmStatePrototype& prototype = it == rootContext()->state_prototypes_.end()
-                                              ? DefaultWasmStatePrototype::get()
-                                              : *it->second.get(); // NOLINT
-    auto state_ptr = std::make_unique<WasmState>(prototype);
+    const CelStatePrototype& prototype =
+        it == rootContext()->state_prototypes_.end()
+            ? Filters::Common::Expr::DefaultCelStatePrototype::get()
+            : *it->second.get(); // NOLINT
+    auto state_ptr = std::make_unique<CelState>(prototype);
     state = state_ptr.get();
     stream_info->filterState()->setData(key, std::move(state_ptr),
                                         StreamInfo::FilterState::StateType::Mutable,
@@ -1135,8 +1148,9 @@ WasmResult Context::setProperty(absl::string_view path, absl::string_view value)
   return WasmResult::Ok;
 }
 
-WasmResult Context::declareProperty(absl::string_view path,
-                                    std::unique_ptr<const WasmStatePrototype> state_prototype) {
+WasmResult
+Context::declareProperty(absl::string_view path,
+                         Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {
   // Do not delete existing schema since it can be referenced by state objects.
   if (state_prototypes_.find(path) == state_prototypes_.end()) {
     state_prototypes_[path] = std::move(state_prototype);

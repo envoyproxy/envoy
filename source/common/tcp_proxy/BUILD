@@ -21,9 +21,11 @@ envoy_cc_library(
         "//include/envoy/tcp:upstream_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:load_balancer_interface",
+        "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/router:header_parser_lib",
     ],
 )
 
@@ -58,6 +60,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:codec_client_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",

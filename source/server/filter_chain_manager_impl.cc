@@ -84,6 +84,10 @@ Http::Context& PerFilterChainFactoryContextImpl::httpContext() {
   return parent_context_.httpContext();
 }
 
+Router::Context& PerFilterChainFactoryContextImpl::routerContext() {
+  return parent_context_.routerContext();
+}
+
 const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const {
   return parent_context_.localInfo();
 }
@@ -415,7 +419,7 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
-  const auto& address = socket.localAddress();
+  const auto& address = socket.addressProvider().localAddress();
 
   const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
@@ -445,7 +449,7 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.localAddress();
+  auto address = socket.addressProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -566,7 +570,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.remoteAddress();
+  auto address = socket.addressProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
     address = fakeAddress();
   }
@@ -676,6 +680,7 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
 Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
+Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
 bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
