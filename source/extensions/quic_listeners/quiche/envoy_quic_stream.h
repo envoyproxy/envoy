@@ -105,12 +105,11 @@ public:
     filter_manager_connection_.updateBytesBuffered(buffered_data_old, buffered_data_new);
   }
 
-  virtual uint32_t streamId() PURE;
-
 protected:
   virtual void switchStreamBlockState(bool should_block) PURE;
 
   // Needed for ENVOY_STREAM_LOG.
+  virtual uint32_t streamId() PURE;
   virtual Network::Connection* connection() PURE;
 
   void setDetails(absl::string_view details) { details_ = details; }

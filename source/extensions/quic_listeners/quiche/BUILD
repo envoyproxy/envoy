@@ -133,7 +133,6 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )
 

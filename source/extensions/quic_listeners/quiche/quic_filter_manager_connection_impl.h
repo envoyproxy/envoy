@@ -113,18 +113,12 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
-  bool isUpdatingWatermarkByHeadersStream() const { return updating_watermark_by_headers_stream_; }
-
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source);
 
   void closeConnectionImmediately() override;
-
-  void setUpdatingWatermarkByHeadersStream(bool updating_watermark_by_headers_stream) {
-    updating_watermark_by_headers_stream_ = updating_watermark_by_headers_stream;
-  }
 
   virtual bool hasDataToWrite() PURE;
 
@@ -151,7 +145,6 @@ private:
   // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
   Buffer::OwnedImpl empty_buffer_;
-  bool updating_watermark_by_headers_stream_{false};
 };
 
 } // namespace Quic

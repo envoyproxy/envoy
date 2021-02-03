@@ -54,11 +54,10 @@ public:
 
   void clearWatermarkBuffer();
 
-  uint32_t streamId() override;
-
 protected:
   // EnvoyQuicStream
   void switchStreamBlockState(bool should_block) override;
+  uint32_t streamId() override;
   Network::Connection* connection() override;
 
   // quic::QuicSpdyStream
