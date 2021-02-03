@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"

@@ -716,7 +716,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake320WrongCloginSeqTest) {
  * -> expect filter to ignore auth-switch message
  *    because of wrong seq.
  */
-TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchWromgSeqTest) {
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchWrongSeqTest) {
   initialize();
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());

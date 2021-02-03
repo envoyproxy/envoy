@@ -16,15 +16,15 @@ TEST(MySQLAuthSwithRespTest, AuthSwithResp) {
 
   ClientSwitchResponse switch_resp_decode{};
   switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, decode_data.length());
-  EXPECT_EQ(switch_resp_decode.getAuthPluginResp(), switch_resp_encode.getAuthPluginResp());
+  EXPECT_EQ(switch_resp_encode.getAuthPluginResp(), switch_resp_decode.getAuthPluginResp());
 }
 
 TEST(MySQLAuthSwithRespTest, AuthSwithRespIncompleteResp) {
   ClientSwitchResponse switch_resp_encode{};
   switch_resp_encode.setAuthPluginResp(MySQLTestUtils::getAuthResp8());
-  Buffer::OwnedImpl decode_data;
-  switch_resp_encode.encode(decode_data);
-
+  Buffer::OwnedImpl buffer;
+  switch_resp_encode.encode(buffer);
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), 0);
   ClientSwitchResponse switch_resp_decode{};
   switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, 0);
   EXPECT_EQ(switch_resp_decode.getAuthPluginResp(), "");

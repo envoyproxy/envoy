@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -63,7 +62,7 @@ constexpr uint8_t LOGIN_OK_SEQ = 2;
 constexpr uint8_t GREETING_SEQ_NUM = 0;
 constexpr uint8_t CHALLENGE_SEQ_NUM = 1;
 constexpr uint8_t CHALLENGE_RESP_SEQ_NUM = 2;
-constexpr uint8_t AUTH_SWITH_RESP_SEQ = 4;
+constexpr uint8_t AUTH_SWITH_RESP_SEQ = 3;
 constexpr uint32_t MYSQL_THREAD_ID = 0x5e;
 constexpr uint16_t MYSQL_SERVER_CAPAB = 0x0101;
 constexpr uint8_t MYSQL_SERVER_LANGUAGE = 0x21;
