@@ -1,0 +1,57 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 443
+    listener_filters:
+    filter_chains:
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          filters:
+          - name: with-matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+              extension_config:
+                  name: response-filter-config
+                  typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                      code: 403
+              matcher:
+                  matcher_tree:
+                      input:
+                          name: request-headers
+                          typed_config:
+                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                              header_name: some-header
+                      exact_match_map:
+                          # Note this additional indirection; this is a workaround for Protobuf oneof limitations.
+                          map:
+                              skip_filter: # This is the header value we're trying to match against.
+                                  action:
+                                      name: skip
+                                      typed_config:
+                                          "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+          route_config:
+            virtual_hosts:
+            - name: default
+              domains: "*"
+              routes:
+              - match: { prefix: "/" }
+                route:
+                  cluster: service_foo
+  clusters:
+    name: service_foo
+    connect_timeout: 15s
+    load_assignment:
+      cluster_name: some_service
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8080

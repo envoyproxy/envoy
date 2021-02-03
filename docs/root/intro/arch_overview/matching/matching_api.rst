@@ -14,29 +14,8 @@ environment data as well as custom sublinear matchers and direct matchers.
 Within supported environments (currently only HTTP filters), a wrapper proto can be used to
 instantiate a matching filter associated with the wrapped structure:
 
-.. code-block:: yaml
-
-    "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
-    extension_config:
-        name: response-filter-config
-        typed_config:
-            "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-            code: 403
-    matcher:
-        matcher_tree:
-            input:
-                name: request-headers
-                typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                    header_name: some-header
-            exact_match_map:
-                # Note this additional indirection; this is a workaround for Protobuf oneof limitations.
-                map:
-                    skip_filter: # This is the header value we're trying to match against.
-                        action:
-                            name: skip
-                            typed_config:
-                                "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+.. literalinclude:: _include/simple.yaml
+    :language: yaml
 
 The above example wraps a HTTP filter (the SetResponseCode filter) in an ExtensionWithMatcher, allowing us to define
 a match tree to be evaluated in conjunction with evaluation of the wrapped filter. Prior to data being made available
