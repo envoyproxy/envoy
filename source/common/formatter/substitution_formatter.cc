@@ -1182,7 +1182,7 @@ absl::optional<std::string> ClusterMetadataFormatter::format(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
     const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
   auto cluster_info = stream_info.upstreamClusterInfo();
-  if (!cluster_info.has_value() || cluster_info.value().get() == nullptr) {
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
     return absl::nullopt;
   }
   return MetadataFormatter::formatMetadata(cluster_info.value()->metadata());
@@ -1194,7 +1194,7 @@ ProtobufWkt::Value ClusterMetadataFormatter::formatValue(const Http::RequestHead
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          absl::string_view) const {
   auto cluster_info = stream_info.upstreamClusterInfo();
-  if (!cluster_info.has_value() || cluster_info.value().get() == nullptr) {
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
     // Let the formatter do its thing with empty metadata.
     return MetadataFormatter::formatMetadataValue(envoy::config::core::v3::Metadata());
   }
