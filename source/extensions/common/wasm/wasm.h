@@ -161,7 +161,8 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // all failures synchronously as it has no facility to report configuration update failures
 // asynchronously. Callers should throw an exception if they are part of a synchronous xDS update
 // because that is the mechanism for reporting configuration errors.
-bool createWasm(const VmConfig& vm_config, const CapabilityRestrictionConfig& cr_config,
+bool createWasm(const VmConfig& vm_config,
+                const CapabilityRestrictionConfig& capability_restriction_config,
                 const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Event::Dispatcher& dispatcher, Api::Api& api,

@@ -34,7 +34,7 @@ using CreateContextFn =
 using PluginHandleExtensionFactory = std::function<PluginHandleBaseSharedPtr(
     const WasmHandleSharedPtr& base_wasm, absl::string_view plugin_key)>;
 using WasmHandleExtensionFactory = std::function<WasmHandleBaseSharedPtr(
-    const VmConfig& vm_config, const CapabilityRestrictionConfig& cr_config,
+    const VmConfig& vm_config, const CapabilityRestrictionConfig& capability_restriction_config,
     const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
     Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
     absl::string_view vm_key)>;

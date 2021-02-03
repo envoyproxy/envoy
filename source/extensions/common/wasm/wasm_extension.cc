@@ -48,12 +48,13 @@ PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
 }
 
 WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
-  return [](const VmConfig vm_config, const CapabilityRestrictionConfig cr_config,
+  return [](const VmConfig vm_config,
+            const CapabilityRestrictionConfig capability_restriction_config,
             const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
             Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
     proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
-    for (auto& capability : cr_config.allowed_capabilities()) {
+    for (auto& capability : capability_restriction_config.allowed_capabilities()) {
       // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
       allowed_capabilities[capability.first] = proxy_wasm::SanitizationConfig();
     }
