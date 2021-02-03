@@ -12,8 +12,8 @@ configure_make(
     configure_options = ["--disable-ssl --disable-gssapi --disable-lz4-ext --disable-zstd && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@edenhill_librdkafka//:all",
     make_commands = [
-        "make",
-        "make install",
+        "make libs",
+        "make install-subdirs",
     ],
     static_libraries = [
         "librdkafka.a",
