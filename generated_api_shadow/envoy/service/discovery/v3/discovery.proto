@@ -105,7 +105,6 @@ message DiscoveryResponse {
   // required for non-stream based xDS implementations.
   string nonce = 5;
 
-  // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 6;
 }
@@ -203,7 +202,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
@@ -228,6 +227,10 @@ message DeltaDiscoveryResponse {
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
   // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
+
+  // [#not-implemented-hide:]
+  // The control plane instance that sent the response.
+  config.core.v3.ControlPlane control_plane = 7;
 }
 
 // [#next-free-field: 8]
