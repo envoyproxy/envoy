@@ -27,6 +27,9 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
 OWS
@@ -36,6 +39,7 @@ SkyWalking
 TIDs
 WASI
 ceil
+CCM
 CHACHA
 CHLO
 CHMOD
@@ -370,6 +374,7 @@ absl
 accesslog
 accessor
 accessors
+ackless
 acks
 acls
 addr
@@ -703,6 +708,7 @@ inlined
 inlining
 inobservability
 inotify
+inserter
 instantiation
 instantiations
 interpretable
@@ -826,6 +832,7 @@ noncopyable
 nonresponsive
 noop
 nop
+npos
 nthreads
 ntohl
 ntop
@@ -873,6 +880,7 @@ passphrase
 passthrough
 pathname
 pausable
+pausedness
 pcall
 pcap
 pclose
@@ -884,6 +892,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix
@@ -1002,6 +1011,7 @@ resolvers
 responder
 restarter
 resync
+ret
 retransmitting
 retriable
 retriggers

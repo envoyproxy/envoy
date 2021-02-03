@@ -728,7 +728,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                         config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
       features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
-          config, http_protocol_options_)),
+          config, *http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
@@ -956,6 +956,17 @@ ClusterImplBase::ClusterImplBase(
       });
 }
 
+namespace {
+
+bool excludeBasedOnHealthFlag(const Host& host) {
+  return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+}
+
+} // namespace
+
 std::tuple<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr,
            ExcludedHostVectorConstSharedPtr>
 ClusterImplBase::partitionHostList(const HostVector& hosts) {
@@ -970,7 +981,7 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
     if (host->health() == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
-    if (host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    if (excludeBasedOnHealthFlag(*host)) {
       excluded_list->get().emplace_back(host);
     }
   }
@@ -981,10 +992,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
 std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
            HostsPerLocalityConstSharedPtr>
 ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
-  auto filtered_clones = hosts.filter(
-      {[](const Host& host) { return host.health() == Host::Health::Healthy; },
-       [](const Host& host) { return host.health() == Host::Health::Degraded; },
-       [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
+  auto filtered_clones =
+      hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
+                    [](const Host& host) { return host.health() == Host::Health::Degraded; },
+                    [](const Host& host) { return excludeBasedOnHealthFlag(host); }});
 
   return std::make_tuple(std::move(filtered_clones[0]), std::move(filtered_clones[1]),
                          std::move(filtered_clones[2]));
@@ -1384,22 +1395,19 @@ void PriorityStateManager::updateClusterPrioritySet(
   }
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
-                                                   HostVector& current_priority_hosts,
-                                                   HostVector& hosts_added_to_current_priority,
-                                                   HostVector& hosts_removed_from_current_priority,
-                                                   HostMap& updated_hosts,
-                                                   const HostMap& all_hosts) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(
+    const HostVector& new_hosts, HostVector& current_priority_hosts,
+    HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
+    HostMap& updated_hosts, const HostMap& all_hosts,
+    const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
   //
-  // Has the EDS health status changed the health of any endpoint? If so, we
+  // Have host attributes changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
   // endpoint has materially changed (e.g. if previously failing active health
   // checks, we just note it's now failing EDS health status but don't rebuild).
-  //
-  // Likewise, if metadata for an endpoint changed we rebuild the hosts vectors.
   //
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to
@@ -1414,8 +1422,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
-  absl::node_hash_set<std::string> existing_hosts_for_current_priority(
+  absl::flat_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
+  // Keep track of hosts we're adding (or replacing)
+  absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (updated_hosts.count(host->address()->asString())) {
@@ -1449,6 +1459,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // so do that here.
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
+      }
+      if (existing_host->second->weight() != host->weight()) {
+        existing_host->second->weight(host->weight());
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
+          // We do full host set rebuilds so that load balancers can do pre-computation of data
+          // structures based on host weight. This may become a performance problem in certain
+          // deployments so it is runtime feature guarded and may also need to be configurable
+          // and/or dynamic in the future.
+          hosts_changed = true;
+        }
       }
 
       hosts_changed |=
@@ -1485,10 +1506,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
-      existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
+      new_hosts_for_current_priority.emplace(host->address()->asString());
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
@@ -1545,7 +1566,18 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                       [&all_new_hosts, &new_hosts_for_current_priority, &updated_hosts,
+                        &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                         if (all_new_hosts.contains(p->address()->asString()) &&
+                             !new_hosts_for_current_priority.contains(p->address()->asString())) {
+                           // If the address is being completely deleted from this priority, but is
+                           // referenced from another priority, then we assume that the other
+                           // priority will perform an in-place update to re-use the existing Host.
+                           // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
+                           // instead remove it immediately from this priority.
+                           return false;
+                         }
+
                          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
                                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
                            if (p->weight() > max_host_weight) {

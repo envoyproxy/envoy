@@ -14,19 +14,16 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-static const std::string INLINE_STRING = "<inline>";
+void WasmServiceExtension::onServerInitialized() { createWasm(context_); }
 
-void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& config,
-                             Server::Configuration::ServerFactoryContext& context,
-                             CreateWasmServiceCallback&& cb) {
+void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
   auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config().name(), config.config().root_id(), config.config().vm_config().vm_id(),
-      config.config().vm_config().runtime(),
-      Common::Wasm::anyToBytes(config.config().configuration()), config.config().fail_open(),
+      config_.config().name(), config_.config().root_id(), config_.config().vm_config().vm_id(),
+      config_.config().vm_config().runtime(),
+      Common::Wasm::anyToBytes(config_.config().configuration()), config_.config().fail_open(),
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(), nullptr);
 
-  bool singleton = config.singleton();
-  auto callback = [&context, singleton, plugin, cb](Common::Wasm::WasmHandleSharedPtr base_wasm) {
+  auto callback = [this, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     if (!base_wasm) {
       if (plugin->fail_open_) {
         ENVOY_LOG(error, "Unable to create Wasm service {}", plugin->name_);
@@ -35,10 +32,11 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
       }
       return;
     }
-    if (singleton) {
+    if (config_.singleton()) {
       // Return a Wasm VM which will be stored as a singleton by the Server.
-      cb(std::make_unique<WasmService>(plugin, Common::Wasm::getOrCreateThreadLocalPlugin(
-                                                   base_wasm, plugin, context.dispatcher())));
+      wasm_service_ = std::make_unique<WasmService>(
+          plugin,
+          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
       return;
     }
     // Per-thread WASM VM.
@@ -48,7 +46,7 @@ void WasmFactory::createWasm(const envoy::extensions::wasm::v3::WasmService& con
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
       return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
     });
-    cb(std::make_unique<WasmService>(plugin, std::move(tls_slot)));
+    wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));
   };
 
   if (!Common::Wasm::createWasm(
@@ -70,12 +68,7 @@ WasmFactory::createBootstrapExtension(const Protobuf::Message& config,
       MessageUtil::downcastAndValidate<const envoy::extensions::wasm::v3::WasmService&>(
           config, context.messageValidationContext().staticValidationVisitor());
 
-  auto wasm_service_extension = std::make_unique<WasmServiceExtension>();
-  createWasm(typed_config, context,
-             [extension = wasm_service_extension.get()](WasmServicePtr wasm) {
-               extension->wasm_service_ = std::move(wasm);
-             });
-  return wasm_service_extension;
+  return std::make_unique<WasmServiceExtension>(typed_config, context);
 }
 
 // /**

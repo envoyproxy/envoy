@@ -56,7 +56,9 @@ void createHttpBodyEnvelope(Buffer::Instance& output,
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
  */
-class JsonTranscoderConfig : public Logger::Loggable<Logger::Id::config> {
+class JsonTranscoderConfig : public Logger::Loggable<Logger::Id::config>,
+                             public Router::RouteSpecificFilterConfig {
+
 public:
   /**
    * constructor that loads protobuf descriptors from the file specified in the JSON config.
@@ -81,13 +83,13 @@ public:
                    Protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                   MethodInfoSharedPtr& method_info);
+                   MethodInfoSharedPtr& method_info) const;
 
   /**
    * Converts an arbitrary protobuf message to JSON.
    */
   ProtobufUtil::Status translateProtoMessageToJson(const Protobuf::Message& message,
-                                                   std::string* json_out);
+                                                   std::string* json_out) const;
 
   /**
    * If true, skip clearing the route cache after the incoming request has been modified.
@@ -102,14 +104,17 @@ public:
    */
   bool convertGrpcStatus() const;
 
+  bool disabled() const { return disabled_; }
+
+  bool strict_http_request_validation_{false};
+
 private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
   ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
-                                           google::grpc::transcoding::RequestInfo* info);
+                                           google::grpc::transcoding::RequestInfo* info) const;
 
-private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
@@ -128,6 +133,8 @@ private:
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
+
+  bool disabled_;
 };
 
 using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
@@ -176,15 +183,17 @@ private:
                               Http::ResponseHeaderOrTrailerMap& trailers);
   bool hasHttpBodyAsOutputType();
   void doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers);
+  void initPerRouteConfig();
 
   JsonTranscoderConfig& config_;
+  const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;
   TranscoderInputStreamImpl response_in_;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   MethodInfoSharedPtr method_;
-  Http::ResponseHeaderMap* response_headers_{nullptr};
+  Http::ResponseHeaderMap* response_headers_{};
   Grpc::Decoder decoder_;
 
   // Data of the initial request message, initialized from query arguments, path, etc.

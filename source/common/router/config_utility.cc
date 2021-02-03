@@ -118,8 +118,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
 }
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
-                                                   Api::Api& api) {
-  static const ssize_t MaxBodySize = 4096;
+                                                   Api::Api& api, uint32_t max_body_size_bytes) {
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
   }
@@ -133,17 +132,17 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
     if (size < 0) {
       throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
     }
-    if (size > MaxBodySize) {
+    if (size > max_body_size_bytes) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, size, MaxBodySize));
+                                       filename, size, max_body_size_bytes));
     }
     return api.fileSystem().fileReadToEnd(filename);
   }
   const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
                                                             : body.inline_bytes());
-  if (inline_body.length() > MaxBodySize) {
+  if (inline_body.length() > max_body_size_bytes) {
     throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
-                                     inline_body.length(), MaxBodySize));
+                                     inline_body.length(), max_body_size_bytes));
   }
   return inline_body;
 }

@@ -74,7 +74,6 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
   state.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener.config()));
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
-
 } // namespace
 
 bool ListenSocketCreationParams::operator==(const ListenSocketCreationParams& rhs) const {
@@ -95,12 +94,11 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(
+              MessageUtil::getJsonStringFromMessageOrError(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config()),
-                  true));
+                            proto_config.hidden_envoy_deprecated_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -129,12 +127,11 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(
+              MessageUtil::getJsonStringFromMessageOrError(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config()),
-                  true));
+                            proto_config.hidden_envoy_deprecated_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -158,12 +155,11 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(
+              MessageUtil::getJsonStringFromMessageOrError(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
-                            proto_config.hidden_envoy_deprecated_config()),
-                  true));
+                            proto_config.hidden_envoy_deprecated_config())));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -1024,7 +1020,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
-  auto filter_chain_res = std::make_unique<FilterChainImpl>(
+  auto filter_chain_res = std::make_shared<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
