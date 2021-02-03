@@ -87,7 +87,6 @@ message ExternalProcessor {
   // or could not be opened, processing continues without error.
   bool failure_mode_allow = 2;
 
-  // [#not-implemented-hide:]
   // Specifies default options for how HTTP headers, trailers, and bodies are
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;

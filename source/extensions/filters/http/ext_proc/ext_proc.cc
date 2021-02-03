@@ -9,6 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
+
 using envoy::service::ext_proc::v3alpha::HeadersResponse;
 using envoy::service::ext_proc::v3alpha::ImmediateResponse;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
@@ -20,29 +22,41 @@ using Http::ResponseHeaderMap;
 
 static const std::string kErrorPrefix = "ext_proc error";
 
+void Filter::openStream() {
+  if (!stream_) {
+    ENVOY_LOG(debug, "Opening gRPC stream to external processor");
+    stream_ = client_->start(*this, config_->grpcTimeout());
+    stats_.streams_started_.inc();
+  }
+}
+
 void Filter::closeStream() {
-  if (!stream_closed_) {
+  if (!processing_complete_) {
     if (stream_) {
-      ENVOY_LOG(debug, "Closing gRPC stream to processing server");
+      ENVOY_LOG(debug, "Closing gRPC stream to external processor");
       stream_->close();
       stats_.streams_closed_.inc();
     }
-    stream_closed_ = true;
+    processing_complete_ = true;
   }
 }
 
 void Filter::onDestroy() { closeStream(); }
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of_stream) {
+  if (processing_mode_.request_header_mode() == ProcessingMode::SKIP) {
+    return FilterHeadersStatus::Continue;
+  }
+
   // We're at the start, so start the stream and send a headers message
+  openStream();
   request_headers_ = &headers;
-  stream_ = client_->start(*this, config_->grpcTimeout());
-  stats_.streams_started_.inc();
   ProcessingRequest req;
   auto* headers_req = req.mutable_request_headers();
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_of_stream);
   request_state_ = FilterState::HEADERS;
+  ENVOY_LOG(debug, "Sending request_headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
@@ -51,16 +65,19 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of
 }
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_of_stream) {
-  if (stream_closed_) {
+  if (processing_complete_ || processing_mode_.response_header_mode() == ProcessingMode::SKIP) {
     return FilterHeadersStatus::Continue;
   }
 
+  // Depending on processing mode this may or may not be the first message
+  openStream();
   response_headers_ = &headers;
   ProcessingRequest req;
   auto* headers_req = req.mutable_response_headers();
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_of_stream);
   response_state_ = FilterState::HEADERS;
+  ENVOY_LOG(debug, "Sending response_headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   return FilterHeadersStatus::StopAllIterationAndWatermark;
@@ -82,6 +99,10 @@ void Filter::onReceiveMessage(
   }
 
   if (message_handled) {
+    if (response->has_mode_override()) {
+      ENVOY_LOG(debug, "Processing mode overridden by server for this request");
+      processing_mode_ = response->mode_override();
+    }
     stats_.stream_msgs_received_.inc();
   } else {
     stats_.spurious_msgs_received_.inc();
@@ -135,7 +156,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     stats_.failure_mode_allowed_.inc();
 
   } else {
-    stream_closed_ = true;
+    processing_complete_ = true;
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
@@ -145,7 +166,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
 void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
-  stream_closed_ = true;
+  processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
