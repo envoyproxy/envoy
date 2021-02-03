@@ -135,7 +135,7 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
 // exists.)
 
 auto testing_values = ::testing::Values("front-proxy_front-envoy.yaml", "envoyproxy_io_proxy.yaml",
-#if defined(WIN32) && !defined(SO_ORIGINAL_DST)
+#if defined(WIN32) && defined(SO_ORIGINAL_DST)
                                         "configs_original-dst-cluster_proxy_config.yaml"
 #endif
 #ifndef WIN32
