@@ -50,7 +50,7 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
   };
 
   if (!Common::Wasm::createWasm(
-          config.config().vm_config(), config.config().capability_restriction_config(), plugin,
+          config_.config().vm_config(), config_.config().capability_restriction_config(), plugin,
           context.scope().createScope(""), context.clusterManager(), context.initManager(),
           context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
           std::move(callback))) {
