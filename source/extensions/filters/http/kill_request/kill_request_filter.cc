@@ -1,13 +1,20 @@
 #include "extensions/filters/http/kill_request/kill_request_filter.h"
 
 #include <csignal>
+#include <string>
 
 #include "common/protobuf/utility.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace KillRequest {
+
+using ::envoy::extensions::filters::http::kill_request::v3::KillRequest;
+
+KillSettings::KillSettings(const KillRequest& kill_request)
+    : kill_probability_(kill_request.probability()) {}
 
 bool KillRequestFilter::isKillRequestEnabled() {
   return ProtobufPercentHelper::evaluateFractionalPercent(kill_request_.probability(),
@@ -27,6 +34,22 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
   if (kill_request_header.empty() ||
       !absl::SimpleAtob(kill_request_header[0]->value().getStringView(), &is_kill_request)) {
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Route-level configuration overrides filter-level configuration.
+  if (decoder_callbacks_->route() &&
+      decoder_callbacks_->route()->routeEntry()) {
+    const std::string& name =
+        Extensions::HttpFilters::HttpFilterNames::get().KillRequest;
+    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
+
+    const auto* per_route_kill_settings =
+        route_entry->mostSpecificPerFilterConfigTyped<KillSettings>(name);
+
+    if (per_route_kill_settings) {
+      envoy::type::v3::FractionalPercent probability = per_route_kill_settings->getProbability();
+      kill_request_.set_allocated_probability(&probability);
+    }
   }
 
   if (is_kill_request && isKillRequestEnabled()) {

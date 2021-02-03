@@ -7,6 +7,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -52,7 +53,10 @@ public:
     return Http::FilterTrailersStatus::Continue;
   }
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
+  void setDecoderFilterCallbacks(
+      Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
@@ -82,8 +86,32 @@ private:
   // equaling true.
   bool isKillRequestEnabled();
 
-  const envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request_;
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request_;
   Random::RandomGenerator& random_generator_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+};
+
+/**
+ * Configuration for fault injection.
+ */
+class KillSettings : public Router::RouteSpecificFilterConfig {
+public:
+  KillSettings(
+      const envoy::extensions::filters::http::kill_request::v3::KillRequest&
+          kill_request);
+
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
+    return kill_request_filter_headers_;
+  }
+
+  const envoy::type::v3::FractionalPercent getProbability() const {
+    return std::move(kill_probability_);
+  }
+
+private:
+  envoy::type::v3::FractionalPercent kill_probability_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>
+      kill_request_filter_headers_;
 };
 
 } // namespace KillRequest
