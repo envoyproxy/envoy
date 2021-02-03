@@ -21,16 +21,25 @@ public:
    * @param code status code.
    * @param body response body.
    * @param content_type response content_type.
+   * @return whether the local reply used a non-default body formatter to populate `body`
    */
-  virtual void rewrite(const Http::RequestHeaderMap* request_headers,
+  virtual bool rewrite(const Http::RequestHeaderMap* request_headers,
                        Http::ResponseHeaderMap& response_headers,
                        StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        absl::string_view& content_type) const PURE;
 
-  virtual bool match(const Http::RequestHeaderMap* request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap* response_trailers,
-                     StreamInfo::StreamInfo& stream_info) const PURE;
+  /**
+   * decide if any mapper matches the request/response.
+   * @param request_headers the request headers.
+   * @param response_headers the response headers.
+   * @param response_trailers the response trailers, if any.
+   * @param stream_info the stream info.
+   * @return whether any mapper is a match
+   */
+  virtual bool matchesAnyMapper(const Http::RequestHeaderMap* request_headers,
+                                const Http::ResponseHeaderMap& response_headers,
+                                const Http::ResponseTrailerMap* response_trailers,
+                                StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using LocalReplyPtr = std::unique_ptr<LocalReply>;

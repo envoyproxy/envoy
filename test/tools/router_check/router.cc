@@ -170,7 +170,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
 void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
                                      const Router::DirectResponseEntry& entry) {
   auto encode_functions = Envoy::Http::Utility::EncodeFunctions{
-      nullptr, nullptr,
+      nullptr, nullptr, nullptr,
       [&](Envoy::Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         UNREFERENCED_PARAMETER(end_stream);
         Http::HeaderMapImpl::copyFrom(*tool_config.response_headers_->header_map_, *headers);
@@ -182,8 +182,9 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
   bool is_grpc = false;
   bool is_head_request = false;
-  Envoy::Http::Utility::LocalReplyData local_reply_data{
-      is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request};
+  Envoy::Http::Utility::LocalReplyData local_reply_data{is_direct_local_reply, is_grpc,
+                                                        entry.responseCode(),  entry.responseBody(),
+                                                        absl::nullopt,         is_head_request};
 
   Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }

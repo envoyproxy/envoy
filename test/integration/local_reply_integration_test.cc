@@ -13,6 +13,35 @@ public:
     TestUtility::loadFromYaml(yaml, local_reply_config);
     config_helper_.setLocalReply(local_reply_config);
   }
+
+  IntegrationStreamDecoderPtr getUpstreamResponse(const std::string& yaml,
+                                                  const std::string& response_code,
+                                                  uint64_t upstream_body_size,
+                                                  const std::string& method = "GET") {
+    setLocalReplyConfig(yaml);
+    initialize();
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto response = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", method},
+                                       {":path", "/"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"test-header", "exact-match-value"}});
+    waitForNextUpstreamRequest();
+
+    if (upstream_body_size > 0) {
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", response_code}},
+                                       false);
+      upstream_request_->encodeData(upstream_body_size, true);
+    } else {
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", response_code}},
+                                       true);
+    }
+    response->waitForHeaders();
+    return response;
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalReplyIntegrationTest,
@@ -466,9 +495,49 @@ body_format:
   EXPECT_EQ(response->body(), "");
 }
 
-// Should match and rewrite an upstream response that does not contain a body.
-TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusHeadersOnly) {
-  const std::string yaml = R"EOF(
+const std::string match_501_yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 501
+          runtime_key: key_b
+  headers_to_add:
+  - header:
+      key: x-upstream-5xx
+      value: "1"
+    append: true
+  status_code: 500
+body_format:
+  text_format_source:
+    inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
+)EOF";
+
+// Should not match the http response code and not add a header nor modify (add) the body.
+TEST_P(LocalReplyIntegrationTest, LocalyReplyNoMatchNoUpstreamBody) {
+  auto response = getUpstreamResponse(match_501_yaml, "200", 0, "GET");
+
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(0, response->headers().get(Http::LowerCaseString("x-upstream-5xx")).size());
+  EXPECT_EQ(response->body(), "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should not match the http response code and not add a header nor modify (replace) the body.
+TEST_P(LocalReplyIntegrationTest, LocalyReplyNoMatchWithUpstreamBody) {
+  auto response = getUpstreamResponse(match_501_yaml, "200", 8, "GET");
+
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(0, response->headers().get(Http::LowerCaseString("x-upstream-5xx")).size());
+  EXPECT_EQ(response->body(), std::string(8, 'a'));
+
+  cleanupUpstreamAndDownstream();
+}
+
+const std::string match_429_rewrite_450_yaml = R"EOF(
 mappers:
 - filter:
     status_code_filter:
@@ -482,16 +551,10 @@ body_format:
   text_format_source:
     inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
 )EOF";
-  setLocalReplyConfig(yaml);
-  initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "429"}}, true);
-  response->waitForHeaders();
+// Should match an http response code and modify (add) the upstream response.
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusNoBody) {
+  auto response = getUpstreamResponse(match_429_rewrite_450_yaml, "429", 0);
 
   EXPECT_EQ("450", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response->body(), "450: via_upstream");
@@ -499,8 +562,17 @@ body_format:
   cleanupUpstreamAndDownstream();
 }
 
+// Should match an http response code and modify (replace) the upstream response.
 TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithBody) {
-  const std::string yaml = R"EOF(
+  auto response = getUpstreamResponse(match_429_rewrite_450_yaml, "429", 512);
+
+  EXPECT_EQ("450", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "450: via_upstream");
+
+  cleanupUpstreamAndDownstream();
+}
+
+const std::string match_429_rewrite_451_remove_body_yaml = R"EOF(
 mappers:
 - filter:
     status_code_filter:
@@ -512,22 +584,127 @@ mappers:
   status_code: 451
 body_format:
   text_format_source:
-    inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
+    inline_string: ""
 )EOF";
-  setLocalReplyConfig(yaml);
-  initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "429"}}, false);
-  upstream_request_->encodeData(512, true);
-  response->waitForHeaders();
+// Should match an http response code and remove the response body (no body from upstream).
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusRemoveEmptyBody) {
+  auto response = getUpstreamResponse(match_429_rewrite_451_remove_body_yaml, "429", 0);
 
   EXPECT_EQ("451", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "451: via_upstream");
+  EXPECT_EQ(response->body(), "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should match an http response code and remove the response body (non-empty body from upstream).
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusRemoveNonEmptyBody) {
+  auto response = getUpstreamResponse(match_429_rewrite_451_remove_body_yaml, "429", 512);
+
+  EXPECT_EQ("451", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+const std::string match_429_rewrite_475_unmodified_body_yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 429
+          runtime_key: key_b
+  status_code: 475
+)EOF";
+
+// Should match an http response code and rewrite status without modifying upstream body (no body
+// from upstream).
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithUnmodifiedEmptyBody) {
+  auto response = getUpstreamResponse(match_429_rewrite_475_unmodified_body_yaml, "429", 0);
+
+  EXPECT_EQ("475", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should match an http response code and rewrite status without modifying upstream body (non-empty
+// body from upstream).
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithUnmodifiedNonEmptyBody) {
+  auto response = getUpstreamResponse(match_429_rewrite_475_unmodified_body_yaml, "429", 8);
+
+  EXPECT_EQ("475", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), std::string(8, 'a'));
+
+  cleanupUpstreamAndDownstream();
+}
+
+const std::string match_test_header_rewrite_435_yaml = R"EOF(
+mappers:
+- filter:
+    header_filter:
+      header:
+        name: test-header
+        exact_match: exact-match-value
+  status_code: 435
+body_format:
+  text_format_source:
+    inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
+)EOF";
+
+// Should match an http header, rewrite the response code, and modify the upstream response body (no
+// upstream response body)
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeaderNoBody) {
+  auto response = getUpstreamResponse(match_test_header_rewrite_435_yaml, "200", 0);
+
+  EXPECT_EQ("435", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "435: via_upstream");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should match an http header, rewrite the response code, and modify the upstream response body
+// (non-empty upstream response body)
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeaderWithBody) {
+  auto response = getUpstreamResponse(match_test_header_rewrite_435_yaml, "200", 512);
+
+  EXPECT_EQ("435", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(response->body(), "435: via_upstream");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should match an http response code, add a response header, but not add any body to
+// a HEAD response, even though a body format is configured.
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeadResponseAddHeaderNoBody) {
+  const std::string yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 500
+          runtime_key: key_b
+  headers_to_add:
+  - header:
+      key: x-upstream-500
+      value: "1"
+    append: true
+body_format:
+  text_format_source:
+    inline_string: "%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%"
+)EOF";
+  auto response = getUpstreamResponse(yaml, "500", 0, "HEAD");
+
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(1, response->headers().get(Http::LowerCaseString("x-upstream-500")).size());
+  EXPECT_EQ(
+      "1",
+      response->headers().get(Http::LowerCaseString("x-upstream-500"))[0]->value().getStringView());
+  EXPECT_EQ(response->body(), "");
 
   cleanupUpstreamAndDownstream();
 }

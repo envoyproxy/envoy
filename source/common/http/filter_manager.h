@@ -20,6 +20,7 @@
 #include "common/grpc/common.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/utility.h"
@@ -1080,9 +1081,12 @@ private:
       std::make_shared<Network::Socket::Options>();
 
   FilterChainFactory& filter_chain_factory_;
+  // Used to track local reply state
+  // TODO(esmet): We could combine the local reply reference and data into one pointer
+  // member that stays nullptr when no local reply config is present to save space in
+  // the 'off' case. But, for now, we spend two pointers of space in all cases.
   const LocalReply::LocalReply& local_reply_;
-  bool do_rewrite_{};
-  bool did_rewrite_{};
+  Utility::LocalReplyDataPtr local_reply_data_;
   OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
@@ -1116,7 +1120,7 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false) {}
+          non_100_response_headers_encoded_(false), do_response_rewrite_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -1134,6 +1138,8 @@ private:
     bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
+    // True if we should rewrite the upstream response using local_reply_
+    bool do_response_rewrite_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

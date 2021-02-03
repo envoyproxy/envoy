@@ -295,6 +295,11 @@ struct EncodeFunctions {
   std::function<void(ResponseHeaderMap& response_headers, Code& code, std::string& body,
                      absl::string_view& content_type)>
       rewrite_;
+  // Function to encode a gRPC response.
+  std::function<void(ResponseHeaderMap& headers, Code& code, std::string& body,
+                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                     bool is_head_request)>
+      encode_grpc_;
   // Function to encode response headers.
   std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
   // Function to encode the response body.
@@ -313,6 +318,7 @@ struct LocalReplyData {
   // Tells if this is a response to a HEAD request.
   bool is_head_request_ = false;
 };
+using LocalReplyDataPtr = std::unique_ptr<LocalReplyData>;
 
 /**
  * Create a locally generated response using filter callbacks.
@@ -336,6 +342,18 @@ void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callback
  */
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
+
+/**
+ * Convert a response into a gRPC trailers-only response.
+ * @param response_headers the response headers. will be modified.
+ * @param code the upstream response code. will be converted to grpc-status
+ * @param grpc_status the original grpc status
+ * @param is_head_request whether this is a HEAD request
+ */
+void toGrpcTrailersOnlyResponse(Http::ResponseHeaderMap& response_headers, const Http::Code& code,
+                                std::string& response_body,
+                                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                bool is_head_request);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.

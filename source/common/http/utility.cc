@@ -512,7 +512,7 @@ void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks&
 
   sendLocalReply(
       is_reset,
-      Utility::EncodeFunctions{nullptr, nullptr,
+      Utility::EncodeFunctions{nullptr, nullptr, nullptr,
                                [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
                                  callbacks.encodeHeaders(std::move(headers), end_stream, details);
                                },
@@ -520,6 +520,27 @@ void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks&
                                  callbacks.encodeData(data, end_stream);
                                }},
       local_reply_data);
+}
+
+void Utility::toGrpcTrailersOnlyResponse(Http::ResponseHeaderMap& response_headers,
+                                         const Http::Code& code, std::string& response_body,
+                                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                         bool is_head_request) {
+  response_headers.setStatus(std::to_string(enumToInt(Http::Code::OK)));
+  response_headers.setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
+  response_headers.setGrpcStatus(std::to_string(enumToInt(
+      grpc_status ? grpc_status.value() : Grpc::Utility::httpToGrpcStatus(enumToInt(code)))));
+  if (!response_body.empty() && !is_head_request) {
+    // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
+    // status.
+    // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
+    // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
+    if (response_body[response_body.length() - 1] == '\n') {
+      response_body = response_body.substr(0, response_body.length() - 1);
+    }
+    response_headers.setGrpcMessage(Http::Utility::PercentEncoding::encode(response_body));
+  }
+  response_headers.removeContentLength();
 }
 
 void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
@@ -542,26 +563,15 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
   }
 
-  // Respond with a gRPC trailers-only response if the request is gRPC
+  // Respond with a gRPC trailers-only response if the request is gRPC. The actual encoding of the
+  // trailers-only response happens in encode_grpc_, if set. Otherwise it is assumed that the
+  // response is already encoded and ready to be finalized by encodeHeaders with end_stream=true.
   if (local_reply_data.is_grpc_) {
-    response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
-    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
-    response_headers->setGrpcStatus(
-        std::to_string(enumToInt(local_reply_data.grpc_status_
-                                     ? local_reply_data.grpc_status_.value()
-                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
-    if (!body_text.empty() && !local_reply_data.is_head_request_) {
-      // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
-      // status.
-      // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
-      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
-      if (body_text[body_text.length() - 1] == '\n') {
-        body_text = body_text.substr(0, body_text.length() - 1);
-      }
-      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
+    if (encode_functions.encode_grpc_) {
+      encode_functions.encode_grpc_(*response_headers, response_code, body_text,
+                                    local_reply_data.grpc_status_,
+                                    local_reply_data.is_head_request_);
     }
-    // The `modify_headers` function may have added content-length, remove it.
-    response_headers->removeContentLength();
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
     return;
   }

@@ -90,7 +90,7 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
   Utility::sendLocalReply(
       stream_destroyed_,
       Utility::EncodeFunctions{
-          nullptr, nullptr,
+          nullptr, nullptr, nullptr,
           [this, modify_headers, details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             if (modify_headers != nullptr) {
               modify_headers(*headers);

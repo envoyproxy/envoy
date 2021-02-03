@@ -160,16 +160,17 @@ public:
       Server::Configuration::FactoryContext& context)
       : body_formatter_(config.has_body_format()
                             ? std::make_unique<BodyFormatter>(config.body_format(), context.api())
-                            : std::make_unique<BodyFormatter>()) {
+                            : std::make_unique<BodyFormatter>()),
+        has_configured_body_formatter_(config.has_body_format()) {
     for (const auto& mapper : config.mappers()) {
       mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
     }
   }
 
-  bool match(const Http::RequestHeaderMap* request_headers,
-             const Http::ResponseHeaderMap& response_headers,
-             const Http::ResponseTrailerMap* response_trailers,
-             StreamInfo::StreamInfo& stream_info) const override {
+  bool matchesAnyMapper(const Http::RequestHeaderMap* request_headers,
+                        const Http::ResponseHeaderMap& response_headers,
+                        const Http::ResponseTrailerMap* response_trailers,
+                        StreamInfo::StreamInfo& stream_info) const override {
     for (const auto& mapper : mappers_) {
       if (mapper->match(request_headers, response_headers, response_trailers, stream_info)) {
         return true;
@@ -178,7 +179,7 @@ public:
     return false;
   }
 
-  void rewrite(const Http::RequestHeaderMap* request_headers,
+  bool rewrite(const Http::RequestHeaderMap* request_headers,
                Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
                Http::Code& code, std::string& body,
                absl::string_view& content_type) const override {
@@ -204,14 +205,18 @@ public:
     if (!final_formatter) {
       final_formatter = body_formatter_.get();
     }
-    return final_formatter->format(*request_headers, response_headers,
-                                   *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                                   body, content_type);
+    final_formatter->format(*request_headers, response_headers,
+                            *Http::StaticEmptyHeaders::get().response_trailers, stream_info, body,
+                            content_type);
+    // If this local reply has a configured body formatter or the final formatter is not the
+    // default formatter, then we know `body` was modified by an explicitly configured formatter.
+    return has_configured_body_formatter_ || final_formatter != body_formatter_.get();
   }
 
 private:
   std::list<ResponseMapperPtr> mappers_;
   const BodyFormatterPtr body_formatter_;
+  bool has_configured_body_formatter_;
 };
 
 LocalReplyPtr Factory::createDefault() { return std::make_unique<LocalReplyImpl>(); }
