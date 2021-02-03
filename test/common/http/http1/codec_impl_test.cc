@@ -81,8 +81,10 @@ public:
                          TestRequestHeaderMapImpl& expected_headers);
   void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
                  absl::string_view details = "");
-  void testRequestHeadersExceedLimit(std::string header_string, std::string error_message,absl::string_view details = "");
-  void testTrailersExceedLimit(std::string trailer_string, std::string error_message, bool enable_trailers);
+  void testRequestHeadersExceedLimit(std::string header_string, std::string error_message,
+                                     absl::string_view details = "");
+  void testTrailersExceedLimit(std::string trailer_string, std::string error_message,
+                               bool enable_trailers);
   void testRequestHeadersAccepted(std::string header_string);
   // Used to test if trailers are decoded/encoded
   void expectTrailersTest(bool enable_trailers);
@@ -2662,7 +2664,8 @@ TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyTrailersRejected) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit", true);
+  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit",
+                          true);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
@@ -2680,7 +2683,8 @@ TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit", false);
+  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", "trailers count exceeds limit",
+                          false);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
@@ -2708,13 +2712,14 @@ TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
-  testRequestHeadersExceedLimit(long_string, "headers size exceeds limit","");
+  testRequestHeadersExceedLimit(long_string, "headers size exceeds limit", "");
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersRejected) {
   // Send a request with 101 headers.
-  testRequestHeadersExceedLimit(createHeaderFragment(101), "headers count exceeds limit", "http1.too_many_headers");
+  testRequestHeadersExceedLimit(createHeaderFragment(101), "headers count exceeds limit",
+                                "http1.too_many_headers");
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersSplitRejected) {
