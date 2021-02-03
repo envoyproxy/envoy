@@ -55,7 +55,7 @@ public:
   // utility functions
   X509_STORE* getTrustBundleStore(X509* leaf_cert);
   static std::string extractTrustDomain(const std::string& san);
-  static int certificatePrecheck(X509* leaf_cert);
+  static bool certificatePrecheck(X509* leaf_cert);
   absl::flat_hash_map<std::string, X509StorePtr>& trustBundleStores() {
     return trust_bundle_stores_;
   };

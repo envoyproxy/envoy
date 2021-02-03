@@ -99,25 +99,25 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints: CA:True,
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
-  EXPECT_EQ(0, SPIFFEValidator::certificatePrecheck(cert.get()));
+  EXPECT_FALSE(SPIFFEValidator::certificatePrecheck(cert.get()));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage has keyCertSign
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/keyusage_cert_sign_cert.pem"));
-  EXPECT_EQ(0, SPIFFEValidator::certificatePrecheck(cert.get()));
+  EXPECT_FALSE(SPIFFEValidator::certificatePrecheck(cert.get()));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage has cRLSign
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/keyusage_crl_sign_cert.pem"));
-  EXPECT_EQ(0, SPIFFEValidator::certificatePrecheck(cert.get()));
+  EXPECT_FALSE(SPIFFEValidator::certificatePrecheck(cert.get()));
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage does not have keyCertSign and cRLSign
       // should be considered valid (i.e. return 1)
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
-  EXPECT_EQ(1, SPIFFEValidator::certificatePrecheck(cert.get()));
+  EXPECT_TRUE(SPIFFEValidator::certificatePrecheck(cert.get()));
 }
 
 TEST(SPIFFEValidator, TestInitializeSslContexts) {

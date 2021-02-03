@@ -142,11 +142,17 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
                                        Ssl::SslExtendedSocketInfo* ssl_extended_info,
                                        X509& leaf_cert, const Network::TransportSocketOptions*) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
+    }
     return 0;
   }
 
   auto trust_bundle = getTrustBundleStore(&leaf_cert);
   if (!trust_bundle) {
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
+    }
     return 0;
   }
 
@@ -158,7 +164,6 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
         ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
                  : Envoy::Ssl::ClientValidationStatus::Failed);
   }
-
   return ret;
 }
 
@@ -189,16 +194,16 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
   return target_store->second.get();
 }
 
-int SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
+bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
   // Check basic constrains and key usage
   // https://github.com/spiffe/spiffe/blob/master/standards/X509-SVID.md#52-leaf-validation
   auto ext = X509_get_extension_flags(leaf_cert);
   if (ext & EXFLAG_CA) {
-    return 0;
+    return false;
   }
 
   auto us = X509_get_key_usage(leaf_cert);
-  return !(us & (KU_CRL_SIGN | KU_KEY_CERT_SIGN));
+  return (us & (KU_CRL_SIGN | KU_KEY_CERT_SIGN)) == 0;
 }
 
 std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
