@@ -1,3 +1,5 @@
+#include <array>
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -6,6 +8,7 @@
 #include "envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
@@ -24,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -1913,6 +1917,81 @@ TEST_F(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100)
   testServerAllowChunkedContentLength(100, true);
 }
 
+TEST_F(Http1ServerConnectionImplTest,
+       ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
+  initialize();
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  Buffer::OwnedImpl headers("POST / HTTP/1.1\r\n"
+                            "Host: host\r\n"
+                            "Accept-Language: en\r\n"
+                            "Connection: keep-alive\r\n"
+                            "Unfinished-Header: Not-Finished-Value");
+
+  auto status = codec_->dispatch(headers);
+  EXPECT_TRUE(status.ok());
+
+  // Dumps the header map without allocating memory
+  Stats::TestUtil::MemoryTest memory_test;
+  dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+  // Check dump contents for completed headers and partial headers.
+  EXPECT_THAT(
+      ostream.contents(),
+      testing::HasSubstr("absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n  ':authority', "
+                         "'host'\n  'accept-language', 'en'\n  'connection', 'keep-alive'"));
+  EXPECT_THAT(ostream.contents(),
+              testing::HasSubstr("header_parsing_state_: Value, current_header_field_: "
+                                 "Unfinished-Header, current_header_value_: Not-Finished-Value"));
+}
+
+TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Dump the body
+  // Set content length to enable us to dumpState before
+  // buffers are drained. Only the first slice should be dumped.
+  Buffer::OwnedImpl request;
+  request.appendSliceForTest("POST / HTTP/1.1\r\n"
+                             "Content-Length: 5\r\n"
+                             "\r\n"
+                             "Hello");
+  request.appendSliceForTest("GarbageDataShouldNotBeDumped");
+  EXPECT_CALL(decoder, decodeData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) {
+        // dumpState here before buffers are drained. No memory should be allocated.
+        Stats::TestUtil::MemoryTest memory_test;
+        dynamic_cast<Http1::ServerConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
+        EXPECT_EQ(memory_test.consumedBytes(), 0);
+      }))
+      .WillOnce(Invoke([]() {}));
+
+  auto status = codec_->dispatch(request);
+  EXPECT_TRUE(status.ok());
+
+  // Check dump contents
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
+                                            "Done, current_header_field_: , current_header_value_: "
+                                            "\n, active_request_.request_url_: null"));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: \"POST / "
+                        "HTTP/1.1\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
+}
+
 class Http1ClientConnectionImplTest : public Http1CodecTestBase {
 public:
   void initialize() {
@@ -2958,6 +3037,74 @@ TEST_F(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength1) {
 
 TEST_F(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
   testClientAllowChunkedContentLength(100, true);
+}
+
+TEST_F(Http1ClientConnectionImplTest,
+       ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
+  initialize();
+
+  // Send request and dispatch response without headers completed.
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nserver: foo\r\nContent-Length: 8");
+  auto status = codec_->dispatch(response);
+  EXPECT_EQ(0UL, response.length());
+  EXPECT_TRUE(status.ok());
+
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
+
+  // Check for header map and partial headers.
+  EXPECT_THAT(ostream.contents(),
+              testing::HasSubstr(
+                  "absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n  'server', 'foo'\n"));
+  EXPECT_THAT(ostream.contents(),
+              testing::HasSubstr("header_parsing_state_: Value, current_header_field_: "
+                                 "Content-Length, current_header_value_: 8"));
+}
+
+TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
+  initialize();
+
+  // Send request
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // Send response; dumpState while parsing response.
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  EXPECT_CALL(response_decoder, decodeData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) {
+        // dumpState here before buffers are drained. No memory should be allocated.
+        Stats::TestUtil::MemoryTest memory_test;
+        dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
+        EXPECT_EQ(memory_test.consumedBytes(), 0);
+      }))
+      .WillOnce(Invoke([]() {}));
+
+  // Dump the body
+  // Set content length to enable us to dumpState before
+  // buffers are drained. Only the first slice should be dumped.
+  Buffer::OwnedImpl response;
+  response.appendSliceForTest("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello");
+  response.appendSliceForTest("GarbageDataShouldNotBeDumped");
+  auto status = codec_->dispatch(response);
+  // Client codec complains about extraneous data.
+  EXPECT_EQ(response.length(), 28UL);
+  EXPECT_FALSE(status.ok());
+
+  // Check for body data.
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
+                                            "Done"));
+  EXPECT_THAT(ostream.contents(),
+              testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
+                                 "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
 }
 
 } // namespace Http
