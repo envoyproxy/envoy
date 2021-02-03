@@ -1225,6 +1225,19 @@ public:
                        testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
         .WillOnce(Return(enable_runtime));
   }
+
+  // Enable rate limit test with customized fault config input
+  void setupRateLimitTest(envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
+    fault.mutable_response_rate_limit()->mutable_fixed_limit()->set_limit_kbps(1);
+    fault.mutable_response_rate_limit()->mutable_percentage()->set_numerator(100);
+    setUpTest(fault);
+
+    EXPECT_CALL(
+        runtime_.snapshot_,
+        featureEnabled("fault.http.rate_limit.response_percent",
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+        .WillOnce(Return(true));
+  }
 };
 
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitDisabled) {
@@ -1255,6 +1268,70 @@ TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
   filter_->onDestroy();
 
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
+// Make sure the rate limiter doesn't free up after the delay elapsed
+// Regression test for https://github.com/envoyproxy/envoy/pull/14762
+TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
+  fault.mutable_delay()->mutable_percentage()->set_numerator(100);
+  fault.mutable_delay()->mutable_percentage()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+  fault.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
+  setupRateLimitTest(fault);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  // Delay related calls
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.delay.fixed_delay_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("DelayWithResponseRateLimitEnabled");
+  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+
+  // Rate limiter related calls
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  // The timer is consumed but not used by this test
+  new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, true));
+
+  // Delay with rate limiter enabled case
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+      .Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  timer_->invokeCallback();
+
+  // Make sure the rate limiter doesn't free up after the delay elapsed
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
