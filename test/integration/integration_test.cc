@@ -29,6 +29,7 @@ using Envoy::Http::HttpStatusIs;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace {
@@ -1021,12 +1022,15 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 403 Forbidden\r\n") == 0);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 403 Forbidden\r\n"));
 }
 
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
   // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
   // and match the configured redirect.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_xff_num_trusted_hops(1); });
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
@@ -1036,7 +1040,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response, true);
-  EXPECT_FALSE(response.find("HTTP/1.1 302\r\n") == 0);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.

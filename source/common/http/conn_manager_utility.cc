@@ -24,7 +24,17 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
 
+absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
+  if (!forwarded_proto.empty() && (forwarded_proto == Headers::get().SchemeValues.Https ||
+                                   forwarded_proto == Headers::get().SchemeValues.Http)) {
+    return forwarded_proto;
+  }
+  return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
+}
+
+} // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
   if (!connection.nextProtocol().empty()) {
@@ -141,12 +151,14 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
   }
-  // If :scheme is not set, sets :scheme based on X-Forwarded-Proto.
+  // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
+  // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ, especially in the case of L2
   // Envoys, where :scheme is set based on transport security.
   if (!request_headers.Scheme() &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
-    request_headers.setReferenceScheme(request_headers.getForwardedProtoValue());
+    request_headers.setScheme(
+        getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
 
   // At this point we can determine whether this is an internal or external request. The
