@@ -374,7 +374,7 @@ typed_config:
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
-  Stats::CounterSharedPtr  counter =
+  Stats::CounterSharedPtr counter =
       test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
   EXPECT_EQ(0, counter->value());
   counter->reset();

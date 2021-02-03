@@ -213,7 +213,7 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 13]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -375,6 +375,9 @@ message CertificateValidationContext {
       [(validate.rules).enum = {defined_only: true}];
 
   // The configuration of an extension specific certificate validator.
-  // If specified, then the usage of all the values above depends on the chosen extension.
-  config.core.v3.TypedExtensionConfig custom_validator_config = 13;
+  // If specified, all the values above are *ignored*.
+  // Currently only
+  // :ref:`envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`
+  // is implemented in Envoy.
+  config.core.v3.TypedExtensionConfig custom_validator_config = 12;
 }
