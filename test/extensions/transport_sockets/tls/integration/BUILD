@@ -16,6 +16,7 @@ envoy_cc_test(
     ],
     data = [
         "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
         "//source/common/event:dispatcher_includes",

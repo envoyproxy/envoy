@@ -378,13 +378,45 @@ typed_config:
 
 // Server configured on SPIFFE certificate validation for mTLS
 // clientcert.pem's san is "spiffe://lyft.com/frontend-team" so it should be rejected.
-TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected) {
+TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected1) {
   auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
+    example.com:
+      filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  )EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  server_rsa_cert_ = true;
+  initialize();
+  auto conn = makeSslClientConnection({});
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
+    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    EXPECT_FALSE(codec->connected());
+  } else {
+    makeHttpConnection(std::move(conn))->close();
+  }
+  // handshake fails so the handshake counter must be 0
+  Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
+  EXPECT_EQ(0, counter->value());
+  counter->reset();
+}
+
+// Server configured on SPIFFE certificate validation for mTLS
+// clientcert.pem's san is "spiffe://lyft.com/frontend-team" but the corresponding trust bundle does
+// not match with the client cert. So this should also be rejected.
+TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected2) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+    lyft.com:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"
     example.com:
       filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
   )EOF"),
