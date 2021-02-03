@@ -111,7 +111,7 @@ size_t EnvoyQuicClientSession::WriteHeadersOnHeadersStream(
   // gQUIC headers are sent on a dedicated stream. Only count the bytes sent against
   // connectin level watermark buffer. Do not count them into stream level
   // watermark buffer, because it is impossible to identify which byte belongs
-  // to which stream when the bufferred bytes are drained in headers stream.
+  // to which stream when the buffered bytes are drained in headers stream.
   // This updater may be in the scope of another one in OnCanWrite(), in such
   // case, this one doesn't udpate the watermark.
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);

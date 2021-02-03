@@ -39,7 +39,7 @@ public:
   };
 
 protected:
-  // Update the monitor with the new bufferred bytes and check watermark threshold.
+  // Update the monitor with the new buffered bytes and check watermark threshold.
   virtual void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) = 0;
 
   bool isDoingWatermarkAccounting() const { return is_doing_watermark_accounting_; }

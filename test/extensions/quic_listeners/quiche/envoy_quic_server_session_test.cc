@@ -1199,13 +1199,13 @@ TEST_P(EnvoyQuicServerSessionTest, OnCanWriteUpdateWatermarkGquic) {
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark)
       .WillOnce(Invoke(
           [this]() { http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark(); }));
-  // Write trailers when bufferred bytes drops below low watermark.
+  // Write trailers when buffered bytes drops below low watermark.
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark())
       .Times(2)
       .WillOnce(Return())
       .WillOnce(Invoke([stream1, send_algorithm]() {
-        // Block this trailer so that it gets bufferred in headers stream.
-        // Verify that the bufferred bytes are counted into watermark only once.
+        // Block this trailer so that it gets buffered in headers stream.
+        // Verify that the buffered bytes are counted into watermark only once.
         EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(false));
 
         // The trailer is large enough so that if its data is counted into watermark once the
