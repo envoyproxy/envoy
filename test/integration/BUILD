@@ -1634,3 +1634,14 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "original_ip_detection_integration_test",
+    srcs = [
+        "original_ip_detection_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
