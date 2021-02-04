@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
+
 #include "common/event/real_time_system.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/spiffe_validator.h"
@@ -184,6 +186,19 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 
+TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
+  initialize();
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      // basicConstraints: CA:True,
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+
+  TestSslExtendedSocketInfo info;
+  EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
+  EXPECT_EQ(1, stats().fail_verify_error_.value());
+  EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::Failed);
+}
+
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSingleTrustDomain) {
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -313,6 +328,8 @@ typed_config:
     lyft.com:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
     example.com:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+    foo.com:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"),
              time_system);

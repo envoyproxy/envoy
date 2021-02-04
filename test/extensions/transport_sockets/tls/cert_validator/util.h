@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/ssl_socket_extended_info.h"
 
 #include "common/common/macros.h"
 
@@ -10,6 +11,21 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+class TestSslExtendedSocketInfo : public Envoy::Ssl::SslExtendedSocketInfo {
+public:
+  TestSslExtendedSocketInfo(){};
+
+  void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override {
+    status_ = validated;
+  }
+  Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override {
+    return status_;
+  }
+
+private:
+  Envoy::Ssl::ClientValidationStatus status_;
+};
 
 class TestCertificateValidationContextConfig
     : public Envoy::Ssl::CertificateValidationContextConfig {
