@@ -14,7 +14,7 @@ namespace Tls {
 
 class TestSslExtendedSocketInfo : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
-  TestSslExtendedSocketInfo(){};
+  TestSslExtendedSocketInfo() = default;
 
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override {
     status_ = validated;

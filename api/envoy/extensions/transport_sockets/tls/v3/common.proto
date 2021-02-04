@@ -375,7 +375,7 @@ message CertificateValidationContext {
       [(validate.rules).enum = {defined_only: true}];
 
   // The configuration of an extension specific certificate validator.
-  // If specified, all the values above are *ignored*.
+  // If specified, the usage of all the values above depends on the custom validator.
   // Currently only
   // :ref:`envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`
   // is implemented in Envoy.
