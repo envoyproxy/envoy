@@ -46,10 +46,6 @@ void BufferHelper::addLengthEncodedInteger(Buffer::Instance& buffer, uint64_t va
 
 void BufferHelper::addString(Buffer::Instance& buffer, const std::string& str) { buffer.add(str); }
 
-void BufferHelper::addStringBySize(Buffer::Instance& buffer, size_t len, const std::string& str) {
-  buffer.add(str.substr(0, len));
-}
-
 void BufferHelper::encodeHdr(Buffer::Instance& pkg, uint8_t seq) {
   // the pkg buffer should only contain one package data
   uint32_t header = (seq << 24) | (pkg.length() & MYSQL_HDR_PKT_SIZE_MASK);
@@ -195,15 +191,6 @@ DecodeStatus BufferHelper::peekUint32(Buffer::Instance& buffer, uint32_t& val) {
 DecodeStatus BufferHelper::peekUint16(Buffer::Instance& buffer, uint16_t& val) {
   try {
     val = buffer.peekLEInt<uint16_t>(0);
-    return DecodeStatus::Success;
-  } catch (EnvoyException& e) {
-    return DecodeStatus::Failure;
-  }
-}
-
-DecodeStatus BufferHelper::peekUint8(Buffer::Instance& buffer, uint8_t& val) {
-  try {
-    val = buffer.peekLEInt<uint8_t>(0);
     return DecodeStatus::Success;
   } catch (EnvoyException& e) {
     return DecodeStatus::Failure;

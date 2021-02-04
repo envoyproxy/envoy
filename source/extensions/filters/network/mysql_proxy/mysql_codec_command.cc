@@ -71,6 +71,8 @@ DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t le
   return DecodeStatus::Success;
 }
 
+void CommandResponse::encode(Buffer::Instance& out) { BufferHelper::addString(out, data_); }
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

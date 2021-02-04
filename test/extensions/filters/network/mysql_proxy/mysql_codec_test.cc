@@ -81,6 +81,25 @@ TEST(MySQLCodecTest, MySQLCommandOther) {
   EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::FieldList);
 }
 
+TEST(MySQLCodecTest, MySQLCommandResp) {
+  CommandResponse mysql_cmd_resp_encode{};
+  mysql_cmd_resp_encode.setData(MySQLTestUtils::getCommandResponse());
+  Buffer::OwnedImpl decode_data;
+  mysql_cmd_resp_encode.encode(decode_data);
+  CommandResponse mysql_cmd_resp_decode{};
+  mysql_cmd_resp_decode.decode(decode_data, 0, decode_data.length());
+  EXPECT_EQ(mysql_cmd_resp_decode.getData(), mysql_cmd_resp_encode.getData());
+}
+
+TEST(MySQLCodecTest, MySQLCommandRespIncompleteData) {
+  CommandResponse mysql_cmd_resp_encode{};
+  mysql_cmd_resp_encode.setData(MySQLTestUtils::getCommandResponse());
+  Buffer::OwnedImpl decode_data;
+  CommandResponse mysql_cmd_resp_decode{};
+  mysql_cmd_resp_decode.decode(decode_data, 0, decode_data.length());
+  EXPECT_EQ(mysql_cmd_resp_decode.getData(), "");
+}
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

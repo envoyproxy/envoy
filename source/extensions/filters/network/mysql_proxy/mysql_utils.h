@@ -31,7 +31,6 @@ public:
   static void addUint32(Buffer::Instance& buffer, uint32_t val);
   static void addLengthEncodedInteger(Buffer::Instance& buffer, uint64_t val);
   static void addString(Buffer::Instance& buffer, const std::string& str);
-  static void addStringBySize(Buffer::Instance& buffer, size_t len, const std::string& str);
   static void encodeHdr(Buffer::Instance& pkg, uint8_t seq);
   static bool endOfBuffer(Buffer::Instance& buffer);
   static DecodeStatus readUint8(Buffer::Instance& buffer, uint8_t& val);
@@ -46,7 +45,6 @@ public:
   static DecodeStatus readAll(Buffer::Instance& buffer, std::string& str);
   static DecodeStatus peekUint32(Buffer::Instance& buffer, uint32_t& val);
   static DecodeStatus peekUint16(Buffer::Instance& buffer, uint16_t& val);
-  static DecodeStatus peekUint8(Buffer::Instance& buffer, uint8_t& val);
   static void consumeHdr(Buffer::Instance& buffer);
   static DecodeStatus peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq);
 };

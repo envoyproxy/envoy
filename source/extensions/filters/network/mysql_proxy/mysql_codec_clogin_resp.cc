@@ -92,16 +92,16 @@ ClientLoginResponse::ClientLoginResponse(const ClientLoginResponse& other)
   case Null:
     break;
   case AuthSwitch:
-    *auth_switch_ = *auth_switch_;
+    *auth_switch_ = *(other.auth_switch_.get());
     break;
   case AuthMoreData:
-    *auth_more_ = *other.auth_more_;
+    *auth_more_ = *(other.auth_more_.get());
     break;
   case Ok:
-    *ok_ = *other.ok_;
+    *ok_ = *(other.ok_.get());
     break;
   case Err:
-    *err_ = *other.err_;
+    *err_ = *(other.err_.get());
     break;
   default:
     break;
@@ -164,16 +164,16 @@ ClientLoginResponse& ClientLoginResponse::operator=(const ClientLoginResponse& o
   case Null:
     break;
   case AuthSwitch:
-    *auth_switch_ = *other.auth_switch_;
+    *auth_switch_ = *(other.auth_switch_.get());
     break;
   case AuthMoreData:
-    *auth_more_ = *other.auth_more_;
+    *auth_more_ = *(other.auth_more_.get());
     break;
   case Ok:
-    *ok_ = *other.ok_;
+    *ok_ = *(other.ok_.get());
     break;
   case Err:
-    *err_ = *other.err_;
+    *err_ = *(other.err_.get());
     break;
   default:
     break;
@@ -288,7 +288,7 @@ DecodeStatus ClientLoginResponse::parseOk(Buffer::Instance& buffer, uint32_t) {
     ENVOY_LOG(info, "error parsing warnings in mysql Login Ok msg");
     return DecodeStatus::Failure;
   }
-  if (BufferHelper::readString(buffer, ok_->info_) != DecodeStatus::Success) {
+  if (BufferHelper::readStringEof(buffer, ok_->info_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error parsing info in mysql Login Ok msg");
     return DecodeStatus::Failure;
   }

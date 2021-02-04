@@ -2,6 +2,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include <bits/stdint-uintn.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -17,14 +18,16 @@ public:
   uint8_t getProtocol() const { return protocol_; }
   const std::string& getVersion() const { return version_; }
   uint32_t getThreadId() const { return thread_id_; }
-  uint8_t getAutPluginDataLen() const {
-    return auth_plugin_data1_.size() + auth_plugin_data2_.size();
-  }
   const std::string& getAuthPluginData1() const { return auth_plugin_data1_; }
   const std::string& getAuthPluginData2() const { return auth_plugin_data2_; }
-  std::string getAuthPluginData() const { return auth_plugin_data1_ + auth_plugin_data2_; }
-  int getServerCharset() const { return server_charset_; }
-  int getServerStatus() const { return server_status_; }
+  std::string getAuthPluginData() const {
+    if ((server_cap_ & CLIENT_PLUGIN_AUTH) || (server_cap_ & CLIENT_SECURE_CONNECTION)) {
+      return auth_plugin_data1_ + auth_plugin_data2_;
+    }
+    return auth_plugin_data1_;
+  }
+  uint8_t getServerCharset() const { return server_charset_; }
+  uint16_t getServerStatus() const { return server_status_; }
   uint32_t getServerCap() const { return server_cap_; }
   uint16_t getBaseServerCap() const { return server_cap_ & 0xffff; }
   uint16_t getExtServerCap() const { return server_cap_ >> 16; }
