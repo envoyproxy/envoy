@@ -29,6 +29,13 @@ uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
   return tokens;
 }
 
+uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial,
+                                  std::chrono::milliseconds& timeToNextToken) {
+  auto tokens_consumed = consume(tokens, allow_partial);
+  timeToNextToken = nextTokenAvailable();
+  return tokens_consumed;
+}
+
 std::chrono::milliseconds TokenBucketImpl::nextTokenAvailable() {
   // If there are tokens available, return immediately.
   if (tokens_ >= 1) {

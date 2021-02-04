@@ -19,6 +19,13 @@ uint64_t SharedTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
   return impl_.consume(tokens, allow_partial);
 };
 
+uint64_t SharedTokenBucketImpl::consume(uint64_t tokens, bool allow_partial,
+                                        std::chrono::milliseconds& timeToNextToken) {
+  Thread::LockGuard lock(mutex_);
+  synchronizer_.syncPoint(GetImplSyncPoint);
+  return impl_.consume(tokens, allow_partial, timeToNextToken);
+};
+
 std::chrono::milliseconds SharedTokenBucketImpl::nextTokenAvailable() {
   Thread::LockGuard lock(mutex_);
   synchronizer_.syncPoint(GetImplSyncPoint);

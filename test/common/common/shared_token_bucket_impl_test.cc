@@ -161,4 +161,38 @@ TEST_F(SharedTokenBucketImplTest, SynchronizedNextTokenAvailable) {
   EXPECT_FALSE(isMutexLocked(token_bucket));
 }
 
+// Verifies that TokenBucket can consume tokens with thread safety.
+TEST_F(SharedTokenBucketImplTest, SynchronizedConsumeAndNextToken) {
+  SharedTokenBucketImpl token_bucket{10, time_system_, 5};
+
+  // Exhaust all tokens.
+  EXPECT_EQ(10, token_bucket.consume(20, true));
+  EXPECT_EQ(std::chrono::milliseconds(200), token_bucket.nextTokenAvailable());
+  time_system_.advanceTimeWait(std::chrono::milliseconds(400));
+
+  // Start a thread and call consume to refill tokens.
+  std::thread t1([&] { EXPECT_EQ(1, token_bucket.consume(1, false)); });
+
+  t1.join();
+
+  EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
+
+  token_bucket.reset(10);
+  // Exhaust all tokens.
+  std::chrono::milliseconds timeToNextToken(0);
+  EXPECT_EQ(10, token_bucket.consume(20, true, timeToNextToken));
+  EXPECT_EQ(timeToNextToken.count(), 200);
+  time_system_.advanceTimeWait(std::chrono::milliseconds(400));
+
+  // Start a thread and call consume to refill tokens.
+  std::thread t2([&] {
+    EXPECT_EQ(1, token_bucket.consume(1, false, timeToNextToken));
+    EXPECT_EQ(timeToNextToken.count(), 0);
+  });
+
+  t2.join();
+
+  EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
+}
+
 } // namespace Envoy
