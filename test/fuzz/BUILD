@@ -5,6 +5,10 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+load(
+    "@rules_fuzzing//fuzzing:cc_deps.bzl",
+    "cc_fuzzing_engine",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -86,4 +90,12 @@ envoy_cc_test(
     deps = [
         "//test/fuzz:random_lib",
     ],
+)
+
+cc_fuzzing_engine(
+    name = "fuzz_runner_engine",
+    testonly = True,
+    display_name = "Fuzz Test Runner",
+    launcher = "fuzz_runner_launcher.sh",
+    library = ":main",
 )
