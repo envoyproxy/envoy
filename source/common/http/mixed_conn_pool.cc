@@ -50,6 +50,9 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
 
   Upstream::Host::CreateConnectionData data{std::move(tcp_client->connection_),
                                             client.real_host_description_};
+  // As this connection comes from the tcp connection pool, it will be
+  // read-disabled to handle TCP traffic where upstream sends data first. Undo
+  // this as it is not necessary for HTTP/HTTPS.
   data.connection_->readDisable(false);
   data.connection_->removeConnectionCallbacks(*tcp_client);
   data.connection_->removeReadFilter(tcp_client->read_filter_handle_);
