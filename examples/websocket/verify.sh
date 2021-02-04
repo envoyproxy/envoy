@@ -19,7 +19,7 @@ interact_ws () {
        insecure="--insecure"
     fi
     expect <<EOF
-set timeout 1
+set timeout 2
 spawn docker run --rm -ti --network=host solsson/websocat $insecure $protocol://localhost:$port
 set ret 1
 expect "\n"
@@ -36,8 +36,6 @@ send \x03
 exit \$ret
 EOF
 }
-
-sleep 5
 
 run_log "Generate wss certs"
 mkdir -p certs
