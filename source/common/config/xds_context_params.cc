@@ -42,7 +42,7 @@ const NodeContextRenderers& nodeParamCbs() {
 void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
                        const ProtobufWkt::Struct& metadata, const std::string& prefix) {
   for (const auto& it : metadata.fields()) {
-    params[prefix + it.first] = MessageUtil::getJsonStringFromMessage(it.second);
+    params[prefix + it.first] = MessageUtil::getJsonStringFromMessageOrDie(it.second);
   }
 }
 

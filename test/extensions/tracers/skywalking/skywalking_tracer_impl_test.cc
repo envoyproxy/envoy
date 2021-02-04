@@ -49,12 +49,9 @@ protected:
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
   Event::SimulatedTimeSystem time_system_;
-
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
-
   envoy::config::trace::v3::SkyWalkingConfig config_;
   std::string test_string = "ABCDEFGHIJKLMN";
-
   DriverPtr driver_;
 };
 
@@ -71,82 +68,92 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
   )EOF";
   setupSkyWalkingDriver(yaml_string);
 
-  std::string trace_id =
-      SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
-  std::string segment_id =
-      SkyWalkingTestHelper::generateId(context_.server_factory_context_.api_.random_);
-
-  // Create new span segment with previous span context.
-  std::string previous_header_value =
-      fmt::format("{}-{}-{}-{}-{}-{}-{}-{}", 0, SkyWalkingTestHelper::base64Encode(trace_id),
-                  SkyWalkingTestHelper::base64Encode(segment_id), 233333,
-                  SkyWalkingTestHelper::base64Encode("SERVICE"),
-                  SkyWalkingTestHelper::base64Encode("INSTATNCE"),
-                  SkyWalkingTestHelper::base64Encode("ENDPOINT"),
-                  SkyWalkingTestHelper::base64Encode("ADDRESS"));
-
-  Http::TestRequestHeaderMapImpl request_headers{{"sw8", previous_header_value},
-                                                 {":path", "/path"},
-                                                 {":method", "GET"},
-                                                 {":authority", "test.com"}};
-
-  ON_CALL(mock_tracing_config_, operationName())
-      .WillByDefault(Return(Tracing::OperationName::Ingress));
-
   Tracing::Decision decision;
   decision.traced = true;
-
-  Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
-                                                 time_system_.systemTime(), decision);
-  EXPECT_NE(nullptr, org_span.get());
-
-  Span* span = dynamic_cast<Span*>(org_span.get());
-  ASSERT(span);
-
-  EXPECT_NE(nullptr, span->segmentContext()->previousSpanContext());
-
-  EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->service());
-  EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->serviceInstance());
-
-  // Tracing decision will be overwrite by sampling flag in propagation headers.
-  EXPECT_EQ(0, span->segmentContext()->sampled());
-
-  // Since the sampling flag is false, no segment data is reported.
-  span->finishSpan();
-
   auto& factory_context = context_.server_factory_context_;
-  EXPECT_EQ(0U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
 
-  // Create new span segment with no previous span context.
-  Http::TestRequestHeaderMapImpl new_request_headers{
-      {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
+  {
+    auto previous_header_value = SkyWalkingTestHelper::createPropagatedSW8HeaderValue(false, "");
+    Http::TestRequestHeaderMapImpl request_headers{{"sw8", previous_header_value},
+                                                   {":path", "/path"},
+                                                   {":method", "GET"},
+                                                   {":authority", "test.com"}};
+    ON_CALL(mock_tracing_config_, operationName())
+        .WillByDefault(Return(Tracing::OperationName::Ingress));
 
-  Tracing::SpanPtr org_new_span = driver_->startSpan(mock_tracing_config_, new_request_headers, "",
-                                                     time_system_.systemTime(), decision);
+    Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
+                                                   time_system_.systemTime(), decision);
+    EXPECT_NE(nullptr, org_span.get());
 
-  Span* new_span = dynamic_cast<Span*>(org_new_span.get());
-  ASSERT(new_span);
+    Span* span = dynamic_cast<Span*>(org_span.get());
+    ASSERT(span);
 
-  EXPECT_EQ(nullptr, new_span->segmentContext()->previousSpanContext());
+    EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->service());
+    EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->serviceInstance());
 
-  EXPECT_EQ(true, new_span->segmentContext()->sampled());
+    // Tracing decision will be overwrite by skip analysis flag in propagation headers.
+    EXPECT_FALSE(span->segmentContext()->skipAnalysis());
 
-  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-  new_span->finishSpan();
-  EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    // Since the sampling flag is false, no segment data is reported.
+    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+    span->finishSpan();
 
-  // Create new span segment with error propagation header.
-  Http::TestRequestHeaderMapImpl error_request_headers{{":path", "/path"},
-                                                       {":method", "GET"},
-                                                       {":authority", "test.com"},
-                                                       {"sw8", "xxxxxx-error-propagation-header"}};
-  Tracing::SpanPtr org_null_span = driver_->startSpan(
-      mock_tracing_config_, error_request_headers, "TEST_OP", time_system_.systemTime(), decision);
+    EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+  }
 
-  EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
+  {
+    // Create new span segment with no previous span context.
+    Http::TestRequestHeaderMapImpl new_request_headers{
+        {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
-  auto& null_span = *org_null_span;
-  EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
+    Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, new_request_headers, "",
+                                                   time_system_.systemTime(), decision);
+
+    Span* span = dynamic_cast<Span*>(org_span.get());
+    ASSERT(span);
+
+    EXPECT_FALSE(span->segmentContext()->skipAnalysis());
+
+    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+    span->finishSpan();
+
+    EXPECT_EQ(2U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+  }
+
+  {
+    // Create new span segment with error propagation header.
+    Http::TestRequestHeaderMapImpl error_request_headers{
+        {":path", "/path"},
+        {":method", "GET"},
+        {":authority", "test.com"},
+        {"sw8", "xxxxxx-error-propagation-header"}};
+    Tracing::SpanPtr org_null_span =
+        driver_->startSpan(mock_tracing_config_, error_request_headers, "TEST_OP",
+                           time_system_.systemTime(), decision);
+
+    EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
+
+    auto& null_span = *org_null_span;
+    EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
+  }
+
+  {
+    // Create root segment span with disabled tracing.
+    decision.traced = false;
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, "TEST_OP",
+                                               time_system_.systemTime(), decision);
+    Span* new_span = dynamic_cast<Span*>(span.get());
+    ASSERT(new_span);
+
+    EXPECT_TRUE(new_span->segmentContext()->skipAnalysis());
+
+    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
+    span->finishSpan();
+
+    EXPECT_EQ(3U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+  }
 }
 
 TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
