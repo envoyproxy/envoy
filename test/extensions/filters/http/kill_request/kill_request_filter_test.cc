@@ -4,6 +4,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/http/well_known_names.h"
 #include "extensions/filters/http/kill_request/kill_request_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
