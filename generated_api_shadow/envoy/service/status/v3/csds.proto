@@ -100,8 +100,10 @@ message PerXdsConfig {
   // the CSDS server is an xDS server. No matter what the client config status
   // is, xDS clients should always dump the most recent accepted xDS config.
   //
+  // .. attention::
   //   This field is deprecated. Use :ref:`ClientResourceStatus
-  // <envoy_api_msg_admin.v3.ClientResourceStatus>` instead.
+  //   <envoy_v3_api_enum_admin.v3.ClientResourceStatus>` for per-resource
+  //   config status instead.
   ClientConfigStatus client_status = 7 [deprecated = true];
 
   oneof per_xds_config {

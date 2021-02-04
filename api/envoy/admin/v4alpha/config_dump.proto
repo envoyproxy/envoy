@@ -28,7 +28,7 @@ enum ClientResourceStatus {
   // arrives or the client times out waiting for the resource.
   REQUESTED = 1;
 
-  // This resouce has been requested by the client but has either not been
+  // This resource has been requested by the client but has either not been
   // delivered by the server or was previously delivered by the server and then
   // subsequently removed from resources provided by the server. For more
   // information, please refer to the :ref:`"Knowing When a Requested Resource
