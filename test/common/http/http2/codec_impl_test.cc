@@ -983,7 +983,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
   // Check the entire dump to ensure correct formating.
   // This test might be a little brittle because of this, and hence in the other
   // dump tests we focus on the particular substring of interest.
-  EXPECT_THAT(ostream.contents(), StartsWith("Http2::ConnectionImpl 0x"));
+  EXPECT_THAT(ostream.contents(), StartsWith("Http2::ConnectionImpl"));
   EXPECT_THAT(
       ostream.contents(),
       HasSubstr(
@@ -993,7 +993,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_: 0\n"
           "&protocol_constraints_: \n"
-          "  ProtocolConstraints 0x"));
+          "  ProtocolConstraints"));
   EXPECT_THAT(
       ostream.contents(),
       EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
