@@ -96,7 +96,7 @@ TEST(MySQLCodecTest, MySQLCommandRespIncompleteData) {
   mysql_cmd_resp_encode.setData(MySQLTestUtils::getCommandResponse());
   Buffer::OwnedImpl decode_data;
   CommandResponse mysql_cmd_resp_decode{};
-  mysql_cmd_resp_decode.decode(decode_data, 0, decode_data.length());
+  mysql_cmd_resp_decode.decode(decode_data, 0, decode_data.length() + 1);
   EXPECT_EQ(mysql_cmd_resp_decode.getData(), "");
 }
 

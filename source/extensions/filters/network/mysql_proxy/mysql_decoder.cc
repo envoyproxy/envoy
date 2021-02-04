@@ -11,12 +11,11 @@ namespace MySQLProxy {
 
 void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len) {
   ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}", seq, len);
-
   // Run the MySQL state machine
   switch (session_.getState()) {
 
-  // Expect Server Challenge packet
   case MySQLSession::State::Init: {
+    // Expect Server Challenge packet
     ServerGreeting greeting;
     greeting.decode(message, seq, len);
     callbacks_.onServerGreeting(greeting);
@@ -25,8 +24,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     break;
   }
 
-  // Process Client Handshake Response
   case MySQLSession::State::ChallengeReq: {
+    // Process Client Handshake Response
     ClientLogin client_login{};
     client_login.decode(message, seq, len);
     callbacks_.onClientLogin(client_login);

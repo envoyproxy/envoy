@@ -83,14 +83,9 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   }
   setBaseServerCap(base_server_cap);
 
-  if (BufferHelper::endOfBuffer(buffer)) {
+  if (BufferHelper::readUint8(buffer, server_charset_) != DecodeStatus::Success) {
     // HandshakeV10 can terminate after Server Capabilities
     return DecodeStatus::Success;
-  }
-
-  if (BufferHelper::readUint8(buffer, server_charset_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing server_language in mysql greeting msg");
-    return DecodeStatus::Failure;
   }
   if (BufferHelper::readUint16(buffer, server_status_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing server_status in mysql greeting msg");
@@ -150,12 +145,6 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
     }
   } else if (server_cap_ & CLIENT_SECURE_CONNECTION) {
     if (auth_plugin_len != 20 && auth_plugin_data_len != 0) {
-      ENVOY_LOG(info, "error when parsing auth plugin data in mysql greeting msg");
-      return DecodeStatus::Failure;
-    }
-  } else {
-    /* old auth */
-    if (auth_plugin_len != 8) {
       ENVOY_LOG(info, "error when parsing auth plugin data in mysql greeting msg");
       return DecodeStatus::Failure;
     }

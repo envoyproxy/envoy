@@ -38,6 +38,7 @@ ClientLoginResponse initErrMessage() {
 ClientLoginResponse initOldAuthSwitchMessage() {
   ClientLoginResponse auth_switch{};
   auth_switch.type(AuthSwitch);
+  auth_switch.asAuthSwitchMessage().setIsOldAuthSwitch(true);
   return auth_switch;
 }
 ClientLoginResponse initAuthSwitchMessage() {
@@ -259,6 +260,38 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteWarnings) {
 }
 
 /*
+ * Negative Test the MYSQL Server Login OK message parser:
+ * - incomplete info
+ */
+TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteInfo) {
+  ClientLoginResponse& mysql_loginok_encode = MySQLCLoginRespTest::getOkMessage();
+  Buffer::OwnedImpl buffer;
+  mysql_loginok_encode.encode(buffer);
+
+  int incomplete_len = sizeof(uint8_t) +
+                       MySQLTestUtils::sizeOfLengthEncodeInteger(
+                           mysql_loginok_encode.asOkMessage().getAffectedRows()) +
+                       MySQLTestUtils::sizeOfLengthEncodeInteger(
+                           mysql_loginok_encode.asOkMessage().getLastInsertId()) +
+                       sizeof(mysql_loginok_encode.asOkMessage().getServerStatus()) +
+                       sizeof(mysql_loginok_encode.asOkMessage().getWarnings());
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+
+  ClientLoginResponse mysql_loginok_decode{};
+  mysql_loginok_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
+  EXPECT_EQ(mysql_loginok_decode.type(), mysql_loginok_encode.type());
+  EXPECT_EQ(mysql_loginok_decode.asOkMessage().getAffectedRows(),
+            mysql_loginok_encode.asOkMessage().getAffectedRows());
+  EXPECT_EQ(mysql_loginok_decode.asOkMessage().getLastInsertId(),
+            mysql_loginok_encode.asOkMessage().getLastInsertId());
+  EXPECT_EQ(mysql_loginok_decode.asOkMessage().getServerStatus(),
+            mysql_loginok_encode.asOkMessage().getServerStatus());
+  EXPECT_EQ(mysql_loginok_decode.asOkMessage().getWarnings(),
+            mysql_loginok_encode.asOkMessage().getWarnings());
+  EXPECT_EQ(mysql_loginok_decode.asOkMessage().getInfo(), "");
+}
+
+/*
  * Negative Test the MYSQL Server Login Err message parser:
  * - incomplete response code
  */
@@ -382,7 +415,9 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompletePluginName) {
   Buffer::OwnedImpl buffer;
   mysql_login_auth_switch_encode.encode(buffer);
 
-  int incomplete_len = sizeof(uint8_t);
+  int incomplete_len =
+      sizeof(uint8_t) +
+      mysql_login_auth_switch_encode.asAuthSwitchMessage().getAuthPluginName().size() - 1;
   Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
 
   ClientLoginResponse mysql_login_auth_switch_decode{};
@@ -451,6 +486,17 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginRespTypeConvert) {
   ClientLoginResponse err = MySQLCLoginRespTest::getErrMessage();
   ClientLoginResponse auth_switch = MySQLCLoginRespTest::getAuthSwitchMessage();
   ClientLoginResponse auth_more = MySQLCLoginRespTest::getAuthMoreMessage();
+  ClientLoginResponse null_msg{};
+  EXPECT_EQ(ok, ok);
+  EXPECT_NE(ok, err);
+  EXPECT_NE(ok, auth_switch);
+  EXPECT_NE(ok, auth_more);
+  EXPECT_EQ(err, err);
+  EXPECT_NE(err, auth_more);
+  EXPECT_NE(err, auth_switch);
+  EXPECT_EQ(auth_switch, auth_switch);
+  EXPECT_NE(auth_switch, auth_more);
+  EXPECT_EQ(auth_more, auth_more);
 
   ClientLoginResponse ok2err = ok;
   ok.type(ClientLoginResponseType::Ok);
@@ -495,6 +541,36 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginRespTypeConvert) {
   EXPECT_EQ(auth_more_move, MySQLCLoginRespTest::getAuthMoreMessage());
   auth_more = std::move(auth_more_move);
   EXPECT_EQ(auth_more, MySQLCLoginRespTest::getAuthMoreMessage());
+
+  ClientLoginResponse null_msg_move(std::move(null_msg));
+  EXPECT_EQ(null_msg_move, ClientLoginResponse{});
+  null_msg = std::move(null_msg_move);
+  EXPECT_EQ(null_msg, ClientLoginResponse{});
+  ClientLoginResponse null_copy(null_msg);
+  EXPECT_EQ(null_copy, null_msg);
+
+  ClientLoginResponse unknown_msg{};
+  unknown_msg.type(static_cast<ClientLoginResponseType>(ClientLoginResponseType::AuthMoreData + 1));
+  EXPECT_NE(unknown_msg, ClientLoginResponse{});
+
+  ClientLoginResponse unknown_copy(unknown_msg);
+  EXPECT_EQ(unknown_msg, unknown_copy);
+  ClientLoginResponse unknown_move(std::move(unknown_msg));
+  EXPECT_EQ(unknown_move, unknown_copy);
+  unknown_msg = std::move(unknown_move);
+  EXPECT_EQ(unknown_msg, unknown_copy);
+
+  ClientLoginResponse copy_all{};
+  copy_all = ok;
+  EXPECT_EQ(copy_all, ok);
+  copy_all = err;
+  EXPECT_EQ(copy_all, err);
+  copy_all = auth_switch;
+  EXPECT_EQ(copy_all, auth_switch);
+  copy_all = auth_more;
+  EXPECT_EQ(copy_all, auth_more);
+  copy_all = unknown_msg;
+  EXPECT_EQ(copy_all, unknown_msg);
 }
 
 } // namespace MySQLProxy

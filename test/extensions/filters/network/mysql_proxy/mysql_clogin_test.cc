@@ -98,6 +98,92 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnEncDec) {
 }
 
 /*
+ * Test the MYSQL Client Login 41 message parser when CLIENT_SECURE_CONNECTION set
+ * - Incomplete auth len
+ */
+TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnIncompleteAuthLen) {
+  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
+      CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION);
+  Buffer::OwnedImpl buffer;
+  mysql_clogin_encode.encode(buffer);
+
+  int incomplete_len = sizeof(mysql_clogin_encode.getClientCap()) +
+                       sizeof(mysql_clogin_encode.getMaxPacket()) +
+                       sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
+                       mysql_clogin_encode.getUsername().size() + 1;
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+  ClientLogin mysql_clogin_decode{};
+  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
+  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
+  EXPECT_TRUE(mysql_clogin_decode.isClientSecureConnection());
+  EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getBaseClientCap(), mysql_clogin_encode.getBaseClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+}
+
+/*
+ * Test the MYSQL Client Login 41 message parser when CLIENT_SECURE_CONNECTION set
+ * - Incomplete auth resp
+ */
+TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnIncompleteAuthResp) {
+  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
+      CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION);
+  Buffer::OwnedImpl buffer;
+  mysql_clogin_encode.encode(buffer);
+
+  int incomplete_len = sizeof(mysql_clogin_encode.getClientCap()) +
+                       sizeof(mysql_clogin_encode.getMaxPacket()) +
+                       sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
+                       mysql_clogin_encode.getUsername().size() + 1 + 1;
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+  ClientLogin mysql_clogin_decode{};
+  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
+  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
+  EXPECT_TRUE(mysql_clogin_decode.isClientSecureConnection());
+  EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getBaseClientCap(), mysql_clogin_encode.getBaseClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+}
+
+/*
+ * Test the MYSQL Client Login 41 message parser
+ * - Incomplete auth resp
+ */
+TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthResp) {
+  ClientLogin& mysql_clogin_encode =
+      MySQLCLoginTest::getClientLogin(CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41);
+  Buffer::OwnedImpl buffer;
+  mysql_clogin_encode.encode(buffer);
+
+  int incomplete_len = sizeof(mysql_clogin_encode.getClientCap()) +
+                       sizeof(mysql_clogin_encode.getMaxPacket()) +
+                       sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
+                       mysql_clogin_encode.getUsername().size() + 1;
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+  ClientLogin mysql_clogin_decode{};
+  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
+  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
+  EXPECT_EQ(mysql_clogin_decode.isResponse41(), true);
+  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getBaseClientCap(), mysql_clogin_encode.getBaseClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
+  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
+  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+}
+
+/*
  * Test the MYSQL Client Login 41 message parser without CLIENT_CONNECT_WITH_DB:
  * - message is encoded using the ClientLogin class
  * - message is decoded using the ClientLogin class
@@ -222,9 +308,9 @@ TEST_F(MySQLCLoginTest, MySQLParseLengthEncodedInteger) {
 
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
- * Incomplete header at Client Capability
+ * Incomplete base client cap
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteClientCap) {
+TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteBaseClientCap) {
   ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(CLIENT_PROTOCOL_41);
   Buffer::OwnedImpl buffer;
   mysql_clogin_encode.encode(buffer);
@@ -234,24 +320,24 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteClientCap) {
 
   ClientLogin mysql_clogin_decode{};
   mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), 0);
+  EXPECT_EQ(mysql_clogin_decode.getBaseClientCap(), 0);
 }
 
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
- * Incomplete header at Extended Base Client Capability
+ * Incomplete ext client cap
  */
 TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteExtClientCap) {
   ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(CLIENT_PROTOCOL_41);
   Buffer::OwnedImpl buffer;
   mysql_clogin_encode.encode(buffer);
 
-  int incomplete_len = sizeof(mysql_clogin_encode.getBaseClientCap());
-  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+  int client_cap_len = sizeof(uint16_t);
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), client_cap_len);
 
   ClientLogin mysql_clogin_decode{};
   mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getBaseClientCap(), mysql_clogin_decode.getBaseClientCap());
   EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), 0);
 }
 
@@ -619,12 +705,12 @@ TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteCap) {
   Buffer::OwnedImpl buffer;
   mysql_clogin_encode.encode(buffer);
 
-  int incomplete_len = 0;
+  int incomplete_len = sizeof(mysql_clogin_encode.getClientCap()) - 1;
   Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
 
   ClientLogin mysql_clogin_decode{};
   mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), 0);
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), 0);
 }
 
 /*
@@ -642,7 +728,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLoginSslIncompleteMaxPacket) {
   ClientLogin mysql_clogin_decode{};
   mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
   EXPECT_TRUE(mysql_clogin_decode.isSSLRequest());
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
+  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), 0);
 }
 

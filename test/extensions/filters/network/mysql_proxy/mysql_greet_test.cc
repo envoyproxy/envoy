@@ -158,6 +158,28 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteSalt) {
 
 /*
  * Negative Testing: Server Greetings v10 Incomplete
+ * - incomplete filler
+ */
+TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteFiller) {
+  ServerGreeting mysql_greet_encode = getV10Greet(0);
+  Buffer::OwnedImpl buffer;
+  mysql_greet_encode.encode(buffer);
+
+  int incomplete_len =
+      sizeof(mysql_greet_encode.getProtocol()) + mysql_greet_encode.getVersion().size() + 1 +
+      sizeof(mysql_greet_encode.getThreadId()) + mysql_greet_encode.getAuthPluginData1().size();
+  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+
+  ServerGreeting mysql_greet_decode{};
+  mysql_greet_decode.decode(decode_data, GREETING_SEQ_NUM, decode_data.length());
+  EXPECT_EQ(mysql_greet_decode.getProtocol(), mysql_greet_encode.getProtocol());
+  EXPECT_EQ(mysql_greet_decode.getVersion(), mysql_greet_encode.getVersion());
+  EXPECT_EQ(mysql_greet_decode.getThreadId(), mysql_greet_encode.getThreadId());
+  EXPECT_EQ(mysql_greet_decode.getAuthPluginData1(), mysql_greet_encode.getAuthPluginData1());
+}
+
+/*
+ * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete Server Capabilities
  */
 TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteServerCap) {
@@ -263,8 +285,9 @@ TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteExtServerCap) {
  * Negative Testing: Server Greetings v10 Incomplete
  * - incomplete extended Server Capabilities
  */
-TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteFiller) {
+TEST_F(MySQLGreetTest, MySQLServerChallengeIncompleteAuthPluginDataLen) {
   ServerGreeting mysql_greet_encode = getV10Greet(0);
+  mysql_greet_encode.setAuthPluginData1(MySQLTestUtils::getAuthPluginData8());
   Buffer::OwnedImpl buffer;
   mysql_greet_encode.encode(buffer);
 

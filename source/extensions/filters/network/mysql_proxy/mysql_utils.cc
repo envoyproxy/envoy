@@ -139,9 +139,6 @@ DecodeStatus BufferHelper::readStringEof(Buffer::Instance& buffer, std::string& 
   if (index == -1) {
     return DecodeStatus::Failure;
   }
-  if (static_cast<DecodeStatus>(buffer.length()) < (index + 1)) {
-    return DecodeStatus::Failure;
-  }
   str.assign(std::string(static_cast<char*>(buffer.linearize(index)), index));
   buffer.drain(index + 1);
   return DecodeStatus::Success;
@@ -159,9 +156,6 @@ DecodeStatus BufferHelper::readString(Buffer::Instance& buffer, std::string& str
   char end = MYSQL_STR_END;
   ssize_t index = buffer.search(&end, sizeof(end), 0);
   if (index == -1) {
-    return DecodeStatus::Failure;
-  }
-  if (static_cast<DecodeStatus>(buffer.length()) < (index + 1)) {
     return DecodeStatus::Failure;
   }
   str.assign(std::string(static_cast<char*>(buffer.linearize(index)), index));
@@ -182,15 +176,6 @@ DecodeStatus BufferHelper::readStringBySize(Buffer::Instance& buffer, size_t len
 DecodeStatus BufferHelper::peekUint32(Buffer::Instance& buffer, uint32_t& val) {
   try {
     val = buffer.peekLEInt<uint32_t>(0);
-    return DecodeStatus::Success;
-  } catch (EnvoyException& e) {
-    return DecodeStatus::Failure;
-  }
-}
-
-DecodeStatus BufferHelper::peekUint16(Buffer::Instance& buffer, uint16_t& val) {
-  try {
-    val = buffer.peekLEInt<uint16_t>(0);
     return DecodeStatus::Success;
   } catch (EnvoyException& e) {
     return DecodeStatus::Failure;

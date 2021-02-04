@@ -50,9 +50,9 @@ private:
   void encodeResponse41(Buffer::Instance& out);
   void encodeResponse320(Buffer::Instance& out);
 
-  uint32_t client_cap_;
-  uint32_t max_packet_;
-  uint8_t charset_;
+  uint32_t client_cap_{0};
+  uint32_t max_packet_{0};
+  uint8_t charset_{0};
   std::string username_;
   std::string auth_resp_;
   std::string db_;

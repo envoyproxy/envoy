@@ -59,25 +59,27 @@ DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
   /* 4.0 uses 2 bytes, 4.1+ uses 4 bytes, but the proto-flag is in the lower 2
    * bytes */
   uint16_t base_cap;
-  if (BufferHelper::peekUint16(buffer, base_cap) != DecodeStatus::Success) {
+  if (BufferHelper::readUint16(buffer, base_cap) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing cap client login message");
     return DecodeStatus::Failure;
   }
   setBaseClientCap(base_cap);
-  if (client_cap_ & CLIENT_SSL) {
+  if (base_cap & CLIENT_SSL) {
     return parseResponseSsl(buffer);
   }
-  if (client_cap_ & CLIENT_PROTOCOL_41) {
+  if (base_cap & CLIENT_PROTOCOL_41) {
     return parseResponse41(buffer);
   }
   return parseResponse320(buffer);
 }
 
 DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
-  if (BufferHelper::readUint32(buffer, client_cap_) != DecodeStatus::Success) {
+  uint16_t ext_cap;
+  if (BufferHelper::readUint16(buffer, ext_cap) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing cap client ssl message");
     return DecodeStatus::Failure;
   }
+  setExtendedClientCap(ext_cap);
   if (BufferHelper::readUint32(buffer, max_packet_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing max packet client ssl message");
     return DecodeStatus::Failure;
@@ -94,10 +96,12 @@ DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
 }
 
 DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
-  if (BufferHelper::readUint32(buffer, client_cap_) != DecodeStatus::Success) {
+  uint16_t ext_cap;
+  if (BufferHelper::readUint16(buffer, ext_cap) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing client cap of client login message");
     return DecodeStatus::Failure;
   }
+  setExtendedClientCap(ext_cap);
   if (BufferHelper::readUint32(buffer, max_packet_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing max packet of client login message");
     return DecodeStatus::Failure;
@@ -155,12 +159,6 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
 }
 
 DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer) {
-  uint16_t base_cap;
-  if (BufferHelper::readUint16(buffer, base_cap) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing cap of client login message");
-    return DecodeStatus::Failure;
-  }
-  setBaseClientCap(base_cap);
   if (BufferHelper::readUint24(buffer, max_packet_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing max packet of client login message");
     return DecodeStatus::Failure;

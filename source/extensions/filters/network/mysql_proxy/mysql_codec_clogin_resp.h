@@ -12,7 +12,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-enum ClientLoginResponseType { Null, Ok, Err, AuthSwitch, AuthMoreData };
+enum ClientLoginResponseType : uint8_t {
+  Null = 0,
+  Ok = 1,
+  Err = 2,
+  AuthSwitch = 3,
+  AuthMoreData = 4
+};
 
 // ClientLoginResponse could be
 // Protocol::OldAuthSwitchRequest, Protocol::AuthSwitchRequest when server wants switch auth method
@@ -26,7 +32,6 @@ public:
   ClientLoginResponse& operator=(ClientLoginResponse&&) noexcept;
   bool operator==(const ClientLoginResponse& other) const; // test for equality, unit tests
   bool operator!=(const ClientLoginResponse& other) const { return !(*this == other); }
-
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   void encode(Buffer::Instance&) override;

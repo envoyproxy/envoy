@@ -64,22 +64,18 @@ void ClientLoginResponse::type(ClientLoginResponseType type) {
   // Need to use placement new because of the union.
   type_ = type;
   switch (type_) {
-  case ClientLoginResponseType::Ok: {
+  case ClientLoginResponseType::Ok:
     ok_ = std::make_unique<OkMessage>();
     break;
-  }
-  case ClientLoginResponseType::Err: {
+  case ClientLoginResponseType::Err:
     err_ = std::make_unique<ErrMessage>();
     break;
-  }
-  case ClientLoginResponseType::AuthSwitch: {
+  case ClientLoginResponseType::AuthSwitch:
     auth_switch_ = std::make_unique<AuthSwitchMessage>();
     break;
-  }
-  case ClientLoginResponseType::AuthMoreData: {
+  case ClientLoginResponseType::AuthMoreData:
     auth_more_ = std::make_unique<AuthMoreMessage>();
     break;
-  }
   default:
     break;
   }
