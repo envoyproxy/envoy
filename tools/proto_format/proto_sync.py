@@ -3,7 +3,7 @@
 # 1. Take protoxform artifacts from Bazel cache and pretty-print with protoprint.py.
 # 2. In the case where we are generating an Envoy internal shadow, it may be
 #    necessary to combine the current active proto, subject to hand editing, with
-#    shadow artifacts from the previous verion; this is done via
+#    shadow artifacts from the previous version; this is done via
 #    merge_active_shadow.py.
 # 3. Diff or copy resulting artifacts to the source tree.
 

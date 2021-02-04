@@ -4,8 +4,6 @@ package envoy.service.trace.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
 
-import "google/api/annotations.proto";
-
 import "opencensus/proto/trace/v1/trace.proto";
 
 import "udpa/annotations/status.proto";

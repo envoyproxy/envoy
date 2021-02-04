@@ -8,7 +8,6 @@ import "google/api/annotations.proto";
 
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.service.extension.v3";
 option java_outer_classname = "ConfigDiscoveryProto";

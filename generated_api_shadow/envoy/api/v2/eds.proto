@@ -5,13 +5,10 @@ package envoy.api.v2;
 import "envoy/api/v2/discovery.proto";
 
 import "google/api/annotations.proto";
-import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 import public "envoy/api/v2/endpoint.proto";
 

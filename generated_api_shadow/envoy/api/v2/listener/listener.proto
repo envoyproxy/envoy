@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2.listener;
 
-import "udpa/annotations/status.proto";
-
 import public "envoy/api/v2/listener/listener_components.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
