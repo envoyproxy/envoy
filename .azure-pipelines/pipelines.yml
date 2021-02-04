@@ -331,13 +331,6 @@ stages:
         pool:
           vmImage: "ubuntu-18.04"
         steps:
-          - task: DownloadBuildArtifacts@0
-            inputs:
-              buildType: current
-              artifactName: "docker"
-              itemPattern: "docker/envoy-docker-images.tar.xz"
-              downloadType: single
-              targetPath: $(Build.StagingDirectory)
           - bash: ./ci/do_ci.sh verify_examples
             env:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
