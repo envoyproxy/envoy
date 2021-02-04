@@ -97,6 +97,9 @@ public:
   // Undo the readDisable done in onEvent(Connected) - now that there is an associated connection,
   // drain any data.
   void readEnableIfNew() {
+    // It is expected for Envoy use of ActiveTcpClient this function only be
+    // called once. Other users of the TcpConnPool may recycle Tcp connections,
+    // and this safeguards them against read-enabling too many times.
     if (!associated_before_) {
       associated_before_ = true;
       connection_->readDisable(false);
