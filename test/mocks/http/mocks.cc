@@ -175,9 +175,7 @@ IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers
 }
 
 MockReceivedSettings::MockReceivedSettings() {
-  ON_CALL(*this, maxConcurrentStreams()).WillByDefault(([this]() -> absl::optional<int32_t> {
-    return max_concurrent_streams_;
-  }));
+  ON_CALL(*this, maxConcurrentStreams()).WillByDefault(ReturnRef(max_concurrent_streams_));
 }
 
 } // namespace Http
