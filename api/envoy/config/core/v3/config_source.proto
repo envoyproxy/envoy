@@ -73,8 +73,9 @@ message ApiConfigSource {
     AGGREGATED_DELTA_GRPC = 6;
   }
 
-  // API type (gRPC, REST, delta gRPC)
-  ApiType api_type = 1 [(validate.rules).enum = {defined_only: true}];
+  // API type (gRPC, REST, delta gRPC).
+  // Aggregated gRPC and delta gRPC are not implemented.
+  ApiType api_type = 1 [(validate.rules).enum = {defined_only: true not_in: 5 not_in: 6}];
 
   // API version for xDS transport protocol. This describes the xDS gRPC/REST
   // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.

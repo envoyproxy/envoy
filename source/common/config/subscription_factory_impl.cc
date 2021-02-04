@@ -82,6 +82,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false,
           use_namespace_matching);
     }
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC: {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
