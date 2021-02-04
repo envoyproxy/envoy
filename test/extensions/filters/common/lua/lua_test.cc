@@ -134,7 +134,8 @@ TEST_F(LuaTest, MarkDead) {
   InSequence s;
   setup(SCRIPT);
   EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeFirst", initializers_)));
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeSecond", initializers_)));
+  EXPECT_NE(LUA_REFNIL,
+            state_->getGlobalRef(state_->registerGlobal("callMeSecond", initializers_)));
 
   CoroutinePtr cr1(state_->createCoroutine());
   LuaDeathRef<TestObject> ref(TestObject::create(cr1->luaState()), true);

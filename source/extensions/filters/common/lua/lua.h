@@ -390,8 +390,7 @@ public:
    * @param initializers supplies a collection of initializers.
    * @return a slot/index for later use with getGlobalRef().
    */
-  uint64_t registerGlobal(const std::string& global,
-                          const InitializerList& initializers);
+  uint64_t registerGlobal(const std::string& global, const InitializerList& initializers);
 
   /**
    * Register a type with the thread local state. After this call the type will be available on
