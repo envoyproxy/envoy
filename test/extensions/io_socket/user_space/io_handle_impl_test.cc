@@ -214,6 +214,20 @@ TEST_F(IoHandleImplTest, BasicReadv) {
   EXPECT_EQ(0, result.rc_);
 }
 
+// Test readv on slices.
+TEST_F(IoHandleImplTest, ReadvMultiSlices) {
+  Buffer::OwnedImpl buf_to_write(std::string(1024, 'a'));
+  io_handle_peer_->write(buf_to_write);
+
+  char full_frag[1024];
+  Buffer::RawSlice slices[2] = {{full_frag, 512}, {full_frag + 512, 512}};
+
+  auto result = io_handle_->readv(1024, slices, 2);
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(1024, result.rc_);
+}
+
 TEST_F(IoHandleImplTest, FlowControl) {
   io_handle_->setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
