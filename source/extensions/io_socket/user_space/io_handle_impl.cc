@@ -68,18 +68,19 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
                                  Network::IoSocketError::deleteIoError)};
     }
   }
+  // The read bytes can not exceed the provided buffer size or pending received size.
+  const auto max_bytes_to_read = std::min(pending_received_data_.length(), max_length);
   uint64_t bytes_offset = 0;
   for (uint64_t i = 0; i < num_slice && bytes_offset < max_length; i++) {
     auto bytes_to_read_in_this_slice =
-        std::min(std::min(pending_received_data_.length(), max_length) - bytes_offset,
-                 uint64_t(slices[i].len_));
+        std::min(max_bytes_to_read - bytes_offset, uint64_t(slices[i].len_));
     // Copy and drain, so pending_received_data_ always copy from offset 0.
     pending_received_data_.copyOut(0, bytes_to_read_in_this_slice, slices[i].mem_);
     pending_received_data_.drain(bytes_to_read_in_this_slice);
     bytes_offset += bytes_to_read_in_this_slice;
   }
-  auto bytes_read = bytes_offset;
-  ASSERT(bytes_read <= max_length);
+  const auto bytes_read = bytes_offset;
+  ASSERT(bytes_read <= max_bytes_to_read);
   ENVOY_LOG(trace, "socket {} readv {} bytes", static_cast<void*>(this), bytes_read);
   return {bytes_read, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
 }
@@ -103,7 +104,7 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
     }
   }
   // TODO(lambdai): Move slice by slice until high watermark.
-  uint64_t max_bytes_to_read = std::min(max_length, pending_received_data_.length());
+  const uint64_t max_bytes_to_read = std::min(max_length, pending_received_data_.length());
   buffer.move(pending_received_data_, max_bytes_to_read);
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
 }
@@ -227,7 +228,7 @@ Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flag
     }
   }
   // Specify uint64_t since the latter length may not have the same type.
-  auto max_bytes_to_read = std::min<uint64_t>(pending_received_data_.length(), length);
+  const auto max_bytes_to_read = std::min<uint64_t>(pending_received_data_.length(), length);
   pending_received_data_.copyOut(0, max_bytes_to_read, buffer);
   if (!(flags & MSG_PEEK)) {
     pending_received_data_.drain(max_bytes_to_read);
