@@ -3,8 +3,8 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common/api:78.0"
-"source/common/api/posix:77.1"
+"source/common/api:75.4"
+"source/common/api/posix:74.0"
 "source/common/common:96.3"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
@@ -67,7 +67,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:85.7"
 "source/server:94.6"
 "source/server/admin:95.1"
-"source/server/config_validation:76.6"
+"source/server/config_validation:75.6"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
