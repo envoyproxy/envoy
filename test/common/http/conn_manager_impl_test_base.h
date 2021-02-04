@@ -140,6 +140,7 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  uint32_t maxRequestsConnection() const override { return max_requests_connection_; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -169,6 +170,7 @@ public:
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
+  uint32_t max_requests_connection_{0};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};

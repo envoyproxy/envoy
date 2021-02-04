@@ -805,6 +805,39 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
   EXPECT_EQ(100, config.maxRequestHeadersCount());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, ConfiguredMaxRequestsConnection) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_requests_connection: 10
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(10, config.maxRequestsConnection());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnconfiguredMaxRequestsConnection) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(0, config.maxRequestsConnection());
+}
+
 // Check that max request header count is configured.
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   const std::string yaml_string = R"EOF(
