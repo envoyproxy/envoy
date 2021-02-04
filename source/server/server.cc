@@ -600,8 +600,13 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 }
 
 void InstanceImpl::onRuntimeReady() {
-  // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
+  try {
+    // Begin initializing secondary clusters after RTDS configuration has been applied.
+    clusterManager().initializeSecondaryClusters(bootstrap_);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
+    shutdown();
+  }
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();

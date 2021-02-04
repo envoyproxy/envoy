@@ -391,6 +391,13 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
+// Expect that exceptions in secondary cluster initialization callbacks are caught.
+TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
+  initialize("test/server/test_data/server/health_check_nullptr.yaml");
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_NO_THROW(server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock));
+}
+
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
   absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
