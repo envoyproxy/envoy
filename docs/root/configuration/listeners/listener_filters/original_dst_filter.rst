@@ -13,8 +13,9 @@ with setting the listener's :ref:`transparent <envoy_v3_api_field_config.listene
 Windows
 ===============
 
-Original destination listener filter reads the SO_ORIGINAL_DST socket option set when a connection
-has been redirected by an HNS policy applied to a container endpoint. For this fiter to work the
+Original destination listener filter reads the SO_ORIGINAL_DST socket option set when a connection has been redirected by an
+`HNS <https://docs.microsoft.com/en-us/virtualization/windowscontainers/container-networking/architecture#container-network-management-with-host-network-service>`_
+policy applied to a container endpoint. For this filter to work the
 :ref:`traffic_direction <envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>` must be set
 on the listener. This means that a separate listener is needed to handle inbound and outbound traffic.
 

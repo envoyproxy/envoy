@@ -400,10 +400,10 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
-SysCallIntResult OsSysCallsImpl::genericIoctl(os_fd_t sockfd, unsigned long control_code,
-                                              void* in_buffer, unsigned long in_buffer_len,
-                                              void* out_buffer, unsigned long out_buffer_len,
-                                              unsigned long* bytes_returned) {
+SysCallIntResult OsSysCallsImpl::win32Ioctl(os_fd_t sockfd, unsigned long control_code,
+                                            void* in_buffer, unsigned long in_buffer_len,
+                                            void* out_buffer, unsigned long out_buffer_len,
+                                            unsigned long* bytes_returned) {
   const int rc = ::WSAIoctl(sockfd, control_code, in_buffer, in_buffer_len, out_buffer,
                             out_buffer_len, bytes_returned, nullptr, nullptr);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};

@@ -281,8 +281,8 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, EOPNOTSUPP};
 }
 
-SysCallIntResult OsSysCallsImpl::genericIoctl(os_fd_t, unsigned long, void*, unsigned long, void*,
-                                              unsigned long, unsigned long*) {
+SysCallIntResult OsSysCallsImpl::win32Ioctl(os_fd_t, unsigned long, void*, unsigned long, void*,
+                                            unsigned long, unsigned long*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

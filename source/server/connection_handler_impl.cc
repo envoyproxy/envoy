@@ -488,9 +488,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
       ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
       unsigned long redirectRecordsSize = 0;
       auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
-      auto status = socket->genericIoctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
-                                         redirect_records->buf_, sizeof(redirect_records->buf_),
-                                         &redirect_records->buf_size_);
+      auto status = socket->win32Ioctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
+                                       redirect_records->buf_, sizeof(redirect_records->buf_),
+                                       &redirect_records->buf_size_);
       if (status.rc_ != 0) {
         ENVOY_LOG(debug,
                   "closing connection: cannot broker connection to original destination "

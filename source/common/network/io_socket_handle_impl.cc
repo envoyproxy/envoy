@@ -574,13 +574,12 @@ Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void
   return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
 }
 
-Api::SysCallIntResult IoSocketHandleImpl::genericIoctl(unsigned long control_code, void* in_buffer,
-                                                       unsigned long in_buffer_len,
-                                                       void* out_buffer,
-                                                       unsigned long out_buffer_len,
-                                                       unsigned long* bytes_returned) {
-  return Api::OsSysCallsSingleton::get().genericIoctl(fd_, control_code, in_buffer, in_buffer_len,
-                                                      out_buffer, out_buffer_len, bytes_returned);
+Api::SysCallIntResult IoSocketHandleImpl::win32Ioctl(unsigned long control_code, void* in_buffer,
+                                                     unsigned long in_buffer_len, void* out_buffer,
+                                                     unsigned long out_buffer_len,
+                                                     unsigned long* bytes_returned) {
+  return Api::OsSysCallsSingleton::get().win32Ioctl(fd_, control_code, in_buffer, in_buffer_len,
+                                                    out_buffer, out_buffer_len, bytes_returned);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {

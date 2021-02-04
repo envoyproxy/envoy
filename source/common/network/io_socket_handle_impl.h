@@ -60,10 +60,10 @@ public:
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
                                   socklen_t optlen) override;
   Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
-  Api::SysCallIntResult genericIoctl(unsigned long control_code, void* in_buffer,
-                                     unsigned long in_buffer_len, void* out_buffer,
-                                     unsigned long out_buffer_len,
-                                     unsigned long* bytes_returned) override;
+  Api::SysCallIntResult win32Ioctl(unsigned long control_code, void* in_buffer,
+                                   unsigned long in_buffer_len, void* out_buffer,
+                                   unsigned long out_buffer_len,
+                                   unsigned long* bytes_returned) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;

@@ -22,7 +22,7 @@ bool Win32RedirectRecordsOptionImpl::setOption(
     }
 
     unsigned long size = 0;
-    const Api::SysCallIntResult result = socket.genericIoctl(
+    const Api::SysCallIntResult result = socket.win32Ioctl(
         optname_.option(), const_cast<void*>(reinterpret_cast<const void*>(redirect_records_.buf_)),
         redirect_records_.buf_size_, nullptr, 0, &size);
     if (result.rc_ != 0) {

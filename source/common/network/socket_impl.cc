@@ -94,12 +94,12 @@ Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* 
   return io_handle_->getOption(level, optname, optval, optlen);
 }
 
-Api::SysCallIntResult SocketImpl::genericIoctl(unsigned long control_code, void* in_buffer,
-                                               unsigned long in_buffer_len, void* out_buffer,
-                                               unsigned long out_buffer_len,
-                                               unsigned long* bytes_returned) {
-  return io_handle_->genericIoctl(control_code, in_buffer, in_buffer_len, out_buffer,
-                                  out_buffer_len, bytes_returned);
+Api::SysCallIntResult SocketImpl::win32Ioctl(unsigned long control_code, void* in_buffer,
+                                             unsigned long in_buffer_len, void* out_buffer,
+                                             unsigned long out_buffer_len,
+                                             unsigned long* bytes_returned) {
+  return io_handle_->win32Ioctl(control_code, in_buffer, in_buffer_len, out_buffer, out_buffer_len,
+                                bytes_returned);
 }
 
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
