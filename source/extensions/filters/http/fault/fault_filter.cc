@@ -452,6 +452,8 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
     // Should not continue to count as an active fault after the delay has elapsed if no other type
     // of fault is active. As the delay timer is always done at this point and followed abort faults
     // have been checked earlier, here we just check if there's a response rate limit configured.
+    ASSERT(fault_active_);
+    ASSERT(delay_timer_ == nullptr);
     if (!isResponseRateLimitConfigured()) {
       config_->stats().active_faults_.dec();
       fault_active_ = false;
