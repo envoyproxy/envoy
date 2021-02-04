@@ -30,9 +30,9 @@ uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
 }
 
 uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial,
-                                  std::chrono::milliseconds& timeToNextToken) {
+                                  std::chrono::milliseconds& time_to_next_token) {
   auto tokens_consumed = consume(tokens, allow_partial);
-  timeToNextToken = nextTokenAvailable();
+  time_to_next_token = nextTokenAvailable();
   return tokens_consumed;
 }
 

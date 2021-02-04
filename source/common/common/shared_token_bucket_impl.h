@@ -31,7 +31,7 @@ public:
 
   uint64_t consume(uint64_t tokens, bool allow_partial) override;
   uint64_t consume(uint64_t tokens, bool allow_partial,
-                   std::chrono::milliseconds& timeToNextToken) override;
+                   std::chrono::milliseconds& time_to_next_token) override;
   std::chrono::milliseconds nextTokenAvailable() override;
 
   /**

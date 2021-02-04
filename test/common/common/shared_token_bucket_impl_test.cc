@@ -179,15 +179,15 @@ TEST_F(SharedTokenBucketImplTest, SynchronizedConsumeAndNextToken) {
 
   token_bucket.reset(10);
   // Exhaust all tokens.
-  std::chrono::milliseconds timeToNextToken(0);
-  EXPECT_EQ(10, token_bucket.consume(20, true, timeToNextToken));
-  EXPECT_EQ(timeToNextToken.count(), 200);
+  std::chrono::milliseconds time_to_next_token(0);
+  EXPECT_EQ(10, token_bucket.consume(20, true, time_to_next_token));
+  EXPECT_EQ(time_to_next_token.count(), 200);
   time_system_.advanceTimeWait(std::chrono::milliseconds(400));
 
   // Start a thread and call consume to refill tokens.
   std::thread t2([&] {
-    EXPECT_EQ(1, token_bucket.consume(1, false, timeToNextToken));
-    EXPECT_EQ(timeToNextToken.count(), 0);
+    EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
+    EXPECT_EQ(time_to_next_token.count(), 0);
   });
 
   t2.join();

@@ -33,11 +33,11 @@ public:
    *                      than asked for. If allow_partial is true, the bucket contains 3 tokens,
    *                      and the caller asks for 5, the bucket will return 3 tokens and now be
    *                      empty.
-   * @param timeToNextToken out param indicating the approx time until next token is available.
+   * @param time_to_next_token out param indicating the approx time until next token is available.
    * @return the number of tokens actually consumed.
    */
   virtual uint64_t consume(uint64_t tokens, bool allow_partial,
-                           std::chrono::milliseconds& timeToNextToken) PURE;
+                           std::chrono::milliseconds& time_to_next_token) PURE;
 
   /**
    * @return returns the approximate time until a next token is available. Currently it
