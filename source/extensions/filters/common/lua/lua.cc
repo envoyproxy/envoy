@@ -72,7 +72,7 @@ int ThreadLocalState::getGlobalRef(uint64_t slot) {
 
 uint64_t ThreadLocalState::registerGlobal(const std::string& global,
                                           const InitializerList& initializers) {
-  tls_slot_->runOnAllThreads([global, initializers](OptRef<LuaThreadLocal> tls) {
+  tls_slot_->runOnAllThreads([global, &initializers](OptRef<LuaThreadLocal> tls) {
     lua_getglobal(tls->state_.get(), global.c_str());
     if (lua_isfunction(tls->state_.get(), -1)) {
       for (const auto& initialize : initializers) {
