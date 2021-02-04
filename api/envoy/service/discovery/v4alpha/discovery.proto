@@ -65,7 +65,31 @@ message DiscoveryRequest {
   google.rpc.Status error_detail = 6;
 }
 
-// [#next-free-field: 7]
+// A response status for a discovery request, that describes the error, if any,
+// that was encountered by the server.
+message DiscoveryResponseStatus {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.discovery.v3.DiscoveryResponseStatus";
+
+  enum ErrorType {
+    // No error has occurred.
+    OK = 0;
+
+    // No resources matching the request.
+    NO_MATCHING_RESOURCE = 1;
+
+    // No resources in the API version range matching the request.
+    NO_MATCHING_VERSION_RESOURCE = 2;
+  }
+
+  // The cause of the response.
+  ErrorType type = 1;
+
+  // An optional error message description that can be logged.
+  string description = 2;
+}
+
+// [#next-free-field: 9]
 message DiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DiscoveryResponse";
@@ -108,6 +132,22 @@ message DiscoveryResponse {
 
   // The control plane instance that sent the response.
   config.core.v4alpha.ControlPlane control_plane = 6;
+
+  // [#not-implemented-hide:]
+  // An optional per-resource status response that can be used when no matching resource(s)
+  // are sent to the client, and will describe the reason. This will be a map
+  // from a resource name to its status. A resource that doesn't appear in the map
+  // implies the resource response is valid. No status map implies that all the
+  // resources in the response are valid.
+  map<string, DiscoveryResponseStatus> resources_status = 7;
+
+  // [#not-implemented-hide:]
+  // An optional API patch version of the requested resource that is supported by
+  // the client. This is useful for use-cases where the client and server support new
+  // API features, before the next API minor version is rolled out.
+  // If not included, the patch version defaults to 0, stating that the client
+  // supports API features up to the client's minor version.
+  uint32 patch_version = 8;
 }
 
 // DeltaDiscoveryRequest and DeltaDiscoveryResponse are used in a new gRPC
@@ -142,7 +182,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DeltaDiscoveryRequest";
@@ -202,9 +242,17 @@ message DeltaDiscoveryRequest {
   // failed to update configuration. The *message* field in *error_details*
   // provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
+
+  // [#not-implemented-hide:]
+  // An optional API patch version of the requested resource that is supported by
+  // the client. This is useful for use-cases where the client and server support new
+  // API features, before the next API minor version is rolled out.
+  // If not included, the patch version defaults to 0, stating that the client
+  // supports API features up to the client's minor version.
+  uint32 patch_version = 8;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DeltaDiscoveryResponse";
@@ -233,6 +281,14 @@ message DeltaDiscoveryResponse {
   // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   config.core.v4alpha.ControlPlane control_plane = 7;
+
+  // [#not-implemented-hide:]
+  // An optional per-resource status response that can be used when no matching resource(s)
+  // are sent to the client, and will describe the reason. This will be a map
+  // from a resource name to its status. A resource that doesn't appear in the map
+  // implies the resource response is valid. No status map implies that all the
+  // resources in the response are valid.
+  map<string, DiscoveryResponseStatus> resources_status = 8;
 }
 
 // [#next-free-field: 8]

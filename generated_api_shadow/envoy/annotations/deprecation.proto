@@ -4,18 +4,25 @@ package envoy.annotations;
 
 import "google/protobuf/descriptor.proto";
 
-// Allows tagging proto fields as fatal by default. One Envoy release after
-// deprecation, deprecated fields will be disallowed by default, a state which
-// is reversible with :ref:`runtime overrides <config_runtime_deprecation>`.
+// [#protodoc-title: Deprecation]
+// Adds annotations for deprecated fields and enums to allow tagging proto
+// fields as fatal by default and the minor version in which the field was
+// deprecated. One Envoy release after deprecation, deprecated fields will be
+// disallowed by default, a state which is reversible with
+// :ref:`runtime overrides <config_runtime_deprecation>`.
 
 // Magic number in this file derived from top 28bit of SHA256 digest of
-// "envoy.annotation.disallowed_by_default"
+// "envoy.annotation.disallowed_by_default" and "envoy.annotation.minor_ver"
 extend google.protobuf.FieldOptions {
   bool disallowed_by_default = 189503207;
+
+  uint32 minor_ver = 240115895;
 }
 
 // Magic number in this file derived from top 28bit of SHA256 digest of
-// "envoy.annotation.disallowed_by_default_enum"
+// "envoy.annotation.disallowed_by_default_enum" and "envoy.annotation.minor_ver_enum"
 extend google.protobuf.EnumValueOptions {
   bool disallowed_by_default_enum = 70100853;
+
+  uint32 minor_ver_enum = 194440465;
 }

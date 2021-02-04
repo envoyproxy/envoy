@@ -7,6 +7,10 @@ stability.
 
 # API semantic versioning
 
+The Envoy API version is used to define a set of services, extensions and resources that the Envoy client supports.
+The API versioning is of the form `X.Y.Z` where X denotes the major version, Y
+denotes the minor version, and Z denotes the patch version.
+
 The Envoy APIs consist of a family of packages, e.g. `envoy.admin.v2alpha`,
 `envoy.service.trace.v2`. Each package is independently versioned with a protobuf semantic
 versioning scheme based on https://cloud.google.com/apis/design/versioning.
@@ -15,9 +19,6 @@ The major version for a package is captured in its name (and directory structure
 of the tracing API package is named `envoy.service.trace.v2` and its constituent protos are located
 in `api/envoy/service/trace/v2`. Every protobuf must live directly in a versioned package namespace,
 we do not allow subpackages such as `envoy.service.trace.v2.somethingelse`.
-
-Minor and patch versions will be implemented in the future, this effort is tracked in
-https://github.com/envoyproxy/envoy/issues/8416.
 
 In everyday discussion and GitHub labels, we refer to the `v2`, `v3`, `vN`, `...` APIs. This has a
 specific technical meaning. Any given message in the Envoy API, e.g. the `Bootstrap` at
@@ -28,9 +29,24 @@ configuration resources (e.g. bootstrap, xDS resources such as `Cluster`). The
 v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Boostrap`, even
 though it might might transitively reference `envoy.service.trace.v2`.
 
+The minor version enables API stability and support, and to safely deprecate old
+features and reduce the tech debt. A client can support a range of minor API
+versions, and can request xDS resources that match this range, using the resource
+[context parameters](https://github.com/cncf/udpa/blob/master/xds/core/v3/context_params.proto).
+Deprecated features, from previous minor or major versions (and their code), can be safely removed
+from the client. In general, within a minor API version, we do not allow any breaking changes
+(more details below). The minor version will be reset to 0 upon a release of a new major version.
+
+The patch version tracks incremental changes to the API, such as, adding a new
+package, adding a new field, deprecating a field, etc.
+A client can supply the supported patch version when requesting xDS resources,
+which allows clients and servers to support new features, before the release of
+the next minor version.
+The patch version will be reset to 0 upon a release of a new minor version.
+
 # Backwards compatibility
 
-In general, within a package's major API version, we do not allow any breaking changes. The guiding
+In general, within a minor API version, we do not allow any breaking changes. The guiding
 principle is that neither the wire format nor protobuf compiler generated language bindings should
 experience a backward compatible break on a change. Specifically:
 
@@ -84,7 +100,7 @@ from clients (Envoy, gRPC) and a large number of control planes, ranging from si
 management servers to xDS-as-a-service offerings run by vendors. The [xDS API
 shepherds](https://github.com/orgs/envoyproxy/teams/api-shepherds) will make the decision to add a
 new major version subject to the following constraints:
-* There exists sufficient technical debt in the xDS APIs in the existing supported major version
+* There exists a major, breaking change, to the xDS APIs in the existing supported major version
   to justify the cost burden for xDS client/server implementations.
 * At least one year has elapsed since the last major version was cut.
 * Consultation with the Envoy community (via Envoy community call, `#xds` channel on Slack), as
@@ -92,44 +108,35 @@ new major version subject to the following constraints:
   process; the API shepherds retain the right to move forward with a new major API version after
   weighing this input with the first two considerations above.
 
-Following the release of a new major version, the API lifecycle follows a deprecation clock.
-Envoy will support at most three major versions of any API package at all times:
-* The current stable major version, e.g. v3.
-* The previous stable major version, e.g. v2. This is needed to ensure that we provide at least 1
-  year for a supported major version to sunset. By supporting two stable major versions
-  simultaneously, this makes it easier to coordinate control plane and Envoy
-  rollouts as well. This previous stable major version will be supported for exactly 1
-  year after the introduction of the new current stable major version, after which it will be
-  removed from the Envoy implementation.
-* Optionally, the next experimental alpha major version, e.g. v4alpha. This is a release candidate
-  for the next stable major version. This is only generated when the current stable major version
-  requires a breaking change at the next cycle, e.g. a deprecation or field rename. This release
-  candidate is mechanically generated via the
-  [protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool from the
-  current stable major version, making use of annotations such as `deprecated = true`. This is not a
-  human editable artifact.
+A new API minor version is expected to be released once a year, around Q1. This
+allows for gradual introduction of new capabilities and features that will be supported
+by clients, and by control planes.
+Following the release of a new minor version, the API lifecycle follows a deprecation clock.
+Envoy will support the most recent 3 minor versions, including the current. This
+entails that we provide at least 2 years of supported deprecated features to
+unset.
 
-An example of how this might play out is that at the end of December in 2020, if a v4 major version
-is justified, we might freeze
-`envoy.config.bootstrap.v4alpha` and this package would then become the current stable major version
-`envoy.config.bootstrap.v4`. The `envoy.config.bootstrap.v3` package will become the previous stable
-major version and support for `envoy.config.bootstrap.v2` will be dropped from the Envoy
-implementation. Note that some transitively referenced package, e.g.
-`envoy.config.filter.network.foo.v2` may remain at version 2 during this release, if no changes were
-made to the referenced package. If no major version is justified at this point, the decision to cut
-v4 might occur at some point in 2021 or beyond, however v2 support will still be removed at the end
-of 2020.
+The patch version will be incremented upon changes to the API proto files, such
+as adding a new enum value, or setting a field as deprecated. We expect frequent
+updates to the patch version.
 
-The implication of this API lifecycle and clock is that any deprecated feature in the Envoy API will
-retain implementation support for at least 1-2 years.
+The following is a an example of the API versioning lifecycle. Assume that the
+current API version is v3.7.18. Assume that a new change (pull-request) updates the API as follows:
+`field1` is annotated as deprecated and `field2`, a new field, is added.
+As a consequence of this, the patch version is increased and the API version becomes v3.7.19.
+Upon sending a request for xDS resources, the client provides the resource type
+which includes its full package path which entails the API major version (v3), and
+the range of minor versions that the client supports (5 to 7) using the resource
+context parameters: `xds.api.oldest_minor_ver=5` and `xds.api.latest_minor_ver=7`.
+In addition, the client will provide patch version (19) as part of the xDS resource request.
+This allows the control plane to send either resources with `field1` or with `field2`.
+In the next year's Q1, the current API minor version will be cut, and the API
+version becomes v3.8.0. The client will now support a new minor versions range
+(6 to 8), and features deprecated in minor version 5 will be removed.
+When the API version becomes v3.10.0, `field1` will be removed from the API.
 
-We are currently working on a strategy to introduce minor versions
-(https://github.com/envoyproxy/envoy/issues/8416). This will bump the xDS API minor version on every
-deprecation and field introduction/modification. This will provide an opportunity for the control
-plane to condition on client and major/minor API version support. Currently under discussion, but
-not finalized will be the sunsetting of Envoy client support for deprecated features after a year
-of support within a major version. Please post to https://github.com/envoyproxy/envoy/issues/8416
-any thoughts around this.
+Patch version updates and minor version releases, is done using tools (TBD) that
+maintain the consistency of the API proto files.
 
 # New API features
 
@@ -143,6 +150,18 @@ only be made to the *current stable major version*. The rationale for this polic
   feature in both locations.
 * We encourage Envoy users to move to the current stable major version from the previous one to
   consume new functionality.
+
+As previously discussed, the new feature is added to the current minor version, and increases the
+patch version.
+
+# API feature deprecation
+
+A feature can be deprecated by annotating the corresponding field or enum value as `[deprecated = true]`.
+This implies that the feature is deprecated during the current minor version, `Y`.
+When the minor version is cut (starting with minor version `Y+1`), automatic tools will add another annotation,
+`[deprecated = true, minor_ver=Y]` (or `minor_ver_enum` for an enum value), indicating that the field
+(or enum value) were deprecated during minor version Y. 2 years later, when minor version `Y+2` will
+be cut (and `Y+3` will be the current version), the deprecated field or enum value will be removed.
 
 # When can an API change be made to a package's previous stable major version?
 
@@ -185,7 +204,7 @@ enabled by the above process.
 
 # Client features
 
-Not all clients will support all fields and features in a given major API version. In general, it is
+Not all clients will support all fields and features in a given API version. In general, it is
 preferable to use Protobuf semantics to support this, for example:
 * Ignoring a field's contents is sufficient to indicate that the support is missing in a client.
 * Setting both deprecated and the new method for expressing a field if support for a range of

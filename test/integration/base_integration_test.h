@@ -7,6 +7,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/version_converter.h"
@@ -147,14 +148,19 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
   template <class T>
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
-                             const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version,
-                             const bool api_downgrade = false) {
+  void sendDiscoveryResponse(
+      const std::string& type_url, const std::vector<T>& state_of_the_world,
+      const std::vector<T>& added_or_updated, const std::vector<std::string>& removed,
+      const std::string& version, const bool api_downgrade = false,
+      const absl::flat_hash_map<std::string,
+                                envoy::service::discovery::v3::DiscoveryResponseStatus>&
+          resources_status = {}) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade,
+                                resources_status);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade,
+                                 resources_status);
     }
   }
 
@@ -183,9 +189,14 @@ public:
       const std::string& expected_error_message = "");
 
   template <class T>
-  void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, const bool api_downgrade = false) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+  void sendSotwDiscoveryResponse(
+      const std::string& type_url, const std::vector<T>& messages, const std::string& version,
+      const bool api_downgrade = false,
+      const absl::flat_hash_map<std::string,
+                                envoy::service::discovery::v3::DiscoveryResponseStatus>&
+          resources_status = {}) {
+    // API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
@@ -195,38 +206,53 @@ public:
         discovery_response.add_resources()->PackFrom(message);
       }
     }
+    if (!resources_status.empty()) {
+      auto& response_status_map = *discovery_response.mutable_resources_status();
+      for (const auto& kv : resources_status) {
+        response_status_map[kv.first] = kv.second;
+      }
+    }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::string& type_url,
-                                  const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version, const bool api_downgrade = false) {
+  void sendDeltaDiscoveryResponse(
+      const std::string& type_url, const std::vector<T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version,
+      const bool api_downgrade = false,
+      const absl::flat_hash_map<std::string,
+                                envoy::service::discovery::v3::DiscoveryResponseStatus>&
+          resources_status = {}) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
-                               api_downgrade);
+                               api_downgrade, resources_status);
   }
   template <class T>
-  void
-  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             const bool api_downgrade = false) {
+  void sendDeltaDiscoveryResponse(
+      const std::string& type_url, const std::vector<T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version, FakeStreamPtr& stream,
+      const std::vector<std::string>& aliases = {}, const bool api_downgrade = false,
+      const absl::flat_hash_map<std::string,
+                                envoy::service::discovery::v3::DiscoveryResponseStatus>&
+          resources_status = {}) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
-                                                    aliases, api_downgrade);
+                                                    aliases, api_downgrade, resources_status);
     stream->sendGrpcMessage(response);
   }
 
   template <class T>
-  envoy::api::v2::DeltaDiscoveryResponse
-  createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
-                               const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases,
-                               const bool api_downgrade = false) {
+  // envoy::api::v2::DeltaDiscoveryResponse
+  envoy::service::discovery::v3::DeltaDiscoveryResponse createDeltaDiscoveryResponse(
+      const std::string& type_url, const std::vector<T>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version,
+      const std::vector<std::string>& aliases, const bool api_downgrade = false,
+      const absl::flat_hash_map<std::string,
+                                envoy::service::discovery::v3::DiscoveryResponseStatus>&
+          resources_status = {}) {
 
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
+    // API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
@@ -246,6 +272,12 @@ public:
       }
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+    if (!resources_status.empty()) {
+      auto& response_status_map = *response.mutable_resources_status();
+      for (const auto& kv : resources_status) {
+        response_status_map[kv.first] = kv.second;
+      }
+    }
     static int next_nonce_counter = 0;
     response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     return response;
@@ -375,6 +407,14 @@ protected:
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
     proxy_buffer_factory_ = proxy_buffer_factory;
+  }
+
+  // Printing all counters and their values
+  void printAllCounters() {
+    std::cerr << "Counters:" << std::endl;
+    for (const auto& c : test_server_->counters()) {
+      std::cerr << "\t" << c->name() << ": " << c->value() << std::endl;
+    }
   }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
