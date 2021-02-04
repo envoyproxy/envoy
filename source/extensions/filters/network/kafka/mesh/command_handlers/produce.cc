@@ -89,33 +89,6 @@ std::vector<RecordFootmark> RecordExtractorImpl::extractRecordsOutOfBatchWithMag
   return result;
 }
 
-// Helper function to get the data (key, value) out of record.
-static absl::string_view comsumeBytes(absl::string_view& input) {
-  VarInt32Deserializer length_deserializer;
-  length_deserializer.feed(input);
-  if (!length_deserializer.ready()) {
-    throw EnvoyException("byte array length not present");
-  }
-  const int32_t length = length_deserializer.get();
-  // Length can be negative (null value was published by client).
-  if (-1 == length) {
-    return {};
-  }
-
-  if (length >= 0) {
-    if (static_cast<absl::string_view::size_type>(length) > input.size()) {
-      throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}",
-                                       length, input.size()));
-    }
-    const absl::string_view result = {input.data(),
-                                      static_cast<absl::string_view::size_type>(length)};
-    input = {input.data() + length, input.length() - length};
-    return result;
-  } else {
-    throw EnvoyException(fmt::format("byte array length less than -1: {}", length));
-  }
-}
-
 RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition,
                                                   absl::string_view& data) const {
   // The reference implementation is:
@@ -143,8 +116,8 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
         fmt::format("attributes not present in record for [{}-{}]", topic, partition));
   }
 
-  absl::string_view key = comsumeBytes(data);
-  absl::string_view value = comsumeBytes(data);
+  absl::string_view key = extractElement(data);
+  absl::string_view value = extractElement(data);
 
   VarInt32Deserializer headers_count_deserializer;
   headers_count_deserializer.feed(data);
@@ -158,8 +131,8 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
                                      partition, headers_count));
   }
   for (int32_t i = 0; i < headers_count; ++i) {
-    comsumeBytes(data); // header key
-    comsumeBytes(data); // header value
+    extractElement(data); // header key
+    extractElement(data); // header value
   }
 
   if (data == expected_end_of_record) {
@@ -169,6 +142,34 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
     // Bad data - there are bytes left.
     throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic,
                                      partition, data.length()));
+  }
+}
+
+// Most of the fields in records are kept as variable-encoded length and following bytes.
+// So here we have a helper function to get the data (such as key, value) out of given input.
+absl::string_view RecordExtractorImpl::extractElement(absl::string_view& input) {
+  VarInt32Deserializer length_deserializer;
+  length_deserializer.feed(input);
+  if (!length_deserializer.ready()) {
+    throw EnvoyException("byte array length not present");
+  }
+  const int32_t length = length_deserializer.get();
+  // Length can be negative (null value was published by client).
+  if (-1 == length) {
+    return {};
+  }
+
+  if (length >= 0) {
+    if (static_cast<absl::string_view::size_type>(length) > input.size()) {
+      throw EnvoyException(fmt::format("byte array length larger than data provided: {} vs {}",
+                                       length, input.size()));
+    }
+    const absl::string_view result = {input.data(),
+                                      static_cast<absl::string_view::size_type>(length)};
+    input = {input.data() + length, input.length() - length};
+    return result;
+  } else {
+    throw EnvoyException(fmt::format("byte array length less than -1: {}", length));
   }
 }
 

@@ -211,6 +211,8 @@ TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
 
 // Tests for record extractor.
 
+// Simple matcher that verifies that the input given is a collection containing correct number of
+// unique (!) records for given topic-partition pairs.
 MATCHER_P3(HasRecords, topic, partition, expected, "") {
   size_t expected_count = expected;
   std::set<absl::string_view> saved_key_pointers = {};
@@ -234,6 +236,8 @@ MATCHER_P3(HasRecords, topic, partition, expected, "") {
   return saved_key_pointers.size() == saved_value_pointers.size();
 }
 
+// Helper function to create a record batch that contains a single record with 5-byte key and 5-byte
+// value.
 Bytes makeGoodRecordBatch() {
   // Record batch bytes get ignored (apart from magic field), so we can put 0 there.
   Bytes result = Bytes(16 + 1 + 44);
@@ -279,7 +283,7 @@ Bytes makeGoodRecordBatch() {
   return result;
 }
 
-TEST(RecordExtractor, shouldProcessRecordData) {
+TEST(RecordExtractorImpl, shouldProcessRecordBytes) {
   // given
   const RecordExtractorImpl testee;
 
@@ -347,24 +351,12 @@ const std::vector<TopicProduceData> makeTopicProduceData(const unsigned int stag
     // Last header value is going to be shorter, so there will be one unconsumed byte.
     bytes[92] = 8;
   }
-  if (10 == stage) {
-    bytes[92] = 128;
-    bytes.erase(bytes.begin() + 92, bytes.end());
-  }
-  if (11 == stage) {
-    // Data length is said to be 16, while there will be only 5 bytes in last header.
-    bytes[92] = 32;
-  }
-  if (12 == stage) {
-    // Negative variable length integer.
-    bytes[92] = 17;
-  }
   const PartitionProduceData ppd = {0, bytes};
   const TopicProduceData tpd = {"topic", {ppd}};
   return {tpd};
 }
 
-TEST(RecordExtractor, shouldHandleFailureScenarios) {
+TEST(RecordExtractorImpl, shouldHandleInvalidRecordBytes) {
   const RecordExtractorImpl testee;
   EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(1)), EnvoyException,
                           "no common fields");
@@ -384,12 +376,46 @@ TEST(RecordExtractor, shouldHandleFailureScenarios) {
                           "invalid header count");
   EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(9)), EnvoyException,
                           "data left after consuming record");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(10)), EnvoyException,
-                          "byte array length not present");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(11)), EnvoyException,
-                          "byte array length larger than data provided");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(12)), EnvoyException,
-                          "byte array length less than -1");
+}
+
+// Minor helper function.
+absl::string_view bytesToStringView(const Bytes& bytes) {
+  return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
+}
+
+TEST(RecordExtractorImpl, shouldExtractElementData) {
+  {
+    const Bytes noBytes = Bytes(0);
+    auto arg = bytesToStringView(noBytes);
+    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractElement(arg), EnvoyException,
+                            "byte array length not present");
+  }
+  {
+    const Bytes nullValueBytes = {0b00000001}; // Length = -1.
+    auto arg = bytesToStringView(nullValueBytes);
+    EXPECT_EQ(RecordExtractorImpl::extractElement(arg), absl::string_view());
+  }
+  {
+    const Bytes negativeLengthBytes = {0b01111111}; // Length = -64.
+    auto arg = bytesToStringView(negativeLengthBytes);
+    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractElement(arg), EnvoyException,
+                            "byte array length less than -1: -64");
+  }
+  {
+    const Bytes bigLengthBytes = {0b01111110}; // Length = 63.
+    auto arg = bytesToStringView(bigLengthBytes);
+    EXPECT_THROW_WITH_REGEX(RecordExtractorImpl::extractElement(arg), EnvoyException,
+                            "byte array length larger than data provided: 63 vs 0");
+  }
+  {
+    // Length = 4, 7 bytes follow, 4 should be consumed, 13s should stay.
+    const Bytes goodBytes = {0b00001000, 42, 42, 42, 42, 13, 13, 13};
+    auto arg = bytesToStringView(goodBytes);
+    EXPECT_EQ(RecordExtractorImpl::extractElement(arg),
+              absl::string_view(reinterpret_cast<const char*>(goodBytes.data() + 1), 4));
+    EXPECT_EQ(arg.data(), reinterpret_cast<const char*>(goodBytes.data() + 5));
+    EXPECT_EQ(arg.size(), 3);
+  }
 }
 
 } // namespace

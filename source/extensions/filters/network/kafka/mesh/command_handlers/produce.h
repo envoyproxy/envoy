@@ -9,13 +9,16 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+// Binds a single inbound record from Kafka client with its delivery information.
 struct RecordFootmark {
 
+  // These fields were received from downstream.
   std::string topic_;
   int32_t partition_;
   absl::string_view key_;
   absl::string_view value_;
 
+  // These fields get updated when delivery to upstream Kafka cluster finishes.
   int16_t error_code_;
   uint32_t saved_offset_;
 
@@ -25,6 +28,7 @@ struct RecordFootmark {
         saved_offset_{0} {};
 };
 
+// Dependency injection class responsible for extracting records out of produce request's contents.
 class RecordExtractor {
 public:
   virtual ~RecordExtractor() = default;
@@ -37,6 +41,8 @@ class RecordExtractorImpl : public RecordExtractor {
 public:
   std::vector<RecordFootmark>
   computeFootmarks(const std::vector<TopicProduceData>& data) const override;
+
+  static absl::string_view extractElement(absl::string_view& input);
 
 private:
   std::vector<RecordFootmark> computeFootmarksForTopic(const std::string& topic,
