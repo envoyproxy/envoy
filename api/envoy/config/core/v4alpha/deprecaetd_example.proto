@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.config.core.v4alpha;
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v4alpha";
+option java_outer_classname = "DeprecaetdExampleProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+// [#protodoc-title: Test message]
+
+// EnumExample
+enum EnumExample {
+  reserved 1;
+
+  reserved "VAL2";
+
+  // Enum value deprecated in minor version 5.
+  DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0
+      [deprecated = true, (envoy.annotations.minor_ver_enum) = 5];
+
+  // Enum value that wasn't deprecated.
+  VAL3 = 2;
+}
+
+// Test message that shows deprecated fields/enums life cycle
+message TestMessage {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.TestMessage";
+
+  reserved 1, 2;
+
+  reserved "field1", "field2";
+
+  // Non-deprecated field.
+  string field3 = 3;
+}

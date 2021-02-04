@@ -4,8 +4,6 @@
 
 #include "envoy/config/core/v3/api_version.pb.h"
 
-//#include "envoy/config/core/v3/base.pb.h"
-
 #include "common/version/api_version_number.h"
 
 namespace Envoy {
