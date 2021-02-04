@@ -246,8 +246,7 @@ private:
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
@@ -255,8 +254,7 @@ private:
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
@@ -264,8 +262,7 @@ private:
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForServerNames(
       ServerNamesMapSharedPtr& server_names_map_ptr,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,

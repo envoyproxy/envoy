@@ -84,7 +84,7 @@ public:
     mock_socket->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*mock_socket, requestedServerName())
-        .WillByDefault(Return(absl::string_view(server_name)));
+        .WillByDefault(Return(absl::string_view(absl::AsciiStrToLower(server_name))));
     ON_CALL(*mock_socket, detectedTransportProtocol())
         .WillByDefault(Return(absl::string_view(transport_protocol)));
     ON_CALL(*mock_socket, requestedApplicationProtocols())
@@ -147,6 +147,17 @@ public:
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
   auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_EQ(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
+  envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+  new_filter_chain.mutable_filter_chain_match()->add_server_names("foo.EXAMPLE.com");
+  filter_chain_manager_.addFilterChains(
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
+      filter_chain_factory_builder_, filter_chain_manager_);
+  auto filter_chain =
+      findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
 }
 
 TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
