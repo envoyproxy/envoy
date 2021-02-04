@@ -37,6 +37,8 @@ exit \$ret
 EOF
 }
 
+sleep 5
+
 run_log "Generate wss certs"
 mkdir -p certs
 openssl req -batch -new -x509 -nodes -keyout certs/key.pem -out certs/cert.pem
