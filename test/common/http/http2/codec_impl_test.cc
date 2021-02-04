@@ -41,7 +41,6 @@ using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::StartsWith;
-using std::string_literals::operator""s;
 
 namespace Envoy {
 namespace Http {
@@ -1096,8 +1095,12 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
   request_encoder_->encodeData(hello, false);
 
   // Check contents for the current slice information
-  EXPECT_THAT(ostream.contents(),
-              HasSubstr("current slice length: 20 contents: \"\0\0\\v\0\0\0\0\0\x1hello envoy"s));
+  {
+    using namespace std::string_literals;
+    EXPECT_THAT(
+        ostream.contents(),
+        EndsWith("current slice length: 20 contents: \"\0\0\\v\0\0\0\0\0\x1hello envoy\"\n"s));
+  }
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
