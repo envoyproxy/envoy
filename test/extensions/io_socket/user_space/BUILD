@@ -29,26 +29,26 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "io_socket_handle_impl_test",
-    srcs = ["io_socket_handle_impl_test.cc"],
+    name = "io_handle_impl_test",
+    srcs = ["io_handle_impl_test.cc"],
     extension_name = "envoy.io_socket.user_space",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
-        "//source/extensions/io_socket/user_space:io_socket_handle_lib",
+        "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
     ],
 )
 
 envoy_extension_cc_test(
-    name = "io_socket_handle_impl_platform_test",
-    srcs = ["io_socket_handle_impl_platform_test.cc"],
+    name = "io_handle_impl_platform_test",
+    srcs = ["io_handle_impl_platform_test.cc"],
     extension_name = "envoy.io_socket.user_space",
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
-        "//source/extensions/io_socket/user_space:io_socket_handle_lib",
+        "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
     ],
 )

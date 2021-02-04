@@ -1,7 +1,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
-#include "extensions/io_socket/user_space/io_socket_handle_impl.h"
+#include "extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -22,16 +22,16 @@ public:
 };
 
 // Explicitly mark the test failing on windows and will be fixed.
-class BufferedIoSocketHandlePlatformTest : public testing::Test {
+class IoHandleImplPlatformTest : public testing::Test {
 public:
-  BufferedIoSocketHandlePlatformTest() {
-    first_io_handle_ = std::make_unique<IoSocketHandleImpl>();
-    second_io_handle_ = std::make_unique<IoSocketHandleImpl>();
+  IoHandleImplPlatformTest() {
+    first_io_handle_ = std::make_unique<IoHandleImpl>();
+    second_io_handle_ = std::make_unique<IoHandleImpl>();
     first_io_handle_->setPeerHandle(second_io_handle_.get());
     second_io_handle_->setPeerHandle(first_io_handle_.get());
   }
 
-  ~BufferedIoSocketHandlePlatformTest() override {
+  ~IoHandleImplPlatformTest() override {
     if (first_io_handle_->isOpen()) {
       first_io_handle_->close();
     }
@@ -40,13 +40,13 @@ public:
     }
   }
 
-  std::unique_ptr<IoSocketHandleImpl> first_io_handle_;
-  std::unique_ptr<IoSocketHandleImpl> second_io_handle_;
+  std::unique_ptr<IoHandleImpl> first_io_handle_;
+  std::unique_ptr<IoHandleImpl> second_io_handle_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   MockFileEventCallback cb_;
 };
 
-TEST_F(BufferedIoSocketHandlePlatformTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
+TEST_F(IoHandleImplPlatformTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
   // schedulable_cb will be destroyed by IoHandle.
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());

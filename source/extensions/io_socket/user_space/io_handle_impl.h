@@ -27,15 +27,15 @@ namespace UserSpace {
  * getter/setter options.
  * 3. It doesn't support UDP interface.
  * 4. The peer BufferedIoSocket must be scheduled in the same thread to avoid data race because
- *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
+ *    IoHandleImpl mutates the state of peer handle and no lock is introduced.
  */
-class IoSocketHandleImpl final : public Network::IoHandle,
-                                 public UserSpace::IoHandle,
-                                 protected Logger::Loggable<Logger::Id::io> {
+class IoHandleImpl final : public Network::IoHandle,
+                           public UserSpace::IoHandle,
+                           protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoSocketHandleImpl();
+  IoHandleImpl();
 
-  ~IoSocketHandleImpl() override;
+  ~IoHandleImpl() override;
 
   // Network::IoHandle
   os_fd_t fdDoNotUse() const override {

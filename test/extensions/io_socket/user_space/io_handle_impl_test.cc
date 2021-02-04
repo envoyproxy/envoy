@@ -5,7 +5,7 @@
 #include "common/common/fancy_logger.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/io_socket/user_space/io_socket_handle_impl.h"
+#include "extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -40,33 +40,33 @@ public:
   MOCK_METHOD(void, called, (uint32_t arg));
 };
 
-class BufferedIoSocketHandleTest : public testing::Test {
+class IoHandleImplTest : public testing::Test {
 public:
-  BufferedIoSocketHandleTest() : buf_(1024) {
-    io_handle_ = std::make_unique<IoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<IoSocketHandleImpl>();
+  IoHandleImplTest() : buf_(1024) {
+    io_handle_ = std::make_unique<IoHandleImpl>();
+    io_handle_peer_ = std::make_unique<IoHandleImpl>();
     io_handle_->setPeerHandle(io_handle_peer_.get());
     io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
-  ~BufferedIoSocketHandleTest() override = default;
+  ~IoHandleImplTest() override = default;
 
-  Buffer::WatermarkBuffer& getWatermarkBufferHelper(IoSocketHandleImpl& io_handle) {
+  Buffer::WatermarkBuffer& getWatermarkBufferHelper(IoHandleImpl& io_handle) {
     return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
 
-  // Owned by BufferedIoSocketHandle.
+  // Owned by IoHandleImpl.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
   MockFileEventCallback cb_;
-  std::unique_ptr<IoSocketHandleImpl> io_handle_;
-  std::unique_ptr<IoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<IoHandleImpl> io_handle_;
+  std::unique_ptr<IoHandleImpl> io_handle_peer_;
   absl::FixedArray<char> buf_;
 };
 
 // Test recv side effects.
-TEST_F(BufferedIoSocketHandleTest, BasicRecv) {
+TEST_F(IoHandleImplTest, BasicRecv) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("0123456789");
   {
@@ -88,7 +88,7 @@ TEST_F(BufferedIoSocketHandleTest, BasicRecv) {
 }
 
 // Test recv side effects.
-TEST_F(BufferedIoSocketHandleTest, RecvPeek) {
+TEST_F(IoHandleImplTest, RecvPeek) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("0123456789");
   {
@@ -124,7 +124,7 @@ TEST_F(BufferedIoSocketHandleTest, RecvPeek) {
   }
 }
 
-TEST_F(BufferedIoSocketHandleTest, RecvPeekWhenPendingDataButShutdown) {
+TEST_F(IoHandleImplTest, RecvPeekWhenPendingDataButShutdown) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("0123456789");
   auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
@@ -132,7 +132,7 @@ TEST_F(BufferedIoSocketHandleTest, RecvPeekWhenPendingDataButShutdown) {
   ASSERT_EQ("0123456789", absl::string_view(buf_.data(), result.rc_));
 }
 
-TEST_F(BufferedIoSocketHandleTest, MultipleRecvDrain) {
+TEST_F(IoHandleImplTest, MultipleRecvDrain) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
   {
@@ -152,7 +152,7 @@ TEST_F(BufferedIoSocketHandleTest, MultipleRecvDrain) {
 }
 
 // Test read side effects.
-TEST_F(BufferedIoSocketHandleTest, ReadEmpty) {
+TEST_F(IoHandleImplTest, ReadEmpty) {
   Buffer::OwnedImpl buf;
   auto result = io_handle_->read(buf, 10);
   EXPECT_FALSE(result.ok());
@@ -164,7 +164,7 @@ TEST_F(BufferedIoSocketHandleTest, ReadEmpty) {
 }
 
 // Read allows max_length value 0 and returns no error.
-TEST_F(BufferedIoSocketHandleTest, ReadWhileProvidingNoCapacity) {
+TEST_F(IoHandleImplTest, ReadWhileProvidingNoCapacity) {
   Buffer::OwnedImpl buf;
   absl::optional<uint64_t> max_length_opt{0};
   auto result = io_handle_->read(buf, max_length_opt);
@@ -173,7 +173,7 @@ TEST_F(BufferedIoSocketHandleTest, ReadWhileProvidingNoCapacity) {
 }
 
 // Test read side effects.
-TEST_F(BufferedIoSocketHandleTest, ReadContent) {
+TEST_F(IoHandleImplTest, ReadContent) {
   Buffer::OwnedImpl buf;
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcdefg");
@@ -190,7 +190,7 @@ TEST_F(BufferedIoSocketHandleTest, ReadContent) {
 }
 
 // Test readv behavior.
-TEST_F(BufferedIoSocketHandleTest, BasicReadv) {
+TEST_F(IoHandleImplTest, BasicReadv) {
   Buffer::OwnedImpl buf_to_write("abc");
   io_handle_peer_->write(buf_to_write);
 
@@ -214,7 +214,7 @@ TEST_F(BufferedIoSocketHandleTest, BasicReadv) {
   EXPECT_EQ(0, result.rc_);
 }
 
-TEST_F(BufferedIoSocketHandleTest, FlowControl) {
+TEST_F(IoHandleImplTest, FlowControl) {
   io_handle_->setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_->isWritable());
@@ -254,7 +254,7 @@ TEST_F(BufferedIoSocketHandleTest, FlowControl) {
 }
 
 // Consistent with other IoHandle: allow write empty data when handle is closed.
-TEST_F(BufferedIoSocketHandleTest, NoErrorWriteZeroDataToClosedIoHandle) {
+TEST_F(IoHandleImplTest, NoErrorWriteZeroDataToClosedIoHandle) {
   io_handle_->close();
   {
     Buffer::OwnedImpl buf;
@@ -270,31 +270,31 @@ TEST_F(BufferedIoSocketHandleTest, NoErrorWriteZeroDataToClosedIoHandle) {
   }
 }
 
-TEST_F(BufferedIoSocketHandleTest, ErrorOnClosedIoHandle) {
+TEST_F(IoHandleImplTest, ErrorOnClosedIoHandle) {
   io_handle_->close();
   {
     auto [guard, slice] = allocateOneSlice(1024);
     auto result = io_handle_->recv(slice.mem_, slice.len_, 0);
     ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+    ASSERT_EQ(Api::IoError::IoErrorCode::BadFd, result.err_->getErrorCode());
   }
   {
     Buffer::OwnedImpl buf;
     auto result = io_handle_->read(buf, 10);
     ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+    ASSERT_EQ(Api::IoError::IoErrorCode::BadFd, result.err_->getErrorCode());
   }
   {
     auto [guard, slice] = allocateOneSlice(1024);
     auto result = io_handle_->readv(1024, &slice, 1);
     ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+    ASSERT_EQ(Api::IoError::IoErrorCode::BadFd, result.err_->getErrorCode());
   }
   {
     Buffer::OwnedImpl buf("0123456789");
     auto result = io_handle_->write(buf);
     ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+    ASSERT_EQ(Api::IoError::IoErrorCode::BadFd, result.err_->getErrorCode());
   }
   {
     Buffer::OwnedImpl buf("0123456789");
@@ -302,21 +302,21 @@ TEST_F(BufferedIoSocketHandleTest, ErrorOnClosedIoHandle) {
     ASSERT(!slices.empty());
     auto result = io_handle_->writev(slices.data(), slices.size());
     ASSERT(!result.ok());
-    ASSERT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+    ASSERT_EQ(Api::IoError::IoErrorCode::BadFd, result.err_->getErrorCode());
   }
 }
 
-TEST_F(BufferedIoSocketHandleTest, RepeatedShutdownWR) {
+TEST_F(IoHandleImplTest, RepeatedShutdownWR) {
   EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
   EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).rc_, 0);
 }
 
-TEST_F(BufferedIoSocketHandleTest, ShutDownOptionsNotSupported) {
+TEST_F(IoHandleImplTest, ShutDownOptionsNotSupported) {
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
 }
 
-TEST_F(BufferedIoSocketHandleTest, WriteByMove) {
+TEST_F(IoHandleImplTest, WriteByMove) {
   Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_peer_->write(buf);
   EXPECT_TRUE(result.ok());
@@ -327,7 +327,7 @@ TEST_F(BufferedIoSocketHandleTest, WriteByMove) {
 }
 
 // Test write return error code. Ignoring the side effect of event scheduling.
-TEST_F(BufferedIoSocketHandleTest, WriteAgain) {
+TEST_F(IoHandleImplTest, WriteAgain) {
   // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
   Buffer::OwnedImpl pending_data(std::string(256, 'a'));
@@ -341,7 +341,7 @@ TEST_F(BufferedIoSocketHandleTest, WriteAgain) {
 }
 
 // Test write() moves the fragments in front until the destination is over high watermark.
-TEST_F(BufferedIoSocketHandleTest, PartialWrite) {
+TEST_F(IoHandleImplTest, PartialWrite) {
   // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
   // Fragment contents                | a |`bbbb...b`|`ccc`|
@@ -378,7 +378,7 @@ TEST_F(BufferedIoSocketHandleTest, PartialWrite) {
   EXPECT_EQ(0, pending_data.length());
 }
 
-TEST_F(BufferedIoSocketHandleTest, WriteErrorAfterShutdown) {
+TEST_F(IoHandleImplTest, WriteErrorAfterShutdown) {
   Buffer::OwnedImpl buf("0123456789");
   // Write after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
@@ -387,7 +387,7 @@ TEST_F(BufferedIoSocketHandleTest, WriteErrorAfterShutdown) {
   EXPECT_EQ(10, buf.length());
 }
 
-TEST_F(BufferedIoSocketHandleTest, WriteErrorAfterClose) {
+TEST_F(IoHandleImplTest, WriteErrorAfterClose) {
   Buffer::OwnedImpl buf("0123456789");
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
@@ -396,7 +396,7 @@ TEST_F(BufferedIoSocketHandleTest, WriteErrorAfterClose) {
 }
 
 // Test writev return error code. Ignoring the side effect of event scheduling.
-TEST_F(BufferedIoSocketHandleTest, WritevAgain) {
+TEST_F(IoHandleImplTest, WritevAgain) {
   auto [guard, slice] = allocateOneSlice(128);
   // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
@@ -407,7 +407,7 @@ TEST_F(BufferedIoSocketHandleTest, WritevAgain) {
 }
 
 // Test writev() copies the slices in front until the destination is over high watermark.
-TEST_F(BufferedIoSocketHandleTest, PartialWritev) {
+TEST_F(IoHandleImplTest, PartialWritev) {
   // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
   // Slices contents                  | a |`bbbb...b`|`ccc`|
@@ -450,7 +450,7 @@ TEST_F(BufferedIoSocketHandleTest, PartialWritev) {
   EXPECT_EQ(0, pending_data.length());
 }
 
-TEST_F(BufferedIoSocketHandleTest, WritevErrorAfterShutdown) {
+TEST_F(IoHandleImplTest, WritevErrorAfterShutdown) {
   auto [guard, slice] = allocateOneSlice(128);
   // Writev after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
@@ -458,7 +458,7 @@ TEST_F(BufferedIoSocketHandleTest, WritevErrorAfterShutdown) {
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
 }
 
-TEST_F(BufferedIoSocketHandleTest, WritevErrorAfterClose) {
+TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
   auto [guard, slice] = allocateOneSlice(1024);
   // Close the peer.
   io_handle_peer_->close();
@@ -467,7 +467,7 @@ TEST_F(BufferedIoSocketHandleTest, WritevErrorAfterClose) {
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
 }
 
-TEST_F(BufferedIoSocketHandleTest, WritevToPeer) {
+TEST_F(IoHandleImplTest, WritevToPeer) {
   std::string raw_data("0123456789");
   absl::InlinedVector<Buffer::RawSlice, 4> slices{
       // Contains 1 byte.
@@ -485,7 +485,7 @@ TEST_F(BufferedIoSocketHandleTest, WritevToPeer) {
   EXPECT_EQ("012", internal_buffer.toString());
 }
 
-TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
+TEST_F(IoHandleImplTest, EventScheduleBasic) {
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
@@ -498,7 +498,7 @@ TEST_F(BufferedIoSocketHandleTest, EventScheduleBasic) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, SetEnabledTriggerEventSchedule) {
+TEST_F(IoHandleImplTest, SetEnabledTriggerEventSchedule) {
   auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   // No data is available to read. Will not schedule read.
   {
@@ -537,7 +537,7 @@ TEST_F(BufferedIoSocketHandleTest, SetEnabledTriggerEventSchedule) {
   io_handle_peer_->close();
 }
 
-TEST_F(BufferedIoSocketHandleTest, ReadAndWriteAreEdgeTriggered) {
+TEST_F(IoHandleImplTest, ReadAndWriteAreEdgeTriggered) {
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
@@ -564,7 +564,7 @@ TEST_F(BufferedIoSocketHandleTest, ReadAndWriteAreEdgeTriggered) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, SetDisabledBlockEventSchedule) {
+TEST_F(IoHandleImplTest, SetDisabledBlockEventSchedule) {
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
@@ -583,7 +583,7 @@ TEST_F(BufferedIoSocketHandleTest, SetDisabledBlockEventSchedule) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, EventResetClearCallback) {
+TEST_F(IoHandleImplTest, EventResetClearCallback) {
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
@@ -594,7 +594,7 @@ TEST_F(BufferedIoSocketHandleTest, EventResetClearCallback) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, DrainToLowWaterMarkTriggerReadEvent) {
+TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggerReadEvent) {
   io_handle_->setWatermarks(128);
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
 
@@ -637,7 +637,7 @@ TEST_F(BufferedIoSocketHandleTest, DrainToLowWaterMarkTriggerReadEvent) {
   }
 }
 
-TEST_F(BufferedIoSocketHandleTest, Close) {
+TEST_F(IoHandleImplTest, Close) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
   std::string accumulator;
@@ -697,7 +697,7 @@ TEST_F(BufferedIoSocketHandleTest, Close) {
 
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
 // EAGAIN.
-TEST_F(BufferedIoSocketHandleTest, ShutDownRaiseEvent) {
+TEST_F(IoHandleImplTest, ShutDownRaiseEvent) {
   auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
   internal_buffer.add("abcd");
 
@@ -737,7 +737,7 @@ TEST_F(BufferedIoSocketHandleTest, ShutDownRaiseEvent) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, WriteScheduleWritableEvent) {
+TEST_F(IoHandleImplTest, WriteScheduleWritableEvent) {
   std::string accumulator;
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
@@ -777,7 +777,7 @@ TEST_F(BufferedIoSocketHandleTest, WriteScheduleWritableEvent) {
   io_handle_->close();
 }
 
-TEST_F(BufferedIoSocketHandleTest, WritevScheduleWritableEvent) {
+TEST_F(IoHandleImplTest, WritevScheduleWritableEvent) {
   std::string accumulator;
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
@@ -817,7 +817,7 @@ TEST_F(BufferedIoSocketHandleTest, WritevScheduleWritableEvent) {
   io_handle_->close();
 }
 
-TEST_F(BufferedIoSocketHandleTest, ReadAfterShutdownWrite) {
+TEST_F(IoHandleImplTest, ReadAfterShutdownWrite) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
   ENVOY_LOG_MISC(debug, "after {} shutdown write ", static_cast<void*>(io_handle_peer_.get()));
   std::string accumulator;
@@ -863,7 +863,7 @@ TEST_F(BufferedIoSocketHandleTest, ReadAfterShutdownWrite) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, NotifyWritableAfterShutdownWrite) {
+TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   io_handle_peer_->setWatermarks(128);
 
   Buffer::OwnedImpl buf(std::string(256, 'a'));
@@ -903,23 +903,19 @@ TEST_F(BufferedIoSocketHandleTest, NotifyWritableAfterShutdownWrite) {
   io_handle_peer_->close();
 }
 
-TEST_F(BufferedIoSocketHandleTest, NotSupportingMmsg) { EXPECT_FALSE(io_handle_->supportsMmsg()); }
+TEST_F(IoHandleImplTest, NotSupportingMmsg) { EXPECT_FALSE(io_handle_->supportsMmsg()); }
 
-TEST_F(BufferedIoSocketHandleTest, NotSupportsUdpGro) {
-  EXPECT_FALSE(io_handle_->supportsUdpGro());
-}
+TEST_F(IoHandleImplTest, NotSupportsUdpGro) { EXPECT_FALSE(io_handle_->supportsUdpGro()); }
 
-TEST_F(BufferedIoSocketHandleTest, DomainNullOpt) {
-  EXPECT_FALSE(io_handle_->domain().has_value());
-}
+TEST_F(IoHandleImplTest, DomainNullOpt) { EXPECT_FALSE(io_handle_->domain().has_value()); }
 
-TEST_F(BufferedIoSocketHandleTest, Connect) {
+TEST_F(IoHandleImplTest, Connect) {
   auto address_is_ignored =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
   EXPECT_EQ(0, io_handle_->connect(address_is_ignored).rc_);
 }
 
-TEST_F(BufferedIoSocketHandleTest, ActivateEvent) {
+TEST_F(IoHandleImplTest, ActivateEvent) {
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
       dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
@@ -929,40 +925,38 @@ TEST_F(BufferedIoSocketHandleTest, ActivateEvent) {
   ASSERT_TRUE(schedulable_cb_->enabled());
 }
 
-TEST_F(BufferedIoSocketHandleTest, DeathOnActivatingDestroyedEvents) {
+TEST_F(IoHandleImplTest, DeathOnActivatingDestroyedEvents) {
   io_handle_->resetFileEvents();
   ASSERT_DEBUG_DEATH(io_handle_->activateFileEvents(Event::FileReadyType::Read),
                      "Null user_file_event_");
 }
 
-TEST_F(BufferedIoSocketHandleTest, DeathOnEnablingDestroyedEvents) {
+TEST_F(IoHandleImplTest, DeathOnEnablingDestroyedEvents) {
   io_handle_->resetFileEvents();
   ASSERT_DEBUG_DEATH(io_handle_->enableFileEvents(Event::FileReadyType::Read),
                      "Null user_file_event_");
 }
 
-TEST_F(BufferedIoSocketHandleTest, NotImplementDuplicate) {
-  ASSERT_DEATH(io_handle_->duplicate(), "");
-}
+TEST_F(IoHandleImplTest, NotImplementDuplicate) { ASSERT_DEATH(io_handle_->duplicate(), ""); }
 
-TEST_F(BufferedIoSocketHandleTest, NotImplementAccept) {
+TEST_F(IoHandleImplTest, NotImplementAccept) {
   ASSERT_DEATH(io_handle_->accept(nullptr, nullptr), "");
 }
 
-TEST_F(BufferedIoSocketHandleTest, LastRoundtripTimeNullOpt) {
+TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {
   ASSERT_EQ(absl::nullopt, io_handle_->lastRoundTripTime());
 }
 
-class BufferedIoSocketHandleNotImplementedTest : public testing::Test {
+class IoHandleImplNotImplementedTest : public testing::Test {
 public:
-  BufferedIoSocketHandleNotImplementedTest() {
-    io_handle_ = std::make_unique<IoSocketHandleImpl>();
-    io_handle_peer_ = std::make_unique<IoSocketHandleImpl>();
+  IoHandleImplNotImplementedTest() {
+    io_handle_ = std::make_unique<IoHandleImpl>();
+    io_handle_peer_ = std::make_unique<IoHandleImpl>();
     io_handle_->setPeerHandle(io_handle_peer_.get());
     io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
-  ~BufferedIoSocketHandleNotImplementedTest() override {
+  ~IoHandleImplNotImplementedTest() override {
     if (io_handle_->isOpen()) {
       io_handle_->close();
     }
@@ -971,54 +965,54 @@ public:
     }
   }
 
-  std::unique_ptr<IoSocketHandleImpl> io_handle_;
-  std::unique_ptr<IoSocketHandleImpl> io_handle_peer_;
+  std::unique_ptr<IoHandleImpl> io_handle_;
+  std::unique_ptr<IoHandleImpl> io_handle_peer_;
   Buffer::RawSlice slice_;
 };
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnSetBlocking) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnSetBlocking) {
   EXPECT_THAT(io_handle_->setBlocking(false), IsNotSupportedResult());
   EXPECT_THAT(io_handle_->setBlocking(true), IsNotSupportedResult());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnSendmsg) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnSendmsg) {
   EXPECT_THAT(io_handle_->sendmsg(&slice_, 0, 0, nullptr,
                                   Network::Address::EnvoyInternalInstance("listener_id")),
               IsInvalidAddress());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnRecvmsg) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnRecvmsg) {
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
   EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, output_is_ignored), IsInvalidAddress());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnRecvmmsg) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnRecvmmsg) {
   RawSliceArrays slices_is_ignored(1, absl::FixedArray<Buffer::RawSlice>({slice_}));
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
   EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, output_is_ignored), IsInvalidAddress());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnBind) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnBind) {
   auto address_is_ignored =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
   EXPECT_THAT(io_handle_->bind(address_is_ignored), IsNotSupportedResult());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnListen) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnListen) {
   int back_log_is_ignored = 0;
   EXPECT_THAT(io_handle_->listen(back_log_is_ignored), IsNotSupportedResult());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnAddress) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnAddress) {
   ASSERT_THROW(io_handle_->peerAddress(), EnvoyException);
   ASSERT_THROW(io_handle_->localAddress(), EnvoyException);
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnSetOption) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnSetOption) {
   EXPECT_THAT(io_handle_->setOption(0, 0, nullptr, 0), IsNotSupportedResult());
 }
 
-TEST_F(BufferedIoSocketHandleNotImplementedTest, ErrorOnGetOption) {
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnGetOption) {
   EXPECT_THAT(io_handle_->getOption(0, 0, nullptr, nullptr), IsNotSupportedResult());
 }
 } // namespace

@@ -44,12 +44,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "io_socket_handle_lib",
+    name = "io_handle_impl_lib",
     srcs = [
-        "io_socket_handle_impl.cc",
+        "io_handle_impl.cc",
     ],
     hdrs = [
-        "io_socket_handle_impl.h",
+        "io_handle_impl.h",
     ],
     deps = [
         ":file_event_lib",
