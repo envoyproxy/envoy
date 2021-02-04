@@ -121,6 +121,8 @@ Further reading:
 * :ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin endpoint.
 * :ref:`/healthcheck/ok <operations_admin_interface_healthcheck_ok>` admin endpoint.
 
+.. _arch_overview_health_checking_fast_failure:
+
 Active health checking fast failure
 -----------------------------------
 
@@ -129,10 +131,12 @@ When using active health checking along with passive health checking (:ref:`outl
 large amount of active health checking traffic. In this case, it is still useful to be able to
 quickly drain an upstream host when using the :ref:`/healthcheck/fail
 <operations_admin_interface_healthcheck_fail>` admin endpoint. To support this, the :ref:`router
-filter <config_http_filters_router>` will respond to the :ref:`x-envoy-immediate-health-check-fail
+filter <config_http_filters_router>` *and* the HTTP active health checker will respond to the
+:ref:`x-envoy-immediate-health-check-fail
 <config_http_filters_router_x-envoy-immediate-health-check-fail>` header. If this header is set by
-an upstream host, Envoy will immediately mark the host as being failed for active health check. Note
-that this only occurs if the host's cluster has active health checking :ref:`configured
+an upstream host, Envoy will immediately mark the host as being failed for active health check and
+:ref:`excluded <arch_overview_load_balancing_excluded>` from load balancing. Note that this only
+occurs if the host's cluster has active health checking :ref:`configured
 <config_cluster_manager_cluster_hc>`. The :ref:`health checking filter
 <config_http_filters_health_check>` will automatically set this header if Envoy has been marked as
 failed via the :ref:`/healthcheck/fail <operations_admin_interface_healthcheck_fail>` admin
@@ -152,7 +156,7 @@ is that overall configuration becomes more complicated as every health check URL
 
 The Envoy HTTP health checker supports the :ref:`service_name_matcher
 <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>` option. If this option is set,
-the health checker additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
+the health checker additionally compares the value of the *x-envoy-upstream-healthchecked-cluster*
 response header to *service_name_matcher*. If the values do not match, the health check does not pass.
 The upstream health check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers.
 The appended value is determined by the :option:`--service-cluster` command line option.

@@ -77,7 +77,7 @@ private:
   Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
-  const std::string& listener_name_;
+  const std::string listener_name_;
   const bool reuse_port_;
   Network::SocketSharedPtr socket_;
   absl::once_flag steal_once_;
