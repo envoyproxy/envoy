@@ -7,7 +7,6 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/node.proto";
 
 import "google/api/annotations.proto";
-import "google/protobuf/struct.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";

@@ -7,7 +7,6 @@ import "envoy/api/v2/ratelimit/ratelimit.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.ratelimit.v2";
 option java_outer_classname = "RlsProto";
