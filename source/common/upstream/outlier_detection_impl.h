@@ -341,7 +341,7 @@ private:
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;
-  const uint64_t max_ejection_time_ms_;
+  uint64_t max_ejection_time_ms_;
 
   static const uint64_t DEFAULT_INTERVAL_MS = 10000;
   static const uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
