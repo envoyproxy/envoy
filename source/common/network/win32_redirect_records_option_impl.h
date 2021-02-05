@@ -28,7 +28,7 @@ public:
   Win32RedirectRecordsOptionImpl(Network::SocketOptionName optname,
                                  const Win32RedirectRecords& redirect_records)
       : optname_(optname), redirect_records_(redirect_records) {
-    ASSERT(optname_..hasValue());
+    ASSERT(optname_.hasValue());
   }
 
   // Socket::Option
