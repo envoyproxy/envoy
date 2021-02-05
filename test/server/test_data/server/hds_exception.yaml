@@ -19,5 +19,17 @@
                     pipe:
                       path: .
                 healthStatus: DRAINING
-hdsConfig: {}
+hdsConfig:
+  apiType: GRPC
+  grpcServices:
+    - googleGrpc:
+        targetUri: '2'
+        channelCredentials:
+          sslCredentials:
+            privateKey:
+              filename: "\0\0\0\0\0\0\0\0\0\0"
+        statPrefix: '*'
+  requestTimeout: 0.014024704s
+  transportApiVersion: V3
+
 enableDispatcherStats: true
