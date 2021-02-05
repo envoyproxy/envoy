@@ -21,7 +21,7 @@ on the listener. This means that a separate listener is needed to handle inbound
 
 Redirection is not available for use with all types of network traffic. The types of packets that are supported for redirection are shown in the following list:
 
-* TCP
+* TCP/IPv4
 * UDP
 * Raw UDPv4 without the header include option
 * Raw ICMP

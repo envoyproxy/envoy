@@ -14,8 +14,8 @@ namespace OriginalDst {
  */
 class OriginalDstFilter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  OriginalDstFilter(const envoy::config::core::v3::TrafficDirection& trafic_direction)
-      : trafic_direction_(trafic_direction) {}
+  OriginalDstFilter(const envoy::config::core::v3::TrafficDirection& traffic_direction)
+      : traffic_direction_(traffic_direction) {}
 
   virtual Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket& sock);
 
@@ -23,7 +23,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  envoy::config::core::v3::TrafficDirection trafic_direction_;
+  envoy::config::core::v3::TrafficDirection traffic_direction_;
 };
 
 } // namespace OriginalDst

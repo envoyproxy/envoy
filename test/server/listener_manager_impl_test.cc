@@ -3831,8 +3831,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 
 class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
 public:
-  OriginalDstTestFilter(const envoy::config::core::v3::TrafficDirection& trafic_direction)
-      : Extensions::ListenerFilters::OriginalDst::OriginalDstFilter(trafic_direction) {}
+  OriginalDstTestFilter(const envoy::config::core::v3::TrafficDirection& traffic_direction)
+      : Extensions::ListenerFilters::OriginalDst::OriginalDstFilter(traffic_direction) {}
 
 private:
   Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
@@ -4016,8 +4016,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
 class OriginalDstTestFilterIPv6
     : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
 public:
-  OriginalDstTestFilterIPv6(const envoy::config::core::v3::TrafficDirection& trafic_direction)
-      : Extensions::ListenerFilters::OriginalDst::OriginalDstFilter(trafic_direction) {}
+  OriginalDstTestFilterIPv6(const envoy::config::core::v3::TrafficDirection& traffic_direction)
+      : Extensions::ListenerFilters::OriginalDst::OriginalDstFilter(traffic_direction) {}
 
 private:
   Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
