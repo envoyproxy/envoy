@@ -105,9 +105,9 @@ static_resources:
                               R"(
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
-        keepalive_interval: 10
+        keepalive_interval: 8
         keepalive_probes: 1
-        keepalive_time: 5
+        keepalive_time: 2
     circuit_breakers: &circuit_breakers_settings
       thresholds:
         - priority: DEFAULT
