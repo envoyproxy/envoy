@@ -107,7 +107,7 @@ def ignore_decoding_errors(io_wrapper):
   # https://docs.python.org/3/library/io.html#io.TextIOWrapper.reconfigure
   if hasattr(io_wrapper, 'reconfigure'):
     try:
-      io_wrapper.reconfigure('replace')
+      io_wrapper.reconfigure(errros='ignore')
     except:
       pass
 
