@@ -1117,9 +1117,10 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
-  // Per the `10 * (1 + inbound_streams_) + (2 *
-  // max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)` formula without
-  // sending any DATA frames, 21 sequential WINDOW_UPDATE frames should trigger flood protection.
+  // Per the `
+  // max_inbound_window_update_frames_per_data_frame_sent_ * (outbound_data_frames_ +
+  // opened_streams_ + 1)` formula without sending any DATA frames, 1 + 10 * (0 + 1 + 1) = 21
+  // sequential WINDOW_UPDATE frames should trigger flood protection.
   floodServer(Http2Frame::makeWindowUpdateFrame(request_stream_id, 1),
               "http2.inbound_window_update_frames_flood", 21);
 }

@@ -102,9 +102,8 @@ Status ProtocolConstraints::checkInboundFrameLimits() {
     return bufferFloodError("Too many PRIORITY frames");
   }
 
-  if (inbound_window_update_frames_ >
-      (10 * (1 + opened_streams_) +
-       (2 * max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_))) {
+  if (inbound_window_update_frames_ > max_inbound_window_update_frames_per_data_frame_sent_ *
+                                          (outbound_data_frames_ + opened_streams_ + 1)) {
     stats_.inbound_window_update_frames_flood_.inc();
     return bufferFloodError("Too many WINDOW_UPDATE frames");
   }

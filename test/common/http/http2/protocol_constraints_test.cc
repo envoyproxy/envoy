@@ -171,7 +171,7 @@ TEST_F(ProtocolConstraintsTest, Priority) {
 }
 
 TEST_F(ProtocolConstraintsTest, WindowUpdate) {
-  options_.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(1);
+  options_.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(2);
   ProtocolConstraints constraints(http2CodecStats(), options_);
   // Create one stream
   constraints.incrementOpenedStreamCount();
@@ -179,12 +179,12 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   constraints.incrementOutboundDataFrameCount();
   constraints.incrementOutboundDataFrameCount();
 
-  // Per the `10 * (1 + inbound_streams_) + (2 *
-  // max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)` formula 20 + 4
-  // = 24 WINDOW_UPDATE should NOT fail constraint check, but 25th should
+  // Per the `max_inbound_window_update_frames_per_data_frame_sent_ * (outbound_data_frames_ +
+  // opened_streams_ + 1)` formula 2 * (2 + 1 + 1) = 8 WINDOW_UPDATE should NOT fail constraint
+  // check, but 9th should
   nghttp2_frame_hd frame;
   frame.type = NGHTTP2_WINDOW_UPDATE;
-  for (uint32_t i = 0; i < 24; ++i) {
+  for (uint32_t i = 0; i < 8; ++i) {
     EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
   }
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrames(&frame, 0)));
