@@ -56,6 +56,7 @@ RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
     throw EnvoyException(absl::StrCat("Could not create producer:", errstr));
   }
 
+  // Here we are starting the monitoring thread.
   poller_thread_active_ = true;
   std::function<void()> thread_routine = [this]() -> void { checkDeliveryReports(); };
   poller_thread_ = thread_factory.createThread(thread_routine);
@@ -100,10 +101,12 @@ void RichKafkaProducer::checkDeliveryReports() {
     // producer is closed. Unfortunately we do not have any ability to interrupt this call, so every
     // destructor is going to take up to this much time.
     producer_->poll(1000);
+    // This invokes the callback below, if any delivery finished (successful or not).
   }
   ENVOY_LOG(warn, "Poller thread finished");
 }
 
+// Kafka callback that contains the information
 void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
   ENVOY_LOG(warn, "RichKafkaProducer - dr_cb: [{}] {}/{} -> {} (data = {})", message.err(),
             message.topic_name(), message.partition(), message.offset(),

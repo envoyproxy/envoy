@@ -4,11 +4,13 @@
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/synchronization/blocking_counter.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
+using testing::AtLeast;
 using testing::Return;
 using testing::ReturnNull;
 
@@ -177,6 +179,30 @@ TEST_F(UpstreamKafkaClientTest, ShouldThrowIfRawProducerConstructionFails) {
   // when, then - exception gets thrown during construction.
   EXPECT_THROW(RichKafkaProducer(dispatcher_, thread_factory_, config_, kafka_utils_),
                EnvoyException);
+}
+
+// Rich producer's constructor starts a monitoring thread.
+// We are going to wait for at least one invocation of producer 'poll', so we are confident that it
+// does monitoring. Then we are going to destroy the testee, and expect the thread to finish.
+TEST_F(UpstreamKafkaClientTest, ShouldPollProducerForEventsUntilShutdown) {
+  // given
+  setupConstructorExpectations();
+
+  absl::BlockingCounter counter{1};
+  EXPECT_CALL(producer, poll(_)).Times(AtLeast(1)).WillOnce([&counter]() {
+    counter.DecrementCount();
+    return 0;
+  });
+
+  // when
+  {
+    std::unique_ptr<RichKafkaProducer> testee =
+        std::make_unique<RichKafkaProducer>(dispatcher_, thread_factory_, config_, kafka_utils_);
+    counter.Wait();
+  }
+
+  // then - the above block actually finished, what means that the monitoring thread interacted with
+  // underlying Kafka producer.
 }
 
 } // namespace Mesh
