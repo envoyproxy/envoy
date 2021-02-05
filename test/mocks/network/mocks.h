@@ -330,6 +330,7 @@ public:
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
+  MOCK_METHOD(StreamInfo::FilterState&, filterState, (), (const));
 
   NiceMock<MockConnectionSocket> socket_;
 };

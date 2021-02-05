@@ -376,7 +376,8 @@ public:
   }
 
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
-    return upstream_options_;
+    return (upstream_options_ != nullptr) ? upstream_options_
+                                          : callbacks_->getUpstreamSocketOptions();
   }
 
   Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {

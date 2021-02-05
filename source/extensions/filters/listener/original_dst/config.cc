@@ -40,9 +40,10 @@ public:
     }
 #endif
 
-    return [listener_filter_matcher](Network::ListenerFilterManager& filter_manager) -> void {
+    return [listener_filter_matcher, traffic_direction = context.listenerConfig().direction()](
+               Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(listener_filter_matcher,
-                                     std::make_unique<OriginalDstFilter>());
+                                     std::make_unique<OriginalDstFilter>(traffic_direction));
     };
   }
 

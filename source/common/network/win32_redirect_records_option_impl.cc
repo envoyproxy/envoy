@@ -16,18 +16,12 @@ namespace Network {
 bool Win32RedirectRecordsOptionImpl::setOption(
     Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   if (in_state_ == state) {
-    if (!optname_.hasValue()) {
-      ENVOY_LOG(warn, "Failed to set unsupported control on socket");
-      return false;
-    }
-
     unsigned long size = 0;
     const Api::SysCallIntResult result = socket.win32Ioctl(
         optname_.option(), const_cast<void*>(reinterpret_cast<const void*>(redirect_records_.buf_)),
         redirect_records_.buf_size_, nullptr, 0, &size);
     if (result.rc_ != 0) {
-      ENVOY_LOG(warn, "Setting {} control on socket failed: {}", optname_.name(),
-                errorDetails(result.errno_));
+      ENVOY_LOG(warn, "Setting WFP records on socket failed: {}", errorDetails(result.errno_));
       return false;
     }
   }

@@ -27,7 +27,9 @@ class Win32RedirectRecordsOptionImpl : public Socket::Option,
 public:
   Win32RedirectRecordsOptionImpl(Network::SocketOptionName optname,
                                  const Win32RedirectRecords& redirect_records)
-      : optname_(optname), redirect_records_(redirect_records) {}
+      : optname_(optname), redirect_records_(redirect_records) {
+    ASSERT(optname_..hasValue());
+  }
 
   // Socket::Option
   bool setOption(Socket& socket,
@@ -43,7 +45,7 @@ public:
   bool isSupported() const;
 
 private:
-  const static envoy::config::core::v3::SocketOption::SocketState in_state_ =
+  static constexpr envoy::config::core::v3::SocketOption::SocketState in_state_ =
       envoy::config::core::v3::SocketOption::STATE_PREBIND;
   const Network::SocketOptionName optname_;
   Win32RedirectRecords redirect_records_;

@@ -13,6 +13,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
@@ -3829,34 +3830,42 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 }
 
 class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
+public:
+  OriginalDstTestFilter(const envoy::config::core::v3::TrafficDirection& trafic_direction)
+      : Extensions::ListenerFilters::OriginalDst::OriginalDstFilter(trafic_direction) {}
+
+private:
   Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
   }
 };
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
-  class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
-  public:
-    // NamedListenerFilterConfigFactory
-    Network::ListenerFilterFactoryCb
-    createListenerFilterFactoryFromProto(const Protobuf::Message&,
-                                         const Network::ListenerFilterMatcherSharedPtr&,
-                                         Configuration::ListenerFactoryContext&) override {
-      return [](Network::ListenerFilterManager& filter_manager) -> void {
-        filter_manager.addAcceptFilter(nullptr, std::make_unique<OriginalDstTestFilter>());
-      };
-    }
+class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  Network::ListenerFilterFactoryCb
+  createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                       const Network::ListenerFilterMatcherSharedPtr&,
+                                       Configuration::ListenerFactoryContext& context) override {
+    return [traffic_direction = context.listenerConfig().direction()](
+               Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(nullptr,
+                                     std::make_unique<OriginalDstTestFilter>(traffic_direction));
+    };
+  }
 
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      // Using Struct instead of a custom per-filter empty config proto
-      // This is only allowed in tests.
-      return std::make_unique<Envoy::ProtobufWkt::Struct>();
-    }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+  }
 
-    std::string name() const override { return "test.listener.original_dst"; }
-  };
+  std::string name() const override { return "test.listener.original_dst"; }
+};
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
+#ifdef SOL_IP
   OriginalDstTestConfigFactory factory;
   Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
 
@@ -3864,6 +3873,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains: {}
+    traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
       typed_config: {}
@@ -3881,9 +3891,110 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*io_handle, win32Ioctl(_, _, _, _, _, _));
   Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandleImpl>(),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::TopSpan);
+  EXPECT_CALL(callbacks, filterState()).WillOnce(Invoke([&]() -> StreamInfo::FilterState& {
+    return *filter_state;
+  }));
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+#endif
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) {
+#if defined(WIN32) && defined(SOL_IP)
+  OriginalDstTestConfigFactory factory;
+  Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    traffic_direction: OUTBOUND
+    listener_filters:
+    - name: "test.listener.original_dst"
+      typed_config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*io_handle, win32Ioctl(_, _, _, _, _, _))
+      .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
+  Network::AcceptedSocketImpl socket(
+      std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_, _))
+      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
+                           Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onAccept(callbacks));
+      }));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+#endif
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
+#ifdef SOL_IP
+  OriginalDstTestConfigFactory factory;
+  Registry::InjectFactory<Configuration::NamedListenerFilterConfigFactory> registration(factory);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    traffic_direction: INBOUND
+    listener_filters:
+    - name: "test.listener.original_dst"
+      typed_config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  Network::AcceptedSocketImpl socket(
+      std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
@@ -3899,10 +4010,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
   EXPECT_TRUE(socket.addressProvider().localAddressRestored());
   EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+#endif
 }
 
 class OriginalDstTestFilterIPv6
     : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
+public:
+  OriginalDstTestFilterIPv6(const envoy::config::core::v3::TrafficDirection& trafic_direction)
+      : Extensions::ListenerFilters::OriginalDst::OriginalDstFilter(trafic_direction) {}
+
+private:
   Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("1::2", 2345)};
@@ -3916,9 +4033,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     Network::ListenerFilterFactoryCb
     createListenerFilterFactoryFromProto(const Protobuf::Message&,
                                          const Network::ListenerFilterMatcherSharedPtr&,
-                                         Configuration::ListenerFactoryContext&) override {
-      return [](Network::ListenerFilterManager& filter_manager) -> void {
-        filter_manager.addAcceptFilter(nullptr, std::make_unique<OriginalDstTestFilterIPv6>());
+                                         Configuration::ListenerFactoryContext& context) override {
+      return [traffic_direction = context.listenerConfig().direction()](
+                 Network::ListenerFilterManager& filter_manager) -> void {
+        filter_manager.addAcceptFilter(
+            nullptr, std::make_unique<OriginalDstTestFilterIPv6>(traffic_direction));
       };
     }
 

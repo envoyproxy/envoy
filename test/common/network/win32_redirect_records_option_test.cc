@@ -44,14 +44,6 @@ TEST_F(Win32RedirectRecordsOptionImplTest, IgnoresOptionOnDifferentState) {
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
 }
 
-TEST_F(Win32RedirectRecordsOptionImplTest, FailsOnUnsupported) {
-  Win32RedirectRecordsOptionImpl socket_option{Network::SocketOptionName(), *redirect_records_};
-  EXPECT_FALSE(socket_option.isSupported());
-  EXPECT_LOG_CONTAINS("warning", "Failed to set unsupported control on socket",
-                      EXPECT_FALSE(socket_option.setOption(
-                          socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
-}
-
 TEST_F(Win32RedirectRecordsOptionImplTest, FailsOnSyscallFailure) {
   EXPECT_CALL(socket_, win32Ioctl(_, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));

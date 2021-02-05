@@ -11,7 +11,6 @@
 
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
-#include "common/network/redirect_records_filter_state.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
@@ -479,33 +478,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
-#ifdef WIN32
-  // See how to perform bind or connect redirection on MSDN
-  // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
-  if constexpr (Network::win32SupportsOriginalDestination()) {
-    if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
-        socket->addressProvider().localAddressRestored()) {
-      ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
-      unsigned long redirectRecordsSize = 0;
-      auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
-      auto status = socket->win32Ioctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
-                                       redirect_records->buf_, sizeof(redirect_records->buf_),
-                                       &redirect_records->buf_size_);
-      if (status.rc_ != 0) {
-        ENVOY_LOG(debug,
-                  "closing connection: cannot broker connection to original destination "
-                  "[Query redirect record failed] with error {}",
-                  status.errno_);
-        return;
-      }
-      stream_info->filterState()->setData(
-          Network::Win32RedirectRecordsFilterState::key(),
-          std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
-    }
-  }
-#endif
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);

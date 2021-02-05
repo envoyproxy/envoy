@@ -494,11 +494,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
 
-  if (callbacks_->getUpstreamSocketOptions()) {
-    upstream_options_ = std::make_shared<Network::Socket::Options>();
-    Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
-  }
-
   auto has_downstream_connection_with_redirect_records =
       downstreamConnection() && downstreamConnection()
                                     ->streamInfo()
@@ -519,6 +514,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       upstream_options_ = std::make_shared<Network::Socket::Options>();
     }
     Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
+  }
+
+  if (upstream_options_ && callbacks_->getUpstreamSocketOptions()) {
+    Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
   }
 
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);

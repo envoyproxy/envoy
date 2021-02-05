@@ -264,11 +264,6 @@ public:
 
     Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
     Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-    if constexpr (Network::win32SupportsOriginalDestination()) {
-      if (test_listener->direction() == envoy::config::core::v3::TrafficDirection::OUTBOUND) {
-        EXPECT_CALL(*accepted_socket, win32Ioctl(_, _, _, _, _, _));
-      }
-    }
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
           // Insert the Mock filter.
