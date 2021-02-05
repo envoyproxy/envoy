@@ -1096,10 +1096,10 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
 
   // Check contents for the current slice information
   {
-    using namespace std::string_literals;
     EXPECT_THAT(
         ostream.contents(),
-        EndsWith("current slice length: 20 contents: \"\0\0\\v\0\0\0\0\0\x1hello envoy\"\n"s));
+        EndsWith(
+            "current slice length: 20 contents: \"\\0\\0\\v\\0\\0\\0\\0\\0\x1hello envoy\"\n"));
   }
 }
 
