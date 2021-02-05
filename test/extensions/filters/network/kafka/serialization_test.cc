@@ -1,6 +1,7 @@
 #include "extensions/filters/network/kafka/tagged_fields.h"
 
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -153,7 +154,7 @@ TEST(VarUInt32Deserializer, ShouldThrowIfNoEndWith5Bytes) {
 
   // when
   // then
-  EXPECT_THROW(testee.feed(data), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(testee.feed(data), EnvoyException, "is too long");
 }
 
 // Missing tests (chunks).
@@ -204,6 +205,25 @@ TEST(VarInt64Deserializer, ShouldDeserializeMaxInt64) {
   buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
   const int64_t expected_value = std::numeric_limits<int64_t>::max();
   deserializeCompactAndCheckEqualityInOneGo<VarInt64Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldThrowIfNoEndWith10Bytes) {
+  // given
+  VarInt64Deserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  // The buffer makes no sense, it's 10 times 0xFF, while varint encoding ensures that in the worst
+  // case 10th byte has the highest bit clear.
+  for (int i = 0; i < 10; ++i) {
+    const uint8_t all_bits_set = 0xFF;
+    buffer.add(&all_bits_set, sizeof(all_bits_set));
+  }
+
+  absl::string_view data = {getRawData(buffer), 1024};
+
+  // when
+  // then
+  EXPECT_THROW_WITH_REGEX(testee.feed(data), EnvoyException, "is too long");
 }
 
 // String tests.

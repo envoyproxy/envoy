@@ -134,6 +134,57 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   EXPECT_EQ(responses[1].partitions_[0].base_offset_, dm2.offset_);
 }
 
+// Typical flow without errors.
+// The produce request has 2 records, both pointing to same partition.
+// Given that usually we cannot make any guarantees on how Kafka producer is going to append the records (as it depends on configuration like max number of records in flight), the first record is going to be saved on a bigger offset.
+TEST_F(ProduceUnitTest, ShouldMergeRecordFootmarkResponses) {
+  // given
+  const RecordFootmark r1 = {"t1", 13, "aaa", "bbb"};
+  const RecordFootmark r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
+  const std::vector<RecordFootmark> records = {r1, r2};
+  EXPECT_CALL(extractor_, computeFootmarks(_)).WillOnce(Return(records));
+
+  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const ProduceRequest data = {0, 0, {}};
+  const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
+  std::shared_ptr<ProduceRequestHolder> testee =
+      std::make_shared<ProduceRequestHolder>(filter_, extractor_, message);
+
+  // when, then - invoking should use producers to send records.
+  MockRecordSink record_sink;
+  EXPECT_CALL(record_sink, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
+  EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
+      .WillRepeatedly(ReturnRef(record_sink));
+  testee->invoke(upstream_kafka_facade_);
+
+  // when, then - request is not yet finished (2 records' delivery to be confirmed).
+  EXPECT_FALSE(testee->finished());
+
+  // when, then - first record should be delivered.
+  const DeliveryMemento dm1 = {r1.value_.data(), RdKafka::ERR_NO_ERROR, 4242};
+  EXPECT_TRUE(testee->accept(dm1));
+  EXPECT_FALSE(testee->finished());
+
+  const DeliveryMemento dm2 = {r2.value_.data(), RdKafka::ERR_NO_ERROR, 1313};
+  // After all the deliveries have been confirmed, the filter is getting notified.
+  EXPECT_CALL(filter_, onRequestReadyForAnswer());
+  EXPECT_TRUE(testee->accept(dm2));
+  EXPECT_TRUE(testee->finished());
+
+  // when, then - answer gets computed and contains results.
+  const auto answer = testee->computeAnswer();
+  EXPECT_EQ(answer->metadata_.api_key_, header.api_key_);
+  EXPECT_EQ(answer->metadata_.correlation_id_, header.correlation_id_);
+
+  const auto response = std::dynamic_pointer_cast<Response<ProduceResponse>>(answer);
+  ASSERT_TRUE(response);
+  const std::vector<TopicProduceResponse> responses = response->data_.responses_;
+  EXPECT_EQ(responses.size(), 1);
+  EXPECT_EQ(responses[0].partitions_.size(), 1);
+  EXPECT_EQ(responses[0].partitions_[0].error_code_, RdKafka::ERR_NO_ERROR);
+  EXPECT_EQ(responses[0].partitions_[0].base_offset_, 1313);
+}
+
 // Flow with errors.
 // The produce request has 2 records, both pointing to same partition.
 // The first record is going to fail.
