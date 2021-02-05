@@ -141,6 +141,29 @@ function run_process_test_result() {
   "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
 }
 
+function run_ci_verify () {
+  echo "verify examples..."
+  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  _images=$(docker image list --format "{{.Repository}}")
+  while read -r line; do images+=("$line"); done \
+      <<< "$_images"
+  _tags=$(docker image list --format "{{.Tag}}")
+  while read -r line; do tags+=("$line"); done \
+      <<< "$_tags"
+  for i in "${!images[@]}"; do
+      if [[ "${images[i]}" =~ "envoy" ]]; then
+          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
+      fi
+  done
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
+  export DOCKER_NO_PULL=1
+  umask 027
+  chmod -R o-rwx examples/
+  ci/verify_examples.sh "${@}" || exit
+}
+
 CI_TARGET=$1
 shift
 
@@ -431,26 +454,10 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   python3.8 tools/dependency/cve_scan.py
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
-  done
-  docker images
-  sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
-  export DOCKER_NO_PULL=1
-  umask 027
-  chmod -R o-rwx examples/
-  ci/verify_examples.sh "*" wasm-cc
+  run_ci_verify "*" wasm-cc
+  exit 0
+elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
+  run_ci_verify wasm-cc
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

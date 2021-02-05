@@ -342,6 +342,22 @@ stages:
             env:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               NO_BUILD_SETUP: 1
+      - job: examples_build
+        dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: current
+              artifactName: "docker"
+              itemPattern: "docker/envoy-docker-images.tar.xz"
+              downloadType: single
+              targetPath: $(Build.StagingDirectory)
+          - bash: ./ci/do_ci.sh verify_build_examples
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              NO_BUILD_SETUP: 1
 
   - stage: macos
     dependsOn: ["precheck"]
