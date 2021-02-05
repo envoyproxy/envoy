@@ -4,9 +4,7 @@ package envoy.extensions.compression.gzip.decompressor.v3;
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.compression.gzip.decompressor.v3";

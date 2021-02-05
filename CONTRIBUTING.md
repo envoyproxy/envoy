@@ -73,6 +73,9 @@ versioning guidelines:
   `envoy.features.enable_all_deprecated_features` is set to true. Finally, following the deprecation
   of the API major version where the field was first marked deprecated, the entire implementation
   code will be removed from the Envoy implementation.
+* If the runtime key `envoy.features.fail_on_any_deprecated_feature` is enabled,
+  use of deprecated fields will trigger a configuration load failure
+  rather than a logged warning.
 * This policy means that organizations deploying main should have some time to get ready for
   breaking changes at the next major API version. This is typically a window of at least 12 months
   or until the organization moves to the next major API version.
