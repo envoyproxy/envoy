@@ -713,11 +713,6 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 
 bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                             bool worker_started) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.listener_in_place_filterchain_update")) {
-    return false;
-  }
-
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {
