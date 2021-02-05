@@ -11,7 +11,6 @@ import "envoy/config/listener/v4alpha/api_listener.proto";
 import "envoy/config/listener/v4alpha/listener_components.proto";
 import "envoy/config/listener/v4alpha/udp_listener_config.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
