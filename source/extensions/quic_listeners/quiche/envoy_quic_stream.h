@@ -28,7 +28,7 @@ public:
                                 std::move(above_high_watermark), ENVOY_LOGGER()),
         filter_manager_connection_(filter_manager_connection) {}
 
-  ~EnvoyQuicStream() override {}
+  ~EnvoyQuicStream() override = default;
 
   // Http::StreamEncoder
   Stream& getStream() override { return *this; }
