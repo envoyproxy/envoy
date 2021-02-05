@@ -23,7 +23,8 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  envoy::config::core::v3::TrafficDirection traffic_direction_;
+  // Unused on Posix
+  [[maybe_unused]] envoy::config::core::v3::TrafficDirection traffic_direction_;
 };
 
 } // namespace OriginalDst
