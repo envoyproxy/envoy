@@ -91,18 +91,18 @@ public:
   }
 
   // SendBufferMonitor
-  void updateBytesBuffered(uint64_t buffered_data_old, uint64_t buffered_data_new) override {
-    if (buffered_data_new == buffered_data_old) {
+  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
+    if (new_buffered_bytes == old_buffered_bytes) {
       return;
     }
     // If buffered bytes changed, update stream and session's watermark book
     // keeping.
-    if (buffered_data_new > buffered_data_old) {
-      send_buffer_simulation_.checkHighWatermark(buffered_data_new);
+    if (new_buffered_bytes > old_buffered_bytes) {
+      send_buffer_simulation_.checkHighWatermark(new_buffered_bytes);
     } else {
-      send_buffer_simulation_.checkLowWatermark(buffered_data_new);
+      send_buffer_simulation_.checkLowWatermark(new_buffered_bytes);
     }
-    filter_manager_connection_.updateBytesBuffered(buffered_data_old, buffered_data_new);
+    filter_manager_connection_.updateBytesBuffered(old_buffered_bytes, new_buffered_bytes);
   }
 
 protected:

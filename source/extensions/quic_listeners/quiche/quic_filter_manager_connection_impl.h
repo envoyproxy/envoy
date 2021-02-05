@@ -21,7 +21,7 @@ class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
 public:
   QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
                                   uint32_t send_buffer_limit);
-  ~QuicFilterManagerConnectionImpl() override {}
+  ~QuicFilterManagerConnectionImpl() override = default;
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
