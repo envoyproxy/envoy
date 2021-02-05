@@ -317,8 +317,6 @@ void DispatcherImpl::run(RunType type) {
     Thread::LockGuard lock(post_lock_);
     exited_ = true;
   }
-  // TODO(lambdai): reconsider this.
-  runPostCallbacks();
 }
 
 MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
