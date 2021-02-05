@@ -64,7 +64,36 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
                    absl::optional<Http::Protocol>) override;
 
+  class Callbacks {
+  public:
+    Callbacks(HttpConnPool& conn_pool, Upstream::HostDescriptionConstSharedPtr host,
+              Ssl::ConnectionInfoConstSharedPtr ssl_info)
+        : conn_pool_(&conn_pool), host_(host), ssl_info_(ssl_info) {}
+    virtual ~Callbacks() = default;
+    virtual void onSuccess(Http::RequestEncoder& request_encoder) {
+      ASSERT(conn_pool_ != nullptr);
+      conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionLocalAddress(),
+                                     ssl_info_);
+    }
+    virtual void onFailure() {
+      ASSERT(conn_pool_ != nullptr);
+      conn_pool_->callbacks_->onGenericPoolFailure(
+          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, host_);
+    }
+
+  protected:
+    Callbacks() = default;
+
+  private:
+    HttpConnPool* conn_pool_{};
+    Upstream::HostDescriptionConstSharedPtr host_;
+    Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+  };
+
 private:
+  void onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
+                          const Network::Address::InstanceConstSharedPtr& local_address,
+                          Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const std::string hostname_;
   Http::CodecClient::Type type_;
   Http::ConnectionPool::Instance* conn_pool_{};
@@ -92,7 +121,6 @@ private:
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
   ~HttpUpstream() override;
-
   virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
 
   void doneReading();
@@ -112,6 +140,9 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
+  void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
+    conn_pool_callbacks_ = std::move(callbacks);
+  }
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
@@ -129,6 +160,9 @@ private:
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
+      } else if (parent_.conn_pool_callbacks_ != nullptr) {
+        parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
+        parent_.conn_pool_callbacks_.reset();
       }
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
@@ -147,6 +181,10 @@ private:
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+
+  // Used to defer onGenericPoolReady and onGenericPoolFailure to the reception
+  // of the CONNECT response or the resetEncoder.
+  std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
 };
 
 class Http1Upstream : public HttpUpstream {

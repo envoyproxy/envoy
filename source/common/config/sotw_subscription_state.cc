@@ -28,8 +28,9 @@ SotwSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
                                                  dispatcher_);
 }
 
-void SotwSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                                       const std::set<std::string>& cur_removed) {
+void SotwSubscriptionState::updateSubscriptionInterest(
+    const absl::flat_hash_set<std::string>& cur_added,
+    const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
     names_tracked_.insert(a);
   }

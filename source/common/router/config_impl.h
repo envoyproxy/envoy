@@ -177,7 +177,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
-  Stats::StatName statName() const override { return stat_name_; }
+  Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
@@ -193,6 +193,12 @@ public:
 
 private:
   enum class SslRequirements { None, ExternalOnly, All };
+
+  struct StatNameProvider {
+    StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
+        : stat_name_storage_(name, symbol_table) {}
+    Stats::StatNameManagedStorage stat_name_storage_;
+  };
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
@@ -211,23 +217,22 @@ private:
     mutable VirtualClusterStats stats_;
   };
 
-  struct VirtualClusterEntry : public VirtualClusterBase {
+  struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::StatNamePool& pool, Stats::Scope& scope,
-                        const VirtualClusterStatNames& stat_names);
+                        Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
 
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
-    explicit CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(stat_names.other_, scope.createScope("other"), stat_names) {}
+    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
+        : VirtualClusterBase(stat_names.other_, scope.scopeFromStatName(stat_names.other_),
+                             stat_names) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
-  Stats::StatNamePool stat_name_pool_;
-  const Stats::StatName stat_name_;
+  const Stats::StatNameManagedStorage stat_name_storage_;
   Stats::ScopePtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
@@ -405,9 +410,9 @@ class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
-  explicit InternalRedirectPolicyImpl(
-      const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
-      ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
+  InternalRedirectPolicyImpl(const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+                             ProtobufMessage::ValidationVisitor& validator,
+                             absl::string_view current_route_name);
   // Default constructor that disables internal redirect.
   InternalRedirectPolicyImpl() = default;
 

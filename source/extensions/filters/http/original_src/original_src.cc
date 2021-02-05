@@ -14,7 +14,8 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 void OriginalSrcFilter::onDestroy() {}
 
 Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  const auto downstream_address = callbacks_->streamInfo().downstreamRemoteAddress();
+  const auto downstream_address =
+      callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
   ASSERT(downstream_address);
 
   if (downstream_address->type() != Network::Address::Type::Ip) {

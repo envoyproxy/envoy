@@ -31,8 +31,9 @@ DeltaSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url
   return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, init_fetch_timeout,
                                                   dispatcher_);
 }
-void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                                        const std::set<std::string>& cur_removed) {
+void DeltaSubscriptionState::updateSubscriptionInterest(
+    const absl::flat_hash_set<std::string>& cur_added,
+    const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
     resource_state_[a] = ResourceState::waitingForServer();
     // If interest in a resource is removed-then-added (all before a discovery request

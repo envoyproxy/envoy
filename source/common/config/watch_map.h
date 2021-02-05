@@ -17,10 +17,10 @@ namespace Envoy {
 namespace Config {
 
 struct AddedRemoved {
-  AddedRemoved(std::set<std::string>&& added, std::set<std::string>&& removed)
+  AddedRemoved(absl::flat_hash_set<std::string>&& added, absl::flat_hash_set<std::string>&& removed)
       : added_(std::move(added)), removed_(std::move(removed)) {}
-  std::set<std::string> added_;
-  std::set<std::string> removed_;
+  absl::flat_hash_set<std::string> added_;
+  absl::flat_hash_set<std::string> removed_;
 };
 
 struct Watch {
@@ -28,7 +28,7 @@ struct Watch {
       : callbacks_(callbacks), resource_decoder_(resource_decoder) {}
   SubscriptionCallbacks& callbacks_;
   OpaqueResourceDecoder& resource_decoder_;
-  std::set<std::string> resource_names_; // must be sorted set, for set_difference.
+  absl::flat_hash_set<std::string> resource_names_;
   // Needed only for state-of-the-world.
   // Whether the most recent update contained any resources this watch cares about.
   // If true, a new update that also contains no resources can skip this watch.
@@ -72,7 +72,7 @@ public:
   // 2) if 'resources' does not contain Y, and this watch was the only one that cared about Y,
   //    Y will be in removed_.
   AddedRemoved updateWatchInterest(Watch* watch,
-                                   const std::set<std::string>& update_to_these_names);
+                                   const absl::flat_hash_set<std::string>& update_to_these_names);
 
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().
@@ -95,13 +95,13 @@ private:
 
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
-  std::set<std::string> findAdditions(const std::vector<std::string>& newly_added_to_watch,
-                                      Watch* watch);
+  absl::flat_hash_set<std::string>
+  findAdditions(const absl::flat_hash_set<std::string>& newly_added_to_watch, Watch* watch);
 
   // Given a list of names that an individual watch no longer cares about, returns those names that
   // in fact the entire subscription no longer cares about.
-  std::set<std::string> findRemovals(const std::vector<std::string>& newly_removed_from_watch,
-                                     Watch* watch);
+  absl::flat_hash_set<std::string>
+  findRemovals(const absl::flat_hash_set<std::string>& newly_removed_from_watch, Watch* watch);
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);

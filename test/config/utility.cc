@@ -1025,7 +1025,9 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view format) {
+bool ConfigHelper::setAccessLog(
+    const std::string& filename, absl::string_view format,
+    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters) {
   if (getFilterFromListener("http") == nullptr) {
     return false;
   }
@@ -1035,8 +1037,15 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        absl::StrCat(format, "\n"));
+    auto* log_format = access_log_config.mutable_log_format();
+    log_format->mutable_text_format_source()->set_inline_string(absl::StrCat(format, "\n"));
+    if (!formatters.empty()) {
+      for (const auto& formatter : formatters) {
+        auto* added_formatter = log_format->add_formatters();
+        added_formatter->set_name(formatter.name());
+        added_formatter->mutable_typed_config()->PackFrom(formatter.typed_config());
+      }
+    }
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -1152,6 +1161,12 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   for (int i = listener->listener_filters_size() - 1; i > 0; --i) {
     listener->mutable_listener_filters()->SwapElements(i, i - 1);
   }
+}
+
+void ConfigHelper::addBootstrapExtension(const std::string& config) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* extension = bootstrap_.add_bootstrap_extensions();
+  TestUtility::loadFromYaml(config, *extension);
 }
 
 bool ConfigHelper::loadHttpConnectionManager(

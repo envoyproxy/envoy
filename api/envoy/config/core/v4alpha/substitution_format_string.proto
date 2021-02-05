@@ -3,7 +3,9 @@ syntax = "proto3";
 package envoy.config.core.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -19,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message SubstitutionFormatString {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.SubstitutionFormatString";
@@ -92,4 +94,8 @@ message SubstitutionFormatString {
   //   content_type: "text/html; charset=UTF-8"
   //
   string content_type = 4;
+
+  // Specifies a collection of Formatter plugins that can be called from the access log configuration.
+  // See the formatters extensions documentation for details.
+  repeated TypedExtensionConfig formatters = 6;
 }

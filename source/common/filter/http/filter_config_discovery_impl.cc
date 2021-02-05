@@ -87,7 +87,8 @@ FilterConfigSubscription::FilterConfigSubscription(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
+          false);
 }
 
 void FilterConfigSubscription::start() {

@@ -14,9 +14,9 @@
 namespace Envoy {
 namespace Config {
 
-LegacyGrpcMuxImpl::LegacyGrpcMuxImpl(
-    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+LegacyGrpcMuxImpl::LegacyGrpcMuxImpl(const LocalInfo::LocalInfo& local_info, 
+    Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+    const Protobuf::MethodDescriptor& service_method,
     envoy::config::core::v3::ApiVersion transport_api_version, Random::RandomGenerator& random,
     Stats::Scope& scope, const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
@@ -67,7 +67,7 @@ void LegacyGrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 Watch* LegacyGrpcMuxImpl::addWatch(const std::string& type_url,
-                                   const std::set<std::string>& resources,
+                                   const absl::flat_hash_set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
                                    OpaqueResourceDecoder& resource_decoder,
                                    std::chrono::milliseconds, const bool) {

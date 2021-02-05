@@ -1,5 +1,8 @@
 #include "common/config/grpc_subscription_impl.h"
 
+#include "common/config/xds_resource.h"
+#include "common/protobuf/type_util.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -8,10 +11,11 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, absl::stri
                                            OpaqueResourceDecoder& resource_decoder,
                                            SubscriptionStats stats, TimeSource& time_source,
                                            std::chrono::milliseconds init_fetch_timeout,
-                                           bool is_aggregated)
+                                           bool is_aggregated, bool use_namespace_matching)
     : grpc_mux_(std::move(grpc_mux)), type_url_(type_url), callbacks_(callbacks),
       resource_decoder_(resource_decoder), stats_(stats), time_source_(time_source),
-      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated),
+      use_namespace_matching_(use_namespace_matching) {}
 
 GrpcSubscriptionImpl::~GrpcSubscriptionImpl() {
   if (watch_) {
@@ -22,26 +26,26 @@ GrpcSubscriptionImpl::~GrpcSubscriptionImpl() {
 ScopedResume GrpcSubscriptionImpl::pause() { return grpc_mux_->pause(type_url_); }
 
 // Config::Subscription
-void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
-                                 const bool use_namespace_matching) {
+void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
   // ADS initial request batching relies on the users of the GrpcMux *not* calling start on it,
   // whereas non-ADS xDS users must call it themselves.
   if (!is_aggregated_) {
     grpc_mux_->start();
   }
   watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, init_fetch_timeout_,
-                               use_namespace_matching);
+                               use_namespace_matching_);
   stats_.update_attempt_.inc();
   ENVOY_LOG(debug, "{} subscription started", type_url_);
 }
 
 void GrpcSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names, const bool use_namespace_matching) {
-  grpc_mux_->updateWatch(type_url_, watch_, update_to_these_names, use_namespace_matching);
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
+  grpc_mux_->updateWatch(type_url_, watch_, update_to_these_names, use_namespace_matching_);
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& for_update) {
+void GrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& for_update) {
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }
@@ -100,6 +104,22 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
   }
 
   stats_.update_attempt_.inc();
+}
+
+GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
+    const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, TimeSource& time_source, std::chrono::milliseconds init_fetch_timeout,
+    bool is_aggregated)
+    : GrpcSubscriptionImpl(
+          grpc_mux, TypeUtil::descriptorFullNameToTypeUrl(collection_locator.resource_type()),
+          callbacks, resource_decoder, stats, time_source, init_fetch_timeout, is_aggregated,
+          false),
+      collection_locator_(collection_locator) {}
+
+void GrpcCollectionSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
+  ASSERT(resource_names.empty());
+  GrpcSubscriptionImpl::start({XdsResourceIdentifier::encodeUrl(collection_locator_)});
 }
 
 } // namespace Config

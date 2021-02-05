@@ -89,7 +89,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      main_thread_id_(std::this_thread::get_id()), hooks_(hooks), server_contexts_(*this) {
+      hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -141,7 +141,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroyed listener manager");
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -403,8 +406,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      stats().symbolTable(), bootstrap_.node(), local_address, options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
@@ -566,6 +569,11 @@ void InstanceImpl::initialize(const Options& options,
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
+
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized();
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
@@ -819,7 +827,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

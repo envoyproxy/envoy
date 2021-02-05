@@ -85,7 +85,8 @@ public:
    * @return Watch* an opaque watch token added or updated, to be used in future addOrUpdateWatch
    *                calls.
    */
-  virtual Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  virtual Watch* addWatch(const std::string& type_url,
+                          const absl::flat_hash_set<std::string>& resources,
                           SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
                           std::chrono::milliseconds init_fetch_timeout,
                           const bool use_namespace_matching) PURE;
@@ -94,7 +95,7 @@ public:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   virtual void updateWatch(const std::string& type_url, Watch* watch,
-                           const std::set<std::string>& resources,
+                           const absl::flat_hash_set<std::string>& resources,
                            const bool creating_namespace_watch) PURE;
 
   /**
@@ -120,7 +121,7 @@ public:
   virtual void disableInitFetchTimeoutTimer() PURE;
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
-                                     const std::set<std::string>& for_update) PURE;
+                                     const absl::flat_hash_set<std::string>& for_update) PURE;
 
   using TypeUrlMap = absl::flat_hash_map<std::string, std::string>;
   static TypeUrlMap& typeUrlMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(TypeUrlMap, {}); }

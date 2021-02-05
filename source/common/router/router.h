@@ -303,7 +303,8 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->streamInfo().downstreamRemoteAddress().get(), *downstream_headers_,
+            callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
+            *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
             },
@@ -398,7 +399,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->remoteAddress()->asString() + conn->localAddress()->asString();
+    value = conn->addressProvider().remoteAddress()->asString() +
+            conn->addressProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(

@@ -13,10 +13,11 @@ namespace Config {
 LegacyGrpcSubscriptionImpl::LegacyGrpcSubscriptionImpl(
     GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats, absl::string_view type_url,
-    Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+    Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated, bool use_namespace_matching)
     : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(resource_decoder),
       stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated),
+      use_namespace_matching_(use_namespace_matching) {}
 
 LegacyGrpcSubscriptionImpl::~LegacyGrpcSubscriptionImpl() {
   if (watch_) {
@@ -25,8 +26,7 @@ LegacyGrpcSubscriptionImpl::~LegacyGrpcSubscriptionImpl() {
 }
 
 // Config::Subscription
-void LegacyGrpcSubscriptionImpl::start(const std::set<std::string>& resources,
-                                       const bool use_namespace_matching) {
+void LegacyGrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -36,7 +36,7 @@ void LegacyGrpcSubscriptionImpl::start(const std::set<std::string>& resources,
   }
 
   watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, init_fetch_timeout_,
-                               use_namespace_matching);
+                               use_namespace_matching_);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -51,12 +51,12 @@ void LegacyGrpcSubscriptionImpl::start(const std::set<std::string>& resources,
 }
 
 void LegacyGrpcSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names, const bool use_namespace_matching) {
-  grpc_mux_->updateWatch(type_url_, watch_, update_to_these_names, use_namespace_matching);
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
+  grpc_mux_->updateWatch(type_url_, watch_, update_to_these_names, use_namespace_matching_);
   stats_.update_attempt_.inc();
 }
 
-void LegacyGrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& for_update) {
+void LegacyGrpcSubscriptionImpl::requestOnDemandUpdate(const absl::flat_hash_set<std::string>& for_update) {
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }

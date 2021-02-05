@@ -22,8 +22,8 @@ public:
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
-  void updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                  const std::set<std::string>& cur_removed) override;
+  void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
+                                  const absl::flat_hash_set<std::string>& cur_removed) override;
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const override;

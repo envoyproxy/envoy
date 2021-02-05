@@ -111,13 +111,13 @@ public:
     version_ = "";
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, "");
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResourceInterest(cluster_names, false);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     timer_cb_();
   }
 

@@ -26,7 +26,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
   // Ensure this doesn't cause an issue by sending a request, since we don't
   // have a gRPC stream.
-  subscription_->updateResourceInterest({"cluster2"}, false);
+  subscription_->updateResourceInterest({"cluster2"});
 
   // Retry and succeed.
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));

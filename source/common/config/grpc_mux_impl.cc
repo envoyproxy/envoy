@@ -7,6 +7,8 @@
 #include "common/config/decoded_resource_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_context_params.h"
+#include "common/config/xds_resource.h"
 #include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -25,7 +27,8 @@ GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
-Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
+Watch* GrpcMuxImpl::addWatch(const std::string& type_url,
+                             const absl::flat_hash_set<std::string>& resources,
                              SubscriptionCallbacks& callbacks,
                              OpaqueResourceDecoder& resource_decoder,
                              std::chrono::milliseconds init_fetch_timeout,
@@ -53,15 +56,39 @@ Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::st
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                              const std::set<std::string>& resources,
+                              const absl::flat_hash_set<std::string>& resources,
                               const bool creating_namespace_watch) {
   ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
   ASSERT(watch != nullptr);
   SubscriptionState& sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
 
-  auto added_removed = watch_map.updateWatchInterest(watch, resources);
-  if (creating_namespace_watch) {
+  // If this is a glob collection subscription, we need to compute actual context parameters.
+  absl::flat_hash_set<std::string> xdstp_resources;
+  // TODO(htuch): add support for resources beyond glob collections, the constraints below around
+  // resource size and ID reflect the progress of the xdstp:// implementation.
+  if (!resources.empty() && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
+    // Callers must be asking for a single resource, the collection.
+    ASSERT(resources.size() == 1);
+    auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
+    // We only know how to deal with glob collections and static context parameters right now.
+    // TODO(htuch): add support for dynamic context params and list collections in the future.
+    if (absl::EndsWith(resource.id(), "/*")) {
+      auto encoded_context = XdsContextParams::encodeResource(
+          local_info_.contextProvider().nodeContext(), resource.context(), {}, {});
+      resource.mutable_context()->CopyFrom(encoded_context);
+      XdsResourceIdentifier::EncodeOptions encode_options;
+      encode_options.sort_context_params_ = true;
+      xdstp_resources.insert(XdsResourceIdentifier::encodeUrn(resource, encode_options));
+    } else {
+      // TODO(htuch): We will handle list collections here in future work.
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  auto added_removed =
+      watch_map.updateWatchInterest(watch, xdstp_resources.empty() ? resources : xdstp_resources);
+  if (creating_namespace_watch && xdstp_resources.empty()) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub.updateSubscriptionInterest({}, {});
   } else {
@@ -313,7 +340,7 @@ bool GrpcMuxDelta::grpcStreamAvailable() const { return grpc_stream_.grpcStreamA
 bool GrpcMuxDelta::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
-                                         const std::set<std::string>& for_update) {
+                                         const absl::flat_hash_set<std::string>& for_update) {
   SubscriptionState& sub = subscriptionStateFor(type_url);
   sub.updateSubscriptionInterest(for_update, {});
   // Tell the server about our change in interest, if any.
@@ -366,14 +393,14 @@ void GrpcMuxSotw::maybeUpdateQueueSizeStat(uint64_t size) {
 bool GrpcMuxSotw::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
 bool GrpcMuxSotw::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
-Watch* NullGrpcMuxImpl::addWatch(const std::string&, const std::set<std::string>&,
+Watch* NullGrpcMuxImpl::addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
                                  SubscriptionCallbacks&, OpaqueResourceDecoder&,
                                  std::chrono::milliseconds, const bool) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 
-void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*, const std::set<std::string>&,
-                                  const bool) {
+void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*,
+                                  const absl::flat_hash_set<std::string>&, const bool) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 

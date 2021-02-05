@@ -122,7 +122,7 @@ public:
   };
 
   FakeGrpcSubscription makeWatch(const std::string& type_url,
-                                 const std::set<std::string>& resources) {
+                                 const absl::flat_hash_set<std::string>& resources) {
     return FakeGrpcSubscription(grpc_mux_.get(), type_url,
                                 grpc_mux_->addWatch(type_url, resources, callbacks_,
                                                     resource_decoder_,
@@ -130,7 +130,7 @@ public:
   }
 
   FakeGrpcSubscription makeWatch(const std::string& type_url,
-                                 const std::set<std::string>& resources,
+                                 const absl::flat_hash_set<std::string>& resources,
                                  NiceMock<MockSubscriptionCallbacks>& callbacks,
                                  Config::OpaqueResourceDecoder& resource_decoder) {
     return FakeGrpcSubscription(grpc_mux_.get(), type_url,

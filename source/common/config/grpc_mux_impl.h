@@ -41,12 +41,12 @@ public:
               bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info,
               envoy::config::core::v3::ApiVersion transport_api_version);
 
-  Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  Watch* addWatch(const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                   SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
                   std::chrono::milliseconds init_fetch_timeout,
                   const bool use_namespace_matching = false) override;
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources,
+                   const absl::flat_hash_set<std::string>& resources,
                    const bool creating_namespace_watch = false) override;
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
@@ -160,7 +160,7 @@ public:
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
   void requestOnDemandUpdate(const std::string& type_url,
-                             const std::set<std::string>& for_update) override;
+                             const absl::flat_hash_set<std::string>& for_update) override;
 
 protected:
   void establishGrpcStream() override;
@@ -192,7 +192,7 @@ public:
   void
   onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
                       ControlPlaneStats& control_plane_stats) override;
-  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   };
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
@@ -227,12 +227,14 @@ public:
   bool paused(const std::string&) const override { return false; }
   void disableInitFetchTimeoutTimer() override {}
 
-  Watch* addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                  OpaqueResourceDecoder&, std::chrono::milliseconds, const bool) override;
-  void updateWatch(const std::string&, Watch*, const std::set<std::string>&, const bool) override;
+  Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                  SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
+                  const bool) override;
+  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
+                   const bool) override;
   void removeWatch(const std::string&, Watch*) override;
 
-  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 };

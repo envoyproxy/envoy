@@ -47,7 +47,7 @@ public:
         local_info_, false);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_,
-        stats_, dispatcher_.timeSource(), init_fetch_timeout, false);
+        stats_, dispatcher_.timeSource(), init_fetch_timeout, false, false);
 
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
@@ -79,7 +79,7 @@ public:
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -175,7 +175,7 @@ public:
                         std::inserter(unsub, unsub.begin()));
 
     expectSendMessage(sub, unsub, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-    subscription_->updateResourceInterest(cluster_names, false);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     last_cluster_names_ = cluster_names;
   }
 

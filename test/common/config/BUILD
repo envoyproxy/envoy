@@ -203,6 +203,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/config:grpc_subscription_lib",
+        "//source/common/common:utility_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",
@@ -425,6 +426,16 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "context_provider_impl_test",
+    srcs = ["context_provider_impl_test.cc"],
+    deps = [
+        ":xds_test_utility_lib",
+        "//source/common/config:context_provider_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

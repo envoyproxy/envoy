@@ -40,7 +40,7 @@ protected:
     cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
     cds_->initialize();
     cds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }

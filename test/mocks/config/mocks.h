@@ -62,12 +62,11 @@ public:
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD(void, start,
-              (const std::set<std::string>& resources, const bool use_prefix_matching));
+  MOCK_METHOD(void, start, (const absl::flat_hash_set<std::string>& resources));
   MOCK_METHOD(void, updateResourceInterest,
-              (const std::set<std::string>& update_to_these_names,
-               const bool use_namespace_matching));
-  MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
+              (const absl::flat_hash_set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const absl::flat_hash_set<std::string>& add_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -78,7 +77,7 @@ public:
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder));
+               OpaqueResourceDecoder& resource_decoder, bool use_namespace_matching));
   MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -96,11 +95,12 @@ public:
   ~MockGrpcMux() override;
 
   MOCK_METHOD(Watch*, addWatch,
-              (const std::string& type_url, const std::set<std::string>& resources,
+              (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
                std::chrono::milliseconds init_fetch_timeout, const bool use_prefix_matching));
   MOCK_METHOD(void, updateWatch,
-              (const std::string& type_url, Watch* watch, const std::set<std::string>& resources,
+              (const std::string& type_url, Watch* watch,
+               const absl::flat_hash_set<std::string>& resources,
                const bool creating_namespace_watch));
   MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
 
@@ -110,7 +110,8 @@ public:
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
   MOCK_METHOD(void, disableInitFetchTimeoutTimer, ());
   MOCK_METHOD(void, requestOnDemandUpdate,
-              (const std::string& type_url, const std::set<std::string>& add_these_names));
+              (const std::string& type_url,
+               const absl::flat_hash_set<std::string>& add_these_names));
 };
 
 class MockGrpcStreamCallbacks
@@ -155,6 +156,14 @@ public:
   MOCK_METHOD(std::string, configType, ());
   MOCK_METHOD(std::string, name, (), (const));
   MOCK_METHOD(std::string, category, (), (const));
+};
+
+class MockContextProvider : public ContextProvider {
+public:
+  MockContextProvider();
+  ~MockContextProvider() override;
+
+  MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
 };
 
 } // namespace Config

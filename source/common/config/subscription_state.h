@@ -30,8 +30,8 @@ public:
   virtual ~SubscriptionState() = default;
 
   // Update which resources we're interested in subscribing to.
-  virtual void updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                          const std::set<std::string>& cur_removed) PURE;
+  virtual void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
+                                          const absl::flat_hash_set<std::string>& cur_removed) PURE;
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   virtual bool subscriptionUpdatePending() const PURE;

@@ -25,15 +25,15 @@ protected:
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->updateResourceInterest({"name3", "name4"}, false);
+  subscription_->updateResourceInterest({"name3", "name4"});
   expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"}, false);
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   expectSendMessage({}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->updateResourceInterest({"name3", "name4"}, false);
+  subscription_->updateResourceInterest({"name3", "name4"});
   expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"}, false);
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->updateResourceInterest({"name4"}, false);
+  subscription_->updateResourceInterest({"name4"});
 }
 
 // Checks that after a pause(), no requests are sent until resume().
@@ -50,11 +50,11 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   // If not for the pause, these updates would make the expectSendMessage fail due to too many
   // messages being sent.
-  subscription_->updateResourceInterest({"name3", "name4"}, false);
-  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"}, false);
-  subscription_->updateResourceInterest({"name3", "name4"}, false);
-  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"}, false);
-  subscription_->updateResourceInterest({"name3", "name4"}, false);
+  subscription_->updateResourceInterest({"name3", "name4"});
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
+  subscription_->updateResourceInterest({"name3", "name4"});
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
+  subscription_->updateResourceInterest({"name3", "name4"});
 }
 
 TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
@@ -152,12 +152,12 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
 
   auto subscription = std::make_unique<GrpcSubscriptionImpl>(
       xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, resource_decoder, stats,
-      dispatcher.timeSource(), std::chrono::milliseconds(12345), false);
+      dispatcher.timeSource(), std::chrono::milliseconds(12345), false, false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 
   subscription->start({"name1"});
-  subscription->updateResourceInterest({"name1", "name2"}, false);
+  subscription->updateResourceInterest({"name1", "name2"});
 }
 
 } // namespace

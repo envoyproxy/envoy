@@ -58,7 +58,7 @@ public:
                                       /*skip_subsequent_node=*/true),
         Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_,
         dispatcher_.timeSource(), init_fetch_timeout,
-        /*is_aggregated=*/false);
+        /*is_aggregated=*/false, false);
   }
 
   ~GrpcSubscriptionTestHarness() override {
@@ -104,7 +104,7 @@ public:
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "", true);
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -149,7 +149,7 @@ public:
 
   void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResourceInterest(cluster_names, false);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     last_cluster_names_ = cluster_names;
   }
 
