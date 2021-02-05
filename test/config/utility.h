@@ -277,7 +277,7 @@ public:
 
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
-  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect);
+  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&

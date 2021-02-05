@@ -10,7 +10,6 @@ import "envoy/config/endpoint/v3/endpoint_components.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
