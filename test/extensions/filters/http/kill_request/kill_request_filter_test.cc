@@ -102,6 +102,20 @@ TEST_F(KillRequestFilterTest,
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
+TEST_F(KillRequestFilterTest,
+       KillRequestDisabledWhenIsKillRequestEnabledReturnsFalseFromRouteLevelConfiguration) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(0);
+  setUpTest(kill_request);
+  request_headers_.addCopy("x-envoy-kill-request", "true");
+
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+      .WillByDefault(Return(nullptr));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderIsMissing) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(100);
