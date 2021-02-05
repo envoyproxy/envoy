@@ -59,6 +59,12 @@ private:
   Event::TimerPtr init_fetch_timeout_timer_;
   const bool is_aggregated_;
   const bool use_namespace_matching_;
+
+  struct ResourceNameFormatter {
+    void operator()(std::string* out, const Config::DecodedResourceRef& resource) {
+      out->append(resource.get().name());
+    }
+  };
 };
 
 } // namespace Config

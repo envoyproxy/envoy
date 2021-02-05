@@ -1,10 +1,14 @@
 #include "common/config/grpc_subscription_impl.h"
 
+#include <chrono>
+
 #include "common/config/xds_resource.h"
 #include "common/protobuf/type_util.h"
 
 namespace Envoy {
 namespace Config {
+
+constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::milliseconds(50);
 
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, absl::string_view type_url,
                                            SubscriptionCallbacks& callbacks,
@@ -56,12 +60,22 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   ENVOY_LOG(debug, "{} received SotW update", type_url_);
   stats_.update_attempt_.inc();
   grpc_mux_->disableInitFetchTimeoutTimer();
+  auto start = time_source_.monotonicTime();
   callbacks_.onConfigUpdate(resources, version_info);
-  ENVOY_LOG(debug, "{} SotW update successful", type_url_);
+  std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      time_source_.monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(time_source_));
   stats_.version_.set(HashUtil::xxHash64(version_info));
   stats_.version_text_.set(version_info);
+  stats_.update_duration_.recordValue(update_duration.count());
+  ENVOY_LOG(debug, "SotW update for {} accepted with {} resources with version {}", type_url_,
+            resources.size(), version_info);
+
+  if (update_duration > UpdateDurationLogThreshold) {
+    ENVOY_LOG(debug, "gRPC config update took {} ms! Resources names: {}", update_duration.count(),
+              absl::StrJoin(resources, ",", ResourceNameFormatter()));
+  }
 }
 
 void GrpcSubscriptionImpl::onConfigUpdate(
@@ -70,11 +84,15 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const std::string& system_version_info) {
   stats_.update_attempt_.inc();
   grpc_mux_->disableInitFetchTimeoutTimer();
+  auto start = time_source_.monotonicTime();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      time_source_.monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(time_source_));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
+  stats_.update_duration_.recordValue(update_duration.count());
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,

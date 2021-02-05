@@ -80,7 +80,6 @@ docker run --rm \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
        -e ENVOY_RBE \
-       -e FUZZIT_API_KEY \
        -e ENVOY_BUILD_IMAGE \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
@@ -93,5 +92,8 @@ docker run --rm \
        -e SLACK_TOKEN \
        -e BUILD_URI\
        -e REPO_URI \
+       -e SYSTEM_STAGEDISPLAYNAME \
+       -e SYSTEM_JOBDISPLAYNAME \
+       -e SYSTEM_PULLREQUEST_PULLREQUESTID \
        "${ENVOY_BUILD_IMAGE}" \
        "${START_COMMAND[@]}"

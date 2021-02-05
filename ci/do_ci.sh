@@ -450,7 +450,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   export DOCKER_NO_PULL=1
   umask 027
   chmod -R o-rwx examples/
-  ci/verify_examples.sh
+  ci/verify_examples.sh "*" wasm-cc
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

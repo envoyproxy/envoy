@@ -24,12 +24,10 @@ namespace Lightstep {
 static void serializeGrpcMessage(const lightstep::BufferChain& buffer_chain,
                                  Buffer::Instance& body) {
   auto size = buffer_chain.num_bytes();
-  Buffer::RawSlice iovec;
-  body.reserve(size, &iovec, 1);
-  ASSERT(iovec.len_ >= size);
-  iovec.len_ = size;
-  buffer_chain.CopyOut(static_cast<char*>(iovec.mem_), size);
-  body.commit(&iovec, 1);
+  auto reservation = body.reserveSingleSlice(size);
+  ASSERT(reservation.slice().len_ >= size);
+  buffer_chain.CopyOut(static_cast<char*>(reservation.slice().mem_), size);
+  reservation.commit(size);
   Grpc::Common::prependGrpcFrameHeader(body);
 }
 

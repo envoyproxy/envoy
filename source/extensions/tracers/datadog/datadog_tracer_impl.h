@@ -53,6 +53,7 @@ public:
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
+  const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
