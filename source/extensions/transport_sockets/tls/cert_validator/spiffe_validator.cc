@@ -50,20 +50,21 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
                                          ProtobufWkt::Struct(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
-  auto size = message.trust_bundles().size();
+  auto size = message.trust_domains().size();
   if (size == 0) {
-    throw EnvoyException("SPIFFE cert validator requires at least one trusted CA");
+    throw EnvoyException("SPIFFE cert validator requires at least one trust domain");
   }
 
   trust_bundle_stores_.reserve(size);
-  for (auto& it : message.trust_bundles()) {
-    auto cert = Config::DataSource::read(it.second, true, config->api());
+  for (auto& domain : message.trust_domains()) {
+    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr || sk_X509_INFO_num(list.get()) == 0) {
-      throw EnvoyException(absl::StrCat("Failed to load trusted CA certificate for ", it.first));
+      throw EnvoyException(
+          absl::StrCat("Failed to load trusted CA certificate for ", domain.name()));
     }
 
     auto store = X509StorePtr(X509_STORE_new());
@@ -79,8 +80,10 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
           // cert information on getCaCertInformation method.
           // So temporarily we return the first CA's info here.
           ca_loaded = true;
-          ca_file_name_ = absl::StrCat(
-              it.first, ": ", it.second.filename().empty() ? "<inline>" : it.second.filename());
+          ca_file_name_ = absl::StrCat(domain.name(), ": ",
+                                       domain.trust_bundle().filename().empty()
+                                           ? "<inline>"
+                                           : domain.trust_bundle().filename());
         }
       }
 
@@ -92,7 +95,7 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
     if (has_crl) {
       X509_STORE_set_flags(store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
-    trust_bundle_stores_[it.first] = std::move(store);
+    trust_bundle_stores_[domain.name()] = std::move(store);
   }
 }
 

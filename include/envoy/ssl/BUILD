@@ -68,13 +68,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ssl_socket_extended_info_interface",
     hdrs = ["ssl_socket_extended_info.h"],
-    deps = [],
 )
 
 envoy_cc_library(
     name = "ssl_socket_state",
     hdrs = ["ssl_socket_state.h"],
-    deps = [],
 )
 
 envoy_cc_library(

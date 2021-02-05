@@ -361,9 +361,10 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorAccepted) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
   )EOF"),
                             *typed_conf);
 
@@ -387,9 +388,10 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected1) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    example.com:
-      filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
   )EOF"),
                             *typed_conf);
   custom_validator_config_ = typed_conf;
@@ -418,11 +420,13 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected2) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"
-    example.com:
-      filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
   )EOF"),
                             *typed_conf);
   custom_validator_config_ = typed_conf;

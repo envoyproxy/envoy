@@ -77,9 +77,10 @@ TEST_F(TestSPIFFEValidator, InvalidCA) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    hello.com:
-      inline_string: "invalid"
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        inline_string: "invalid"
   )EOF")),
                             EnvoyException, "Failed to load trusted CA certificate for hello.com");
 }
@@ -89,18 +90,19 @@ TEST_F(TestSPIFFEValidator, Constructor) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles: {}
+  trust_domains: []
   )EOF")),
                             EnvoyException,
-                            "SPIFFE cert validator requires at least one trusted CA");
+                            "SPIFFE cert validator requires at least one trust domain");
 
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    hello.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
   )EOF"));
 
   EXPECT_EQ(1, validator().trustBundleStores().size());
@@ -111,11 +113,13 @@ typed_config:
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    hello.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-    k8s-west.example.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keyusage_crl_sign_cert.pem"
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+    - name: k8s-west.example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keyusage_crl_sign_cert.pem"
   )EOF"));
 
   EXPECT_EQ(2, validator().trustBundleStores().size());
@@ -204,9 +208,10 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSingleTrustDomain) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"));
 
   X509StorePtr ssl_ctx = X509_STORE_new();
@@ -242,11 +247,13 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomain) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-    example.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"));
 
   X509StorePtr ssl_ctx = X509_STORE_new();
@@ -284,11 +291,13 @@ TEST_F(TestSPIFFEValidator, TestGetCaCertInformation) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
-    example.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"));
 
   auto actual = validator().getCaCertInformation();
@@ -306,11 +315,13 @@ TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-    example.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"),
              time_system);
   EXPECT_EQ(19224, validator().daysUntilFirstCertExpires());
@@ -324,13 +335,16 @@ TEST_F(TestSPIFFEValidator, TestAddClientValidationContext) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
-    example.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-    foo.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+    - name: foo.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"),
              time_system);
 
@@ -364,11 +378,13 @@ TEST_F(TestSPIFFEValidator, TestUpdateDigestForSessionId) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    lyft.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
-    example.com:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
   )EOF"),
              time_system);
   uint8_t hash_buffer[EVP_MAX_MD_SIZE];
