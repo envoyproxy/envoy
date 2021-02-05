@@ -10,7 +10,6 @@ import "envoy/api/v2/listener/udp_listener_config.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/config/listener/v2/api_listener.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 

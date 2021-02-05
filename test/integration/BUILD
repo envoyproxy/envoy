@@ -1577,6 +1577,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "direct_response_integration_test",
+    srcs = ["direct_response_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "local_reply_integration_test",
     srcs = [
         "local_reply_integration_test.cc",

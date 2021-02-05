@@ -5,6 +5,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/upstreams/http/generic/v3/generic_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
@@ -824,7 +825,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -946,7 +948,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -1078,7 +1081,8 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow));
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _))
       .WillOnce(Return(RetryStatus::NoOverflow));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -3585,7 +3589,8 @@ TEST_F(RouterTest, RetryUpstream5xx) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -3957,7 +3962,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putHttpResponseCode(200));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy());
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->health_checker_,
+      setUnhealthy(Upstream::HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail));
   Http::ResponseHeaderMapPtr response_headers2(new Http::TestResponseHeaderMapImpl{
       {":status", "200"}, {"x-envoy-immediate-health-check-fail", "true"}});
   response_decoder->decodeHeaders(std::move(response_headers2), true);
@@ -4106,7 +4113,8 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -4185,7 +4193,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -5823,7 +5832,7 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
 }
 
 TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
-  // Explicitly configure an TCP upstream, to test factory creation.
+  // Explicitly configure a TCP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
@@ -5843,5 +5852,48 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   router_.onDestroy();
 }
 
+TEST_F(RouterTest, PostExplicitTcpUpstream) {
+  // Explicitly configure a generic upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(generic_config);
+  callbacks_.route_->route_entry_.connect_config_ =
+      absl::make_optional<RouteEntry::ConnectConfig>();
+  callbacks_.route_->route_entry_.connect_config_.value().set_allow_post(true);
+
+  // Make sure newConnection is called on the TCP pool, not newStream on the HTTP pool.
+  EXPECT_CALL(cm_.thread_local_cluster_.tcp_conn_pool_, newConnection(_));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+  router_.decodeHeaders(headers, false);
+
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, PostHttpUpstream) {
+  // Explicitly configure a generic upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(generic_config);
+  callbacks_.route_->route_entry_.connect_config_ =
+      absl::make_optional<RouteEntry::ConnectConfig>();
+
+  // Make sure POST request result in the HTTP pool.
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+  router_.decodeHeaders(headers, false);
+
+  router_.onDestroy();
+}
 } // namespace Router
 } // namespace Envoy

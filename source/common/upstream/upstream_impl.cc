@@ -956,6 +956,17 @@ ClusterImplBase::ClusterImplBase(
       });
 }
 
+namespace {
+
+bool excludeBasedOnHealthFlag(const Host& host) {
+  return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+}
+
+} // namespace
+
 std::tuple<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr,
            ExcludedHostVectorConstSharedPtr>
 ClusterImplBase::partitionHostList(const HostVector& hosts) {
@@ -970,7 +981,7 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
     if (host->health() == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
-    if (host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    if (excludeBasedOnHealthFlag(*host)) {
       excluded_list->get().emplace_back(host);
     }
   }
@@ -981,10 +992,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
 std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
            HostsPerLocalityConstSharedPtr>
 ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
-  auto filtered_clones = hosts.filter(
-      {[](const Host& host) { return host.health() == Host::Health::Healthy; },
-       [](const Host& host) { return host.health() == Host::Health::Degraded; },
-       [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
+  auto filtered_clones =
+      hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
+                    [](const Host& host) { return host.health() == Host::Health::Degraded; },
+                    [](const Host& host) { return excludeBasedOnHealthFlag(host); }});
 
   return std::make_tuple(std::move(filtered_clones[0]), std::move(filtered_clones[1]),
                          std::move(filtered_clones[2]));
@@ -1393,12 +1404,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
   // Did hosts change?
   //
-  // Has the EDS health status changed the health of any endpoint? If so, we
+  // Have host attributes changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
   // endpoint has materially changed (e.g. if previously failing active health
   // checks, we just note it's now failing EDS health status but don't rebuild).
-  //
-  // Likewise, if metadata for an endpoint changed we rebuild the hosts vectors.
   //
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to
