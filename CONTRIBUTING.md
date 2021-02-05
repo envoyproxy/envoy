@@ -73,6 +73,9 @@ versioning guidelines:
   `envoy.features.enable_all_deprecated_features` is set to true. Finally, following the deprecation
   of the API major version where the field was first marked deprecated, the entire implementation
   code will be removed from the Envoy implementation.
+* If the runtime key `envoy.features.fail_on_any_deprecated_feature` is enabled,
+  use of deprecated fields will trigger a configuration load failure
+  rather than a logged warning.
 * This policy means that organizations deploying main should have some time to get ready for
   breaking changes at the next major API version. This is typically a window of at least 12 months
   or until the organization moves to the next major API version.
@@ -232,6 +235,13 @@ and false.
   while preserving the PR author's final DCO sign-off.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
+
+# API changes
+
+If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/master/api),
+please read the [API Review
+Checklist](https://github.com/envoyproxy/envoy/tree/master/api/review_checklist.md)
+and make sure that your changes have addressed all of the considerations listed there.
 
 # Adding new extensions
 

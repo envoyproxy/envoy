@@ -7,8 +7,6 @@ import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
 import "envoy/type/matcher/v4alpha/path.proto";
 
-import "google/protobuf/duration.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -47,7 +45,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message OAuth2Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.oauth2.v3alpha.OAuth2Config";
@@ -80,6 +78,11 @@ message OAuth2Config {
 
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
   repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 8;
+
+  // Optional list of OAuth scopes to be claimed in the authorization request. If not specified,
+  // defaults to "user" scope.
+  // OAuth RFC https://tools.ietf.org/html/rfc6749#section-3.3
+  repeated string auth_scopes = 9;
 }
 
 // Filter config.

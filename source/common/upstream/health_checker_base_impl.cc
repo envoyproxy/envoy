@@ -158,7 +158,6 @@ HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
     active_sessions_[host] = makeSession(host);
-    host->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
     active_sessions_[host]->start();
@@ -184,15 +183,20 @@ void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition ch
   }
 }
 
-void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy() {
+void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy(UnhealthyType type) {
   // This is called cross thread. The cluster/health checker might already be gone.
   std::shared_ptr<HealthCheckerImplBase> health_checker = health_checker_.lock();
   if (health_checker) {
-    health_checker->setUnhealthyCrossThread(host_.lock());
+    health_checker->setUnhealthyCrossThread(host_.lock(), type);
   }
 }
 
-void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
+void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
+                                                    HealthCheckHostMonitor::UnhealthyType type) {
+  if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {
+    host->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+  }
+
   // The threading here is complex. The cluster owns the only strong reference to the health
   // checker. It might go away when we post to the main thread from a worker thread. To deal with
   // this we use the following sequence of events:
@@ -267,6 +271,13 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     // it to healthy. This makes startup faster with a small reduction in overall reliability
     // depending on the HC settings.
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
+      // If the host moves to healthy, clear active HC timeout, which may be toggled off and on
+      // while the host is unhealthy.
+      host_->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+      // A host that was told to exclude based on immediate failure, but is now passing, should
+      // no longer be excluded.
+      host_->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
@@ -310,6 +321,14 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
 }
 
+namespace {
+
+bool networkHealthCheckFailureType(envoy::data::core::v3::HealthCheckFailureType type) {
+  return type == envoy::data::core::v3::NETWORK || type == envoy::data::core::v3::NETWORK_TIMEOUT;
+}
+
+} // namespace
+
 HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     envoy::data::core::v3::HealthCheckFailureType type) {
   // If we are unhealthy, reset the # of healthy to zero.
@@ -317,8 +336,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if (type != envoy::data::core::v3::NETWORK ||
-        ++num_unhealthy_ == parent_.unhealthy_threshold_) {
+    if (!networkHealthCheckFailureType(type) || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
@@ -330,6 +348,16 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     }
   }
 
+  // In the case of network timeout and if the host is currently failed, set the timeout flag.
+  // Otherwise clear it. This allows a host to toggle between timeout and failure if it's continuing
+  // to fail for different reasons.
+  if (type == envoy::data::core::v3::NETWORK_TIMEOUT &&
+      host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    host_->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  } else {
+    host_->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  }
+
   changed_state = clearPendingFlag(changed_state);
 
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {
@@ -337,7 +365,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   }
 
   parent_.stats_.failure_.inc();
-  if (type == envoy::data::core::v3::NETWORK) {
+  if (networkHealthCheckFailureType(type)) {
     parent_.stats_.network_failure_.inc();
   } else if (type == envoy::data::core::v3::PASSIVE) {
     parent_.stats_.passive_failure_.inc();
@@ -381,7 +409,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
-  handleFailure(envoy::data::core::v3::NETWORK);
+  handleFailure(envoy::data::core::v3::NETWORK_TIMEOUT);
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
@@ -450,8 +478,9 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
   callback(event);
 
   // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
+  const auto json =
+      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 } // namespace Upstream

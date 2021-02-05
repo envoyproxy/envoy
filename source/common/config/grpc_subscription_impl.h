@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/config/grpc_mux.h"
@@ -27,9 +28,10 @@ public:
                        bool use_namespace_matching);
 
   // Config::Subscription
-  void start(const std::set<std::string>& resource_names) override;
-  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
-  void requestOnDemandUpdate(const std::set<std::string>& add_these_names) override;
+  void start(const absl::flat_hash_set<std::string>& resource_names) override;
+  void
+  updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) override;
+  void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
@@ -58,6 +60,12 @@ private:
   Event::TimerPtr init_fetch_timeout_timer_;
   const bool is_aggregated_;
   const bool use_namespace_matching_;
+
+  struct ResourceNameFormatter {
+    void operator()(std::string* out, const Config::DecodedResourceRef& resource) {
+      out->append(resource.get().name());
+    }
+  };
 };
 
 using GrpcSubscriptionImplPtr = std::unique_ptr<GrpcSubscriptionImpl>;
@@ -71,7 +79,7 @@ public:
                                  Event::Dispatcher& dispatcher,
                                  std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
 
-  void start(const std::set<std::string>& resource_names) override;
+  void start(const absl::flat_hash_set<std::string>& resource_names) override;
 
 private:
   xds::core::v3::ResourceLocator collection_locator_;
