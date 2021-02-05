@@ -15,6 +15,7 @@ envoy_cc_extension(
         "cluster.h",
         "lb_context.h",
     ],
+    category = "envoy.clusters",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//source/common/upstream:cluster_factory_lib",

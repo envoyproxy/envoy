@@ -32,6 +32,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    category = "envoy.filters.listener",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":http_inspector_lib",

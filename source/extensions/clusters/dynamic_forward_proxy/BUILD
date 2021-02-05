@@ -12,6 +12,7 @@ envoy_cc_extension(
     name = "cluster",
     srcs = ["cluster.cc"],
     hdrs = ["cluster.h"],
+    category = "envoy.clusters",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//source/common/network:transport_socket_options_lib",

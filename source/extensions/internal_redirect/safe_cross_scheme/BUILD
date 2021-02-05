@@ -23,6 +23,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.internal_redirect_predicates",
     # TODO(#9953) clean up by moving the redirect test to extensions.
     extra_visibility = [
         "//test/integration:__subpackages__",

@@ -18,6 +18,7 @@ envoy_cc_extension(
         "crypto_impl.h",
         "utility_impl.h",
     ],
+    category = "DELIBERATELY_OMITTED",
     external_deps = [
         "ssl",
     ],

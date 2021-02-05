@@ -40,6 +40,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.network",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":client_ssl_auth",

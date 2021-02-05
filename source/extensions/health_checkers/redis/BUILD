@@ -31,6 +31,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.health_checkers",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":redis",
