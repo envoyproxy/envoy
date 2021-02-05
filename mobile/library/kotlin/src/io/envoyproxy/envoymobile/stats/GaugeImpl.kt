@@ -8,28 +8,22 @@ import java.lang.ref.WeakReference
  */
 internal class GaugeImpl : Gauge {
   internal val envoyEngine: WeakReference<EnvoyEngine>
-  internal val elements: List<Element>
+  internal val series: String
 
   internal constructor(engine: EnvoyEngine, elements: List<Element>) {
     this.envoyEngine = WeakReference<EnvoyEngine>(engine)
-    this.elements = elements
+    this.series = elements.joinToString(separator = ".") { it.value }
   }
 
   override fun set(value: Int) {
-    envoyEngine.get()?.recordGaugeSet(
-      elements.joinToString(separator = ".") { it.value }, value
-    )
+    envoyEngine.get()?.recordGaugeSet(series, value)
   }
 
   override fun add(amount: Int) {
-    envoyEngine.get()?.recordGaugeAdd(
-      elements.joinToString(separator = ".") { it.value }, amount
-    )
+    envoyEngine.get()?.recordGaugeAdd(series, amount)
   }
 
   override fun sub(amount: Int) {
-    envoyEngine.get()?.recordGaugeSub(
-      elements.joinToString(separator = ".") { it.value }, amount
-    )
+    envoyEngine.get()?.recordGaugeSub(series, amount)
   }
 }
