@@ -137,7 +137,7 @@ private:
   bool isThreadSafe() const override {
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
-  
+
   const std::string name_;
   Api::Api& api_;
   std::string stats_prefix_;

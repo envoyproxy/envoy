@@ -101,9 +101,7 @@ public:
 
   void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
 
-  void movePost(std::function<void()>&& callback) override {
-    impl_.movePost(std::move(callback));
-  }
+  void movePost(std::function<void()>&& callback) override { impl_.movePost(std::move(callback)); }
 
   void run(RunType type) override { impl_.run(type); }
 

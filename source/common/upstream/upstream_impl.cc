@@ -928,9 +928,9 @@ ClusterImplBase::ClusterImplBase(
         const auto name = self->name();
         ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
         dispatcher.movePost([raii_cluster = std::shared_ptr<const ClusterInfoImpl>(self)]() {
-              ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
-                        raii_cluster->name());
-            });
+          ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
+                    raii_cluster->name());
+        });
       });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&

@@ -261,7 +261,8 @@ public:
   virtual void post(PostCb callback) PURE;
 
   /**
-   * Similar to `post()` but will destroy passed callback. This simulates posting move only function.
+   * Similar to `post()` but will destroy passed callback. This simulates posting move only
+   * function.
    */
   virtual void movePost(PostCb&& callback) PURE;
 

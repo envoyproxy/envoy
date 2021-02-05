@@ -245,9 +245,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() {
-  base_scheduler_.loopExit();
-}
+void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
