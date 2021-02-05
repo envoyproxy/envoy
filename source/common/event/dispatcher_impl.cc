@@ -246,11 +246,6 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 }
 
 void DispatcherImpl::exit() {
-  {
-    Thread::LockGuard lock(post_lock_);
-    exited_ = true;
-    // No more tryPost!
-  }
   base_scheduler_.loopExit();
 }
 
@@ -280,12 +275,9 @@ bool DispatcherImpl::tryPost(std::function<void()>&& callback) {
   }
   {
     Thread::LockGuard lock(post_lock_);
-    if (exited_) {
-      return false;
-    }
     do_post = post_callbacks_.empty();
-    post_callbacks_.push_back(callback);
-    // poor man's move only function.
+    post_callbacks_.push_back(std::move(callback));
+    // Poor man's move only function.
     callback = nullptr;
   }
 
@@ -297,26 +289,12 @@ bool DispatcherImpl::tryPost(std::function<void()>&& callback) {
 
 void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
-  {
-    // Allows tryPost.
-    ENVOY_LOG(debug, "{}({})", __FUNCTION__, type);
-    Thread::LockGuard lock(post_lock_);
-    if (type == RunType::Block) {
-      exited_ = false;
-    }
-  }
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
   base_scheduler_.run(type);
-  {
-    ENVOY_LOG(debug, "{}({})", __FUNCTION__, type);
-    // Reject all the follow up tryPost.
-    Thread::LockGuard lock(post_lock_);
-    exited_ = true;
-  }
 }
 
 MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
