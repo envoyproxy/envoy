@@ -391,9 +391,16 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
-// Expect that exceptions in secondary cluster initialization callbacks are caught.
+// Catch exceptions in secondary cluster initialization callbacks.
 TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
   initialize("test/server/test_data/server/health_check_nullptr.yaml");
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_NO_THROW(server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock));
+}
+
+// Catch exceptions in HDS cluster initialization callbacks.
+TEST_P(ServerInstanceImplTest, HdsClusterException) {
+  initialize("test/server/test_data/server/hds_exception.yaml");
   // Error in reading illegal file path for channel credentials in secondary cluster.
   EXPECT_NO_THROW(server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock));
 }
@@ -804,9 +811,12 @@ TEST_P(ServerInstanceImplTest,
 // set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
+  // are caught and will result in server shutdown.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
+                      "protocol versions are deprecated",
+                      initialize("test/server/test_data/server/hds_v2.yaml"));
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
