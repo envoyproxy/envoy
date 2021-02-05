@@ -119,6 +119,11 @@ namespace Envoy {
 #define DEPRECATED_FEATURE_TEST(X) DISABLED_##X
 #endif
 
+class TestEnvoyBug {
+public:
+  static void callEnvoyBug() { ENVOY_BUG(false, ""); }
+};
+
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {

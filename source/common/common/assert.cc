@@ -75,6 +75,13 @@ public:
     }
   }
 
+  static void resetEnvoyBugCounters() {
+    {
+      absl::MutexLock lock(&mutex_);
+      counters_.clear();
+    }
+  }
+
 private:
   // This implementation currently only handles one action being set at a time. This is currently
   // sufficient. If multiple actions are ever needed, the actions should be chained when
@@ -110,6 +117,8 @@ void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly() {
 bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name) {
   return EnvoyBugRegistrationImpl::shouldLogAndInvoke(bug_name);
 }
+
+void resetEnvoyBugCountersForTest() { EnvoyBugRegistrationImpl::resetEnvoyBugCounters(); }
 
 } // namespace Assert
 } // namespace Envoy
