@@ -22,7 +22,7 @@ void Coroutine::start(int function_ref, int num_args, const std::function<void()
 
   state_ = State::Yielded;
   lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
-  ASSERT(lua_isfunction(coroutine_state_.get(), -1) == 1);
+  ASSERT(lua_isfunction(coroutine_state_.get(), -1));
 
   // The function needs to come before the arguments but the arguments are already on the stack,
   // so we need to move it into position.
