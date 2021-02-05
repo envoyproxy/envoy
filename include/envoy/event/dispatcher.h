@@ -261,9 +261,9 @@ public:
   virtual void post(PostCb callback) PURE;
 
   /**
-   * Similar to `post()` but return false if the dispatcher rejects.
+   * Similar to `post()` but will destroy passed callback. This simulates posting move only function.
    */
-  virtual bool tryPost(PostCb&& callback) PURE;
+  virtual void movePost(PostCb&& callback) PURE;
 
   /**
    * Runs the event loop. This will not return until exit() is called either from within a callback

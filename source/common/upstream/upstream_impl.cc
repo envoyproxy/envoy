@@ -927,16 +927,10 @@ ClusterImplBase::ClusterImplBase(
       [&dispatcher](const ClusterInfoImpl* self) {
         const auto name = self->name();
         ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
-        if (!dispatcher.tryPost([raii_cluster = std::shared_ptr<const ClusterInfoImpl>(self)]() {
+        dispatcher.movePost([raii_cluster = std::shared_ptr<const ClusterInfoImpl>(self)]() {
               ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
                         raii_cluster->name());
-            })) {
-          ENVOY_LOG(debug,
-                    "Cannot post cluster destroy task on master thread. Has the master thread "
-                    "exited? Destroying cluster "
-                    "info {} anyway.",
-                    name);
-        }
+            });
       });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&

@@ -267,12 +267,8 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
-bool DispatcherImpl::tryPost(std::function<void()>&& callback) {
+void DispatcherImpl::movePost(std::function<void()>&& callback) {
   bool do_post;
-  // Skip master to master post.
-  if (isThreadSafe()) {
-    return false;
-  }
   {
     Thread::LockGuard lock(post_lock_);
     do_post = post_callbacks_.empty();
@@ -284,7 +280,6 @@ bool DispatcherImpl::tryPost(std::function<void()>&& callback) {
   if (do_post) {
     post_cb_->scheduleCallbackCurrentIteration();
   }
-  return true;
 }
 
 void DispatcherImpl::run(RunType type) {
