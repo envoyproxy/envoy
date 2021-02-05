@@ -101,13 +101,13 @@ TEST_F(TokenBucketImplTest, ConsumeAndNextToken) {
   std::chrono::milliseconds time_to_next_token(0);
   EXPECT_EQ(10, token_bucket.consume(20, true, time_to_next_token));
   EXPECT_EQ(time_to_next_token.count(), 200);
-  EXPECT_EQ(std::chrono::milliseconds(200), token_bucket.nextTokenAvailable());
+  EXPECT_EQ(time_to_next_token, token_bucket.nextTokenAvailable());
   time_system_.advanceTimeWait(std::chrono::milliseconds(400));
 
   // Start a thread and call consume to refill tokens.
   EXPECT_EQ(1, token_bucket.consume(1, false, time_to_next_token));
   EXPECT_EQ(time_to_next_token.count(), 0);
-  EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
+  EXPECT_EQ(time_to_next_token, token_bucket.nextTokenAvailable());
 }
 
 } // namespace Envoy
