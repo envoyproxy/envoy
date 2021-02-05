@@ -35,6 +35,7 @@ message CapabilityRestrictionConfig {
 }
 
 // Configuration for sanitization of inputs to an allowed capability.
+//
 // NOTE: This is currently unimplemented.
 message SanitizationConfig {
 }
