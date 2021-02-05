@@ -343,8 +343,12 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string upstream_cluster_name = "cluster_name";
-    EXPECT_CALL(stream_info.host_->cluster_, name())
-        .WillRepeatedly(ReturnRef(upstream_cluster_name));
+    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
+    // Make sure that cluster info is obtained without calling upstreamHost.
+    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(upstream_cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(request_headers, response_headers,
                                                      response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -393,16 +397,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::stringValue("myhostname")));
-  }
-
-  {
-    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
   }
 
   {
