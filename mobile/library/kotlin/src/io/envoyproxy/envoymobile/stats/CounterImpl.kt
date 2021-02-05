@@ -8,17 +8,15 @@ import java.lang.ref.WeakReference
  */
 internal class CounterImpl : Counter {
   internal val envoyEngine: WeakReference<EnvoyEngine>
-  internal val elements: List<Element>
+  private val series: String
 
   internal constructor(engine: EnvoyEngine, elements: List<Element>) {
     this.envoyEngine = WeakReference<EnvoyEngine>(engine)
-    this.elements = elements
+    this.series = elements.joinToString(separator = ".") { it.value }
   }
 
   // TODO: potentially raise error to platform if the operation is not successful.
   override fun increment(count: Int) {
-    envoyEngine.get()?.recordCounterInc(
-      elements.joinToString(separator = ".") { it.value }, count
-    )
+    envoyEngine.get()?.recordCounterInc(series, count)
   }
 }
