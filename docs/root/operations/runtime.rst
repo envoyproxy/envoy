@@ -1,18 +1,13 @@
 .. _operations_runtime:
 
-Runtime
+运行时
 =======
 
-:ref:`Runtime configuration <config_runtime>` can be used to modify various server settings
-without restarting Envoy. The runtime settings that are available depend on how the server is
-configured. They are documented in the relevant sections of the :ref:`configuration guide <config>`.
+使用 :ref:`运行时配置 <config_runtime>` 不用重启 Envoy 就能修改不同的服务配置。
+运行时配置是否可用取决于服务如何配置。它们记录在 :ref:`配置指南 <config>` 的相关部分中。
 
-Runtime guards are also used as a mechanism to disable new behavior or risky changes not otherwise
-guarded by configuration. Such changes will tend to introduce a runtime guard that can be used to
-disable the new behavior/code path. The names of these runtime guards will be included in the
-release notes alongside an explanation of the change that warrented the runtime guard.
+运行时保护还用作禁用不受配置保护的新行为或危险更改的机制。这类修改往往会引入禁用新行为/代码路径的运行时保护。
+运行时保护的名称将包含在发布说明中，同时还附含保证运行时保护的修改说明。
 
-Due to this usage of runtime guards, some deployments might find it useful to set up
-dynamic runtime configuration as a safety measure to be able to quickly disable the new behavior
-without having to revert to an older version of Envoy or redeploy it with a new set of static
-runtime flags.
+由于运行时保护的使用，在一些部署中设置动态运行时配置作为一种安全手段可以有效地在不回滚 Envoy 到旧版本
+或使用一组新的静态运行时标识重新部署的情况下快速禁用新行为。
