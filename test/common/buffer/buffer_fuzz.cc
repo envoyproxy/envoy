@@ -167,8 +167,8 @@ public:
 
   void commit(uint64_t length, absl::Span<Buffer::RawSlice>,
               Buffer::ReservationSlicesOwnerPtr) override {
-    size_ += length;
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
+    size_ += length;
   }
 
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
