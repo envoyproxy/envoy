@@ -17,7 +17,8 @@ namespace Tls {
 
 ContextManagerImpl::~ContextManagerImpl() {
   removeEmptyContexts();
-  KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
+  // Contexts could be referenced by cluster to be destroyed. The cluster destroy is driven by the
+  // master thread dispatcher, but the dispatcher ceases running for good.
 }
 
 void ContextManagerImpl::removeEmptyContexts() {
