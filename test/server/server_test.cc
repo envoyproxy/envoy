@@ -391,20 +391,23 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
-// Catch exceptions in secondary cluster initialization callbacks.
+// Catch exceptions in secondary cluster initialization callbacks. These are not caught in the main
+// initialization try/catch.
 TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
-  initialize("test/server/test_data/server/health_check_nullptr.yaml");
   // Error in reading illegal file path for channel credentials in secondary cluster.
-  EXPECT_LOG_CONTAINS("warn", "Skipping initialization of secondary cluster: Invalid path:",
-                      server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock));
+  EXPECT_LOG_CONTAINS("warn", "Skipping initialization of secondary cluster: Invalid path:", {
+    initialize("test/server/test_data/server/health_check_nullptr.yaml");
+    server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  });
 }
 
 // Catch exceptions in HDS cluster initialization callbacks.
 TEST_P(ServerInstanceImplTest, HdsClusterException) {
-  initialize("test/server/test_data/server/hds_exception.yaml");
   // Error in reading illegal file path for channel credentials in secondary cluster.
-  EXPECT_LOG_CONTAINS("warn", "Skipping initialization of HDS cluster: Invalid path:",
-                      server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock));
+  EXPECT_LOG_CONTAINS("warn", "Skipping initialization of HDS cluster: Invalid path:", {
+    initialize("test/server/test_data/server/hds_exception.yaml");
+    server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+  });
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
