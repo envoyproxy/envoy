@@ -436,7 +436,6 @@ envoy_cc_library(
         ":strict_dns_cluster_lib",
         ":upstream_includes",
         ":transport_socket_match_lib",
-        "//source/common/event:deferred_task",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
