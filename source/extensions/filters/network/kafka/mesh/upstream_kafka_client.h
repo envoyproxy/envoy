@@ -33,6 +33,7 @@ struct DeliveryMemento {
   const int64_t offset_;
 };
 
+// Callback for objects that want to be notified that record delivery has been finished.
 class ProduceFinishCb {
 public:
   virtual ~ProduceFinishCb() = default;

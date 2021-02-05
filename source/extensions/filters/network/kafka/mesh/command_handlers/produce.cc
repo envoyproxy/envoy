@@ -8,13 +8,113 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-std::vector<RecordFootmark>
-RecordExtractorImpl::computeFootmarks(const std::vector<TopicProduceData>& data) const {
-  std::vector<RecordFootmark> result;
+ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
+                                           const std::shared_ptr<Request<ProduceRequest>> request)
+    : ProduceRequestHolder{filter, RecordExtractorImpl{}, request} {};
+
+ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
+                                           const RecordExtractor& record_extractor,
+                                           const std::shared_ptr<Request<ProduceRequest>> request)
+    : BaseInFlightRequest{filter}, request_{request} {
+  outbound_records_ = record_extractor.extractRecords(request_->data_.topics_);
+  expected_responses_ = outbound_records_.size();
+}
+
+void ProduceRequestHolder::invoke(UpstreamKafkaFacade& kafka_facade) {
+  // Main part of the proxy: for each outbound record we get the appropriate sink (effectively a
+  // facade for upstream Kafka cluster), and send the record to it.
+  for (auto& outbound_record : outbound_records_) {
+    RecordSink& producer = kafka_facade.getProducerForTopic(outbound_record.topic_);
+    // We need to provide our object as first argument, as we will want to be notified when the
+    // delivery finishes.
+    producer.send(shared_from_this(), outbound_record.topic_, outbound_record.partition_,
+                  outbound_record.key_, outbound_record.value_);
+  }
+  // Corner case handling:
+  // If we ever receive produce request without records, we need to notify the filter we are ready,
+  // because otherwise no notification will ever come from the real Kafka producer.
+  if (0 == expected_responses_) {
+    notifyFilter();
+  }
+}
+
+bool ProduceRequestHolder::finished() const { return 0 == expected_responses_; }
+
+bool ProduceRequestHolder::accept(const DeliveryMemento& memento) {
+  ENVOY_LOG(warn, "ProduceRequestHolder - accept: {}/{}", memento.error_code_, memento.offset_);
+  for (auto& outbound_record : outbound_records_) {
+    if (outbound_record.value_.data() == memento.data_) {
+      // We have matched the downstream request that matches our confirmation from upstream Kafka.
+      ENVOY_LOG(trace, "ProduceRequestHolder - accept - match found for {} in request {}",
+                reinterpret_cast<long>(memento.data_), request_->request_header_.correlation_id_);
+      outbound_record.error_code_ = memento.error_code_;
+      outbound_record.saved_offset_ = memento.offset_;
+      --expected_responses_;
+      if (finished()) {
+        // All elements had their responses matched.
+        // We can notify the filter to check if it can send another response.
+        ENVOY_LOG(warn, "ProduceRequestHolder - accept - notifying filter for {}",
+                  request_->request_header_.correlation_id_);
+        notifyFilter();
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+AbstractResponseSharedPtr ProduceRequestHolder::computeAnswer() const {
+
+  // Header.
+  const RequestHeader& rh = request_->request_header_;
+  ResponseMetadata metadata = {rh.api_key_, rh.api_version_, rh.correlation_id_};
+
+  // Real answer.
+  using ErrorCodeAndOffset = std::pair<int16_t, uint32_t>;
+  std::map<std::string, std::map<int32_t, ErrorCodeAndOffset>> topic_to_partition_responses;
+  for (const auto& outbound_record : outbound_records_) {
+    auto& partition_map = topic_to_partition_responses[outbound_record.topic_];
+    auto it = partition_map.find(outbound_record.partition_);
+    if (it == partition_map.end()) {
+      partition_map[outbound_record.partition_] = {outbound_record.error_code_,
+                                                   outbound_record.saved_offset_};
+    } else {
+      // Proxy logic - aggregating multiple upstream answers into single downstream answer.
+      // Let's fail if anything fails, otherwise use the lowest offset (like Kafka would have done).
+      ErrorCodeAndOffset& curr = it->second;
+      if (RdKafka::ErrorCode::ERR_NO_ERROR == curr.first) {
+        curr.first = outbound_record.error_code_;
+        curr.second = std::min(curr.second, outbound_record.saved_offset_);
+      }
+    }
+  }
+
+  std::vector<TopicProduceResponse> topic_responses;
+  for (const auto& topic_entry : topic_to_partition_responses) {
+    std::vector<PartitionProduceResponse> partition_responses;
+    for (const auto& partition_entry : topic_entry.second) {
+      const int32_t& partition = partition_entry.first;
+      const int16_t& error_code = partition_entry.second.first;
+      const int64_t& offset = partition_entry.second.second;
+      partition_responses.emplace_back(partition, error_code, offset);
+    }
+    const std::string& topic = topic_entry.first;
+    topic_responses.emplace_back(topic, partition_responses);
+  }
+
+  ProduceResponse data = {topic_responses, 0};
+  return std::make_shared<Response<ProduceResponse>>(metadata, data);
+}
+
+// Record extraction.
+
+std::vector<OutboundRecord>
+RecordExtractorImpl::extractRecords(const std::vector<TopicProduceData>& data) const {
+  std::vector<OutboundRecord> result;
   for (auto const& topic_data : data) {
     for (auto const& partition_data : topic_data.partitions_) {
       if (partition_data.records_) {
-        const auto topic_result = computeFootmarksForTopic(
+        const auto topic_result = extractRecordsForTopic(
             topic_data.name_, partition_data.partition_index_, *(partition_data.records_));
         result.insert(result.end(), topic_result.begin(), topic_result.end());
       }
@@ -23,9 +123,9 @@ RecordExtractorImpl::computeFootmarks(const std::vector<TopicProduceData>& data)
   return result;
 }
 
-std::vector<RecordFootmark>
-RecordExtractorImpl::computeFootmarksForTopic(const std::string& topic, const int32_t partition,
-                                              const Bytes& bytes) const {
+std::vector<OutboundRecord> RecordExtractorImpl::extractRecordsForTopic(const std::string& topic,
+                                                                        const int32_t partition,
+                                                                        const Bytes& bytes) const {
 
   // Reference implementation:
   // org.apache.kafka.common.record.DefaultRecordBatch.writeHeader(ByteBuffer, long, int, int, byte,
@@ -63,7 +163,7 @@ RecordExtractorImpl::computeFootmarksForTopic(const std::string& topic, const in
   }
 }
 
-std::vector<RecordFootmark> RecordExtractorImpl::extractRecordsOutOfBatchWithMagicEqualTo2(
+std::vector<OutboundRecord> RecordExtractorImpl::extractRecordsOutOfBatchWithMagicEqualTo2(
     const std::string& topic, const int32_t partition, absl::string_view data) const {
 
   // Not going to reuse the information in these fields, because we are going to republish.
@@ -81,15 +181,15 @@ std::vector<RecordFootmark> RecordExtractorImpl::extractRecordsOutOfBatchWithMag
 
   // We have managed to consume all the fancy bytes, now it's time to get to records.
 
-  std::vector<RecordFootmark> result;
+  std::vector<OutboundRecord> result;
   while (!data.empty()) {
-    const RecordFootmark record = extractRecord(topic, partition, data);
+    const OutboundRecord record = extractRecord(topic, partition, data);
     result.push_back(record);
   }
   return result;
 }
 
-RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition,
+OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, const int32_t partition,
                                                   absl::string_view& data) const {
   // The reference implementation is:
   // org.apache.kafka.common.record.DefaultRecord.writeTo(DataOutputStream, int, long, ByteBuffer,
@@ -137,7 +237,7 @@ RecordFootmark RecordExtractorImpl::extractRecord(const std::string& topic, cons
 
   if (data == expected_end_of_record) {
     // We have consumed everything nicely.
-    return RecordFootmark{topic, partition, key, value};
+    return OutboundRecord{topic, partition, key, value};
   } else {
     // Bad data - there are bytes left.
     throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic,
@@ -171,98 +271,6 @@ absl::string_view RecordExtractorImpl::extractElement(absl::string_view& input) 
   } else {
     throw EnvoyException(fmt::format("byte array length less than -1: {}", length));
   }
-}
-
-ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
-                                           const std::shared_ptr<Request<ProduceRequest>> request)
-    : ProduceRequestHolder{filter, RecordExtractorImpl{}, request} {};
-
-ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
-                                           const RecordExtractor& record_extractor,
-                                           const std::shared_ptr<Request<ProduceRequest>> request)
-    : BaseInFlightRequest{filter}, request_{request} {
-  footmarks_ = record_extractor.computeFootmarks(request_->data_.topics_);
-  expected_responses_ = footmarks_.size();
-}
-
-void ProduceRequestHolder::invoke(UpstreamKafkaFacade& kafka_facade) {
-  for (auto& fm : footmarks_) {
-    RecordSink& producer = kafka_facade.getProducerForTopic(fm.topic_);
-    producer.send(shared_from_this(), fm.topic_, fm.partition_, fm.key_, fm.value_);
-  }
-  // Corner case handling:
-  // If we ever receive produce request without records, we need to notify the filter we are ready,
-  // because otherwise no notification will ever come from the real Kafka producer.
-  if (0 == expected_responses_) {
-    notifyFilter();
-  }
-}
-
-bool ProduceRequestHolder::finished() const { return 0 == expected_responses_; }
-
-bool ProduceRequestHolder::accept(const DeliveryMemento& memento) {
-  ENVOY_LOG(warn, "ProduceRequestHolder - accept: {}/{}", memento.error_code_, memento.offset_);
-  for (auto& footmark : footmarks_) {
-    if (footmark.value_.data() == memento.data_) {
-      // We have matched the downstream request that matches our confirmation from upstream Kafka.
-      ENVOY_LOG(trace, "ProduceRequestHolder - accept - match found for {} in request {}",
-                reinterpret_cast<long>(memento.data_), request_->request_header_.correlation_id_);
-      footmark.error_code_ = memento.error_code_;
-      footmark.saved_offset_ = memento.offset_;
-      --expected_responses_;
-      if (finished()) {
-        // All elements had their responses matched.
-        // We can notify the filter to check if it can send another response.
-        ENVOY_LOG(warn, "ProduceRequestHolder - accept - notifying filter for {}",
-                  request_->request_header_.correlation_id_);
-        notifyFilter();
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
-AbstractResponseSharedPtr ProduceRequestHolder::computeAnswer() const {
-
-  // Header.
-  const RequestHeader& rh = request_->request_header_;
-  ResponseMetadata metadata = {rh.api_key_, rh.api_version_, rh.correlation_id_};
-
-  // Real answer.
-  using ErrorCodeAndOffset = std::pair<int16_t, uint32_t>;
-  std::map<std::string, std::map<int32_t, ErrorCodeAndOffset>> topic_to_partition_responses;
-  for (const auto& footmark : footmarks_) {
-    auto& partition_map = topic_to_partition_responses[footmark.topic_];
-    auto it = partition_map.find(footmark.partition_);
-    if (it == partition_map.end()) {
-      partition_map[footmark.partition_] = {footmark.error_code_, footmark.saved_offset_};
-    } else {
-      // Proxy logic - aggregating multiple upstream answers into single downstream answer.
-      // Let's fail if anything fails, otherwise use the lowest offset (like Kafka would have done).
-      ErrorCodeAndOffset& curr = it->second;
-      if (RdKafka::ErrorCode::ERR_NO_ERROR == curr.first) {
-        curr.first = footmark.error_code_;
-        curr.second = std::min(curr.second, footmark.saved_offset_);
-      }
-    }
-  }
-
-  std::vector<TopicProduceResponse> topic_responses;
-  for (const auto& topic_entry : topic_to_partition_responses) {
-    std::vector<PartitionProduceResponse> partition_responses;
-    for (const auto& partition_entry : topic_entry.second) {
-      const int32_t& partition = partition_entry.first;
-      const int16_t& error_code = partition_entry.second.first;
-      const int64_t& offset = partition_entry.second.second;
-      partition_responses.emplace_back(partition, error_code, offset);
-    }
-    const std::string& topic = topic_entry.first;
-    topic_responses.emplace_back(topic, partition_responses);
-  }
-
-  ProduceResponse data = {topic_responses, 0};
-  return std::make_shared<Response<ProduceResponse>>(metadata, data);
 }
 
 } // namespace Mesh

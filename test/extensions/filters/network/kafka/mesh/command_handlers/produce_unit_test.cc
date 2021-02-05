@@ -28,8 +28,8 @@ public:
 
 class MockRecordExtractor : public RecordExtractor {
 public:
-  MOCK_METHOD((std::vector<RecordFootmark>), computeFootmarks,
-              (const std::vector<TopicProduceData>&), (const));
+  MOCK_METHOD((std::vector<OutboundRecord>), extractRecords, (const std::vector<TopicProduceData>&),
+              (const));
 };
 
 class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
@@ -56,8 +56,8 @@ protected:
 TEST_F(ProduceUnitTest, ShouldHandleProduceRequestWithNoRecords) {
   // given
   MockRecordExtractor extractor;
-  const std::vector<RecordFootmark> records = {};
-  EXPECT_CALL(extractor_, computeFootmarks(_)).WillOnce(Return(records));
+  const std::vector<OutboundRecord> records = {};
+  EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
   const RequestHeader header = {0, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
@@ -83,10 +83,10 @@ TEST_F(ProduceUnitTest, ShouldHandleProduceRequestWithNoRecords) {
 // The response should contain the values returned by Kafka broker.
 TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   // given
-  const RecordFootmark r1 = {"t1", 13, "aaa", "bbb"};
-  const RecordFootmark r2 = {"t2", 42, "ccc", "ddd"};
-  const std::vector<RecordFootmark> records = {r1, r2};
-  EXPECT_CALL(extractor_, computeFootmarks(_)).WillOnce(Return(records));
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
+  const OutboundRecord r2 = {"t2", 42, "ccc", "ddd"};
+  const std::vector<OutboundRecord> records = {r1, r2};
+  EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
   const RequestHeader header = {0, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
@@ -136,13 +136,15 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
 
 // Typical flow without errors.
 // The produce request has 2 records, both pointing to same partition.
-// Given that usually we cannot make any guarantees on how Kafka producer is going to append the records (as it depends on configuration like max number of records in flight), the first record is going to be saved on a bigger offset.
-TEST_F(ProduceUnitTest, ShouldMergeRecordFootmarkResponses) {
+// Given that usually we cannot make any guarantees on how Kafka producer is going to append the
+// records (as it depends on configuration like max number of records in flight), the first record
+// is going to be saved on a bigger offset.
+TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   // given
-  const RecordFootmark r1 = {"t1", 13, "aaa", "bbb"};
-  const RecordFootmark r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
-  const std::vector<RecordFootmark> records = {r1, r2};
-  EXPECT_CALL(extractor_, computeFootmarks(_)).WillOnce(Return(records));
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
+  const OutboundRecord r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
+  const std::vector<OutboundRecord> records = {r1, r2};
+  EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
   const RequestHeader header = {0, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
@@ -193,10 +195,10 @@ TEST_F(ProduceUnitTest, ShouldMergeRecordFootmarkResponses) {
 // proxy (this is going to be amended when we manage to send whole record batch).
 TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
   // given
-  const RecordFootmark r1 = {"t1", 13, "aaa", "bbb"};
-  const RecordFootmark r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
-  const std::vector<RecordFootmark> records = {r1, r2};
-  EXPECT_CALL(extractor_, computeFootmarks(_)).WillOnce(Return(records));
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
+  const OutboundRecord r2 = {r1.topic_, r1.partition_, "ccc", "ddd"};
+  const std::vector<OutboundRecord> records = {r1, r2};
+  EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
   const RequestHeader header = {0, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
@@ -244,9 +246,9 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
 // did not originate in this request, so it should be ignored.
 TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
   // given
-  const RecordFootmark r1 = {"t1", 13, "aaa", "bbb"};
-  const std::vector<RecordFootmark> records = {r1};
-  EXPECT_CALL(extractor_, computeFootmarks(_)).WillOnce(Return(records));
+  const OutboundRecord r1 = {"t1", 13, "aaa", "bbb"};
+  const std::vector<OutboundRecord> records = {r1};
+  EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
   const RequestHeader header = {0, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
@@ -350,7 +352,7 @@ TEST(RecordExtractorImpl, shouldProcessRecordBytes) {
   const std::vector<TopicProduceData> input = {tpd1, tpd2};
 
   // when
-  const auto result = testee.computeFootmarks(input);
+  const auto result = testee.extractRecords(input);
 
   // then
   EXPECT_THAT(result, HasRecords("topic1", 0, 1));
@@ -409,23 +411,23 @@ const std::vector<TopicProduceData> makeTopicProduceData(const unsigned int stag
 
 TEST(RecordExtractorImpl, shouldHandleInvalidRecordBytes) {
   const RecordExtractorImpl testee;
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(1)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(1)), EnvoyException,
                           "no common fields");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(2)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(2)), EnvoyException,
                           "magic byte is not present");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(3)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(3)), EnvoyException,
                           "unknown magic value");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(4)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(4)), EnvoyException,
                           "no attribute fields");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(5)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(5)), EnvoyException,
                           "no length");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(6)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(6)), EnvoyException,
                           "attributes not present");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(7)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(7)), EnvoyException,
                           "header count not present");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(8)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(8)), EnvoyException,
                           "invalid header count");
-  EXPECT_THROW_WITH_REGEX(testee.computeFootmarks(makeTopicProduceData(9)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(9)), EnvoyException,
                           "data left after consuming record");
 }
 

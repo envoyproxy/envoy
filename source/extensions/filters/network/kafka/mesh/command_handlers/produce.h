@@ -10,7 +10,7 @@ namespace Kafka {
 namespace Mesh {
 
 // Binds a single inbound record from Kafka client with its delivery information.
-struct RecordFootmark {
+struct OutboundRecord {
 
   // These fields were received from downstream.
   std::string topic_;
@@ -22,7 +22,7 @@ struct RecordFootmark {
   int16_t error_code_;
   uint32_t saved_offset_;
 
-  RecordFootmark(const std::string& topic, const int32_t partition, const absl::string_view key,
+  OutboundRecord(const std::string& topic, const int32_t partition, const absl::string_view key,
                  const absl::string_view value)
       : topic_{topic}, partition_{partition}, key_{key}, value_{value}, error_code_{0},
         saved_offset_{0} {};
@@ -33,28 +33,28 @@ class RecordExtractor {
 public:
   virtual ~RecordExtractor() = default;
 
-  virtual std::vector<RecordFootmark>
-  computeFootmarks(const std::vector<TopicProduceData>& data) const PURE;
+  virtual std::vector<OutboundRecord>
+  extractRecords(const std::vector<TopicProduceData>& data) const PURE;
 };
 
 class RecordExtractorImpl : public RecordExtractor {
 public:
-  std::vector<RecordFootmark>
-  computeFootmarks(const std::vector<TopicProduceData>& data) const override;
+  std::vector<OutboundRecord>
+  extractRecords(const std::vector<TopicProduceData>& data) const override;
 
   static absl::string_view extractElement(absl::string_view& input);
 
 private:
-  std::vector<RecordFootmark> computeFootmarksForTopic(const std::string& topic,
-                                                       const int32_t partition,
-                                                       const Bytes& records) const;
+  std::vector<OutboundRecord> extractRecordsForTopic(const std::string& topic,
+                                                     const int32_t partition,
+                                                     const Bytes& records) const;
 
   // Impl note: I'm sorry for the long name.
-  std::vector<RecordFootmark> extractRecordsOutOfBatchWithMagicEqualTo2(const std::string& topic,
+  std::vector<OutboundRecord> extractRecordsOutOfBatchWithMagicEqualTo2(const std::string& topic,
                                                                         const int32_t partition,
                                                                         absl::string_view sv) const;
 
-  RecordFootmark extractRecord(const std::string& topic, const int32_t partition,
+  OutboundRecord extractRecord(const std::string& topic, const int32_t partition,
                                absl::string_view& data) const;
 };
 
@@ -90,10 +90,12 @@ private:
   // Original request.
   const std::shared_ptr<Request<ProduceRequest>> request_;
 
-  // How many responses from Kafka Producer handling our request do we expect.
+  // How many responses from Kafka Producer handling our request we still expect.
+  // This value decreases to 0 as we get confirmations from Kafka (successful or not).
   int expected_responses_;
 
-  std::vector<RecordFootmark> footmarks_;
+  // Real records extracted out of request.
+  std::vector<OutboundRecord> outbound_records_;
 };
 
 } // namespace Mesh
