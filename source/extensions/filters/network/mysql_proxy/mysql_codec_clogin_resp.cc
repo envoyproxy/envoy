@@ -1,5 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
+#include <bits/stdint-uintn.h>
 #include <memory>
 #include <string>
 
@@ -226,13 +227,13 @@ DecodeStatus ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint32_
   }
   switch (resp_code) {
   case MYSQL_RESP_AUTH_SWITCH:
-    return parseAuthSwitch(buffer, len);
+    return parseAuthSwitch(buffer, len - sizeof(uint8_t));
   case MYSQL_RESP_OK:
-    return parseOk(buffer, len);
+    return parseOk(buffer, len - sizeof(uint8_t));
   case MYSQL_RESP_ERR:
-    return parseErr(buffer, len);
+    return parseErr(buffer, len - sizeof(uint8_t));
   case MYSQL_RESP_MORE:
-    return parseAuthMore(buffer, len);
+    return parseAuthMore(buffer, len - sizeof(uint8_t));
   }
   ENVOY_LOG(info, "unknown mysql Login resp msg type");
   return DecodeStatus::Failure;
@@ -260,8 +261,10 @@ DecodeStatus ClientLoginResponse::parseAuthSwitch(Buffer::Instance& buffer, uint
 }
 
 // https://dev.mysql.com/doc/internals/en/packet-OK_Packet.html
-DecodeStatus ClientLoginResponse::parseOk(Buffer::Instance& buffer, uint32_t) {
+DecodeStatus ClientLoginResponse::parseOk(Buffer::Instance& buffer, uint32_t len) {
   type(Ok);
+  uint32_t init_len = buffer.length();
+  ASSERT(init_len >= len);
   if (BufferHelper::readLengthEncodedInteger(buffer, ok_->affected_rows_) !=
       DecodeStatus::Success) {
     ENVOY_LOG(info, "error parsing affected_rows in mysql Login Ok msg");
@@ -284,7 +287,10 @@ DecodeStatus ClientLoginResponse::parseOk(Buffer::Instance& buffer, uint32_t) {
     ENVOY_LOG(info, "error parsing warnings in mysql Login Ok msg");
     return DecodeStatus::Failure;
   }
-  if (BufferHelper::readStringEof(buffer, ok_->info_) != DecodeStatus::Success) {
+  uint32_t consumed_len = init_len - buffer.length();
+  // The tail might contain more info base on cap flag and status flag, but just consume all
+  if (BufferHelper::readStringBySize(buffer, len - consumed_len, ok_->info_) !=
+      DecodeStatus::Success) {
     ENVOY_LOG(info, "error parsing info in mysql Login Ok msg");
     return DecodeStatus::Failure;
   }
@@ -361,7 +367,6 @@ void ClientLoginResponse::encodeOk(Buffer::Instance& out) {
   BufferHelper::addUint16(out, ok_->status_);
   BufferHelper::addUint16(out, ok_->warnings_);
   BufferHelper::addString(out, ok_->info_);
-  BufferHelper::addUint8(out, EOF);
 }
 
 void ClientLoginResponse::encodeErr(Buffer::Instance& out) {

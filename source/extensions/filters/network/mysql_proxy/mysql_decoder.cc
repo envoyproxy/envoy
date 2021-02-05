@@ -3,6 +3,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/extensions/filters/network/mysql_proxy/_virtual_includes/proxy_lib/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -156,6 +157,12 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   uint32_t len = 0;
   uint8_t seq = 0;
+
+  // ignore ssl message
+  if (session_.getState() == MySQLSession::State::SslPt) {
+    data.drain(data.length());
+    return true;
+  }
   if (BufferHelper::peekHdr(data, len, seq) != DecodeStatus::Success) {
     throw EnvoyException("error parsing mysql packet header");
   }

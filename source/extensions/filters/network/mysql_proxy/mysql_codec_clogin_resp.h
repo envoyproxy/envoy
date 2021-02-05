@@ -88,6 +88,7 @@ public:
     uint16_t status_;
     uint16_t warnings_;
     std::string info_;
+    std::string session_state_changes_;
   };
 
   class ErrMessage {
