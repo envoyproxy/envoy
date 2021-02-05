@@ -94,7 +94,7 @@ EXTENSION_CATEGORIES = [
     "envoy.transport_sockets.upstream",
     "envoy.upstreams",
     "envoy.wasm.runtime",
-    "SOMECAT",
+    "DELIBERATELY_OMITTED",
 ]
 
 EXTENSION_STATUS_VALUES = [
