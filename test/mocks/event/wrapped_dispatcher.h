@@ -101,7 +101,7 @@ public:
 
   void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
 
-  bool tryPost(std::function<void()> callback) override {
+  bool tryPost(std::function<void()>&& callback) override {
     return impl_.tryPost(std::move(callback));
   }
 

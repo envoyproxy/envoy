@@ -925,26 +925,20 @@ ClusterImplBase::ClusterImplBase(
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
-        FANCY_LOG(debug, "lambdai: schedule destroy cluster info {} on this thread", self->name());
-        if (!dispatcher.tryPost([self]() {
-              // TODO(lambdai): Yet there is risk that master dispatcher receives the function but
-              // doesn't execute during the shutdown. We can either 1) Introduce folly::function
-              // which supports with unique_ptr capture and destroy cluster info by RAII, or 2) Call
-              // run post callback in master thread after no worker post back.
-              FANCY_LOG(debug,
-                        "lambdai: execute destroy cluster info {} on this thread. Master thread is "
-                        "expected.",
-                        self->name());
-              delete self;
+        const auto name = self->name();
+        ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
+        if (!dispatcher.tryPost([raii_cluster = std::shared_ptr<const ClusterInfoImpl>(self)]() {
+              ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
+                        raii_cluster->name());
             })) {
-          FANCY_LOG(debug,
-                    "lambdai: cannot post. Has the master thread exited? Executing destroy cluster "
-                    "info {} on this thread.",
-                    self->name());
-          delete self;
+          ENVOY_LOG(debug,
+                    "Cannot post cluster destroy task on master thread. Has the master thread "
+                    "exited? Destroying cluster "
+                    "info {} anyway.",
+                    name);
         }
       });
-  
+
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
       !raw_factory_pointer->supportsAlpn()) {
     throw EnvoyException(

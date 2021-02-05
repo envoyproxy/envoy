@@ -249,15 +249,9 @@ void DispatcherImpl::exit() {
   {
     Thread::LockGuard lock(post_lock_);
     exited_ = true;
-    // No more post!
+    // No more tryPost!
   }
   base_scheduler_.loopExit();
-  {
-    FANCY_LOG(debug, "lambdai: running postcallbacks after exit");
-    // TODO(lambdai): runtime key.
-    runPostCallbacks();
-    FANCY_LOG(debug, "lambdai: complete postcallbacks after exit");
-  }
 }
 
 SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
@@ -278,20 +272,21 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
-bool DispatcherImpl::tryPost(std::function<void()> callback) {
+bool DispatcherImpl::tryPost(std::function<void()>&& callback) {
   bool do_post;
-  // Post master to master. Skip.
+  // Skip master to master post.
   if (isThreadSafe()) {
     return false;
   }
   {
     Thread::LockGuard lock(post_lock_);
-    // TODO(lambdai): For compatibility we should allow blind post.
     if (exited_) {
       return false;
     }
     do_post = post_callbacks_.empty();
     post_callbacks_.push_back(callback);
+    // poor man's move only function.
+    callback = nullptr;
   }
 
   if (do_post) {
@@ -304,7 +299,7 @@ void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
   {
     // Allows tryPost.
-    FANCY_LOG(debug, "lambdai: run {}", type);
+    ENVOY_LOG(debug, "{}({})", __FUNCTION__, type);
     Thread::LockGuard lock(post_lock_);
     if (type == RunType::Block) {
       exited_ = false;
@@ -317,7 +312,7 @@ void DispatcherImpl::run(RunType type) {
   runPostCallbacks();
   base_scheduler_.run(type);
   {
-    FANCY_LOG(debug, "lambdai: run return {}", type);
+    ENVOY_LOG(debug, "{}({})", __FUNCTION__, type);
     // Reject all the follow up tryPost.
     Thread::LockGuard lock(post_lock_);
     exited_ = true;
