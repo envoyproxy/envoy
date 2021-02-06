@@ -3,6 +3,7 @@ This rules creates a fat static framework that can be included later with
 static_framework_import
 """
 
+load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "CPP_LINK_STATIC_LIBRARY_ACTION_NAME")
 load("@build_bazel_apple_support//lib:apple_support.bzl", "apple_support")
 load("@build_bazel_rules_swift//swift:swift.bzl", "SwiftInfo", "swift_library")
 load("@build_bazel_rules_apple//apple/internal:transition_support.bzl", "transition_support")
@@ -84,13 +85,24 @@ def _swift_static_framework_impl(ctx):
         platform_archive = ctx.actions.declare_file("{}.{}.a".format(module_name, platform))
 
         libtool_args = ["-no_warning_for_no_symbols", "-static", "-syslibroot", "__BAZEL_XCODE_SDKROOT__", "-o", platform_archive.path] + [x.path for x in archives]
+        cc_toolchain = ctx.attr._cc_toolchain[cc_common.CcToolchainInfo]
+        cc_feature_configuration = cc_common.configure_features(
+            ctx = ctx,
+            cc_toolchain = cc_toolchain,
+            requested_features = ctx.features,
+            unsupported_features = ctx.disabled_features,
+        )
+        archiver = cc_common.get_tool_for_action(
+            action_name = CPP_LINK_STATIC_LIBRARY_ACTION_NAME,
+            feature_configuration = cc_feature_configuration,
+        )
         apple_support.run(
             ctx,
             inputs = archives,
             outputs = [platform_archive],
             mnemonic = "LibtoolLinkedLibraries",
             progress_message = "Combining libraries for {} on {}".format(module_name, platform),
-            executable = ctx.executable._libtool,
+            executable = archiver,
             arguments = libtool_args,
         )
 
@@ -131,10 +143,8 @@ def _swift_static_framework_impl(ctx):
 _swift_static_framework = rule(
     attrs = dict(
         apple_support.action_required_attrs(),
-        _libtool = attr.label(
-            default = "@bazel_tools//tools/objc:libtool",
-            cfg = "host",
-            executable = True,
+        _cc_toolchain = attr.label(
+            default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
         ),
         _allowlist_function_transition = attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
@@ -161,6 +171,7 @@ _swift_static_framework = rule(
     cfg = transition_support.static_framework_transition,
     fragments = [
         "apple",
+        "cpp",
     ],
     outputs = {
         "fat_file": "%{framework_name}.fat",
