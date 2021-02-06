@@ -178,8 +178,9 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 
     // add all endpoints for this locality group to the config
     for (const auto& endpoint : locality_endpoints.endpoints()) {
-      endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
-          endpoint.address());
+      auto* new_endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
+      new_endpoint->mutable_address()->MergeFrom(endpoint.address());
+      new_endpoint->mutable_health_check_config()->MergeFrom(endpoint.health_check_config());
     }
   }
 
@@ -370,7 +371,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
           locality_endpoints.locality(),
-          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+          host.endpoint().health_check_config(), 0,
           envoy::config::core::v3::UNKNOWN, time_source_);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
@@ -482,7 +483,7 @@ void HdsCluster::updateHosts(
         host = std::make_shared<HostImpl>(
             info_, "", Network::Address::resolveProtoAddress(endpoint.endpoint().address()),
             nullptr, 1, endpoints.locality(),
-            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+            endpoint.endpoint().health_check_config(), 0,
             envoy::config::core::v3::UNKNOWN, time_source_);
 
         // Set the initial health status as in HdsCluster::initialize.
