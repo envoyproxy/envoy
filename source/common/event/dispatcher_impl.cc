@@ -74,7 +74,10 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
+DispatcherImpl::~DispatcherImpl() {
+  ENVOY_LOG(debug, "destroying dispatcher {}", name_);
+  FatalErrorHandler::removeFatalErrorHandler(*this);
+}
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                       std::chrono::milliseconds min_touch_interval) {

@@ -149,11 +149,13 @@ private:
   SchedulerPtr scheduler_;
   SchedulableCallbackPtr deferred_delete_cb_;
   SchedulableCallbackPtr post_cb_;
+  Thread::MutexBasicLockable post_lock_;
+  // `post_callback_` must be destroyed after `to_delete` because `to_delete` may post callbacks.
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
-  Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+
   absl::InlinedVector<const ScopeTrackedObject*, ExpectedMaxTrackedObjectStackDepth>
       tracked_object_stack_;
   bool deferred_deleting_{};

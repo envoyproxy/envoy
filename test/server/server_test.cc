@@ -268,8 +268,8 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
-  ThreadLocal::InstanceImplPtr thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
+  ThreadLocal::InstanceImplPtr thread_local_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
   Event::GlobalTimeSystem time_system_;

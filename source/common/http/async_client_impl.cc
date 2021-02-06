@@ -149,6 +149,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(dispatcher().isThreadSafe());
   // Map send calls after local closure to no-ops. The send call could have been queued prior to
   // remote reset or closure, and/or closure could have occurred synchronously in response to a
   // previous send. In these cases the router will have already cleaned up stream state. This
@@ -169,6 +170,8 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
+  ASSERT(dispatcher().isThreadSafe());
+
   // See explanation in sendData.
   if (local_closed_) {
     return;
@@ -226,6 +229,7 @@ void AsyncStreamImpl::reset() {
 }
 
 void AsyncStreamImpl::cleanup() {
+  ASSERT(dispatcher().isThreadSafe());
   local_closed_ = remote_closed_ = true;
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.

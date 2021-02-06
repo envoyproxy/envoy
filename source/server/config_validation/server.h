@@ -174,7 +174,12 @@ private:
   void initialize(const Options& options,
                   const Network::Address::InstanceConstSharedPtr& local_address,
                   ComponentFactory& component_factory);
-
+  const Options& options_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
+  Stats::IsolatedStoreImpl& stats_store_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  ThreadLocal::InstanceImpl thread_local_;
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime.
@@ -186,12 +191,7 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
-  const Options& options_;
-  ProtobufMessage::ProdValidationContextImpl validation_context_;
-  Stats::IsolatedStoreImpl& stats_store_;
-  ThreadLocal::InstanceImpl thread_local_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
+
   Server::ValidationAdmin admin_;
   Singleton::ManagerPtr singleton_manager_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
