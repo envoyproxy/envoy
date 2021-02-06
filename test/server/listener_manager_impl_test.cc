@@ -3892,7 +3892,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  #ifdef WIN32
   EXPECT_CALL(*io_handle, win32Ioctl(_, _, _, _, _, _));
+  #endif
   Network::AcceptedSocketImpl socket(
       std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
