@@ -298,7 +298,7 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 }
 
 void DispatcherImpl::preShutdown() {
-  ENVOY_LOG(debug, "Clearing post_callbacks in {}", __FUNCTION__);
+  ENVOY_LOG(debug, "Clearing post callbacks in {}", __FUNCTION__);
   {
     Thread::LockGuard lock(post_lock_);
     post_callbacks_.clear();

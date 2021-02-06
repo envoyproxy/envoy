@@ -18,7 +18,7 @@ public:
   ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
                  Event::TimeSystem& time_system, Filesystem::Instance& file_system,
                  Random::RandomGenerator& random_generator);
-  ~ValidationImpl() override { FANCY_LOG(debug, "In {}", __FUNCTION__); }
+
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,
                                           const Event::ScaledRangeTimerManagerFactory&) override;

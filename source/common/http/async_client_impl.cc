@@ -171,7 +171,6 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 
 void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
   ASSERT(dispatcher().isThreadSafe());
-
   // See explanation in sendData.
   if (local_closed_) {
     return;
