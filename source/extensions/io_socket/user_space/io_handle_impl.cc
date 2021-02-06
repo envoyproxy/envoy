@@ -87,7 +87,8 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
 
 Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
                                            absl::optional<uint64_t> max_length_opt) {
-  const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
+  // Do not read too many bytes in each attempt.
+  uint64_t max_length = max_length_opt.value_or(128 * 1024);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
   }
@@ -103,7 +104,16 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
                                  Network::IoSocketError::deleteIoError)};
     }
   }
-  // TODO(lambdai): Move slice by slice until high watermark.
+  if (buffer.highWatermark() != 0) {
+    // Handler owner should not read if the buffer is above high waterwark.
+    ASSERT(buffer.length() < buffer.highWatermark());
+    // Read 16K even the existing buffer is closed to high watermark.
+    if (buffer.length() < buffer.highWatermark()) {  
+      max_length = std::min(max_length, std::max<uint64_t>(16*1024, buffer.highWatermark() - buffer.length()));
+    } else {
+      max_length = std::min<uint64_t>(max_length, 16 * 1024);
+    }
+  }
   const uint64_t max_bytes_to_read = std::min(max_length, pending_received_data_.length());
   buffer.move(pending_received_data_, max_bytes_to_read);
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
@@ -193,7 +203,7 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
     }
   }
   peer_handle_->setNewDataAvailable();
-  ENVOY_LOG(trace, "socket {} writev {} bytes of {}", static_cast<void*>(this),
+  ENVOY_LOG(trace, "socket {} write {} bytes of {}", static_cast<void*>(this),
             total_bytes_to_write, max_bytes_to_write);
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
 }

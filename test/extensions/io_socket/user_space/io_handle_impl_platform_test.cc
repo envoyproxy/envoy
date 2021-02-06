@@ -21,7 +21,6 @@ public:
   MOCK_METHOD(void, called, (uint32_t arg));
 };
 
-// Explicitly mark the test failing on windows and will be fixed.
 class IoHandleImplPlatformTest : public testing::Test {
 public:
   IoHandleImplPlatformTest() {

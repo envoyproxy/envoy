@@ -44,7 +44,6 @@ envoy_extension_cc_test(
     name = "io_handle_impl_platform_test",
     srcs = ["io_handle_impl_platform_test.cc"],
     extension_name = "envoy.io_socket.user_space",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
