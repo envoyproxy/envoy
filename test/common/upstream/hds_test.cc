@@ -1124,7 +1124,7 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
     auto& host =
         hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[i];
     EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
-    EXPECT_EQ( host->healthCheckAddress()->ip()->port(), 4321 + i);
+    EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 4321 + i);
   }
 }
 
@@ -1156,13 +1156,14 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
     auto& host =
         hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[i];
     EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
-    EXPECT_EQ( host->healthCheckAddress()->ip()->port(), 1234 + i);
+    EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 1234 + i);
   }
 
   // Set custom health config port
   for (int i = 0; i < 3; i++) {
-    auto* endpoint = message->mutable_cluster_health_checks(0)
-                         ->mutable_locality_endpoints(0)->mutable_endpoints(i);
+    auto* endpoint =
+        message->mutable_cluster_health_checks(0)->mutable_locality_endpoints(0)->mutable_endpoints(
+            i);
     endpoint->mutable_health_check_config()->set_port_value(4321 + i);
   }
 
@@ -1174,7 +1175,7 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
     auto& host =
         hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[i];
     EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
-    EXPECT_EQ( host->healthCheckAddress()->ip()->port(), 4321 + i);
+    EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 4321 + i);
   }
 }
 

@@ -370,8 +370,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       // Initialize an endpoint host object.
       HostSharedPtr endpoint = std::make_shared<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
-          locality_endpoints.locality(),
-          host.endpoint().health_check_config(), 0,
+          locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
           envoy::config::core::v3::UNKNOWN, time_source_);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
@@ -482,8 +481,7 @@ void HdsCluster::updateHosts(
         // We do not have this endpoint saved, so create a new one.
         host = std::make_shared<HostImpl>(
             info_, "", Network::Address::resolveProtoAddress(endpoint.endpoint().address()),
-            nullptr, 1, endpoints.locality(),
-            endpoint.endpoint().health_check_config(), 0,
+            nullptr, 1, endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
             envoy::config::core::v3::UNKNOWN, time_source_);
 
         // Set the initial health status as in HdsCluster::initialize.
