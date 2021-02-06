@@ -38,7 +38,7 @@ jobs:
   asan:
     name: asan
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     container:
       image: envoyproxy/envoy-build-ubuntu:11efa5680d987fff33fde4af3cc5ece105015d04
       env:
