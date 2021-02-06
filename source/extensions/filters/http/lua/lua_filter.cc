@@ -123,6 +123,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   const auto thread_local_cluster = filter.clusterManager().getThreadLocalCluster(cluster);
   if (thread_local_cluster == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
+    return nullptr;
   }
 
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -330,7 +331,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
 int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span) {
   http_request_ = makeHttpCall(state, filter_, span, *this);
-  if (http_request_) {
+  if (http_request_ != nullptr) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
   } else {
