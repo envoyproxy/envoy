@@ -444,6 +444,15 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   if (!status.ok()) {
     ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.error_message());
 
+    // If the transcoder cannot be created because the method/url is not found, it is possible that
+    // this url/request should NOT be transcoded by this filter. Pass it through to later filters
+    // in the chain.
+    if (status.code() == Code::NOT_FOUND) {
+      ENVOY_LOG(debug,
+                "Request is passed through without transcoding because method/url is not found.");
+      return Http::FilterHeadersStatus::Continue;
+    }
+
     if (config_.strict_http_request_validation_) {
       ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
       error_ = true;

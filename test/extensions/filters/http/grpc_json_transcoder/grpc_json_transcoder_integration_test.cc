@@ -990,14 +990,17 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
       "", true, false, R"({ "theme" : "Children")");
 
   // Transcoding does not occur when unknown path is called.
-  // The request is rejected.
+  // HTTP Request to is passed directly to gRPC backend.
+  // gRPC response is passed directly to HTTP client.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/unknown/path"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      "", {}, {}, Status(), Http::TestResponseHeaderMapImpl{{":status", "400"}},
-      "Bad request: Could not resolve /unknown/path to a method.", true, false, "", false);
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
 
   // Transcoding does not occur when unknown query param is included.
   // The request is rejected.
