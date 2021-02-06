@@ -90,7 +90,7 @@ constexpr uint8_t LENENCODINT_8BYTES = 0xfe;
 
 constexpr char MYSQL_STR_END = '\0';
 
-enum DecodeStatus : uint8_t {
+enum class DecodeStatus : uint8_t {
   Success = 0,
   Failure = 1,
 };

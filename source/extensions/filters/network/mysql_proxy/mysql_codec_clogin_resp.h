@@ -21,25 +21,34 @@ enum ClientLoginResponseType : uint8_t {
 };
 
 // ClientLoginResponse could be
-// Protocol::OldAuthSwitchRequest, Protocol::AuthSwitchRequest when server wants switch auth method
-// or OK_Packet, ERR_Packet when server auth ok or error
+// Protocol::OldAuthSwitchRequest, Protocol::AuthSwitchRequest when server wants switch auth
+// method or OK_Packet, ERR_Packet when server auth ok or error
 class ClientLoginResponse : public MySQLCodec {
 public:
   ClientLoginResponse() : type_(Null) {}
   ClientLoginResponse(const ClientLoginResponse&);
-  ClientLoginResponse(ClientLoginResponse&&) noexcept;
-  ClientLoginResponse& operator=(const ClientLoginResponse&);
-  ClientLoginResponse& operator=(ClientLoginResponse&&) noexcept;
-  bool operator==(const ClientLoginResponse& other) const; // test for equality, unit tests
-  bool operator!=(const ClientLoginResponse& other) const { return !(*this == other); }
+
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
   void encode(Buffer::Instance&) override;
 
-  class AuthMoreMessage {
+  // Interface of MySQL client login response message
+  class ClientLoginResponseMessage {
+  public:
+    using ClientLoginResponseMessagePtr = std::unique_ptr<ClientLoginResponseMessage>;
+    virtual ~ClientLoginResponseMessage() = default;
+    virtual DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) PURE;
+    virtual void encode(Buffer::Instance& out) PURE;
+  };
+
+  class AuthMoreMessage : public ClientLoginResponseMessage {
   public:
     using AuthMoreMessagePtr = std::unique_ptr<AuthMoreMessage>;
-    bool operator==(const AuthMoreMessage&) const;
+
+    // ClientLoginResponseMessage
+    DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
+    void encode(Buffer::Instance&) override;
+
     const std::string& getAuthMoreData() const { return more_plugin_data_; }
     void setAuthMoreData(const std::string& data) { more_plugin_data_ = data; }
     friend ClientLoginResponse;
@@ -48,10 +57,14 @@ public:
     std::string more_plugin_data_;
   };
 
-  class AuthSwitchMessage {
+  class AuthSwitchMessage : public ClientLoginResponseMessage {
   public:
     using AuthSwitchMessagePtr = std::unique_ptr<AuthSwitchMessage>;
-    bool operator==(const AuthSwitchMessage&) const;
+
+    // ClientLoginResponseMessage
+    DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
+    void encode(Buffer::Instance&) override;
+
     bool isOldAuthSwitch() const { return is_old_auth_switch_; }
     const std::string& getAuthPluginData() const { return auth_plugin_data_; }
     const std::string& getAuthPluginName() const { return auth_plugin_name_; }
@@ -66,10 +79,13 @@ public:
     std::string auth_plugin_name_;
   };
 
-  class OkMessage {
+  class OkMessage : public ClientLoginResponseMessage {
   public:
     using OkMessagePtr = std::unique_ptr<OkMessage>;
-    bool operator==(const OkMessage&) const;
+    // ClientLoginResponseMessage
+    DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
+    void encode(Buffer::Instance&) override;
+
     void setAffectedRows(uint64_t affected_rows) { affected_rows_ = affected_rows; }
     void setLastInsertId(uint64_t last_insert_id) { last_insert_id_ = last_insert_id; }
     void setServerStatus(uint16_t status) { status_ = status; }
@@ -91,10 +107,14 @@ public:
     std::string session_state_changes_;
   };
 
-  class ErrMessage {
+  class ErrMessage : public ClientLoginResponseMessage {
   public:
     using ErrMessagePtr = std::unique_ptr<ErrMessage>;
-    bool operator==(const ErrMessage&) const;
+
+    // ClientLoginResponseMessage
+    DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
+    void encode(Buffer::Instance&) override;
+
     void setErrorCode(uint16_t error_code) { error_code_ = error_code; }
     void setSqlStateMarker(uint8_t marker) { marker_ = marker; }
     void setSqlState(const std::string& state) { sql_state_ = state; }
@@ -126,23 +146,8 @@ public:
   void type(ClientLoginResponseType);
 
 private:
-  DecodeStatus parseAuthSwitch(Buffer::Instance& buffer, uint32_t len);
-  DecodeStatus parseOk(Buffer::Instance& buffer, uint32_t len);
-  DecodeStatus parseErr(Buffer::Instance& buffer, uint32_t len);
-  DecodeStatus parseAuthMore(Buffer::Instance& buffer, uint32_t len);
-  void encodeAuthSwitch(Buffer::Instance&);
-  void encodeOk(Buffer::Instance&);
-  void encodeErr(Buffer::Instance&);
-  void encodeAuthMore(Buffer::Instance&);
-
-  // cleanup storage when change type
-  void cleanup();
-
   ClientLoginResponseType type_{};
-  AuthSwitchMessage::AuthSwitchMessagePtr auth_switch_;
-  AuthMoreMessage::AuthMoreMessagePtr auth_more_;
-  ErrMessage::ErrMessagePtr err_;
-  OkMessage::OkMessagePtr ok_;
+  ClientLoginResponseMessage::ClientLoginResponseMessagePtr message_;
 };
 
 } // namespace MySQLProxy

@@ -168,16 +168,16 @@ DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer) {
     return DecodeStatus::Failure;
   }
   if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
-    if (BufferHelper::readString(buffer, auth_resp_)) {
+    if (BufferHelper::readString(buffer, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp of client login message");
       return DecodeStatus::Failure;
     }
-    if (BufferHelper::readString(buffer, db_)) {
+    if (BufferHelper::readString(buffer, db_) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing db of client login message");
       return DecodeStatus::Failure;
     }
   } else {
-    if (BufferHelper::readStringEof(buffer, auth_resp_)) {
+    if (BufferHelper::readStringEof(buffer, auth_resp_) != DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp of client login message");
       return DecodeStatus::Failure;
     }

@@ -19,7 +19,7 @@ namespace MySQLProxy {
 
 class MySQLCommandTest : public testing::Test, public MySQLTestUtils {
 public:
-  int encodeQuery(std::string query, hsql::SQLParserResult& result) {
+  DecodeStatus encodeQuery(std::string query, hsql::SQLParserResult& result) {
     Command mysql_cmd_encode{};
     Command mysql_cmd_decode{};
     uint8_t seq = 0u;
