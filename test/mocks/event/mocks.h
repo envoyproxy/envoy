@@ -155,6 +155,7 @@ public:
   MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());
   MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const));
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
+  MOCK_METHOD(void, preShutdown, ());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;

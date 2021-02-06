@@ -294,6 +294,14 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
   return approximate_monotonic_time_;
 }
 
+void DispatcherImpl::preShutdown() {
+  ENVOY_LOG(debug, "Clearing post_callbacks in {}", __FUNCTION__);
+  {
+    Thread::LockGuard lock(post_lock_);
+    post_callbacks_.clear();
+  }
+}
+
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
 
 void DispatcherImpl::updateApproximateMonotonicTimeInternal() {

@@ -115,6 +115,7 @@ void ValidationInstance::shutdown() {
   if (config_.clusterManager() != nullptr) {
     config_.clusterManager()->shutdown();
   }
+  dispatcher_->preShutdown();
   thread_local_.shutdownThread();
 }
 

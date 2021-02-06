@@ -794,6 +794,7 @@ void InstanceImpl::terminate() {
   if (config_.clusterManager() != nullptr) {
     config_.clusterManager()->shutdown();
   }
+  dispatcher_->preShutdown();
   handler_.reset();
   thread_local_.shutdownThread();
   restarter_.shutdown();

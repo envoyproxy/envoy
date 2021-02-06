@@ -293,6 +293,8 @@ public:
    * Updates approximate monotonic time to current value.
    */
   virtual void updateApproximateMonotonicTime() PURE;
+
+  virtual void preShutdown() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;
