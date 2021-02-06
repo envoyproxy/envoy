@@ -63,6 +63,15 @@ public:
    */
   envoy_status_t recordGaugeSub(const std::string& elements, uint64_t amount);
 
+  /**
+   * Record a value for the histogram with the given string of elements and unit measurement
+   * @param elements, joined elements of the timeseries.
+   * @param value, value to add to the aggregated distribution of values for quantile calculations
+   * @param unit_measure, the unit of measurement (e.g. milliseconds, bytes, etc.)
+   */
+  envoy_status_t recordHistogramValue(const std::string& elements, uint64_t value,
+                                      envoy_histogram_stat_unit_t unit_measure);
+
 private:
   envoy_status_t run(std::string config, std::string log_level);
 

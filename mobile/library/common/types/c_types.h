@@ -27,6 +27,13 @@ typedef enum {
   ENVOY_FAILURE = 1,
 } envoy_status_t;
 
+typedef enum {
+  UNSPECIFIED = 0, // Measured quantity does not require a unit, e.g. "items".
+  BYTES = 1,
+  MICROSECONDS = 2,
+  MILLISECONDS = 3,
+} envoy_histogram_stat_unit_t;
+
 /**
  * Equivalent constants to envoy_status_t, for contexts where the enum may not be usable.
  */
