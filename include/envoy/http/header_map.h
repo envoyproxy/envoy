@@ -294,7 +294,8 @@ private:
   HEADER_FUNC(Protocol)                                                                            \
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(TE)                                                                                  \
-  HEADER_FUNC(UserAgent)
+  HEADER_FUNC(UserAgent)                                                                           \
+  HEADER_FUNC(Cookie)
 
 /**
  * Default O(1) response headers.

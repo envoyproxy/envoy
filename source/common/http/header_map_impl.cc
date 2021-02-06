@@ -362,8 +362,10 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
+      const std::string delimiter =
+          (*lookup.value().key_ == Http::Headers::get().Cookie ? "; " : ",");
       const uint64_t added_size =
-          appendToHeader((*lookup.value().entry_)->value(), value.getStringView());
+          appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
       value.clear();
     }
