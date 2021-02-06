@@ -17,7 +17,8 @@ constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::mi
 LegacyGrpcSubscriptionImpl::LegacyGrpcSubscriptionImpl(
     GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats, absl::string_view type_url,
-    Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated, bool use_namespace_matching)
+    Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
+    bool use_namespace_matching)
     : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(resource_decoder),
       stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated),
@@ -60,7 +61,8 @@ void LegacyGrpcSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
-void LegacyGrpcSubscriptionImpl::requestOnDemandUpdate(const absl::flat_hash_set<std::string>& for_update) {
+void LegacyGrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& for_update) {
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }
@@ -85,7 +87,7 @@ void LegacyGrpcSubscriptionImpl::onConfigUpdate(
   stats_.update_duration_.recordValue(update_duration.count());
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
-  
+
   if (update_duration > UpdateDurationLogThreshold) {
     ENVOY_LOG(debug, "gRPC config update took {} ms! Resources names: {}", update_duration.count(),
               absl::StrJoin(resources, ",", ResourceNameFormatter()));

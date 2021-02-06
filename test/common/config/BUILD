@@ -202,8 +202,8 @@ envoy_cc_test_library(
     hdrs = ["delta_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
-        "//source/common/config:grpc_subscription_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:grpc_subscription_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",

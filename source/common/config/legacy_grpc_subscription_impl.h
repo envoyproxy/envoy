@@ -24,12 +24,13 @@ public:
                              OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
                              absl::string_view type_url, Event::Dispatcher& dispatcher,
                              std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
-			     bool use_namespace_matching);
+                             bool use_namespace_matching);
   ~LegacyGrpcSubscriptionImpl() override;
 
   // Config::Subscription
   void start(const absl::flat_hash_set<std::string>& resource_names) override;
-  void updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) override;
+  void
+  updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) override;
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

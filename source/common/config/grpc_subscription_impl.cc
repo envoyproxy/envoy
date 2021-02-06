@@ -62,8 +62,8 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   grpc_mux_->disableInitFetchTimeoutTimer();
   auto start = time_source_.monotonicTime();
   callbacks_.onConfigUpdate(resources, version_info);
-  std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source_.monotonicTime() - start);
+  std::chrono::milliseconds update_duration =
+      std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(time_source_));
   stats_.version_.set(HashUtil::xxHash64(version_info));
@@ -86,8 +86,8 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   grpc_mux_->disableInitFetchTimeoutTimer();
   auto start = time_source_.monotonicTime();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
-  std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source_.monotonicTime() - start);
+  std::chrono::milliseconds update_duration =
+      std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(time_source_));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));

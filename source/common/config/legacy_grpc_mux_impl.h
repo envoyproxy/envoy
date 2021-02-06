@@ -55,7 +55,8 @@ public:
                   std::chrono::milliseconds init_fetch_timeout,
                   const bool use_namespace_matching = false) override;
 
-  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&, const bool) override {
+  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
+                   const bool) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
