@@ -3891,19 +3891,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-#ifdef WIN32
-  EXPECT_CALL(*io_handle, win32Ioctl(_, _, _, _, _, _));
-#endif
   Network::AcceptedSocketImpl socket(
-      std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::IoSocketHandleImpl>(),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, win32Ioctl(_, _, _, _, _, _, _));
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::TopSpan);
   EXPECT_CALL(callbacks, filterState()).WillOnce(Invoke([&]() -> StreamInfo::FilterState& {
     return *filter_state;
   }));
+#endif
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
   }));
@@ -3948,10 +3948,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-  EXPECT_CALL(*io_handle, win32Ioctl(_, _, _, _, _, _))
+  // auto io_handle_raw_ptr = io_handle.get();
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, win32Ioctl(_, _, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
+#endif
   Network::AcceptedSocketImpl socket(
-      std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
+      std::make_unique<Network::IoSocketHandleImpl>(),
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {

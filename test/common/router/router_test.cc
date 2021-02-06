@@ -5639,7 +5639,7 @@ TEST_F(RouterTest, IpTransparentOptions) {
   Network::Socket::OptionsSharedPtr expected_options =
       Network::SocketOptionFactory::buildIpTransparentOptions();
   EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
-      .Times(2)
+      .Times(1)
       .WillRepeatedly(Return(expected_options));
 
   Http::TestRequestHeaderMapImpl headers;
