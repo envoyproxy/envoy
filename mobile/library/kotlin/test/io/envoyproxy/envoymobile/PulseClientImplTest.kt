@@ -70,4 +70,32 @@ class PulseClientImplTest {
     assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
     assertThat(amountCaptor.getValue()).isEqualTo(5)
   }
+
+  @Test
+  fun `timer delegates to engine with duration for record`() {
+    val pulseClient = PulseClientImpl(envoyEngine)
+    val timer = pulseClient.timer(Element("test"), Element("stat"))
+
+    timer.completeWithDuration(5)
+
+    val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
+    val durationCaptor = ArgumentCaptor.forClass(Int::class.java)
+    verify(envoyEngine).recordHistogramDuration(elementsCaptor.capture(), durationCaptor.capture())
+    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
+    assertThat(durationCaptor.getValue()).isEqualTo(5)
+  }
+
+  @Test
+  fun `distribution delegates to engine with value for record`() {
+    val pulseClient = PulseClientImpl(envoyEngine)
+    val distribution = pulseClient.distribution(Element("test"), Element("stat"))
+
+    distribution.recordValue(5)
+
+    val elementsCaptor = ArgumentCaptor.forClass(String::class.java)
+    val valueCaptor = ArgumentCaptor.forClass(Int::class.java)
+    verify(envoyEngine).recordHistogramValue(elementsCaptor.capture(), valueCaptor.capture())
+    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
+    assertThat(valueCaptor.getValue()).isEqualTo(5)
+  }
 }

@@ -15,4 +15,10 @@ interface PulseClient {
 
   /** @return A gauge based on the joined elements. */
   fun gauge(vararg elements: Element): Gauge
+
+  /** @return A timer based on the joined elements that can track distribution of durations. */
+  fun timer(vararg elements: Element): Timer
+
+  /** @return A distribution based on the joined elements tracking the quantile stats of values. */
+  fun distribution(vararg elements: Element): Distribution
 }

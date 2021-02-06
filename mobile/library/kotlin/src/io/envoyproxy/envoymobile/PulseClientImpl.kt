@@ -16,4 +16,12 @@ internal class PulseClientImpl constructor(
   override fun gauge(vararg elements: Element): Gauge {
     return GaugeImpl(engine, elements.asList())
   }
+
+  override fun timer(vararg elements: Element): Timer {
+    return TimerImpl(engine, elements.asList())
+  }
+
+  override fun distribution(vararg elements: Element): Distribution {
+    return DistributionImpl(engine, elements.asList())
+  }
 }

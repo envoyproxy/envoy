@@ -15,4 +15,14 @@ public protocol PulseClient: AnyObject {
   ///
   /// - returns: A Gauge based on the joined elements.
   func gauge(elements: [Element]) -> Gauge
+
+  /// - parameter elements: Elements to identify a timer
+  ///
+  /// - returns: A Timer based on the joined elements to track a distribution of durations
+  func timer(elements: [Element]) -> Timer
+
+  /// - parameter elements: Elements to identify a distribution
+  ///
+  /// - returns: A Distribution based on the joined elements to track quantile stats
+  func distribution(elements: [Element]) -> Distribution
 }
