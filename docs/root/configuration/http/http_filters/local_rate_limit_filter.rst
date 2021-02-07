@@ -1,26 +1,20 @@
 .. _config_http_filters_local_rate_limit:
 
-Local rate limit
+本地限流
 ================
 
-* Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`
-* This filter should be configured with the name *envoy.filters.http.local_ratelimit*.
+* 本地限流 :ref:`架构概览 <arch_overview_local_rate_limit>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`
+* 此过滤器应使用 *envoy.filters.http.local_ratelimit* 名称进行配置。
 
-The HTTP local rate limit filter applies a :ref:`token bucket
-<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.token_bucket>` rate
-limit when the request's route or virtual host has a per filter
-:ref:`local rate limit configuration <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`.
+当请求的路由或者虚拟主机各自具有过滤器的 :ref:`本地限流配置 <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>` 时，HTTP 本地限流过滤器将应用 :ref:`令牌桶 <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.token_bucket>` 限流。
 
-If the local rate limit token bucket is checked, and there are no token availables, a 429 response is returned
-(the response is configurable). The local rate limit filter also sets the
-:ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header. Additional response
-headers may be configured.
+如果本地限流令牌桶经过检查且没有可用的令牌，则返回 429 响应（响应是可配置的）。本地限流过滤器同时会设置 :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` 头部。可配置额外的响应头部。
 
-Example configuration
+示例配置
 ---------------------
 
-Example filter configuration for a globally set rate limiter (e.g.: all vhosts/routes share the same token bucket):
+全局设置限流器的过滤器示例配置（例如：所有虚拟主机/路由共享同一个令牌桶)：
 
 .. code-block:: yaml
 
@@ -49,7 +43,7 @@ Example filter configuration for a globally set rate limiter (e.g.: all vhosts/r
           value: 'true'
 
 
-Example filter configuration for a globally disabled rate limiter but enabled for a specific route:
+全局禁用限流器但为特定路由启用的过滤器示例配置：
 
 .. code-block:: yaml
 
@@ -59,7 +53,7 @@ Example filter configuration for a globally disabled rate limiter but enabled fo
     stat_prefix: http_local_rate_limiter
 
 
-The route specific configuration:
+特定路由的配置：
 
 .. code-block:: yaml
 
@@ -97,38 +91,31 @@ The route specific configuration:
         route: { cluster: default_service }
 
 
-Note that if this filter is configured as globally disabled and there are no virtual host or route level
-token buckets, no rate limiting will be applied.
+需要注意的是如果此过滤器已经配置为全局禁用并且没有虚拟主机或路由级别的令牌桶，则限流不会生效。
 
-Statistics
+统计
 ----------
 
-The local rate limit filter outputs statistics in the *<stat_prefix>.http_local_rate_limit.* namespace.
-429 responses -- or the configured status code -- are emitted to the normal cluster :ref:`dynamic HTTP statistics
-<config_cluster_manager_cluster_stats_dynamic_http>`.
+本地限流过滤器在 *<stat_prefix>.http_local_rate_limit.* 命名空间中输出统计信息。429 响应 -- 或者已经配置的状态码 -- 会提交到常规集群 :ref:`动态 HTTP 统计信息 <config_cluster_manager_cluster_stats_dynamic_http>` 中。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  enabled, Counter, Total number of requests for which the rate limiter was consulted
-  ok, Counter, Total under limit responses from the token bucket
-  rate_limited, Counter, Total responses without an available token (but not necessarily enforced)
-  enforced, Counter, Total number of requests for which rate limiting was applied (e.g.: 429 returned)
+  enabled, Counter, 与限流过滤器协商过的请求总数
+  ok, Counter, 低于令牌桶限制的响应总数
+  rate_limited, Counter, 没有可用令牌的响应总数（但不一定强制执行）
+  enforced, Counter, 限流所作用到的请求总数（例如：429 返回）
 
 .. _config_http_filters_local_rate_limit_runtime:
 
-Runtime
+运行时
 -------
 
-The HTTP rate limit filter supports the following runtime fractional settings:
+HTTP 限流过滤器支持如下的运行时部分设置：
 
 http_filter_enabled
-  % of requests that will check the local rate limit decision, but not enforce, for a given *route_key* specified
-  in the :ref:`local rate limit configuration <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`.
-  Defaults to 0.
+  在 :ref:`本地限流配置 <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>` 中指定了 *route_key* 后，将会检查本地限流决策但不强制执行的请求百分比。默认值为 0。
 
 http_filter_enforcing
-  % of requests that will enforce the local rate limit decision for a given *route_key* specified in the
-  :ref:`local rate limit configuration <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`.
-  Defaults to 0. This can be used to test what would happen before fully enforcing the outcome.
+  在 :ref:`本地限流配置 <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>` 中指定了 *route_key* 后，将会强制执行本地限流决策的请求百分比。默认值为 0。这可以用于测试在完全执行结果之前会发生什么。
