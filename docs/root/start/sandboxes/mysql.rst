@@ -1,21 +1,19 @@
 .. _install_sandboxes_mysql:
 
-MySQL Filter
+MySQL 过滤器
 ============
 
-In this example, we show how the :ref:`MySQL filter <config_network_filters_mysql_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
-metrics.
+在这个例子中，我们展示了 :ref:`MySQL 过滤器 <config_network_filters_mysql_proxy>` 如何与 Envoy 代理一起使用。Envoy 的代理配置包含一个 MySQL 过滤器，它可以解析查询并收集 MySQL 特定的指标。
 
-
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+运行沙盒
+~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Build the sandbox
-*************************
+步骤 3：构建沙盒
+****************
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
@@ -31,15 +29,12 @@ Terminal 1
   mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
 
 
-Step 4: Issue commands using mysql
-**********************************
+步骤 4：使用 mysql 发出命令
+***************************
 
-Use ``mysql`` to issue some commands and verify they are routed via Envoy. Note
-that the current implementation of the protocol filter was tested with MySQL
-v5.5. It may, however, not work with other versions of MySQL due to differences
-in the protocol implementation.
+使用 ``mysql`` 发出一些命令，并验证它们是否通过 Envoy 路由。注意，协议过滤器的当前实现已通过 MySQL v5.5 的测试。但是，由于协议实现方面的差异，它可能不适用于其他版本的 MySQL。
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
@@ -76,12 +71,12 @@ Terminal 1
   mysql> exit
   Bye
 
-Step 5: Check egress stats
-**************************
+步骤 5：检查 egress 统计信息
+****************************
 
-Check egress stats were updated.
+检查 egress 统计信息已更新。
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
@@ -96,12 +91,12 @@ Terminal 1
   mysql.egress_mysql.sessions: 1
   mysql.egress_mysql.upgraded_to_ssl: 0
 
-Step 6: Check TCP stats
-***********************
+步骤 6：检查 TCP 统计信息
+*************************
 
-Check TCP stats were updated.
+检查 TCP 统计信息已更新。
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
