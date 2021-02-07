@@ -127,6 +127,7 @@ typed_config:
 
 TEST(SPIFFEValidator, TestExtractTrustDomain) {
   EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("abc.com/"));
+  EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("spiffe://"));
   EXPECT_EQ("abc.com", SPIFFEValidator::extractTrustDomain("spiffe://abc.com/"));
   EXPECT_EQ("dev.envoy.com",
             SPIFFEValidator::extractTrustDomain("spiffe://dev.envoy.com/workload1"));

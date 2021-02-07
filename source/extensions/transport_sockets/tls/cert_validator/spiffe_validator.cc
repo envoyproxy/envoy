@@ -207,13 +207,25 @@ bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
 }
 
 std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
-  static const std::regex reg = Envoy::Regex::Utility::parseStdRegex("spiffe:\\/\\/([^\\/]+)\\/");
-  std::smatch m;
+  static const std::string prefix = "spiffe://";
+  size_t begin = 0;
+  for (; begin < san.size() && begin < prefix.size(); begin++) {
+    if (prefix[begin] != san[begin]) {
+      break;
+    }
+  }
 
-  if (!std::regex_search(san, m, reg) || m.size() < 2) {
+  if (begin != prefix.size()) {
     return "";
   }
-  return m[1];
+
+  size_t end = begin;
+  for (; end < san.size(); end++) {
+    if (san[end] == '/') {
+      break;
+    }
+  }
+  return end < san.size() ? san.substr(begin, end - begin) : "";
 }
 
 size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
