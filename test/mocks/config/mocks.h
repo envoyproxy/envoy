@@ -8,6 +8,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/common/callback_impl.h"
 #include "common/config/config_provider_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -173,6 +174,17 @@ public:
   ~MockContextProvider() override;
 
   MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
+  MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
+              (absl::string_view resource_type_url), (const));
+  MOCK_METHOD(void, setDynamicContextParam,
+              (absl::string_view resource_type_url, absl::string_view key,
+               absl::string_view value));
+  MOCK_METHOD(void, unsetDynamicContextParam,
+              (absl::string_view resource_type_url, absl::string_view key));
+  MOCK_METHOD(Common::CallbackHandle*, addDynamicContextUpdateCallback, (UpdateCb callback),
+              (const));
+
+  Common::CallbackManager<absl::string_view> update_cb_handler_;
 };
 
 } // namespace Config

@@ -61,11 +61,11 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NewGrpcMuxImplPtr grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{"cluster_name"};
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   ControlPlaneStats control_plane_stats_;
@@ -273,10 +273,8 @@ TEST_F(NewGrpcMuxImplTest, XdsTpGlobCollection) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  MockContextProvider context_provider;
-  EXPECT_CALL(local_info_, contextProvider()).WillOnce(ReturnRef(context_provider));
   xds::core::v3::ContextParams context_params;
-  EXPECT_CALL(context_provider, nodeContext()).WillOnce(ReturnRef(context_params));
+  EXPECT_CALL(local_info_.context_provider_, nodeContext()).WillOnce(ReturnRef(context_params));
   // We verify that the gRPC mux normalizes the context parameter order below.
   auto watch = grpc_mux_->addWatch(
       type_url,

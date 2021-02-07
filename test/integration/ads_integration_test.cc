@@ -1467,6 +1467,47 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   testBasicFlow();
 }
 
+class DynamicContextAdsIntegrationTest : public AdsIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDelta, DynamicContextAdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     // There should be no variation across clients.
+                     testing::Values(Grpc::ClientType::EnvoyGrpc),
+                     // Only delta xDS is supported for DCPs at this point (TODO(htuch): add sotw)
+                     testing::Values(Grpc::SotwOrDelta::Delta)));
+
+// Node is resent on a dynamic context parameter update.
+TEST_P(DynamicContextAdsIntegrationTest, ContextParameterUpdate) {
+  initialize();
+
+  // Check that the node is sent in each request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}, true));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {}, {}));
+
+  test_server_->setDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster", "foo",
+                                       "bar");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_EQ("bar", last_node_.dynamic_parameters()
+                       .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
+                       .params()
+                       .at("foo"));
+};
+
 class XdsTpAdsIntegrationTest : public AdsIntegrationTest {
 public:
   void initialize() override {

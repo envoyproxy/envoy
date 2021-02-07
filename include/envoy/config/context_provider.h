@@ -1,7 +1,9 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
 #include "xds/core/v3/context_params.pb.h"
 
 namespace Envoy {
@@ -14,12 +16,45 @@ namespace Config {
  */
 class ContextProvider {
 public:
+  using UpdateCb = std::function<void(absl::string_view)>;
+
   virtual ~ContextProvider() = default;
 
   /**
-   * @return const xds::core::v3::ContextParams& node-level context parameters.
+   * @return const xds::core::v3::ContextParams& static node-level context parameters.
    */
   virtual const xds::core::v3::ContextParams& nodeContext() const PURE;
+
+  /**
+   * @param resource_type_url resource type URL for context parameters.
+   * @return const xds::core::v3::ContextParams& dynamic node-level context parameters.
+   */
+  virtual const xds::core::v3::ContextParams&
+  dynamicContext(absl::string_view resource_type_url) const PURE;
+
+  /**
+   * Set a dynamic context parameter.
+   * @param resource_type_url resource type URL for context parameter.
+   * @param key parameter key.
+   * @param value parameter value.
+   */
+  virtual void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
+                                      absl::string_view value) PURE;
+
+  /**
+   * Set a dynamic context parameter.
+   * @param resource_type_url resource type URL for context parameter.
+   * @param key parameter key.
+   */
+  virtual void unsetDynamicContextParam(absl::string_view resource_type_url,
+                                        absl::string_view key) PURE;
+
+  /**
+   * Register a callback for notification when the dynamic context changes.
+   * @param callback notification callback.
+   * @return Common::CallbackHandle* callback handle for removal.
+   */
+  virtual Common::CallbackHandle* addDynamicContextUpdateCallback(UpdateCb callback) const PURE;
 };
 
 } // namespace Config
