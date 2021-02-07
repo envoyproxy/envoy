@@ -7,7 +7,7 @@
 
 #include "common/event/real_time_system.h"
 
-#include "extensions/transport_sockets/tls/cert_validator/spiffe_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 #include "extensions/transport_sockets/tls/stats.h"
 
 #include "test/extensions/transport_sockets/tls/cert_validator/util.h"
@@ -127,6 +127,7 @@ typed_config:
 
 TEST(SPIFFEValidator, TestExtractTrustDomain) {
   EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("abc.com/"));
+  EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("abc.com/workload/"));
   EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("spiffe://"));
   EXPECT_EQ("abc.com", SPIFFEValidator::extractTrustDomain("spiffe://abc.com/"));
   EXPECT_EQ("dev.envoy.com",

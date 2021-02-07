@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_extension_package",
 )
 
@@ -8,20 +8,20 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_library(
-    name = "cert_validator_lib",
+envoy_cc_extension(
+    name = "config",
     srcs = [
-        "factory.cc",
+        "spiffe_validator.cc",
     ],
     hdrs = [
-        "cert_validator.h",
-        "factory.h",
+        "spiffe_validator.h",
     ],
     external_deps = [
         "ssl",
         "abseil_base",
         "abseil_hash",
     ],
+    security_posture = "unknown",
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/ssl:context_config_interface",
@@ -37,5 +37,7 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/transport_sockets/tls:stats_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

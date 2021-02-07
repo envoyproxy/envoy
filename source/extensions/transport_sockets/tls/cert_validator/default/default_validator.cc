@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/default/default_validator.h"
 
 #include <array>
 #include <deque>

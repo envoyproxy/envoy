@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/cert_validator/spiffe_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
 #include <algorithm>
 #include <array>

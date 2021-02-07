@@ -98,7 +98,6 @@ STD_REGEX_ALLOWLIST = (
     "./source/common/stats/tag_extractor_impl.cc",
     "./source/common/formatter/substitution_formatter.cc",
     "./source/extensions/filters/http/squash/squash_filter.h",
-    "./source/extensions/transport_sockets/tls/cert_validator/spiffe_validator.cc",
     "./source/extensions/filters/http/squash/squash_filter.cc", "./source/server/admin/utils.h",
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",

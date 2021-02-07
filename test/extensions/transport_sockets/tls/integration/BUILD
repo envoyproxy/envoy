@@ -26,6 +26,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator/default:config",
+        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
         "//test/mocks/secret:secret_mocks",

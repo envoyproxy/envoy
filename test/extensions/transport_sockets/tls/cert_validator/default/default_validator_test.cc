@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 
-#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/default/default_validator.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"

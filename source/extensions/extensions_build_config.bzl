@@ -241,6 +241,13 @@ EXTENSIONS = {
     #
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+
+    #
+    # TLS peer certification validators
+    #
+
+    "envoy.tls.cert_validator.default":                 "//source/extensions/transport_sockets/tls/cert_validator/default:config",
+    "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
