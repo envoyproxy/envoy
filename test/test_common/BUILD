@@ -110,6 +110,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":file_system_for_test_lib",
+        ":logging_lib",
         ":printers_lib",
         ":resources_lib",
         ":test_time_lib",
