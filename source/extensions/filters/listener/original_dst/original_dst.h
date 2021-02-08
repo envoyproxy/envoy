@@ -15,7 +15,11 @@ namespace OriginalDst {
 class OriginalDstFilter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   OriginalDstFilter(const envoy::config::core::v3::TrafficDirection& traffic_direction)
-      : traffic_direction_(traffic_direction) {}
+      : traffic_direction_(traffic_direction) {
+    // [[maybe_unused]] attribute is not supported on GCC for class members. We trivially use the
+    // parameter here to silence the warning.
+    (void)traffic_direction_;
+  }
 
   virtual Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket& sock);
 
@@ -23,8 +27,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  // Unused on Posix
-  [[maybe_unused]] envoy::config::core::v3::TrafficDirection traffic_direction_;
+  envoy::config::core::v3::TrafficDirection traffic_direction_;
 };
 
 } // namespace OriginalDst
