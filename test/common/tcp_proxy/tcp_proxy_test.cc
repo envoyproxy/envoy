@@ -875,6 +875,12 @@ public:
             [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
         .WillByDefault(ReturnPointee(&upstream_host_));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
+        .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
+          upstream_cluster_ = cluster_info;
+        }));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
+        .WillByDefault(ReturnPointee(&upstream_cluster_));
     factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
@@ -924,10 +930,6 @@ public:
       upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
       conn_pool_handles_.push_back(
           std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
-
-      ON_CALL(*upstream_hosts_.at(i), cluster())
-          .WillByDefault(ReturnPointee(
-              factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
       ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
       upstream_connections_.at(i)->stream_info_.downstream_address_provider_->setLocalAddress(
           upstream_local_address_);
@@ -1021,6 +1023,7 @@ public:
   std::list<std::function<Tcp::ConnectionPool::Cancellable*(Tcp::ConnectionPool::Cancellable*)>>
       new_connection_functions_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
 };
 
 TEST_F(TcpProxyTest, DefaultRoutes) {
