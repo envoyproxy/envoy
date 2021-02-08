@@ -52,10 +52,6 @@ public:
 
   ~IoHandleImplTest() override = default;
 
-  Buffer::WatermarkBuffer& getWatermarkBufferHelper(IoHandleImpl& io_handle) {
-    return dynamic_cast<Buffer::WatermarkBuffer&>(*io_handle.getWriteBuffer());
-  }
-
   NiceMock<Event::MockDispatcher> dispatcher_;
 
   // Owned by IoHandleImpl.
@@ -68,8 +64,8 @@ public:
 
 // Test recv side effects.
 TEST_F(IoHandleImplTest, BasicRecv) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("0123456789");
+  Buffer::OwnedImpl buf_to_write("0123456789");
+  io_handle_peer_->write(buf_to_write);
   {
     auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
     ASSERT_EQ(10, result.rc_);
@@ -90,8 +86,8 @@ TEST_F(IoHandleImplTest, BasicRecv) {
 
 // Test recv side effects.
 TEST_F(IoHandleImplTest, RecvPeek) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("0123456789");
+  Buffer::OwnedImpl buf_to_write("0123456789");
+  io_handle_peer_->write(buf_to_write);
   {
     ::memset(buf_.data(), 1, buf_.size());
     auto result = io_handle_->recv(buf_.data(), 5, MSG_PEEK);
@@ -126,16 +122,16 @@ TEST_F(IoHandleImplTest, RecvPeek) {
 }
 
 TEST_F(IoHandleImplTest, RecvPeekWhenPendingDataButShutdown) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("0123456789");
+  Buffer::OwnedImpl buf_to_write("0123456789");
+  io_handle_peer_->write(buf_to_write);
   auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
   ASSERT_EQ(10, result.rc_);
   ASSERT_EQ("0123456789", absl::string_view(buf_.data(), result.rc_));
 }
 
 TEST_F(IoHandleImplTest, MultipleRecvDrain) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("abcd");
+  Buffer::OwnedImpl buf_to_write("abcd");
+  io_handle_peer_->write(buf_to_write);
   {
     auto result = io_handle_->recv(buf_.data(), 1, 0);
     EXPECT_TRUE(result.ok());
@@ -148,7 +144,7 @@ TEST_F(IoHandleImplTest, MultipleRecvDrain) {
     EXPECT_EQ(3, result.rc_);
 
     EXPECT_EQ("bcd", absl::string_view(buf_.data(), 3));
-    EXPECT_EQ(0, internal_buffer.length());
+    EXPECT_EQ(0, io_handle_->getWriteBuffer()->length());
   }
 }
 
@@ -175,28 +171,29 @@ TEST_F(IoHandleImplTest, ReadWhileProvidingNoCapacity) {
 
 // Test read side effects.
 TEST_F(IoHandleImplTest, ReadContent) {
+  Buffer::OwnedImpl buf_to_write("abcdefg");
+  io_handle_peer_->write(buf_to_write);
+
   Buffer::OwnedImpl buf;
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("abcdefg");
   auto result = io_handle_->read(buf, 3);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(3, result.rc_);
   ASSERT_EQ(3, buf.length());
-  ASSERT_EQ(4, internal_buffer.length());
+  ASSERT_EQ(4, io_handle_->getWriteBuffer()->length());
   result = io_handle_->read(buf, 10);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(4, result.rc_);
   ASSERT_EQ(7, buf.length());
-  ASSERT_EQ(0, internal_buffer.length());
+  ASSERT_EQ(0, io_handle_->getWriteBuffer()->length());
 }
 
 // Test read throttling on watermark buffer.
 TEST_F(IoHandleImplTest, ReadThrottling) {
   {
     // Prepare data to read.
-    Buffer::OwnedImpl pending_data(std::string(12 * FRAGMENT_SIZE, 'a'));
-    while (pending_data.length() > 0) {
-      io_handle_peer_->write(pending_data);
+    Buffer::OwnedImpl buf_to_write(std::string(12 * FRAGMENT_SIZE, 'a'));
+    while (buf_to_write.length() > 0) {
+      io_handle_peer_->write(buf_to_write);
     }
   }
   Buffer::OwnedImpl unlimited_buf;
@@ -297,7 +294,7 @@ TEST_F(IoHandleImplTest, FlowControl) {
 
   bool writable_flipped = false;
   // During the repeated recv, the writable flag must switch to true.
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
+  auto& internal_buffer = *io_handle_->getWriteBuffer();
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
     FANCY_LOG(debug, "internal buffer length = {}", internal_buffer.length());
@@ -390,8 +387,7 @@ TEST_F(IoHandleImplTest, WriteByMove) {
   auto result = io_handle_peer_->write(buf);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(10, result.rc_);
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  EXPECT_EQ("0123456789", internal_buffer.toString());
+  EXPECT_EQ("0123456789", io_handle_->getWriteBuffer()->toString());
   EXPECT_EQ(0, buf.length());
 }
 
@@ -481,11 +477,10 @@ TEST_F(IoHandleImplTest, WriteErrorAfterClose) {
 
 // Test writev return error code. Ignoring the side effect of event scheduling.
 TEST_F(IoHandleImplTest, WritevAgain) {
+  Buffer::OwnedImpl buf_to_write(std::string(256, ' '));
+  io_handle_->write(buf_to_write);
   auto [guard, slice] = allocateOneSlice(128);
-  // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_peer_);
-  internal_buffer.add(std::string(256, ' '));
   auto result = io_handle_->writev(&slice, 1);
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
 }
@@ -558,9 +553,8 @@ TEST_F(IoHandleImplTest, WritevToPeer) {
       Buffer::RawSlice{raw_data.data() + 1, 2},
   };
   io_handle_peer_->writev(slices.data(), slices.size());
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  EXPECT_EQ(3, internal_buffer.length());
-  EXPECT_EQ("012", internal_buffer.toString());
+  EXPECT_EQ(3, io_handle_->getWriteBuffer()->length());
+  EXPECT_EQ("012", io_handle_->getWriteBuffer()->toString());
 }
 
 TEST_F(IoHandleImplTest, EventScheduleBasic) {
@@ -674,13 +668,13 @@ TEST_F(IoHandleImplTest, EventResetClearCallback) {
 
 TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggerReadEvent) {
   io_handle_->setWatermarks(128);
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
 
   EXPECT_FALSE(io_handle_->isReadable());
   EXPECT_TRUE(io_handle_peer_->isWritable());
 
-  std::string big_chunk(256, 'a');
-  internal_buffer.add(big_chunk);
+  Buffer::OwnedImpl buf_to_write(std::string(256, 'a'));
+  io_handle_peer_->write(buf_to_write);
+
   EXPECT_TRUE(io_handle_->isReadable());
   EXPECT_FALSE(io_handle_->isWritable());
 
@@ -716,8 +710,8 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggerReadEvent) {
 }
 
 TEST_F(IoHandleImplTest, Close) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("abcd");
+  Buffer::OwnedImpl buf_to_write("abcd");
+  io_handle_peer_->write(buf_to_write);
   std::string accumulator;
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
@@ -776,8 +770,8 @@ TEST_F(IoHandleImplTest, Close) {
 // Test that a readable event is raised when peer shutdown write. Also confirm read will return
 // EAGAIN.
 TEST_F(IoHandleImplTest, ShutDownRaiseEvent) {
-  auto& internal_buffer = getWatermarkBufferHelper(*io_handle_);
-  internal_buffer.add("abcd");
+  Buffer::OwnedImpl buf_to_write("abcd");
+  io_handle_peer_->write(buf_to_write);
 
   std::string accumulator;
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
