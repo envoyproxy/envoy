@@ -29,6 +29,9 @@ public:
     code_ = code;
     body_ = TestInitBody;
     content_type_ = TestInitContentType;
+    // LocalReply::matchesAnyMapper() is used in a context where response_headers are assumed to
+    // exist // so we have to set the response code in the headers here.
+    response_headers_.setStatus(std::to_string(enumToInt(code)));
   }
   void resetData(uint32_t code) { resetData(static_cast<Http::Code>(code)); }
 
@@ -49,6 +52,7 @@ TEST_F(LocalReplyTest, TestEmptyConfig) {
   // Empty LocalReply config.
   auto local = Factory::create(config_, context_);
 
+  EXPECT_EQ(false, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
@@ -62,6 +66,7 @@ TEST_F(LocalReplyTest, TestDefaultLocalReply) {
   // Default LocalReply should be the same as empty config.
   auto local = Factory::createDefault();
 
+  EXPECT_EQ(false, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
@@ -112,6 +117,7 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
 
+  EXPECT_EQ(false, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
@@ -134,6 +140,7 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
 
+  EXPECT_EQ(false, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
@@ -203,6 +210,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
 
   // code=400 matches the first filter; rewrite code and body
   resetData(400);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
   EXPECT_EQ(stream_info_.response_code_, 401U);
@@ -213,6 +221,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   // code=403 matches the second filter; does not rewrite code, sets an empty body and content_type.
   resetData(403);
   body_ = "original body text";
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(403));
   EXPECT_EQ(stream_info_.response_code_, 403U);
@@ -222,6 +231,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
 
   // code=410 matches the third filter; rewrite body only
   resetData(410);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(410));
   EXPECT_EQ(stream_info_.response_code_, 410U);
@@ -231,6 +241,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
 
   // code=420 matches the fourth filter; rewrite code only
   resetData(420);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
   EXPECT_EQ(stream_info_.response_code_, 421U);
@@ -240,6 +251,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
 
   // code=430 matches the fifth filter; rewrite nothing
   resetData(430);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(430));
   EXPECT_EQ(stream_info_.response_code_, 430U);
@@ -271,6 +283,7 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewriteDeprecatedTextFo
   // code=404 matches the only filter; does not rewrite code, sets an empty body and content_type.
   resetData(404);
   body_ = "original body text";
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(404));
   EXPECT_EQ(stream_info_.response_code_, 404U);
@@ -319,6 +332,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
   // code=400 matches the first filter; rewrite code and body
   // has its own formatter
   resetData(400);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
   EXPECT_EQ(stream_info_.response_code_, 401U);
@@ -336,6 +350,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
   // code=410 matches the second filter; rewrite code and body
   // but using default formatter
   resetData(410);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
   EXPECT_EQ(stream_info_.response_code_, 411U);
@@ -374,6 +389,7 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
 
   response_headers_.addCopy("foo-2", "bar2");
   response_headers_.addCopy("foo-3", "bar3");
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
@@ -440,6 +456,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   // has its own formatter.
   // content-type is explicitly set to text/html; charset=UTF-8.
   resetData(400);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
   EXPECT_EQ(stream_info_.response_code_, 401U);
@@ -451,6 +468,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   // but using default formatter.
   // content-type is explicitly set to text/html; charset=UTF-8.
   resetData(410);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
   EXPECT_EQ(stream_info_.response_code_, 411U);
@@ -462,7 +480,8 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   // has its own formatter.
   // default content-type is set based on reply format type.
   resetData(420);
-  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(true, local->matchesAnyMapper(&request_headers_, response_headers_, nullptr, stream_info_));
+  EXPECT_EQ(true, local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_));
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
   EXPECT_EQ(stream_info_.response_code_, 421U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "421");
