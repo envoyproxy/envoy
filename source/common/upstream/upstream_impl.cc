@@ -930,7 +930,7 @@ ClusterImplBase::ClusterImplBase(
           ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
                     raii_cluster->name());
         });
-      // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
       });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
