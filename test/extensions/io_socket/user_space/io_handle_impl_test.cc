@@ -1,5 +1,3 @@
-#include <netinet/in.h>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
