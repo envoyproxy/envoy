@@ -171,6 +171,7 @@ message Cluster {
 
     // Cluster specific configuration which depends on the cluster being instantiated.
     // See the supported cluster for further documentation.
+    // [#protodoc-extension: envoy.clusters]
     google.protobuf.Any typed_config = 2;
   }
 
@@ -1004,6 +1005,7 @@ message Cluster {
   // If users desire custom connection pool or upstream behavior, for example terminating
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
+  // [#protodoc-extension: envoy.upstreams]
   core.v3.TypedExtensionConfig upstream_config = 48;
 
   // Configuration to track optional cluster stats.
