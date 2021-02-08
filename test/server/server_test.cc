@@ -395,19 +395,25 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 // initialization try/catch.
 TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
   // Error in reading illegal file path for channel credentials in secondary cluster.
-  EXPECT_LOG_CONTAINS("warn", "Skipping initialization of secondary cluster: Invalid path:", {
-    initialize("test/server/test_data/server/health_check_nullptr.yaml");
-    server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  });
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of secondary cluster: API configs must have either "
+                      "a gRPC service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/health_check_nullptr.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
 }
 
 // Catch exceptions in HDS cluster initialization callbacks.
 TEST_P(ServerInstanceImplTest, HdsClusterException) {
   // Error in reading illegal file path for channel credentials in secondary cluster.
-  EXPECT_LOG_CONTAINS("warn", "Skipping initialization of HDS cluster: Invalid path:", {
-    initialize("test/server/test_data/server/hds_exception.yaml");
-    server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  });
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: API configs must have either a gRPC "
+                      "service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/hds_exception.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
