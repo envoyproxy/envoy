@@ -924,13 +924,13 @@ ClusterImplBase::ClusterImplBase(
       new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
-      // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
         dispatcher.movePost([raii_cluster = std::shared_ptr<const ClusterInfoImpl>(self)]() {
           ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
                     raii_cluster->name());
         });
+      // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
       });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
