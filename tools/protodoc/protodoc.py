@@ -63,7 +63,7 @@ This extension may be referenced by the qualified name *$extension*
 
   This extension extends the following extension type:
 
-  $categories
+$categories
 
 """)
 
