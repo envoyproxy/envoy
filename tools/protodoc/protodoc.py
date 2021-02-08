@@ -216,12 +216,15 @@ def FormatExtension(extension):
     anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+    extension_categories = "\n".join(
+      "  - :ref:`%s <extension_type_%s>`" % (ext, ext)
+      for ext
+      in extension_metadata.get('categories', []))
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
                                          extension=extension,
                                          status=status,
                                          security_posture=security_posture,
-                                         # this shouldnt need get once all have cats...
-                                         categories=extension_metadata.get('categories', []))
+                                         categories=extension_categories)
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
