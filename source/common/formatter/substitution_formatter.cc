@@ -742,8 +742,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-          if (nullptr != stream_info.upstreamHost()) {
-            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+          if (stream_info.upstreamClusterInfo().has_value()) {
+            upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
           }
 
           return upstream_cluster_name.empty()

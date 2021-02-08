@@ -272,14 +272,6 @@ protected:
   }
 
   ABSL_MUST_USE_RESULT
-  auto disableInplaceUpdateForThisTest() {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
-    return scoped_runtime;
-  }
-
-  ABSL_MUST_USE_RESULT
   auto enableTlsInspectorInjectionForThisTest() {
     auto scoped_runtime = std::make_unique<TestScopedRuntime>();
     Runtime::LoaderSingleton::getExisting()->mergeValues(
