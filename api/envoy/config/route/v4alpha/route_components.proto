@@ -136,10 +136,11 @@ message VirtualHost {
   // configurations for filters. The key should match the filter name, such as
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
-  // for if and how it is utilized. If an entry's value is wrapped in a
+  // for if and how it is utilized.
+  // [#comment: If an entry's value is wrapped in a
   // :ref:`OptionalFilterConfig<envoy_api_msg_config.route.v4alpha.OptionalFilterConfig>`
   // message, then clients that do not support this filter will ignore that
-  // entry rather than rejecting the config.
+  // entry rather than rejecting the config.]
   map<string, google.protobuf.Any> typed_per_filter_config = 15;
 
   // Decides whether the :ref:`x-envoy-attempt-count
@@ -249,10 +250,11 @@ message Route {
   // configurations for filters. The key should match the filter name, such as
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
-  // if and how it is utilized. If an entry's value is wrapped in a
+  // if and how it is utilized.
+  // [#comment: If an entry's value is wrapped in a
   // :ref:`OptionalFilterConfig<envoy_api_msg_config.route.v4alpha.OptionalFilterConfig>`
   // message, then clients that do not support this filter will ignore that
-  // entry rather than rejecting the config.
+  // entry rather than rejecting the config.]
   map<string, google.protobuf.Any> typed_per_filter_config = 13;
 
   // Specifies a set of headers that will be added to requests matching this
@@ -367,10 +369,11 @@ message WeightedCluster {
     // configurations for filters. The key should match the filter name, such as
     // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
-    // for if and how it is utilized. If an entry's value is wrapped in a
+    // for if and how it is utilized.
+    // [#comment: If an entry's value is wrapped in a
     // :ref:`OptionalFilterConfig<envoy_api_msg_config.route.v4alpha.OptionalFilterConfig>`
     // message, then clients that do not support this filter will ignore that
-    // entry rather than rejecting the config.
+    // entry rather than rejecting the config.]
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
   }
 
