@@ -13,6 +13,7 @@
 
 #include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
+#include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"
