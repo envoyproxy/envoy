@@ -93,8 +93,7 @@ public:
                   absl::string_view name)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)),
-        transport_socket_connect_timeout_(transport_socket_connect_timeout),
-        name_(name) {}
+        transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -114,9 +113,7 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
-  absl::string_view name() const override {
-    return name_;
-  }
+  absl::string_view name() const override { return name_; }
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;

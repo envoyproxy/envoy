@@ -152,9 +152,7 @@ public:
     return empty_network_filter_factory_;
   }
 
-  absl::string_view name() const override {
-    return "";
-  }
+  absl::string_view name() const override { return ""; }
 
 private:
   const TransportSocketFactoryPtr transport_socket_factory_;
