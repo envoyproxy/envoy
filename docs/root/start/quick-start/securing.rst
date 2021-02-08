@@ -109,7 +109,7 @@ certificate is valid for.
 
 .. _start_quick_start_securing_mtls:
 
-Use mututal ``TLS`` (``mTLS``) to enforce client certificate authentication
+Use mutual ``TLS`` (``mTLS``) to enforce client certificate authentication
 ---------------------------------------------------------------------------
 
 With mutual ``TLS`` (``mTLS``), Envoy also provides a way to authenticate connecting clients.
@@ -146,7 +146,7 @@ similar to validating upstream certificates :ref:`described above <start_quick_s
 
 .. _start_quick_start_securing_mtls_client:
 
-Use mututal ``TLS`` (``mTLS``) to connect with client certificates
+Use mutual ``TLS`` (``mTLS``) to connect with client certificates
 ------------------------------------------------------------------
 
 When connecting to an upstream with client certificates you can set them as follows:

@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package envoy.config.listener.v4alpha;
 
-import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 

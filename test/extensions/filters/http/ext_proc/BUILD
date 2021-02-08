@@ -38,6 +38,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "ordering_test",
+    srcs = ["ordering_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":mock_server_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:common_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "client_test",
     srcs = ["client_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
@@ -95,6 +108,7 @@ envoy_extension_cc_test_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

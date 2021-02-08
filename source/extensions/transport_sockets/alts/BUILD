@@ -34,6 +34,10 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     external_deps = [
         "abseil_node_hash_set",
     ],

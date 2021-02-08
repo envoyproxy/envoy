@@ -801,10 +801,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
+TEST_F(HttpConnectionManagerImplTest, DateHeaderNotPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
@@ -815,63 +812,10 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
   doRemoteClose();
 }
 
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateNotSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
+TEST_F(HttpConnectionManagerImplTest, DateHeaderPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
-  const auto* modified_headers = sendResponseHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
-  ASSERT_TRUE(modified_headers);
-  EXPECT_TRUE(modified_headers->Date());
-  doRemoteClose();
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
-  const auto* modified_headers =
-      sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
-          {":status", "200"}, {"server", "foo"}, {"date", expected_date.c_str()}}});
-  ASSERT_TRUE(modified_headers);
-  ASSERT_TRUE(modified_headers->Date());
-  EXPECT_NE(expected_date, modified_headers->getDateValue());
-  doRemoteClose();
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
-  const auto* modified_headers =
-      sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
-          {":status", "200"}, {"server", "foo"}, {"date", expected_date.c_str()}}});
-  ASSERT_TRUE(modified_headers);
-  ASSERT_TRUE(modified_headers->Date());
-  EXPECT_EQ(expected_date, modified_headers->getDateValue());
-  doRemoteClose();
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateFromCache) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  encoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter);
   const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
   const auto* modified_headers =
       sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
@@ -2656,7 +2600,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     request_timer->invokeCallback();
     return Http::okStatus();
   }));
@@ -2886,7 +2831,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutCallbackDisarmsAndRetu
     EXPECT_CALL(*request_header_timer, enableTimer(request_headers_timeout_, _));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     return Http::okStatus();
   }));
 
@@ -2971,77 +2917,6 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("426", headers.getStatusValue());
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, Http10ConnCloseLegacy) {
-  http1_settings_.accept_http_10_ = true;
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, protocol()).Times(AnyNumber()).WillRepeatedly(Return(Protocol::Http10));
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host:80"}, {":method", "CONNECT"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ProxyConnectLegacyClose) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host:80"}, {":method", "CONNECT"}, {"proxy-connection", "close"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ConnectLegacyClose) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host"}, {":method", "CONNECT"}, {"connection", "close"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("close", headers.getConnectionValue());
       }));
 

@@ -3,7 +3,7 @@
 # 1. Take protoxform artifacts from Bazel cache and pretty-print with protoprint.py.
 # 2. In the case where we are generating an Envoy internal shadow, it may be
 #    necessary to combine the current active proto, subject to hand editing, with
-#    shadow artifacts from the previous verion; this is done via
+#    shadow artifacts from the previous version; this is done via
 #    merge_active_shadow.py.
 # 3. Diff or copy resulting artifacts to the source tree.
 
@@ -433,7 +433,7 @@ def Sync(api_root, mode, labels, shadow):
         if deleted_files:
           print('The following files will be deleted: %s' % sorted(deleted_files))
           print(
-              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/master/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
+              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
           )
           if input('Delete files? [yN] ').strip().lower() == 'y':
             subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))

@@ -32,8 +32,9 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
       type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
       dispatcher_(dispatcher) {}
 
-void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                                        const std::set<std::string>& cur_removed) {
+void DeltaSubscriptionState::updateSubscriptionInterest(
+    const absl::flat_hash_set<std::string>& cur_added,
+    const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
     setResourceWaitingForServer(a);
     // If interest in a resource is removed-then-added (all before a discovery request

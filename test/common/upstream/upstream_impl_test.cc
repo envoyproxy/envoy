@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
@@ -320,7 +321,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                 address:
                   socket_address:
                     address: localhost2
-                    port_value: 11002 
+                    port_value: 11002
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -471,7 +472,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
                 address:
                   socket_address:
                     address: foo.bar.com
-                    port_value: 443 
+                    port_value: 443
   )EOF";
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
@@ -1008,7 +1009,7 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-                    resolver_name: customresolver 
+                    resolver_name: customresolver
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -1167,7 +1168,7 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
                 address:
                   socket_address:
                     address: localhost1
-                    port_value: 11001                     
+                    port_value: 11001
             - endpoint:
                 address:
                   socket_address:
@@ -1661,7 +1662,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
                 address:
                   socket_address:
                     address: 10.0.0.1
-                    port_value: 11001                  
+                    port_value: 11001
             - endpoint:
                 address:
                   socket_address:
@@ -1719,7 +1720,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
                 address:
                   socket_address:
                     address: 10.0.0.1
-                    port_value: 11001                  
+                    port_value: 11001
             - endpoint:
                 address:
                   socket_address:
@@ -1860,7 +1861,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
                 address:
                   socket_address:
                     address: 10.0.0.1
-                    port_value: 11001                  
+                    port_value: 11001
             - endpoint:
                 address:
                   socket_address:
@@ -1898,7 +1899,8 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
   EXPECT_EQ(1UL,
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
-  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy();
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy(
+      HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 }
 
 TEST_F(StaticClusterImplTest, UnsupportedLBType) {
@@ -3350,19 +3352,77 @@ TEST(HostPartitionTest, PartitionHosts) {
   HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source),
                    makeTestHost(info, "tcp://127.0.0.1:81", *time_source),
                    makeTestHost(info, "tcp://127.0.0.1:82", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source)};
+                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source),
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   hosts[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
   hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+  hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
-  auto hosts_per_locality = makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3]}});
+  auto hosts_per_locality =
+      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
 
   auto update_hosts_params =
       HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
 
-  EXPECT_EQ(4, update_hosts_params.hosts->size());
+  EXPECT_EQ(5, update_hosts_params.hosts->size());
+  EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
+  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
+  EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
+  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
+  EXPECT_EQ(2, update_hosts_params.excluded_hosts->get().size());
+  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
+  EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts->get()[1]);
+
+  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
+  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
+
+  EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
+  EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts_per_locality->get()[1][0]);
+
+  EXPECT_EQ(1, update_hosts_params.degraded_hosts_per_locality->get()[0].size());
+  EXPECT_EQ(0, update_hosts_params.degraded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
+
+  EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
+  EXPECT_EQ(2, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
+  EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
+}
+
+// Verifies that partitionHosts correctly splits hosts based on their health flags when
+// "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster" is disabled.
+TEST(HostPartitionTest, PartitionHostsImmediateFailureExcludeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster", "false"}});
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
+  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source),
+                   makeTestHost(info, "tcp://127.0.0.1:81", *time_source),
+                   makeTestHost(info, "tcp://127.0.0.1:82", *time_source),
+                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source),
+                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source)};
+
+  hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  hosts[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+  hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
+  hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  auto hosts_per_locality =
+      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
+
+  auto update_hosts_params =
+      HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
+
+  EXPECT_EQ(5, update_hosts_params.hosts->size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
   EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
@@ -3371,7 +3431,7 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
 
   EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[1].size());
+  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
 
   EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
@@ -3385,6 +3445,7 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
 }
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

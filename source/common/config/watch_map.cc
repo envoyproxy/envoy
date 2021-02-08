@@ -3,6 +3,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/cleanup.h"
+#include "common/common/utility.h"
 #include "common/config/decoded_resource_impl.h"
 #include "common/config/xds_resource.h"
 
@@ -61,23 +62,20 @@ void WatchMap::removeDeferredWatches() {
   deferred_removed_during_update_ = nullptr;
 }
 
-AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
-                                           const std::set<std::string>& update_to_these_names) {
+AddedRemoved
+WatchMap::updateWatchInterest(Watch* watch,
+                              const absl::flat_hash_set<std::string>& update_to_these_names) {
   if (update_to_these_names.empty()) {
     wildcard_watches_.insert(watch);
   } else {
     wildcard_watches_.erase(watch);
   }
 
-  std::vector<std::string> newly_added_to_watch;
-  std::set_difference(update_to_these_names.begin(), update_to_these_names.end(),
-                      watch->resource_names_.begin(), watch->resource_names_.end(),
-                      std::inserter(newly_added_to_watch, newly_added_to_watch.begin()));
+  absl::flat_hash_set<std::string> newly_added_to_watch;
+  SetUtil::setDifference(update_to_these_names, watch->resource_names_, newly_added_to_watch);
 
-  std::vector<std::string> newly_removed_from_watch;
-  std::set_difference(watch->resource_names_.begin(), watch->resource_names_.end(),
-                      update_to_these_names.begin(), update_to_these_names.end(),
-                      std::inserter(newly_removed_from_watch, newly_removed_from_watch.begin()));
+  absl::flat_hash_set<std::string> newly_removed_from_watch;
+  SetUtil::setDifference(watch->resource_names_, update_to_these_names, newly_removed_from_watch);
 
   watch->resource_names_ = update_to_these_names;
 
@@ -226,9 +224,10 @@ void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const Envo
   }
 }
 
-std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& newly_added_to_watch,
-                                              Watch* watch) {
-  std::set<std::string> newly_added_to_subscription;
+absl::flat_hash_set<std::string>
+WatchMap::findAdditions(const absl::flat_hash_set<std::string>& newly_added_to_watch,
+                        Watch* watch) {
+  absl::flat_hash_set<std::string> newly_added_to_subscription;
   for (const auto& name : newly_added_to_watch) {
     auto entry = watch_interest_.find(name);
     if (entry == watch_interest_.end()) {
@@ -242,9 +241,10 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
   return newly_added_to_subscription;
 }
 
-std::set<std::string>
-WatchMap::findRemovals(const std::vector<std::string>& newly_removed_from_watch, Watch* watch) {
-  std::set<std::string> newly_removed_from_subscription;
+absl::flat_hash_set<std::string>
+WatchMap::findRemovals(const absl::flat_hash_set<std::string>& newly_removed_from_watch,
+                       Watch* watch) {
+  absl::flat_hash_set<std::string> newly_removed_from_subscription;
   for (const auto& name : newly_removed_from_watch) {
     auto entry = watch_interest_.find(name);
     RELEASE_ASSERT(
