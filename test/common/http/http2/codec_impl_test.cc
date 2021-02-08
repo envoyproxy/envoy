@@ -977,13 +977,13 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
 
   Stats::TestUtil::MemoryTest memory_test;
-  server_->dumpState(ostream, 0);
+  server_->dumpState(ostream, 1);
 
   EXPECT_EQ(memory_test.consumedBytes(), 0);
   // Check the entire dump to ensure correct formating.
   // This test might be a little brittle because of this, and hence in the other
   // dump tests we focus on the particular substring of interest.
-  EXPECT_THAT(ostream.contents(), StartsWith("Http2::ConnectionImpl"));
+  EXPECT_THAT(ostream.contents(), StartsWith("  Http2::ConnectionImpl"));
   EXPECT_THAT(
       ostream.contents(),
       HasSubstr(
@@ -992,8 +992,8 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
           "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_: 0\n"
-          "&protocol_constraints_: \n"
-          "  ProtocolConstraints"));
+          "  &protocol_constraints_: \n"
+          "    ProtocolConstraints"));
   EXPECT_THAT(
       ostream.contents(),
       EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
@@ -1003,8 +1003,8 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
                "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
                "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
                "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
-               "Number of active streams: 0 Active Streams:\n"
-               "current_slice_: null\n"));
+               "  Number of active streams: 0 Active Streams:\n"
+               "  current_slice_: null\n"));
 }
 
 TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
@@ -1029,22 +1029,21 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     OutputBufferStream ostream{buffer.data(), buffer.size()};
     // Check no memory allocated.
     Stats::TestUtil::MemoryTest memory_test;
-    server_->dumpState(ostream, 0);
+    server_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
 
     // Check contents for active stream, trailers to encode and header map.
-    EXPECT_THAT(
-        ostream.contents(),
-        HasSubstr(
-            "Number of active streams: 1 Active Streams:\nstream: \nConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(), HasSubstr("  Number of active streams: 1 Active Streams:\n"
+                                              "  stream: \n"
+                                              "    ConnectionImpl::StreamImpl"));
     EXPECT_THAT(ostream.contents(),
-                HasSubstr("pending_trailers_to_encode_:   null\n"
-                          "  absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
-                          "    ':scheme', 'http'\n"
-                          "    ':method', 'GET'\n"
-                          "    ':authority', 'host'\n"
-                          "    ':path', '/'\n"
-                          "current_slice_: null"));
+                HasSubstr("pending_trailers_to_encode_:     null\n"
+                          "    absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
+                          "      ':scheme', 'http'\n"
+                          "      ':method', 'GET'\n"
+                          "      ':authority', 'host'\n"
+                          "      ':path', '/'\n"
+                          "  current_slice_: null"));
   }
 
   // Dump client
@@ -1053,18 +1052,18 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     OutputBufferStream ostream{buffer.data(), buffer.size()};
     // Check no memory allocated.
     Stats::TestUtil::MemoryTest memory_test;
-    client_->dumpState(ostream, 0);
+    client_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
 
     // Check contents for active stream, trailers to encode and header map.
-    EXPECT_THAT(ostream.contents(), HasSubstr("Number of active streams: 1 Active Streams:\n"
-                                              "stream: \n"
-                                              "ConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(), HasSubstr("  Number of active streams: 1 Active Streams:\n"
+                                              "  stream: \n"
+                                              "    ConnectionImpl::StreamImpl"));
     EXPECT_THAT(ostream.contents(),
-                HasSubstr("pending_trailers_to_encode_:   null\n"
-                          "  absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n"
-                          "    ':status', '200'\n"
-                          "current_slice_: null"));
+                HasSubstr("pending_trailers_to_encode_:     null\n"
+                          "    absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n"
+                          "      ':status', '200'\n"
+                          "  current_slice_: null"));
   }
 }
 
@@ -1088,7 +1087,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
     // dumpState here while we had a current slice of data. No Memory should be
     // allocated.
     Stats::TestUtil::MemoryTest memory_test;
-    server_->dumpState(ostream, 0);
+    server_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
   }));
   Buffer::OwnedImpl hello("hello envoy");

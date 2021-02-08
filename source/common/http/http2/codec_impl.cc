@@ -1428,7 +1428,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 
 void ConnectionImpl::StreamImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
+  os << spaces << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
      << DUMP_MEMBER(unconsumed_bytes_) << DUMP_MEMBER(read_disable_count_)
      << DUMP_MEMBER(local_end_stream_sent_) << DUMP_MEMBER(remote_end_stream_)
      << DUMP_MEMBER(data_deferred_) << DUMP_MEMBER(received_noninformational_headers_)
