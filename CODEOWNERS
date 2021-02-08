@@ -147,6 +147,7 @@ extensions/filters/common/original_src @snowp @klarose
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/compression/brotli @junr03 @rojkov
 /*/extensions/filters/http/decompressor @rojkov @dio
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
