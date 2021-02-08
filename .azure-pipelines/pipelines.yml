@@ -53,6 +53,7 @@ stages:
           - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
             workingDirectory: $(Build.SourcesDirectory)
             env:
+              AZP_BRANCH: $(Build.SourceBranch)
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance

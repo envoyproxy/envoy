@@ -468,7 +468,7 @@ DEPENDENCY_REPOSITORIES = dict(
     kafka_server_binary = dict(
         sha256 = "b9582bab0c3e8d131953b1afa72d6885ca1caae0061c2623071e7f396f2ccfee",
         strip_prefix = "kafka_2.12-2.4.0",
-        urls = ["https://mirrors.gigenet.com/apache/kafka/2.4.0/kafka_2.12-2.4.0.tgz"],
+        urls = ["https://archive.apache.org/dist/kafka/2.4.0/kafka_2.12-2.4.0.tgz"],
         use_category = ["test"],
     ),
     kafka_python_client = dict(
