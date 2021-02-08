@@ -27,6 +27,9 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
 OWS
@@ -442,6 +445,7 @@ bools
 boringssl
 borks
 broadcasted
+brotli
 buf
 buflen
 bugprone
@@ -886,6 +890,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix

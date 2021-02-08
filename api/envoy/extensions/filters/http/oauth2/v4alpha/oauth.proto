@@ -7,8 +7,6 @@ import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
 import "envoy/type/matcher/v4alpha/path.proto";
 
-import "google/protobuf/duration.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";

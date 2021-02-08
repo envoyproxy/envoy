@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.api.v2.auth;
 
 import "udpa/annotations/migrate.proto";
-import "udpa/annotations/status.proto";
 
 import public "envoy/api/v2/auth/common.proto";
 import public "envoy/api/v2/auth/secret.proto";
