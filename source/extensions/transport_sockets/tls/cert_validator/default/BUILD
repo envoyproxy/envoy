@@ -16,12 +16,14 @@ envoy_cc_extension(
     hdrs = [
         "default_validator.h",
     ],
+    category = "envoy.tls.cert_validator",
     external_deps = [
         "ssl",
         "abseil_base",
         "abseil_hash",
     ],
-    security_posture = "unknown",
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
+    status = "stable",
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/ssl:context_config_interface",

@@ -2,6 +2,8 @@
 
 #include "envoy/ssl/context_config.h"
 
+#include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -10,7 +12,7 @@ namespace Tls {
 std::string getCertValidatorName(const Envoy::Ssl::CertificateValidationContextConfig* config) {
   return config != nullptr && config->customValidatorConfig().has_value()
              ? config->customValidatorConfig().value().name()
-             : "envoy.tls.cert_validator.default";
+             : CertValidatorNames::get().Default;
 };
 
 } // namespace Tls

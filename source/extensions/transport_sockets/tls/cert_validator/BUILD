@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = [
         "cert_validator.h",
         "factory.h",
+        "well_known_names.h",
     ],
     external_deps = [
         "ssl",

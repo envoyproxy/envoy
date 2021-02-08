@@ -213,6 +213,7 @@ message TlsSessionTicketKeys {
 }
 
 // [#next-free-field: 13]
+// .. _extension_envoy.tls.cert_validator.default:
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -372,10 +373,14 @@ message CertificateValidationContext {
       [(validate.rules).enum = {defined_only: true}];
 
   // The configuration of an extension specific certificate validator.
-  // If specified, the usage of all the values above depends on the custom validator.
-  // Currently only
-  // :ref:`envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`
-  // is implemented in Envoy.
+  // If specified, the usage of all the values above depends on the custom validator. Otherwise, the default validator is used.
+  // If you do not want custom validation algorithm, then there is no need to set this field.
+  // The following names are available here:
+  //
+  // .. _extension_envoy.tls.cert_validator.spiffe:
+  //
+  // **envoy.tls.cert_validator.spiffe**: `SPIFFE <https://github.com/spiffe/spiffe>`_ certificate validator.
+  // Please refer to :ref:`envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>` for more information.
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
 
   repeated string hidden_envoy_deprecated_verify_subject_alt_name = 4 [deprecated = true];

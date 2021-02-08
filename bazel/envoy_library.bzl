@@ -93,6 +93,7 @@ EXTENSION_CATEGORIES = [
     "envoy.tracers",
     "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream",
+    "envoy.tls.cert_validator",
     "envoy.upstreams",
     "envoy.wasm.runtime",
     "DELIBERATELY_OMITTED",

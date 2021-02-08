@@ -222,10 +222,10 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   size_t end = begin;
   for (; end < san.size(); end++) {
     if (san[end] == '/') {
-      break;
+      return san.substr(begin, end - begin);
     }
   }
-  return end < san.size() ? san.substr(begin, end - begin) : "";
+  return "";
 }
 
 size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
