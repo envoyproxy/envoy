@@ -19,6 +19,8 @@ namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
+
+constexpr uint64_t FRAGMENT_SIZE = 16*1024;
 /**
  * Network::IoHandle implementation which provides a buffer as data source. It is designed to used
  * by Network::ConnectionImpl. Some known limitations include

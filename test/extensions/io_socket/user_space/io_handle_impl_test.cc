@@ -12,6 +12,7 @@
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <netinet/in.h>
 
 using testing::NiceMock;
 
@@ -189,6 +190,59 @@ TEST_F(IoHandleImplTest, ReadContent) {
   ASSERT_EQ(0, internal_buffer.length());
 }
 
+// Test read throttling on watermark buffer.
+TEST_F(IoHandleImplTest, ReadThrottling) {
+  {
+    // Prepare data to read.
+    Buffer::OwnedImpl pending_data(std::string(12 * FRAGMENT_SIZE, 'a'));
+    while (pending_data.length() > 0) {
+      io_handle_peer_->write(pending_data);
+    }
+  }
+  Buffer::OwnedImpl unlimited_buf;
+  {
+    // Read at most 8 * FRAGMENT_SIZE to unlimited buffer.
+    auto result0 = io_handle_->read(unlimited_buf, absl::nullopt);
+    EXPECT_TRUE(result0.ok());
+    EXPECT_EQ(result0.rc_, 8 * FRAGMENT_SIZE);
+    EXPECT_EQ(unlimited_buf.length(), 8 * FRAGMENT_SIZE);
+    EXPECT_EQ(unlimited_buf.toString(), std::string(8 * FRAGMENT_SIZE, 'a'));
+  }
+
+  Buffer::WatermarkBuffer buf([]() {}, []() {}, []() {});
+  buf.setWatermarks(FRAGMENT_SIZE + 1);
+  {
+    // Verify that read() populates the buf to high watermark.
+    auto result = io_handle_->read(buf, 8 * FRAGMENT_SIZE + 1);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(result.rc_, FRAGMENT_SIZE + 1);
+    EXPECT_EQ(buf.length(), FRAGMENT_SIZE + 1);
+    EXPECT_FALSE(buf.highWatermarkTriggered());
+    EXPECT_EQ(buf.toString(), std::string(FRAGMENT_SIZE + 1, 'a'));
+  }
+
+  {
+    // Verify that read returns FRAGMENT_SIZE if the buf is over high watermark.
+    auto result1 = io_handle_->read(buf, 8 * FRAGMENT_SIZE + 1);
+    EXPECT_TRUE(result1.ok());
+    EXPECT_EQ(result1.rc_, FRAGMENT_SIZE);
+    EXPECT_EQ(buf.length(), 2 * FRAGMENT_SIZE + 1);
+    EXPECT_TRUE(buf.highWatermarkTriggered());
+    EXPECT_EQ(buf.toString(), std::string(2 * FRAGMENT_SIZE + 1, 'a'));
+  }
+  {
+    // Verify that read() returns FRAGMENT_SIZE bytes if the prepared buf is 1 byte away from high
+    // watermark.
+    buf.drain(FRAGMENT_SIZE + 1);
+    EXPECT_EQ(buf.length(), buf.highWatermark() - 1);
+    auto result2 = io_handle_->read(buf, 8 * FRAGMENT_SIZE + 1);
+    EXPECT_TRUE(result2.ok());
+    EXPECT_EQ(result2.rc_, FRAGMENT_SIZE);
+    EXPECT_TRUE(buf.highWatermarkTriggered());
+    EXPECT_EQ(buf.toString(), std::string(buf.highWatermark() - 1 + FRAGMENT_SIZE, 'a'));
+  }
+}
+
 // Test readv behavior.
 TEST_F(IoHandleImplTest, BasicReadv) {
   Buffer::OwnedImpl buf_to_write("abc");
@@ -224,6 +278,7 @@ TEST_F(IoHandleImplTest, ReadvMultiSlices) {
 
   auto result = io_handle_->readv(1024, slices, 2);
 
+  EXPECT_EQ(std::string(1024, 'a'), std::string(full_frag, full_frag + sizeof(full_frag)));
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(1024, result.rc_);
 }
@@ -354,42 +409,57 @@ TEST_F(IoHandleImplTest, WriteAgain) {
   EXPECT_EQ(10, buf.length());
 }
 
-// Test write() moves the fragments in front until the destination is over high watermark.
 TEST_F(IoHandleImplTest, PartialWrite) {
-  // Populate write destination with massive data so as to not writable.
-  io_handle_peer_->setWatermarks(128);
-  // Fragment contents                | a |`bbbb...b`|`ccc`|
-  // Len per fragment                 | 1 |  255     |  3  |
-  // Watermark boundary at b area     | low | high         |
-  // Write                            | 1st          | 2nd |
-  Buffer::OwnedImpl pending_data("a");
-  auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
-      std::string(255, 'b'),
-      [](const Buffer::OwnedBufferFragmentImpl* fragment) { delete fragment; });
-  auto tail_frag = Buffer::OwnedBufferFragmentImpl::create(
-      "ccc", [](const Buffer::OwnedBufferFragmentImpl* fragment) { delete fragment; });
-  pending_data.addBufferFragment(*long_frag.release());
-  pending_data.addBufferFragment(*tail_frag.release());
+  const uint64_t INITIAL_SIZE = 4 * FRAGMENT_SIZE;
+  io_handle_peer_->setWatermarks(FRAGMENT_SIZE + 1);
 
-  // Partial write: the first two slices are moved because the second slice move reaches the high
-  // watermark.
-  auto result = io_handle_->write(pending_data);
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.rc_, 256);
-  EXPECT_EQ(pending_data.length(), 3);
-  EXPECT_FALSE(io_handle_peer_->isWritable());
+  Buffer::OwnedImpl pending_data(std::string(INITIAL_SIZE, 'a'));
 
-  // Confirm that the further write return `EAGAIN`.
-  auto result2 = io_handle_->write(pending_data);
-  ASSERT_EQ(result2.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
-
-  // Make the peer writable again.
-  Buffer::OwnedImpl black_hole_buffer;
-  io_handle_peer_->read(black_hole_buffer, 10240);
-  EXPECT_TRUE(io_handle_peer_->isWritable());
-  auto result3 = io_handle_->write(pending_data);
-  EXPECT_EQ(result3.rc_, 3);
-  EXPECT_EQ(0, pending_data.length());
+  {
+    // Write until high watermark. The write bytes reaches high watermark value but high watermark
+    // is not triggered.
+    auto result = io_handle_->write(pending_data);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(result.rc_, FRAGMENT_SIZE + 1);
+    EXPECT_EQ(pending_data.length(), INITIAL_SIZE - (FRAGMENT_SIZE + 1));
+    EXPECT_TRUE(io_handle_peer_->isWritable());
+    EXPECT_EQ(io_handle_peer_->getWriteBuffer()->toString(), std::string(FRAGMENT_SIZE + 1, 'a'));
+  }
+  {
+    // Write another fragment since when high watermark is reached.
+    auto result1 = io_handle_->write(pending_data);
+    EXPECT_TRUE(result1.ok());
+    EXPECT_EQ(result1.rc_, FRAGMENT_SIZE);
+    EXPECT_EQ(pending_data.length(), INITIAL_SIZE - (FRAGMENT_SIZE + 1) - FRAGMENT_SIZE);
+    EXPECT_FALSE(io_handle_peer_->isWritable());
+    EXPECT_EQ(io_handle_peer_->getWriteBuffer()->toString(),
+              std::string(2 * FRAGMENT_SIZE + 1, 'a'));
+  }
+  {
+    // Confirm that the further write return `EAGAIN`.
+    auto result2 = io_handle_->write(pending_data);
+    ASSERT_EQ(result2.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+    ASSERT_EQ(result2.rc_, 0);
+  }
+  {
+    // Make the peer writable again.
+    Buffer::OwnedImpl black_hole_buffer;
+    auto result_drain =
+        io_handle_peer_->read(black_hole_buffer, FRAGMENT_SIZE + FRAGMENT_SIZE / 2 + 2);
+    ASSERT_EQ(result_drain.rc_, FRAGMENT_SIZE + FRAGMENT_SIZE / 2 + 2);
+    EXPECT_TRUE(io_handle_peer_->isWritable());
+  }
+  {
+    // The buffer in peer is less than FRAGMENT_SIZE away from high watermark. Write a FRAGMENT_SIZE
+    // anyway.
+    auto len = io_handle_peer_->getWriteBuffer()->length();
+    EXPECT_LT(io_handle_peer_->getWriteBuffer()->highWatermark() - len, FRAGMENT_SIZE);
+    EXPECT_GT(pending_data.length(), FRAGMENT_SIZE);
+    auto result3 = io_handle_->write(pending_data);
+    EXPECT_EQ(result3.rc_, FRAGMENT_SIZE);
+    EXPECT_FALSE(io_handle_peer_->isWritable());
+    EXPECT_EQ(io_handle_peer_->getWriteBuffer()->toString(), std::string(len + FRAGMENT_SIZE, 'a'));
+  }
 }
 
 TEST_F(IoHandleImplTest, WriteErrorAfterShutdown) {
@@ -420,14 +490,8 @@ TEST_F(IoHandleImplTest, WritevAgain) {
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
 }
 
-// Test writev() copies the slices in front until the destination is over high watermark.
 TEST_F(IoHandleImplTest, PartialWritev) {
-  // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
-  // Slices contents                  | a |`bbbb...b`|`ccc`|
-  // Len per slice                    | 1 |  255     |  3  |
-  // Watermark boundary at b area     | low | high         |
-  // Writev                           | 1st          | 2nd |
   Buffer::OwnedImpl pending_data("a");
   auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
       std::string(255, 'b'),

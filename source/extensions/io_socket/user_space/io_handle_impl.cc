@@ -21,6 +21,32 @@ namespace {
 Api::SysCallIntResult makeInvalidSyscallResult() {
   return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
 }
+
+/**
+ * Move at most max_length from src to dst. If the dst is close or beyond high watermark, move no
+ * more than 16K. It's not an error if src buffer doesn't contain enough data.
+ * @param dst supplies the buffer where the data is move to.
+ * @param src supplies the buffer where the data is move from.
+ * @param max_length supplies the max bytes the call can move.
+ * @return number of bytes this call moves.
+ */
+uint64_t move(Buffer::Instance& dst, Buffer::Instance& src, uint64_t max_length) {
+  ASSERT(src.length() > 0);
+  if (dst.highWatermark() != 0) {
+    if (dst.length() < dst.highWatermark()) {
+      // Move until high watermark so that high watermark is not triggered.
+      // However, if dst buffer is near high watermark, move 16K to avoid the small fragment move.
+      max_length = std::min(max_length,
+                            std::max<uint64_t>(FRAGMENT_SIZE, dst.highWatermark() - dst.length()));
+    } else {
+      // Move at most 16K if the dst buffer is over high watermark.
+      max_length = std::min<uint64_t>(max_length, FRAGMENT_SIZE);
+    }
+  }
+  uint64_t res = std::min(max_length, src.length());
+  dst.move(src, res);
+  return res;
+}
 } // namespace
 
 IoHandleImpl::IoHandleImpl()
@@ -88,7 +114,7 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
 Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
                                            absl::optional<uint64_t> max_length_opt) {
   // Do not read too many bytes in each attempt.
-  uint64_t max_length = max_length_opt.value_or(128 * 1024);
+  uint64_t max_length = max_length_opt.value_or(8 * FRAGMENT_SIZE);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
   }
@@ -104,19 +130,8 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
                                  Network::IoSocketError::deleteIoError)};
     }
   }
-  if (buffer.highWatermark() != 0) {
-    // Handler owner should not read if the buffer is above high waterwark.
-    ASSERT(buffer.length() < buffer.highWatermark());
-    // Read 16K even the existing buffer is closed to high watermark.
-    if (buffer.length() < buffer.highWatermark()) {  
-      max_length = std::min(max_length, std::max<uint64_t>(16*1024, buffer.highWatermark() - buffer.length()));
-    } else {
-      max_length = std::min<uint64_t>(max_length, 16 * 1024);
-    }
-  }
-  const uint64_t max_bytes_to_read = std::min(max_length, pending_received_data_.length());
-  buffer.move(pending_received_data_, max_bytes_to_read);
-  return {max_bytes_to_read, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
+  const uint64_t bytes_to_read = move(buffer, pending_received_data_, max_length);
+  return {bytes_to_read, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoHandleImpl::writev(const Buffer::RawSlice* slices, uint64_t num_slice) {
@@ -191,20 +206,12 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
     return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                Network::IoSocketError::deleteIoError)};
   }
-  uint64_t total_bytes_to_write = 0;
   const uint64_t max_bytes_to_write = buffer.length();
-  while (peer_handle_->isWritable()) {
-    const auto& front_slice = buffer.frontSlice();
-    if (front_slice.len_ == 0) {
-      break;
-    } else {
-      total_bytes_to_write += front_slice.len_;
-      peer_handle_->getWriteBuffer()->move(buffer, front_slice.len_);
-    }
-  }
+  const uint64_t total_bytes_to_write =
+      move(*peer_handle_->getWriteBuffer(), buffer, 8 * FRAGMENT_SIZE);
   peer_handle_->setNewDataAvailable();
-  ENVOY_LOG(trace, "socket {} write {} bytes of {}", static_cast<void*>(this),
-            total_bytes_to_write, max_bytes_to_write);
+  ENVOY_LOG(trace, "socket {} write {} bytes of {}", static_cast<void*>(this), total_bytes_to_write,
+            max_bytes_to_write);
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
 }
 
