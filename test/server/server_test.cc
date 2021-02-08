@@ -787,13 +787,13 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   // previous step in this test verified that it is equal to API_VERSION_NUMBER).
   std::string expected_oldest_api_version_string = absl::StrJoin(
       {server_->localInfo().node().user_agent_latest_api_version().version().major_number(),
-       std::max(static_cast<int64_t>(server_->localInfo()
-                                         .node()
-                                         .user_agent_latest_api_version()
-                                         .version()
-                                         .minor_number()) -
-                    1,
-                static_cast<int64_t>(0)),
+       static_cast<uint32_t>(std::max(static_cast<int64_t>(server_->localInfo()
+                                                               .node()
+                                                               .user_agent_latest_api_version()
+                                                               .version()
+                                                               .minor_number()) -
+                                          1,
+                                      static_cast<int64_t>(0))),
        server_->localInfo().node().user_agent_latest_api_version().version().patch()},
       ".");
   std::string oldest_api_version_string = absl::StrJoin(
