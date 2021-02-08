@@ -20,7 +20,8 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
-constexpr uint64_t FRAGMENT_SIZE = 16*1024;
+constexpr uint64_t FRAGMENT_SIZE = 16 * 1024;
+
 /**
  * Network::IoHandle implementation which provides a buffer as data source. It is designed to used
  * by Network::ConnectionImpl. Some known limitations include
@@ -33,10 +34,9 @@ constexpr uint64_t FRAGMENT_SIZE = 16*1024;
  */
 class IoHandleImpl final : public Network::IoHandle,
                            public UserSpace::IoHandle,
-                           protected Logger::Loggable<Logger::Id::io> {
+                           protected Logger::Loggable<Logger::Id::io>,
+                           NonCopyable {
 public:
-  IoHandleImpl();
-
   ~IoHandleImpl() override;
 
   // Network::IoHandle
@@ -141,6 +141,9 @@ public:
   }
 
 private:
+  friend class IoHandleFactory;
+  IoHandleImpl();
+
   // Support isOpen() and close(). Network::IoHandle owner must invoke close() to avoid potential
   // resource leak.
   bool closed_{false};
@@ -163,6 +166,14 @@ private:
 
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
+};
+
+using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;
+class IoHandleFactory {
+public:
+  static std::pair<IoHandleImplPtr, IoHandleImplPtr> createIoHandlePair() {
+    return std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(), new IoHandleImpl()};
+  }
 };
 } // namespace UserSpace
 } // namespace IoSocket

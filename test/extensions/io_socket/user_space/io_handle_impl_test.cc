@@ -1,3 +1,5 @@
+#include <netinet/in.h>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
@@ -12,7 +14,6 @@
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <netinet/in.h>
 
 using testing::NiceMock;
 
@@ -44,8 +45,7 @@ public:
 class IoHandleImplTest : public testing::Test {
 public:
   IoHandleImplTest() : buf_(1024) {
-    io_handle_ = std::make_unique<IoHandleImpl>();
-    io_handle_peer_ = std::make_unique<IoHandleImpl>();
+    std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
     io_handle_->setPeerHandle(io_handle_peer_.get());
     io_handle_peer_->setPeerHandle(io_handle_.get());
   }
@@ -1022,8 +1022,7 @@ TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {
 class IoHandleImplNotImplementedTest : public testing::Test {
 public:
   IoHandleImplNotImplementedTest() {
-    io_handle_ = std::make_unique<IoHandleImpl>();
-    io_handle_peer_ = std::make_unique<IoHandleImpl>();
+    std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
     io_handle_->setPeerHandle(io_handle_peer_.get());
     io_handle_peer_->setPeerHandle(io_handle_.get());
   }
