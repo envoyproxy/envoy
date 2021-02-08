@@ -775,6 +775,21 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
+// Validate server localInfo().zoneStatName() is set from bootstrap config
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromBootstrap) {
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
+// Validate server localInfo().zoneStatName() can by overridden by option
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
+  options_.service_zone_name_ = "bootstrap_zone_override";
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone_override",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
 // set.
 TEST_P(ServerInstanceImplTest,
