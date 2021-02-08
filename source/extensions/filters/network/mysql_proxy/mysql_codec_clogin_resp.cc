@@ -46,22 +46,22 @@ ClientLoginResponse::ClientLoginResponse(const ClientLoginResponse& other) {
 }
 
 ClientLoginResponse::AuthMoreMessage& ClientLoginResponse::asAuthMoreMessage() {
-  ASSERT(type_ == AuthMoreData);
+  ASSERT(type_ == ClientLoginResponseType::AuthMoreData);
   return *(dynamic_cast<AuthMoreMessage*>(message_.get()));
 }
 
 ClientLoginResponse::AuthSwitchMessage& ClientLoginResponse::asAuthSwitchMessage() {
-  ASSERT(type_ == AuthSwitch);
+  ASSERT(type_ == ClientLoginResponseType::AuthSwitch);
   return *(dynamic_cast<AuthSwitchMessage*>(message_.get()));
 }
 
 ClientLoginResponse::OkMessage& ClientLoginResponse::asOkMessage() {
-  ASSERT(type_ == Ok);
+  ASSERT(type_ == ClientLoginResponseType::Ok);
   return *(dynamic_cast<OkMessage*>(message_.get()));
 }
 
 ClientLoginResponse::ErrMessage& ClientLoginResponse::asErrMessage() {
-  ASSERT(type_ == Err);
+  ASSERT(type_ == ClientLoginResponseType::Err);
   return *(dynamic_cast<ErrMessage*>(message_.get()));
 }
 
@@ -73,16 +73,16 @@ DecodeStatus ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint32_
   }
   switch (resp_code) {
   case MYSQL_RESP_AUTH_SWITCH:
-    type(AuthSwitch);
+    type(ClientLoginResponseType::AuthSwitch);
     return message_->parseMessage(buffer, len - sizeof(uint8_t));
   case MYSQL_RESP_OK:
-    type(Ok);
+    type(ClientLoginResponseType::Ok);
     return message_->parseMessage(buffer, len - sizeof(uint8_t));
   case MYSQL_RESP_ERR:
-    type(Err);
+    type(ClientLoginResponseType::Err);
     return message_->parseMessage(buffer, len - sizeof(uint8_t));
   case MYSQL_RESP_MORE:
-    type(AuthMoreData);
+    type(ClientLoginResponseType::AuthMoreData);
     return message_->parseMessage(buffer, len - sizeof(uint8_t));
   default:
     break;
@@ -178,16 +178,16 @@ DecodeStatus ClientLoginResponse::AuthMoreMessage::parseMessage(Buffer::Instance
 
 void ClientLoginResponse::encode(Buffer::Instance& out) {
   switch (type_) {
-  case AuthSwitch:
+  case ClientLoginResponseType::AuthSwitch:
     message_->encode(out);
     break;
-  case Ok:
+  case ClientLoginResponseType::Ok:
     message_->encode(out);
     break;
-  case Err:
+  case ClientLoginResponseType::Err:
     message_->encode(out);
     break;
-  case AuthMoreData:
+  case ClientLoginResponseType::AuthMoreData:
     message_->encode(out);
     break;
   default:

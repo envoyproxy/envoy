@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -84,15 +85,15 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
 }
 
 void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.type() == AuthSwitch) {
+  if (client_login_resp.type() == ClientLoginResponseType::AuthSwitch) {
     config_->stats_.auth_switch_request_.inc();
-  } else if (client_login_resp.type() == Err) {
+  } else if (client_login_resp.type() == ClientLoginResponseType::Err) {
     config_->stats_.login_failures_.inc();
   }
 }
 
 void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.type() == Err) {
+  if (client_login_resp.type() == ClientLoginResponseType::Err) {
     config_->stats_.login_failures_.inc();
   }
 }

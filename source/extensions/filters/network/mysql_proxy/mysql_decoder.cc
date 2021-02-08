@@ -52,23 +52,23 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     callbacks_.onClientLoginResponse(client_login_resp);
 
     switch (client_login_resp.type()) {
-    case Ok: {
+    case ClientLoginResponseType::Ok: {
       session_.setState(MySQLSession::State::Req);
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
-    case AuthSwitch: {
+    case ClientLoginResponseType::AuthSwitch: {
       session_.setState(MySQLSession::State::AuthSwitchResp);
       break;
     }
-    case Err: {
+    case ClientLoginResponseType::Err: {
       // client/server should close the connection:
       // https://dev.mysql.com/doc/internals/en/connection-phase.html
       session_.setState(MySQLSession::State::Error);
       break;
     }
-    case AuthMoreData:
+    case ClientLoginResponseType::AuthMoreData:
     default:
       session_.setState(MySQLSession::State::NotHandled);
       break;
@@ -91,21 +91,21 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     callbacks_.onMoreClientLoginResponse(client_login_resp);
 
     switch (client_login_resp.type()) {
-    case Ok: {
+    case ClientLoginResponseType::Ok: {
       session_.setState(MySQLSession::State::Req);
       break;
     }
-    case AuthMoreData: {
+    case ClientLoginResponseType::AuthMoreData: {
       session_.setState(MySQLSession::State::AuthSwitchResp);
       break;
     }
-    case Err: {
+    case ClientLoginResponseType::Err: {
       // stop parsing auth req/response, attempt to resync in command state
       session_.setState(MySQLSession::State::Resync);
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
-    case AuthSwitch:
+    case ClientLoginResponseType::AuthSwitch:
     default:
       session_.setState(MySQLSession::State::NotHandled);
       break;

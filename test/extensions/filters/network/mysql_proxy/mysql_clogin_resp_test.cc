@@ -18,7 +18,7 @@ constexpr int MYSQL_UT_SERVER_WARNINGS = 0x0001;
 namespace {
 ClientLoginResponse initOkMessage() {
   ClientLoginResponse ok{};
-  ok.type(Ok);
+  ok.type(ClientLoginResponseType::Ok);
   ok.asOkMessage().setAffectedRows(1);
   ok.asOkMessage().setLastInsertId(MYSQL_UT_LAST_ID);
   ok.asOkMessage().setServerStatus(MYSQL_UT_SERVER_OK);
@@ -28,7 +28,7 @@ ClientLoginResponse initOkMessage() {
 }
 ClientLoginResponse initErrMessage() {
   ClientLoginResponse err{};
-  err.type(Err);
+  err.type(ClientLoginResponseType::Err);
   err.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
   err.asErrMessage().setSqlStateMarker('#');
   err.asErrMessage().setSqlState(MySQLTestUtils::getSqlState());
@@ -37,20 +37,20 @@ ClientLoginResponse initErrMessage() {
 }
 ClientLoginResponse initOldAuthSwitchMessage() {
   ClientLoginResponse auth_switch{};
-  auth_switch.type(AuthSwitch);
+  auth_switch.type(ClientLoginResponseType::AuthSwitch);
   auth_switch.asAuthSwitchMessage().setIsOldAuthSwitch(true);
   return auth_switch;
 }
 ClientLoginResponse initAuthSwitchMessage() {
   ClientLoginResponse auth_switch{};
-  auth_switch.type(AuthSwitch);
+  auth_switch.type(ClientLoginResponseType::AuthSwitch);
   auth_switch.asAuthSwitchMessage().setAuthPluginName(MySQLTestUtils::getAuthPluginName());
   auth_switch.asAuthSwitchMessage().setAuthPluginData(MySQLTestUtils::getAuthPluginData20());
   return auth_switch;
 }
 ClientLoginResponse initAuthMoreMessage() {
   ClientLoginResponse auth_more{};
-  auth_more.type(AuthMoreData);
+  auth_more.type(ClientLoginResponseType::AuthMoreData);
   auth_more.asAuthMoreMessage().setAuthMoreData(MySQLTestUtils::getAuthPluginData20());
   return auth_more;
 }
@@ -129,7 +129,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrEncDec) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginOldAuthSwitch) {
+TEST_F(MySQLCLoginRespTest, MySQLLoginOldClientLoginResponseAuthSwitch) {
   ClientLoginResponse& mysql_old_auth_switch_encode =
       MySQLCLoginRespTest::getOldAuthSwitchMessage();
   Buffer::OwnedImpl decode_data;
@@ -148,7 +148,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOldAuthSwitch) {
  * - message is encoded using the ClientLoginResponse class
  * - message is decoded using the ClientLoginResponse class
  */
-TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitch) {
+TEST_F(MySQLCLoginRespTest, MySQLLoginClientLoginResponseAuthSwitch) {
   ClientLoginResponse mysql_auth_switch_encode(MySQLCLoginRespTest::getAuthSwitchMessage());
   Buffer::OwnedImpl decode_data;
   mysql_auth_switch_encode.encode(decode_data);
@@ -187,7 +187,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginOkIncompleteRespCode) {
 
   ClientLoginResponse mysql_loginok_decode{};
   mysql_loginok_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_loginok_decode.type(), Null);
+  EXPECT_EQ(mysql_loginok_decode.type(), ClientLoginResponseType::Null);
 }
 
 /*
@@ -323,7 +323,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginErrIncompleteRespCode) {
 
   ClientLoginResponse mysql_loginerr_decode{};
   mysql_loginerr_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_loginerr_decode.type(), Null);
+  EXPECT_EQ(mysql_loginerr_decode.type(), ClientLoginResponseType::Null);
 }
 
 /*
@@ -426,7 +426,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthSwitchIncompleteRespCode) {
 
   ClientLoginResponse mysql_login_auth_switch_decode{};
   mysql_login_auth_switch_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_login_auth_switch_decode.type(), Null);
+  EXPECT_EQ(mysql_login_auth_switch_decode.type(), ClientLoginResponseType::Null);
 }
 
 /*
@@ -480,7 +480,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompleteRespCode) {
 
   ClientLoginResponse mysql_login_auth_more_decode{};
   mysql_login_auth_more_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_EQ(mysql_login_auth_more_decode.type(), Null);
+  EXPECT_EQ(mysql_login_auth_more_decode.type(), ClientLoginResponseType::Null);
 }
 
 /*

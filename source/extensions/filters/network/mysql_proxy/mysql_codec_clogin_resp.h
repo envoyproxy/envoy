@@ -12,7 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-enum ClientLoginResponseType : uint8_t {
+enum class ClientLoginResponseType : uint8_t {
   Null = 0,
   Ok = 1,
   Err = 2,
@@ -25,7 +25,7 @@ enum ClientLoginResponseType : uint8_t {
 // method or OK_Packet, ERR_Packet when server auth ok or error
 class ClientLoginResponse : public MySQLCodec {
 public:
-  ClientLoginResponse() : type_(Null) {}
+  ClientLoginResponse() : type_(ClientLoginResponseType::Null) {}
   ClientLoginResponse(const ClientLoginResponse&);
 
   // MySQLCodec

@@ -49,21 +49,21 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
   ClientLoginResponse mysql_login_resp_encode{};
   switch (srv_resp) {
   case MYSQL_RESP_OK:
-    mysql_login_resp_encode.type(Ok);
+    mysql_login_resp_encode.type(ClientLoginResponseType::Ok);
     mysql_login_resp_encode.asOkMessage().setAffectedRows(MYSQL_SM_AFFECTED_ROWS);
     mysql_login_resp_encode.asOkMessage().setLastInsertId(MYSQL_SM_LAST_ID);
     mysql_login_resp_encode.asOkMessage().setServerStatus(MYSQL_SM_SERVER_OK);
     mysql_login_resp_encode.asOkMessage().setWarnings(MYSQL_SM_SERVER_WARNINGS);
     break;
   case MYSQL_RESP_ERR:
-    mysql_login_resp_encode.type(Err);
+    mysql_login_resp_encode.type(ClientLoginResponseType::Err);
     mysql_login_resp_encode.asErrMessage().setErrorCode(MYSQL_ERROR_CODE);
     mysql_login_resp_encode.asErrMessage().setSqlStateMarker('#');
     mysql_login_resp_encode.asErrMessage().setSqlState(MySQLTestUtils::getSqlState());
     mysql_login_resp_encode.asErrMessage().setErrorMessage(MySQLTestUtils::getErrorMessage());
     break;
   case MYSQL_RESP_AUTH_SWITCH:
-    mysql_login_resp_encode.type(AuthSwitch);
+    mysql_login_resp_encode.type(ClientLoginResponseType::AuthSwitch);
     mysql_login_resp_encode.asAuthSwitchMessage().setIsOldAuthSwitch(false);
     mysql_login_resp_encode.asAuthSwitchMessage().setAuthPluginData(
         MySQLTestUtils::getAuthPluginData20());
@@ -71,7 +71,7 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
         MySQLTestUtils::getAuthPluginName());
     break;
   case MYSQL_RESP_MORE:
-    mysql_login_resp_encode.type(AuthMoreData);
+    mysql_login_resp_encode.type(ClientLoginResponseType::AuthMoreData);
     mysql_login_resp_encode.asAuthMoreMessage().setAuthMoreData(
         MySQLTestUtils::getAuthPluginData20());
   }
