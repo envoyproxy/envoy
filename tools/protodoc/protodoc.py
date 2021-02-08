@@ -224,7 +224,7 @@ def FormatExtension(extension):
                                          extension=extension,
                                          status=status,
                                          security_posture=security_posture,
-                                         categories=extension_categories)
+                                         categories="%s\n  \n" % extension_categories)
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
