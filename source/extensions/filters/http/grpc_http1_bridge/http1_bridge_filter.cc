@@ -51,9 +51,10 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
   response_headers_ = &headers;
   if (end_stream) {
     // We still need to check if would-be trailers are present as headers
-    // for a gRPC Trailers-Only response. We do not need to set grpc status
-    // and message in this case because the "trailers" we are passing here
-    // are already the response headers heading downstream to the client.
+    // for a gRPC Trailers-Only response. Non-zero grpc-status will change the response code.
+    //
+    // However, we do not need to set grpc status and message in this case because the "trailers" we
+    // are passing here are already the response headers heading downstream to the client.
     doTrailers(headers, /*set_grpc_status_and_message=*/false);
     return Http::FilterHeadersStatus::Continue;
   } else {
@@ -79,13 +80,11 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
     chargeStat(trailers);
   }
 
-  if (!do_bridging_) {
-    return Http::FilterTrailersStatus::Continue;
+  if (do_bridging_) {
+    // We're bridging, so we need to process trailers and set the grpc status and message from
+    // the those input trailers.
+    doTrailers(trailers, /*set_grpc_status_and_message=*/true);
   }
-
-  // We're bridging, so we need to process trailers and set the grpc status and message from
-  // the those input trailers.
-  doTrailers(trailers, /*set_grpc_status_and_message=*/true);
 
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
   //       the chunk encoded response which is what we want.

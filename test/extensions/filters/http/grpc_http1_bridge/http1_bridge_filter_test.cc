@@ -224,6 +224,8 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/14872 testing trailers-only
+// responses
 TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatusTrailersOnlyResponse) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
