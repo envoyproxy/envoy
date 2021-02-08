@@ -286,12 +286,12 @@ Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscal
 absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
 
 Network::Address::InstanceConstSharedPtr IoHandleImpl::localAddress() {
-  // TODO(lambdai): Rewrite when caller accept error as the return value.
+  // TODO(lambdai): Replace throwing exception by returning value.
   throw EnvoyException(fmt::format("getsockname failed for IoHandleImpl"));
 }
 
 Network::Address::InstanceConstSharedPtr IoHandleImpl::peerAddress() {
-  // TODO(lambdai): Rewrite when caller accept error as the return value.
+  // TODO(lambdai): Replace throwing exception by returning value.
   throw EnvoyException(fmt::format("getsockname failed for IoHandleImpl"));
 }
 
