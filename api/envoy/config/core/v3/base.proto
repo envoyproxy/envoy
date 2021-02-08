@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/api_version.proto";
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/v3/percent.proto";
@@ -132,7 +133,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
@@ -181,6 +182,18 @@ message Node {
     // Structured version of the entity requesting config.
     BuildVersion user_agent_build_version = 8;
   }
+
+  // The oldest (minimal) API version the client supports (inclusive).
+  // Note that Envoy does not support API versions across different major versions,
+  // hence the user_agent_oldest_api_version and user_agent_latest_api_version must
+  // have the same major version.
+  ApiVersionNumber user_agent_oldest_api_version = 12;
+
+  // The latest (maximal) API version the client supports (inclusive).
+  // Note that Envoy does not support API versions across different major versions,
+  // hence the user_agent_oldest_api_version and user_agent_latest_api_version must
+  // have the same major version.
+  ApiVersionNumber user_agent_latest_api_version = 13;
 
   // List of extensions and their versions supported by the node.
   repeated Extension extensions = 9;

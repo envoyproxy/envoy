@@ -34,21 +34,25 @@ features and reduce the tech debt. A client can support a range of minor API
 versions, and can request xDS resources that match this range, using the resource
 [context parameters](https://github.com/cncf/udpa/blob/master/xds/core/v3/context_params.proto).
 Deprecated features, from previous minor or major versions (and their code), can be safely removed
-from the client. In general, within a minor API version, we do not allow any breaking changes
-(more details below). The minor version will be reset to 0 upon a release of a new major version.
+from the client. In general, within a major and minor API version, we do not allow any breaking
+changes to the protobuf definitions for the API (more details below).
+The minor version will be reset to 0 upon a release of a new major version.
 
 The patch version tracks incremental changes to the API, such as, adding a new
 package, adding a new field, deprecating a field, etc.
 A client can supply the supported patch version when requesting xDS resources,
-which allows clients and servers to support new features, before the release of
-the next minor version.
+which enables the server to detect the most recent API version that the client supports,
+and send configurations with new features, before the release of
+the next minor version. If the client does not supply a patch version, the
+server will assume that it is 0.
 The patch version will be reset to 0 upon a release of a new minor version.
 
 # Backwards compatibility
 
-In general, within a minor API version, we do not allow any breaking changes. The guiding
-principle is that neither the wire format nor protobuf compiler generated language bindings should
-experience a backward compatible break on a change. Specifically:
+In general, within a major and minor API version, we do not allow any breaking changes the protobuf
+definitions for the API. The guiding principle is that neither the wire format nor protobuf
+compiler generated language bindings should experience a backward compatible break on a change.
+Specifically:
 
 * Fields should not be renumbered or have their types changed. This is standard proto development
   procedure.
@@ -100,7 +104,7 @@ from clients (Envoy, gRPC) and a large number of control planes, ranging from si
 management servers to xDS-as-a-service offerings run by vendors. The [xDS API
 shepherds](https://github.com/orgs/envoyproxy/teams/api-shepherds) will make the decision to add a
 new major version subject to the following constraints:
-* There exists a major, breaking change, to the xDS APIs in the existing supported major version
+* There exists sufficient technical debt in the xDS APIs in the existing supported major version
   to justify the cost burden for xDS client/server implementations.
 * At least one year has elapsed since the last major version was cut.
 * Consultation with the Envoy community (via Envoy community call, `#xds` channel on Slack), as
@@ -108,13 +112,14 @@ new major version subject to the following constraints:
   process; the API shepherds retain the right to move forward with a new major API version after
   weighing this input with the first two considerations above.
 
-A new API minor version is expected to be released once a year, around Q1. This
+A new API minor version is expected to be released once a year, at the Q2 release. This
 allows for gradual introduction of new capabilities and features that will be supported
 by clients, and by control planes.
 Following the release of a new minor version, the API lifecycle follows a deprecation clock.
-Envoy will support the most recent 3 minor versions, including the current. This
-entails that we provide at least 2 years of supported deprecated features to
-unset.
+Envoy will support the most recent 2 minor versions, including the current. This
+entails that it may take between 1 to 2 years for a deprecated field to have
+support removed, depending on when the deprecation occurred in relation to the
+minor API version release.
 
 The patch version will be incremented upon changes to the API proto files, such
 as adding a new enum value, or setting a field as deprecated. We expect frequent
@@ -122,18 +127,24 @@ updates to the patch version.
 
 The following is a an example of the API versioning lifecycle. Assume that the
 current API version is v3.7.18. Assume that a new change (pull-request) updates the API as follows:
-`field1` is annotated as deprecated and `field2`, a new field, is added.
+`field1` is annotated as deprecated and a new field, `field2`, is added.
 As a consequence of this, the patch version is increased and the API version becomes v3.7.19.
 Upon sending a request for xDS resources, the client provides the resource type
 which includes its full package path which entails the API major version (v3), and
-the range of minor versions that the client supports (5 to 7) using the resource
-context parameters: `xds.api.oldest_minor_ver=5` and `xds.api.latest_minor_ver=7`.
+the range of minor versions that the client supports (6 to 7) using the resource
+context parameters: `xds.api.oldest_minor_version=6` and `xds.api.latest_minor_version=7`,
+as well as via the `user_agent_oldest_api_version` and `user_agent_latest_api_version` fields of
+the [Node](https://github.com/envoyproxy/envoy/blob/1942151aafceee50630572c82cc40d220ec4a63c/api/envoy/config/core/v3/base.proto#L135)
+descriptor that is sent as part of the
+[DiscoveryRequest](https://github.com/envoyproxy/envoy/blob/1942151aafceee50630572c82cc40d220ec4a63c/api/envoy/service/discovery/v3/discovery.proto#L24)
+(or [DeltaDiscoveryRequest](https://github.com/envoyproxy/envoy/blob/1942151aafceee50630572c82cc40d220ec4a63c/api/envoy/service/discovery/v3/discovery.proto#L144)
+in Delta xDS mode).
 In addition, the client will provide patch version (19) as part of the xDS resource request.
 This allows the control plane to send either resources with `field1` or with `field2`.
-In the next year's Q1, the current API minor version will be cut, and the API
+In the next year's Q2 release, the current API minor version will be cut, and the API
 version becomes v3.8.0. The client will now support a new minor versions range
-(6 to 8), and features deprecated in minor version 5 will be removed.
-When the API version becomes v3.10.0, `field1` will be removed from the API.
+(7 to 8), and features deprecated in minor version 6 will be removed.
+When the API version becomes v3.9.0, `field1` will be removed from the API.
 
 Patch version updates and minor version releases, is done using tools (TBD) that
 maintain the consistency of the API proto files.
@@ -156,12 +167,23 @@ patch version.
 
 # API feature deprecation
 
-A feature can be deprecated by annotating the corresponding field or enum value as `[deprecated = true]`.
+A feature can be deprecated by annotating the corresponding field or enum value as
+`[deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "X.Y"]` (or
+`(envoy.annotations.deprecated_at_minor_version_enum)` for enum values), where X and Y are the
+major and minor versions, respectively, on which the feature was deprecated. The
+[protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool will ensure that
+all deprecated features have a `envoy.annotations.deprecated_at_minor_version` set, and add an
+annotation with the current API minor version to the ones that do not.
 This implies that the feature is deprecated during the current minor version, `Y`.
-When the minor version is cut (starting with minor version `Y+1`), automatic tools will add another annotation,
-`[deprecated = true, minor_ver=Y]` (or `minor_ver_enum` for an enum value), indicating that the field
-(or enum value) were deprecated during minor version Y. 2 years later, when minor version `Y+2` will
-be cut (and `Y+3` will be the current version), the deprecated field or enum value will be removed.
+When the minor version is cut (starting with minor version `Y+1`), the protoxform tool will first
+verify that all deprecated fields have a `minor_version` annotations and remove any field or enum
+value with minor version `Y-1`. Note that the API should not contain features of
+version smaller than or equal to `Y-1` after the a new minor version is introduced.
+
+For example, if the current API version is 3.7.19, then
+new deprecated fields or enum values will be tagged with the value "3.7" in their
+deprecated at minor version annotation. Upon a new minor version release (8), all features that
+are annotated with minor version 6 will be removed.
 
 # When can an API change be made to a package's previous stable major version?
 

@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
 
@@ -63,6 +63,14 @@ message DiscoveryRequest {
   // internal exception related to the failure. It is only intended for consumption during manual
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
+
+  // [#not-implemented-hide:]
+  // An optional API patch version of the requested resource that is supported by
+  // the client. This is useful for use-cases where the client and server support new
+  // API features, before the next API minor version is rolled out.
+  // If not included, the patch version defaults to 0, stating that the client
+  // supports API features up to the client's minor version.
+  uint32 patch_version = 7;
 }
 
 // A response status for a discovery request, that describes the error, if any,
@@ -86,7 +94,7 @@ message DiscoveryResponseStatus {
   string description = 2;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message DiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryResponse";
 
@@ -136,14 +144,6 @@ message DiscoveryResponse {
   // implies the resource response is valid. No status map implies that all the
   // resources in the response are valid.
   map<string, DiscoveryResponseStatus> resources_status = 7;
-
-  // [#not-implemented-hide:]
-  // An optional API patch version of the requested resource that is supported by
-  // the client. This is useful for use-cases where the client and server support new
-  // API features, before the next API minor version is rolled out.
-  // If not included, the patch version defaults to 0, stating that the client
-  // supports API features up to the client's minor version.
-  uint32 patch_version = 8;
 }
 
 // DeltaDiscoveryRequest and DeltaDiscoveryResponse are used in a new gRPC

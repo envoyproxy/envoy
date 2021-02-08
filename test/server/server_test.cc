@@ -12,6 +12,7 @@
 #include "common/network/socket_option_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/thread_local/thread_local_impl.h"
+#include "common/version/api_version.h"
 #include "common/version/version.h"
 
 #include "server/process_context_impl.h"
@@ -773,6 +774,34 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
   EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_latest_api_version());
+  // Verify that the node's user_agent_latest_api_version equals to API_VERSION_NUMBER.
+  std::string latest_api_version_string = absl::StrJoin(
+      {server_->localInfo().node().user_agent_latest_api_version().version().major_number(),
+       server_->localInfo().node().user_agent_latest_api_version().version().minor_number(),
+       server_->localInfo().node().user_agent_latest_api_version().version().patch()},
+      ".");
+  EXPECT_EQ(API_VERSION_NUMBER, latest_api_version_string);
+  // Verify that the node's user_agent_oldest_api_version equals API_VERSION_NUMBER minus
+  // at most 2 minor versions (Using the node's user_agent_latest_api_version as the
+  // previous step in this test verified that it is equal to API_VERSION_NUMBER).
+  std::string expected_oldest_api_version_string = absl::StrJoin(
+      {server_->localInfo().node().user_agent_latest_api_version().version().major_number(),
+       std::max(static_cast<int64_t>(server_->localInfo()
+                                         .node()
+                                         .user_agent_latest_api_version()
+                                         .version()
+                                         .minor_number()) -
+                    1,
+                static_cast<int64_t>(0)),
+       server_->localInfo().node().user_agent_latest_api_version().version().patch()},
+      ".");
+  std::string oldest_api_version_string = absl::StrJoin(
+      {server_->localInfo().node().user_agent_oldest_api_version().version().major_number(),
+       server_->localInfo().node().user_agent_oldest_api_version().version().minor_number(),
+       server_->localInfo().node().user_agent_oldest_api_version().version().patch()},
+      ".");
+  EXPECT_EQ(expected_oldest_api_version_string, oldest_api_version_string);
 }
 
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not

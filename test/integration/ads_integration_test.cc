@@ -1514,9 +1514,9 @@ public:
   const absl::flat_hash_map<std::string, std::string> DEFAULT_XDSTP_CONTEXT_PARAMS{
       {"xds.node.id", "node_name"},
       {"xds.node.cluster", "cluster_name"},
-      {"xds.api.latest_minor_ver",
+      {"xds.api.latest_minor_version",
        absl::StrCat(ApiVersionInfo::apiVersion().version().minor_number())},
-      {"xds.api.oldest_minor_ver",
+      {"xds.api.oldest_minor_version",
        absl::StrCat(ApiVersionInfo::oldestApiVersion().version().minor_number())}};
 };
 

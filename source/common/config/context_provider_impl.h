@@ -15,9 +15,9 @@ public:
       : node_context_(XdsContextParams::encodeNodeContext(node, node_context_params)) {
     // Add the range of minor versions supported by the client to the context.
     auto& params = *node_context_.mutable_params();
-    params["xds.api.oldest_minor_ver"] =
+    params["xds.api.oldest_minor_version"] =
         absl::StrCat(ApiVersionInfo::oldestApiVersion().version().minor_number());
-    params["xds.api.latest_minor_ver"] =
+    params["xds.api.latest_minor_version"] =
         absl::StrCat(ApiVersionInfo::apiVersion().version().minor_number());
   }
 

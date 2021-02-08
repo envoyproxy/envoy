@@ -12,14 +12,15 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Test message]
+// This is only an example and should not be part of the actual API.
 
 // EnumExample
 enum EnumExample {
-  // Enum value deprecated in minor version 5.
-  VAL1 = 0 [deprecated = true, (envoy.annotations.minor_ver_enum) = 5];
+  // Enum value deprecated at minor version 5.
+  VAL1 = 0 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.5"];
 
-  // Enum value deprecated in current minor version.
-  VAL2 = 1 [deprecated = true];
+  // Enum value deprecated at current minor version (7).
+  VAL2 = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
 
   // Enum value that wasn't deprecated.
   VAL3 = 2;
@@ -27,11 +28,11 @@ enum EnumExample {
 
 // Test message that shows deprecated fields/enums life cycle
 message TestMessage {
-  // Field deprecated in minor version 6.
-  string field1 = 1 [deprecated = true, (envoy.annotations.minor_ver) = 6];
+  // Field deprecated at minor version 6.
+  string field1 = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.6"];
 
-  // Field deprecated in current minor version.
-  string field2 = 2 [deprecated = true];
+  // Field deprecated at current minor version (7).
+  string field2 = 2 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
 
   // Non-deprecated field.
   string field3 = 3;

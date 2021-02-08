@@ -63,7 +63,7 @@ envoy::config::core::v3::ApiVersionNumber ApiVersionInfo::computeOldestApiVersio
   // cannot be set to a previous major number.
   result.mutable_version()->set_major_number(latest_version.version().major_number());
   result.mutable_version()->set_minor_number(std::max(
-      static_cast<int64_t>(latest_version.version().minor_number()) - 2, static_cast<int64_t>(0)));
+      static_cast<int64_t>(latest_version.version().minor_number()) - 1, static_cast<int64_t>(0)));
   result.mutable_version()->set_patch(0);
   return result;
 }

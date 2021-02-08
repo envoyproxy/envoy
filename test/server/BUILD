@@ -365,6 +365,7 @@ envoy_cc_test(
         ":static_validation_test_data",
     ],
     deps = [
+        "//source/common/version:api_version_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",

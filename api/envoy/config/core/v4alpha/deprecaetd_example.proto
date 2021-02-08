@@ -12,6 +12,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Test message]
+// This is only an example and should not be part of the actual API.
 
 // EnumExample
 enum EnumExample {
@@ -19,9 +20,9 @@ enum EnumExample {
 
   reserved "VAL2";
 
-  // Enum value deprecated in minor version 5.
+  // Enum value deprecated at minor version 5.
   DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0
-      [deprecated = true, (envoy.annotations.minor_ver_enum) = 5];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.5"];
 
   // Enum value that wasn't deprecated.
   VAL3 = 2;
