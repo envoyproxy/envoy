@@ -50,6 +50,7 @@ message AccessLog {
   // #. "envoy.access_loggers.tcp_grpc": :ref:`TcpGrpcAccessLogConfig
   //    <envoy_api_msg_extensions.access_loggers.grpc.v3.TcpGrpcAccessLogConfig>`
   oneof config_type {
+    // [#protodoc-extension: envoy.access_loggers]
     google.protobuf.Any typed_config = 4;
   }
 }
