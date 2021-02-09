@@ -247,6 +247,11 @@ public:
 private:
   friend RtdsSubscription;
 
+  struct ThreadSafeSnapshot {
+    absl::Mutex mutex;
+    SnapshotConstSharedPtr snapshot ABSL_GUARDED_BY(mutex);
+  };
+
   // Create a new Snapshot
   SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
@@ -269,8 +274,7 @@ private:
   Upstream::ClusterManager* cm_{};
   Stats::Store& store_;
 
-  absl::Mutex snapshot_mutex_;
-  SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
+  std::vector<ThreadSafeSnapshot> thread_safe_snapshots_;
 };
 
 } // namespace Runtime

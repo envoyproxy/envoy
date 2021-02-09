@@ -1,7 +1,9 @@
 #include "common/runtime/runtime_impl.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
+#include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -370,7 +372,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {
+      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store),
+      thread_safe_snapshots_(std::thread::hardware_concurrency()) {
   absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
@@ -510,9 +513,9 @@ void LoaderImpl::loadNewSnapshot() {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
 
-  {
-    absl::MutexLock lock(&snapshot_mutex_);
-    thread_safe_snapshot_ = ptr;
+  for (ThreadSafeSnapshot& shard : thread_safe_snapshots_) {
+    absl::MutexLock lock(&shard.mutex);
+    shard.snapshot = ptr;
   }
 }
 
@@ -527,9 +530,12 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
     return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
 
+  int shard_num =
+      std::hash<std::thread::id>{}(std::this_thread::get_id()) % thread_safe_snapshots_.size();
+  ThreadSafeSnapshot& shard = thread_safe_snapshots_[shard_num];
   {
-    absl::ReaderMutexLock lock(&snapshot_mutex_);
-    return thread_safe_snapshot_;
+    absl::ReaderMutexLock lock(&shard.mutex);
+    return shard.snapshot;
   }
 }
 
