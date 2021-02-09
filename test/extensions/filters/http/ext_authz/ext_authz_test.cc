@@ -1587,9 +1587,31 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
 
-// Test that the request continues when the filter_callbacks has no route.
-TEST_P(HttpFilterTestParam, NoRoute) {
+// Test that the request stops at decodeHeaders when filter_callbacks has a route entry.
+TEST_P(HttpFilterTestParam, StopIterationWithRouteEntry) {
+  NiceMock<Router::MockRouteEntry> route_entry;
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(&route_entry));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, true));
+}
+
+// Test that the request stops at decodeHeaders when filter_callbacks has no route entry, but it
+// does have a direct response entry.
+TEST_P(HttpFilterTestParam, StopIterationWithDirectResponsEntry) {
+  NiceMock<Router::MockDirectResponseEntry> direct_response_entry;
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(*filter_callbacks_.route_, directResponseEntry()).WillOnce(Return(&direct_response_entry));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, true));
+}
+
+// Test that the request continues when filter_callbacks has no route / direct response entry.
+TEST_P(HttpFilterTestParam, ContinueIterationWithNoRouteOrDirectResponseEntry) {
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*filter_callbacks_.route_, directResponseEntry()).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
