@@ -382,3 +382,13 @@ message GrpcProtocolOptions {
 
   Http2ProtocolOptions http2_protocol_options = 1;
 }
+
+// [#not-implemented-hide:]
+//
+// A message which allows using HTTP/3 as an upstream protocol.
+//
+// Eventually this will include configuration for tuning HTTP/3.
+message Http3ProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.Http3ProtocolOptions";
+}

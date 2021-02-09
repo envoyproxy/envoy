@@ -706,6 +706,8 @@ public:
     // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
     // If ALPN is attempted but not supported by the upstream HTTP/1.1 is used.
     static const uint64_t USE_ALPN = 0x8;
+    // Whether the upstream supports HTTP3. This is used when creating connection pools.
+    static const uint64_t HTTP3 = 0x10;
   };
 
   virtual ~ClusterInfo() = default;
