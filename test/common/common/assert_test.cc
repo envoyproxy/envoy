@@ -1,6 +1,7 @@
 #include "common/common/assert.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -47,16 +48,18 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
   auto envoy_bug_action_registration =
       Assert::setEnvoyBugFailureRecordAction([&]() { envoy_bug_fail_count++; });
 
-#ifndef NDEBUG
-  EXPECT_DEATH({ ENVOY_BUG(false, ""); }, ".*envoy bug failure: false.*");
-  EXPECT_DEATH({ ENVOY_BUG(false, ""); }, ".*envoy bug failure: false.*");
-  EXPECT_DEATH({ ENVOY_BUG(false, "With some logs"); },
-               ".*envoy bug failure: false. Details: With some logs.*");
-  EXPECT_EQ(0, envoy_bug_fail_count);
-#else
-  // Same log lines trigger exponential back-off.
+  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "envoy bug failure: false.");
+  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "envoy bug failure: false.");
+  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, "With some logs"); },
+                   "envoy bug failure: false. Details: With some logs");
+
+#ifdef NDEBUG
+  EXPECT_EQ(3, envoy_bug_fail_count);
+  // Reset envoy bug count to simplify testing exponential back-off below.
+  envoy_bug_fail_count = 0;
+  // In release mode, same log lines trigger exponential back-off.
   for (int i = 0; i < 4; i++) {
-    ENVOY_BUG(false, "");
+    ENVOY_BUG(false, "placeholder ENVOY_BUG");
   }
   // 3 counts because 1st, 2nd, and 4th instances are powers of 2.
   EXPECT_EQ(3, envoy_bug_fail_count);
@@ -67,6 +70,15 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
                       ENVOY_BUG(false, "With some logs"));
   EXPECT_EQ(5, envoy_bug_fail_count);
 #endif
+}
+
+TEST(EnvoyBugDeathTest, TestResetCounters) {
+  // The callEnvoyBug counter has already been called in assert2_test.cc.
+  // ENVOY_BUG only log and increment stats on power of two cases. Ensure that counters are reset
+  // between tests by checking that two consecutive calls trigger the expectation.
+  for (int i = 0; i < 2; i++) {
+    EXPECT_ENVOY_BUG(TestEnvoyBug::callEnvoyBug(), "envoy bug failure: false.");
+  }
 }
 
 } // namespace Envoy
