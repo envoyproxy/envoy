@@ -20,7 +20,6 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -57,10 +56,10 @@ public:
                            uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                            Stats::Scope& scope, std::string access_log_prefix,
                            const Protobuf::MethodDescriptor& service_method,
-                           envoy::config::core::v3::ApiVersion transport_api_version)
+                           envoy::config::core::v3::ApiVersion transport_api_version, bool streaming)
       : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
                          dispatcher, scope, access_log_prefix, service_method,
-                         transport_api_version) {}
+                         transport_api_version, streaming) {}
 
   int numInits() const { return num_inits_; }
 
@@ -118,13 +117,13 @@ public:
     return entry;
   }
 
-  void initLogger(std::chrono::milliseconds buffer_flush_interval_msec, size_t buffer_size_bytes) {
+  void initLogger(std::chrono::milliseconds buffer_flush_interval_msec, size_t buffer_size_bytes, bool streaming) {
     timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, buffer_flush_interval_msec, buffer_size_bytes,
         dispatcher_, stats_store_, "mock_access_log_prefix.", mockMethodDescriptor(),
-        TRANSPORT_API_VERSION);
+        TRANSPORT_API_VERSION, streaming);
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
@@ -159,7 +158,7 @@ public:
 
 // Test basic stream logging flow.
 TEST_F(GrpcAccessLogTest, BasicFlow) {
-  initLogger(FlushInterval, 0);
+  initLogger(FlushInterval, 0, true);
 
   // Start a stream for the first log.
   MockAccessLogStream stream;
@@ -201,9 +200,53 @@ TEST_F(GrpcAccessLogTest, BasicFlow) {
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
 }
 
+// Test basic unary logging flow.
+TEST_F(GrpcAccessLogTest, BasicUnaryFlow) {
+  initLogger(FlushInterval, 0, false);
+
+  // Start a stream for the first log.
+  MockAccessLogStream stream;
+  AccessLogCallbacks* callbacks;
+  expectStreamStart(stream, &callbacks);
+  // Log an HTTP entry.
+  expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
+  // In Unary we expect the stream to be closed after a single message
+  EXPECT_CALL(stream, closeStream());
+  logger_->log(mockHttpEntry());
+  EXPECT_EQ(1, logger_->numInits());
+  EXPECT_EQ(1,
+            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
+
+  // Log a TCP entry.
+  expectFlushedLogEntriesCount(stream, MOCK_TCP_LOG_FIELD_NAME, 1);
+  EXPECT_CALL(stream, closeStream());
+  logger_->log(ProtobufWkt::Empty());
+  // TCP logging doesn't change the logs_written counter.
+  EXPECT_EQ(1,
+            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
+
+  // Verify that sending an empty response message doesn't do anything bad.
+  callbacks->onReceiveMessage(std::make_unique<ProtobufWkt::Struct>());
+
+  // Close the stream and make sure we make a new one.
+  callbacks->onRemoteClose(Grpc::Status::Internal, "bad");
+
+  expectStreamStart(stream, &callbacks);
+  // Log an HTTP entry.
+  expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
+  EXPECT_CALL(stream, closeStream());
+  logger_->log(mockHttpEntry());
+  // Message should be initialized again.
+  EXPECT_EQ(2, logger_->numInits());
+  EXPECT_EQ(0,
+            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
+  EXPECT_EQ(2,
+            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
+}
+
 TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   InSequence s;
-  initLogger(FlushInterval, 1);
+  initLogger(FlushInterval, 1, true);
 
   // Start a stream for the first log.
   MockAccessLogStream stream;
@@ -250,7 +293,7 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
 
 // Test that stream failure is handled correctly.
 TEST_F(GrpcAccessLogTest, StreamFailure) {
-  initLogger(FlushInterval, 0);
+  initLogger(FlushInterval, 0, true);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
       .WillOnce(
@@ -267,7 +310,7 @@ TEST_F(GrpcAccessLogTest, StreamFailure) {
 TEST_F(GrpcAccessLogTest, Batching) {
   // The approximate log size for buffering is calculated based on each entry's byte size.
   const int max_buffer_size = 3 * mockHttpEntry().ByteSizeLong();
-  initLogger(FlushInterval, max_buffer_size);
+  initLogger(FlushInterval, max_buffer_size, true);
 
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
@@ -292,7 +335,7 @@ TEST_F(GrpcAccessLogTest, Batching) {
 
 // Test that log entries are flushed periodically.
 TEST_F(GrpcAccessLogTest, Flushing) {
-  initLogger(FlushInterval, 100);
+  initLogger(FlushInterval, 100, true);
 
   // Nothing to do yet.
   EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
@@ -332,7 +375,7 @@ private:
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
         std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-        "mock_access_log_prefix.", mockMethodDescriptor(), config.transport_api_version());
+        "mock_access_log_prefix.", mockMethodDescriptor(), config.transport_api_version(), true);
   }
 };
 

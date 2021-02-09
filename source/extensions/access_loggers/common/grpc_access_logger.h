@@ -77,12 +77,21 @@ template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(Grpc::RawAsyncClientPtr&& client,
                       const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogClient(std::move(client), service_method, absl::nullopt) {}
+      : GrpcAccessLogClient(std::move(client), service_method, absl::nullopt, true) {}
   GrpcAccessLogClient(Grpc::RawAsyncClientPtr&& client,
                       const Protobuf::MethodDescriptor& service_method,
                       envoy::config::core::v3::ApiVersion transport_api_version)
       : client_(std::move(client)), service_method_(service_method),
-        transport_api_version_(transport_api_version) {}
+        transport_api_version_(transport_api_version), streaming_(true) {}
+  GrpcAccessLogClient(Grpc::RawAsyncClientPtr&& client,
+                      const Protobuf::MethodDescriptor& service_method, bool streaming)
+      : GrpcAccessLogClient(std::move(client), service_method, absl::nullopt, streaming) {}
+  GrpcAccessLogClient(Grpc::RawAsyncClientPtr&& client,
+                      const Protobuf::MethodDescriptor& service_method,
+                      envoy::config::core::v3::ApiVersion transport_api_version, bool streaming)
+      : client_(std::move(client)), service_method_(service_method),
+        transport_api_version_(transport_api_version), streaming_(streaming) {}
+
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -127,6 +136,9 @@ public:
       } else {
         stream_->stream_->sendMessage(request, false);
       }
+      if (isStreamStarted() && !streaming_) {
+        stream_->stream_->closeStream();
+      }
     } else {
       // Clear out the stream data due to stream creation failure.
       stream_.reset();
@@ -138,6 +150,8 @@ public:
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
+  // Indicates this should be a streaming connection and not a unary connection.
+  const bool streaming_;
 };
 
 } // namespace Detail
@@ -171,16 +185,33 @@ public:
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
+                   const Protobuf::MethodDescriptor& service_method,
+                   envoy::config::core::v3::ApiVersion transport_api_version)
+      :GrpcAccessLogger(std::move(client), buffer_flush_interval_msec,
+                        max_buffer_size_bytes, dispatcher, scope, access_log_prefix, service_method,
+                        transport_api_version, true) {}
+  GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
+                   std::chrono::milliseconds buffer_flush_interval_msec,
+                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
+                   Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method)
+      :GrpcAccessLogger(std::move(client), buffer_flush_interval_msec,
+                        max_buffer_size_bytes, dispatcher, scope, access_log_prefix, service_method, true){}
+
+  GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
+                   std::chrono::milliseconds buffer_flush_interval_msec,
+                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
+                   Stats::Scope& scope, std::string access_log_prefix,
+                   const Protobuf::MethodDescriptor& service_method, bool streaming)
       : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
-                         dispatcher, scope, access_log_prefix, service_method, absl::nullopt) {}
+                         dispatcher, scope, access_log_prefix, service_method, absl::nullopt, streaming) {}
   GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method,
-                   envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(std::move(client), service_method, transport_api_version),
+                   envoy::config::core::v3::ApiVersion transport_api_version, bool streaming)
+      : client_(std::move(client), service_method, transport_api_version, streaming),
         buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
