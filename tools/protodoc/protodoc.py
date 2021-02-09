@@ -240,12 +240,15 @@ def FormatExtensionType(extension_type):
   Returns:
     RST formatted extension type description.
   """
+  IGNORED_EXTENSIONS = [
+    "envoy.tracers.xray", "envoy.filters.http.cache.simple_http_cache"]
   try:
     anchor = FormatAnchor('extension_type_' + extension_type)
     extensions = "\n".join(
       "  - :ref:`%s <extension_%s>`" % (ext, ext)
       for ext
-      in EXTENSION_CATEGORIES[extension_type])
+      in EXTENSION_CATEGORIES[extension_type]
+      if ext not in IGNORED_EXTENSIONS)
     return EXTENSION_TYPE_TEMPLATE.substitute(anchor=anchor,
                                               extensions="%s\n  \n" % extensions)
   except KeyError as e:
