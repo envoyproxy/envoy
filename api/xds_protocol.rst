@@ -507,6 +507,8 @@ if no other :ref:`Listener <envoy_api_msg_Listener>` is pointing to :ref:`RouteC
 an empty :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` is effectively a no-op
 from the client's perspective.
 
+.. _xds_protocol_resource_not_existed:
+
 Knowing When a Requested Resource Does Not Exist
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
