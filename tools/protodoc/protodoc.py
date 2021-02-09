@@ -57,6 +57,8 @@ EXTENSION_TEMPLATE = string.Template("""$anchor
 This extension may be referenced by the qualified name *$extension*
 
 .. note::
+  EXTENSION_MARKER
+
   $status
 
   $security_posture
@@ -71,6 +73,8 @@ $categories
 EXTENSION_TYPE_TEMPLATE = string.Template("""$anchor
 
 .. tip::
+  EXTENSION_TYPE_MARKER
+
   This extension type has the following known extensions
 
 $extensions
