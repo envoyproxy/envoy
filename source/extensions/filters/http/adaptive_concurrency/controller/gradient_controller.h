@@ -220,7 +220,7 @@ public:
   void cancelLatencySample() override;
   uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
 
-private:
+
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
   void updateMinRTT();

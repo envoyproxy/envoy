@@ -69,6 +69,15 @@ protected:
     controller->recordLatencySample(time_system_.monotonicTime() - latency);
   }
 
+  void enterMinRTTSamplingWindow(const GradientControllerSharedPtr& controller) {
+      //absl::MutexLock ml(&controller->sample_mutation_mtx_);
+      controller->enterMinRTTSamplingWindow();
+  }
+
+  void updateMinRTT(const GradientControllerSharedPtr& controller) {
+    controller->updateMinRTT();
+  }
+
   // Helper function that will attempt to pull forwarding decisions.
   void tryForward(const GradientControllerSharedPtr& controller,
                   const bool expect_forward_response) {
@@ -370,6 +379,31 @@ min_rtt_calc_params:
     sampleLatency(controller, std::chrono::milliseconds(i));
   }
   verifyMinRTTValue(std::chrono::milliseconds(3));
+}
+
+TEST_F(GradientControllerTest, EmptyHistogramTestWithEnterMinRTTSamplingWindow) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  jitter:
+    value: 0.0
+  interval: 30s
+  request_count: 5
+)EOF";
+
+  auto controller = makeController(yaml);
+  tryForward(controller, true);
+  sampleLatency(controller, std::chrono::milliseconds(1));
+  updateMinRTT(controller);
+  enterMinRTTSamplingWindow(controller);
+  updateMinRTT(controller);
+
+
+  verifyMinRTTValue(std::chrono::milliseconds(1));
 }
 
 TEST_F(GradientControllerTest, SamplePercentileProcessTest) {
