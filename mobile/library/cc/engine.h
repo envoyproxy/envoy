@@ -15,6 +15,14 @@ namespace Platform {
 //   - change context from Engine ptr to EngineCallbacks ptr
 //   - move c_on_(...) from private static fn to static fn in anonymous namespace
 
+struct EngineCallbacks {
+  std::function<void()> on_engine_running;
+  // unused:
+  // std::function<void()> on_exit;
+};
+
+using EngineCallbacksSharedPtr = std::shared_ptr<EngineCallbacks>;
+
 class Engine {
 public:
   ~Engine();
@@ -24,15 +32,12 @@ public:
 
 private:
   Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level,
-         std::function<void()> on_engine_running);
-
-  static void c_on_engine_running(void* context);
-  static void c_on_exit(void* context);
+         EngineCallbacksSharedPtr callbacks);
 
   friend class EngineBuilder;
 
   envoy_engine_t engine_;
-  std::function<void()> on_engine_running_;
+  EngineCallbacksSharedPtr callbacks_;
   StreamClientSharedPtr stream_client_;
   PulseClientSharedPtr pulse_client_;
 };

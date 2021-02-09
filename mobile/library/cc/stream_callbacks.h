@@ -27,28 +27,11 @@ struct StreamCallbacks {
   absl::optional<OnErrorCallback> on_error;
   absl::optional<OnCompleteCallback> on_complete;
   absl::optional<OnCancelCallback> on_cancel;
+
+  envoy_http_callbacks as_envoy_http_callbacks();
 };
 
 using StreamCallbacksSharedPtr = std::shared_ptr<StreamCallbacks>;
-
-class EnvoyHttpCallbacksAdapter {
-public:
-  EnvoyHttpCallbacksAdapter(StreamCallbacksSharedPtr callbacks);
-
-  envoy_http_callbacks as_envoy_http_callbacks();
-
-private:
-  static void* c_on_headers(envoy_headers headers, bool end_stream, void* context);
-  static void* c_on_data(envoy_data data, bool end_stream, void* context);
-  static void* c_on_trailers(envoy_headers metadata, void* context);
-  static void* c_on_error(envoy_error raw_error, void* context);
-  static void* c_on_complete(void* context);
-  static void* c_on_cancel(void* context);
-
-  StreamCallbacksSharedPtr stream_callbacks_;
-};
-
-using EnvoyHttpCallbacksAdapterSharedPtr = std::shared_ptr<EnvoyHttpCallbacksAdapter>;
 
 } // namespace Platform
 } // namespace Envoy

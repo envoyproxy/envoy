@@ -9,11 +9,12 @@ EngineBuilder::EngineBuilder() {}
 
 EngineBuilder& EngineBuilder::add_log_level(LogLevel log_level) {
   this->log_level_ = log_level;
+  this->callbacks_ = std::make_shared<EngineCallbacks>();
   return *this;
 }
 
 EngineBuilder& EngineBuilder::set_on_engine_running(std::function<void()> closure) {
-  this->on_engine_running_ = closure;
+  this->callbacks_->on_engine_running = closure;
   return *this;
 }
 
@@ -87,8 +88,7 @@ EngineSharedPtr EngineBuilder::build() {
     }
   }
 
-  Engine* engine =
-      new Engine(init_engine(), config_str, this->log_level_, this->on_engine_running_);
+  Engine* engine = new Engine(init_engine(), config_str, this->log_level_, this->callbacks_);
   return EngineSharedPtr(engine);
 }
 

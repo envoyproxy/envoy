@@ -9,8 +9,8 @@
 namespace Envoy {
 namespace Platform {
 
-Stream::Stream(envoy_stream_t handle, EnvoyHttpCallbacksAdapterSharedPtr adapter)
-    : handle_(handle), adapter_(adapter) {}
+Stream::Stream(envoy_stream_t handle, StreamCallbacksSharedPtr callbacks)
+    : handle_(handle), callbacks_(callbacks) {}
 
 Stream& Stream::send_headers(RequestHeadersSharedPtr headers, bool end_stream) {
   envoy_headers raw_headers = raw_header_map_as_envoy_headers(headers->all_headers());

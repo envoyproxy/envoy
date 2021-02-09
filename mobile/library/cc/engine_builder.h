@@ -35,7 +35,7 @@ public:
 
 private:
   LogLevel log_level_ = LogLevel::info;
-  std::function<void()> on_engine_running_;
+  EngineCallbacksSharedPtr callbacks_;
 
   std::string stats_domain_ = "0.0.0.0";
   int connect_timeout_seconds_ = 30;

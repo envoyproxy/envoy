@@ -11,10 +11,9 @@ StreamPrototype::StreamPrototype(envoy_engine_t engine) : engine_(engine) {
 
 StreamSharedPtr StreamPrototype::start() {
   auto stream = init_stream(this->engine_);
-  auto adapter = std::make_shared<EnvoyHttpCallbacksAdapter>(this->callbacks_);
-  start_stream(stream, adapter->as_envoy_http_callbacks());
+  start_stream(stream, this->callbacks_->as_envoy_http_callbacks());
 
-  return std::make_shared<Stream>(stream, adapter);
+  return std::make_shared<Stream>(stream, this->callbacks_);
 }
 
 StreamPrototype& StreamPrototype::set_on_headers(OnHeadersCallback closure) {
