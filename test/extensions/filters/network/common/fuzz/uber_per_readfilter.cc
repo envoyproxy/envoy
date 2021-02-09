@@ -25,16 +25,16 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().LocalRateLimit,
         NetworkFilterNames::get().ClientSslAuth,
+        NetworkFilterNames::get().ExtAuthorization,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager,
+        NetworkFilterNames::get().LocalRateLimit,
         NetworkFilterNames::get().RateLimit,
         NetworkFilterNames::get().Rbac,
         NetworkFilterNames::get().TcpProxy,
-        NetworkFilterNames::get().Echo,
+
     };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
