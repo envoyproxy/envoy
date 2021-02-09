@@ -1404,6 +1404,8 @@ TEST_P(MysqlIntegrationTest, UpstreamWritesFirst) {
 
 // Make sure that with the connection read disabled, that disconnect detection
 // works.
+// Early close notification does not work for OSX
+#if !defined(__APPLE__)
 TEST_P(MysqlIntegrationTest, DisconnectDetected) {
   // Switch to per-upstream preconnect.
   perUpstreamPreconnect();
@@ -1422,6 +1424,7 @@ TEST_P(MysqlIntegrationTest, DisconnectDetected) {
 
   tcp_client->close();
 }
+#endif
 
 void MysqlIntegrationTest::testPreconnect() {
   globalPreconnect();
