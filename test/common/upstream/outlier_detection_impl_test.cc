@@ -1437,7 +1437,8 @@ TEST_F(OutlierDetectorImplTest, CrossThreadRemoveRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   loadRq(hosts_[0], 1, 500);
 
   // Remove before the cross thread event comes in.
@@ -1459,7 +1460,8 @@ TEST_F(OutlierDetectorImplTest, CrossThreadDestroyRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   loadRq(hosts_[0], 1, 500);
 
   // Destroy before the cross thread event comes in.
@@ -1482,7 +1484,8 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   loadRq(hosts_[0], 4, 500);
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   loadRq(hosts_[0], 1, 500);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));

@@ -152,7 +152,8 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   Buffer::OwnedImpl empty;
   std::function<void()> done;
 
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&done));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&done));
 
   handshaker->next(empty);
   handshaker->deferredDelete();

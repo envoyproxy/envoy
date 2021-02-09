@@ -205,7 +205,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   {
     TestLoadBalancerContext lb_context(nullptr);
     OriginalDstCluster::LoadBalancer lb(cluster_);
-    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
   }
@@ -219,7 +219,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     // tests we do not have the thread local clusters, so we pass a reference to the HostSet of the
     // primary cluster. The implementation handles both cases the same.
     OriginalDstCluster::LoadBalancer lb(cluster_);
-    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
   }
@@ -232,7 +232,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
         std::make_shared<Network::Address::PipeInstance>("unix://foo"));
 
     OriginalDstCluster::LoadBalancer lb(cluster_);
-    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
   }
@@ -267,7 +267,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
       std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
 
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
   HostConstSharedPtr host = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
@@ -316,7 +317,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   // New host gets created
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   // Mock the cluster manager by recreating the load balancer with the new host map
   HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
@@ -363,14 +365,16 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   OriginalDstCluster::LoadBalancer lb(cluster_);
   EXPECT_CALL(membership_updated_, ready());
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
   EXPECT_EQ(*connection1.addressProvider().localAddress(), *host1->address());
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
@@ -446,7 +450,8 @@ TEST_F(OriginalDstClusterTest, Connection) {
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
@@ -496,7 +501,8 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
 
   OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
@@ -539,7 +545,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -553,7 +560,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
                                       "127.0.0.1:5556");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   post_cb();
   ASSERT_NE(host2, nullptr);
@@ -563,7 +571,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
   TestLoadBalancerContext lb_context3(nullptr, Http::Headers::get().EnvoyOriginalDstHost.get(), "");
 
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
   HostConstSharedPtr host3 = lb.chooseHost(&lb_context3);
   EXPECT_EQ(host3, nullptr);
   EXPECT_EQ(
@@ -574,7 +582,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
                                       "a.b.c.d");
 
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
   HostConstSharedPtr host4 = lb.chooseHost(&lb_context4);
   EXPECT_EQ(host4, nullptr);
   EXPECT_EQ(
@@ -611,7 +619,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
   post_cb();
   ASSERT_NE(host1, nullptr);
@@ -625,7 +634,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
   HostConstSharedPtr host2 = lb.chooseHost(&lb_context2);
   EXPECT_EQ(host2, nullptr);
 
@@ -637,7 +646,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
                                       "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>())).Times(0);
   HostConstSharedPtr host3 = lb.chooseHost(&lb_context3);
   EXPECT_EQ(host3, nullptr);
 }

@@ -285,7 +285,8 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
 
   // Fake a balancer posting a connection to us.
   Event::PostCb post_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  EXPECT_CALL(dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
+      .WillOnce(SaveArg<0>(&post_cb));
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   current_handler->incNumConnections();
 #ifndef NDEBUG
