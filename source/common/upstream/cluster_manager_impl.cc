@@ -1490,9 +1490,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
-  if (protocols.size() == 2 &&
-      ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
-       (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
+  if (protocols.size() == 2) {
+    ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
+           (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);

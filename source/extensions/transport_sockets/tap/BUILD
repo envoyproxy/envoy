@@ -51,6 +51,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",

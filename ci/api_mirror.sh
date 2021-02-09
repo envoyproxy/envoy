@@ -3,8 +3,8 @@
 set -e
 
 CHECKOUT_DIR=../data-plane-api
-MAIN_BRANCH="refs/heads/master"
-API_MAIN_BRANCH="master"
+MAIN_BRANCH="refs/heads/main"
+API_MAIN_BRANCH="main"
 
 if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   echo "Cloning..."

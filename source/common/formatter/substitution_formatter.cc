@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -48,9 +49,6 @@ const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
-
-template <class... Ts> struct StructFormatMapVisitor : Ts... { using Ts::operator()...; };
-template <class... Ts> StructFormatMapVisitor(Ts...) -> StructFormatMapVisitor<Ts...>;
 
 } // namespace
 
@@ -141,83 +139,153 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       absl::string_view local_reply_body) const {
-  const auto output_struct = struct_formatter_.format(
+  const ProtobufWkt::Struct output_struct = struct_formatter_.format(
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
-  const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
+  const std::string log_line =
+      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
+StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                                 bool omit_empty_values)
+    : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+      empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
+      struct_output_format_(toFormatMapValue(format_mapping)) {}
+
 StructFormatter::StructFormatMapWrapper
-StructFormatter::toFormatMap(const ProtobufWkt::Struct& struct_format) const {
+StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
   for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
     case ProtobufWkt::Value::kStringValue:
-      output->emplace(pair.first, SubstitutionFormatParser::parse(pair.second.string_value()));
+      output->emplace(pair.first, toFormatStringValue(pair.second.string_value()));
       break;
+
     case ProtobufWkt::Value::kStructValue:
-      output->emplace(pair.first, toFormatMap(pair.second.struct_value()));
+      output->emplace(pair.first, toFormatMapValue(pair.second.struct_value()));
       break;
+
+    case ProtobufWkt::Value::kListValue:
+      output->emplace(pair.first, toFormatListValue(pair.second.list_value()));
+      break;
+
     default:
-      throw EnvoyException(
-          "Only string values or nested structs are supported in structured access log format.");
+      throw EnvoyException("Only string values, nested structs and list values are "
+                           "supported in structured access log format.");
     }
   }
   return {std::move(output)};
 };
+
+StructFormatter::StructFormatListWrapper
+StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const {
+  auto output = std::make_unique<StructFormatList>();
+  for (const auto& value : list_value_format.values()) {
+    switch (value.kind_case()) {
+    case ProtobufWkt::Value::kStringValue:
+      output->emplace_back(toFormatStringValue(value.string_value()));
+      break;
+
+    case ProtobufWkt::Value::kStructValue:
+      output->emplace_back(toFormatMapValue(value.struct_value()));
+      break;
+
+    case ProtobufWkt::Value::kListValue:
+      output->emplace_back(toFormatListValue(value.list_value()));
+      break;
+    default:
+      throw EnvoyException("Only string values, nested structs and list values are "
+                           "supported in structured access log format.");
+    }
+  }
+  return {std::move(output)};
+}
+
+std::vector<FormatterProviderPtr>
+StructFormatter::toFormatStringValue(const std::string& string_format) const {
+  return SubstitutionFormatParser::parse(string_format);
+};
+
+ProtobufWkt::Value StructFormatter::providersCallback(
+    const std::vector<FormatterProviderPtr>& providers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+    absl::string_view local_reply_body) const {
+  ASSERT(!providers.empty());
+  if (providers.size() == 1) {
+    const auto& provider = providers.front();
+    if (preserve_types_) {
+      return provider->formatValue(request_headers, response_headers, response_trailers,
+                                   stream_info, local_reply_body);
+    }
+
+    if (omit_empty_values_) {
+      return ValueUtil::optionalStringValue(provider->format(
+          request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+    }
+
+    const auto str = provider->format(request_headers, response_headers, response_trailers,
+                                      stream_info, local_reply_body);
+    return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
+  }
+  // Multiple providers forces string output.
+  std::string str;
+  for (const auto& provider : providers) {
+    const auto bit = provider->format(request_headers, response_headers, response_trailers,
+                                      stream_info, local_reply_body);
+    str += bit.value_or(empty_value_);
+  }
+  return ValueUtil::stringValue(str);
+}
+
+ProtobufWkt::Value StructFormatter::structFormatMapCallback(
+    const StructFormatter::StructFormatMapWrapper& format_map,
+    const StructFormatter::StructFormatMapVisitor& visitor) const {
+  ProtobufWkt::Struct output;
+  auto* fields = output.mutable_fields();
+  for (const auto& pair : *format_map.value_) {
+    ProtobufWkt::Value value = absl::visit(visitor, pair.second);
+    if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
+      continue;
+    }
+    (*fields)[pair.first] = value;
+  }
+  return ValueUtil::structValue(output);
+}
+
+ProtobufWkt::Value StructFormatter::structFormatListCallback(
+    const StructFormatter::StructFormatListWrapper& format_list,
+    const StructFormatter::StructFormatMapVisitor& visitor) const {
+  std::vector<ProtobufWkt::Value> output;
+  for (const auto& val : *format_list.value_) {
+    ProtobufWkt::Value value = absl::visit(visitor, val);
+    if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
+      continue;
+    }
+    output.push_back(value);
+  }
+  return ValueUtil::listValue(output);
+}
 
 ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& request_headers,
                                             const Http::ResponseHeaderMap& response_headers,
                                             const Http::ResponseTrailerMap& response_trailers,
                                             const StreamInfo::StreamInfo& stream_info,
                                             absl::string_view local_reply_body) const {
-  const std::string& empty_value =
-      omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
-  const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
-      providers_callback = [&](const std::vector<FormatterProviderPtr>& providers) {
-        ASSERT(!providers.empty());
-        if (providers.size() == 1) {
-          const auto& provider = providers.front();
-          if (preserve_types_) {
-            return provider->formatValue(request_headers, response_headers, response_trailers,
-                                         stream_info, local_reply_body);
-          }
-
-          if (omit_empty_values_) {
-            return ValueUtil::optionalStringValue(
-                provider->format(request_headers, response_headers, response_trailers, stream_info,
-                                 local_reply_body));
-          }
-
-          const auto str = provider->format(request_headers, response_headers, response_trailers,
-                                            stream_info, local_reply_body);
-          return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
-        }
-        // Multiple providers forces string output.
-        std::string str;
-        for (const auto& provider : providers) {
-          const auto bit = provider->format(request_headers, response_headers, response_trailers,
-                                            stream_info, local_reply_body);
-          str += bit.value_or(empty_value);
-        }
-        return ValueUtil::stringValue(str);
-      };
-  const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>
-      struct_format_map_callback = [&](const StructFormatter::StructFormatMapWrapper& format) {
-        ProtobufWkt::Struct output;
-        auto* fields = output.mutable_fields();
-        StructFormatMapVisitor visitor{struct_format_map_callback, providers_callback};
-        for (const auto& pair : *format.value_) {
-          ProtobufWkt::Value value = absl::visit(visitor, pair.second);
-          if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
-            continue;
-          }
-          (*fields)[pair.first] = value;
-        }
-        return ValueUtil::structValue(output);
-      };
-  return struct_format_map_callback(struct_output_format_).struct_value();
+  StructFormatMapVisitor visitor{
+      [&](const std::vector<FormatterProviderPtr>& providers) {
+        return providersCallback(providers, request_headers, response_headers, response_trailers,
+                                 stream_info, local_reply_body);
+      },
+      [&, this](const StructFormatter::StructFormatMapWrapper& format_map) {
+        return structFormatMapCallback(format_map, visitor);
+      },
+      [&, this](const StructFormatter::StructFormatListWrapper& format_list) {
+        return structFormatListCallback(format_list, visitor);
+      },
+  };
+  return structFormatMapCallback(struct_output_format_, visitor).struct_value();
 }
 
 void SubstitutionFormatParser::parseCommandHeader(const std::string& token, const size_t start,
@@ -294,6 +362,7 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
 
 FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token) {
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
+  static constexpr absl::string_view CLUSTER_META_TOKEN{"CLUSTER_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
@@ -329,6 +398,14 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
 
     parseCommand(token, start, ":", filter_namespace, path, max_length);
     return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
+  } else if (absl::StartsWith(token, CLUSTER_META_TOKEN)) {
+    std::string filter_namespace;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = CLUSTER_META_TOKEN.size();
+
+    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
     std::string key;
     absl::optional<size_t> max_length;
@@ -357,6 +434,15 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     return std::make_unique<DownstreamPeerCertVEndFormatter>(token);
   } else if (absl::StartsWith(token, "GRPC_STATUS")) {
     return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
+  } else if (absl::StartsWith(token, "REQUEST_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_TRAILERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
   }
 
   return nullptr;
@@ -666,8 +752,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-          if (nullptr != stream_info.upstreamHost()) {
-            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+          if (stream_info.upstreamClusterInfo().has_value()) {
+            upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
           }
 
           return upstream_cluster_name.empty()
@@ -955,6 +1041,41 @@ ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
   return HeaderFormatter::formatValue(response_trailers);
 }
 
+HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
+    : header_type_(header_type) {}
+
+uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers) const {
+  switch (header_type_) {
+  case HeaderType::RequestHeaders:
+    return request_headers.byteSize();
+  case HeaderType::ResponseHeaders:
+    return response_headers.byteSize();
+  case HeaderType::ResponseTrailers:
+    return response_trailers.byteSize();
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+absl::optional<std::string>
+HeadersByteSizeFormatter::format(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const {
+  return absl::StrCat(extractHeadersByteSize(request_headers, response_headers, response_trailers));
+}
+
+ProtobufWkt::Value
+HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
+                                      const Http::ResponseHeaderMap& response_headers,
+                                      const Http::ResponseTrailerMap& response_trailers,
+                                      const StreamInfo::StreamInfo&, absl::string_view) const {
+  return ValueUtil::numberValue(
+      extractHeadersByteSize(request_headers, response_headers, response_trailers));
+}
+
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
                                          absl::optional<size_t> max_length)
@@ -1006,7 +1127,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     return absl::nullopt;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
   truncate(json, max_length_);
   return json;
 }
@@ -1031,8 +1152,8 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
   return val;
 }
 
-// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
-// See: https://github.com/envoyproxy/envoy/issues/3006
+// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by
+// @htuch. See: https://github.com/envoyproxy/envoy/issues/3006
 DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
                                                    absl::optional<size_t> max_length)
@@ -1050,6 +1171,34 @@ ProtobufWkt::Value DynamicMetadataFormatter::formatValue(const Http::RequestHead
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          absl::string_view) const {
   return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
+}
+
+ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_namespace,
+                                                   const std::vector<std::string>& path,
+                                                   absl::optional<size_t> max_length)
+    : MetadataFormatter(filter_namespace, path, max_length) {}
+
+absl::optional<std::string> ClusterMetadataFormatter::format(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    return absl::nullopt;
+  }
+  return MetadataFormatter::formatMetadata(cluster_info.value()->metadata());
+}
+
+ProtobufWkt::Value ClusterMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo& stream_info,
+                                                         absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    // Let the formatter do its thing with empty metadata.
+    return MetadataFormatter::formatMetadataValue(envoy::config::core::v3::Metadata());
+  }
+  return MetadataFormatter::formatMetadataValue(cluster_info.value()->metadata());
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,

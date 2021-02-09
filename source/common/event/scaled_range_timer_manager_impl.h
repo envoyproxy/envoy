@@ -23,11 +23,14 @@ namespace Event {
  */
 class ScaledRangeTimerManagerImpl : public ScaledRangeTimerManager {
 public:
-  explicit ScaledRangeTimerManagerImpl(Dispatcher& dispatcher);
+  // Takes a Dispatcher and a map from timer type to scaled minimum value.
+  ScaledRangeTimerManagerImpl(Dispatcher& dispatcher,
+                              const ScaledTimerTypeMapConstSharedPtr& timer_minimums = nullptr);
   ~ScaledRangeTimerManagerImpl() override;
 
   // ScaledRangeTimerManager impl
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
+  TimerPtr createTimer(ScaledTimerType timer_type, TimerCb callback) override;
   void setScaleFactor(UnitFloat scale_factor) override;
 
 private:
@@ -65,6 +68,10 @@ private:
     //   2) on expiration
     //   3) when the scale factor changes
     const TimerPtr timer_;
+
+    // A flag indicating whether the queue is currently processing timers. Used to guard against
+    // queue deletion during timer processing.
+    bool processing_timers_{false};
   };
 
   /**
@@ -116,6 +123,7 @@ private:
   void onQueueTimerFired(Queue& queue);
 
   Dispatcher& dispatcher_;
+  const ScaledTimerTypeMapConstSharedPtr timer_minimums_;
   UnitFloat scale_factor_;
   absl::flat_hash_set<std::unique_ptr<Queue>, Hash, Eq> queues_;
 };

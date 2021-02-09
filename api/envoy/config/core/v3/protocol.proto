@@ -266,7 +266,7 @@ message Http2ProtocolOptions {
   // Still under implementation. DO NOT USE.
   //
   // Allows metadata. See [metadata
-  // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
+  // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
 
@@ -388,4 +388,12 @@ message GrpcProtocolOptions {
       "envoy.api.v2.core.GrpcProtocolOptions";
 
   Http2ProtocolOptions http2_protocol_options = 1;
+}
+
+// [#not-implemented-hide:]
+//
+// A message which allows using HTTP/3 as an upstream protocol.
+//
+// Eventually this will include configuration for tuning HTTP/3.
+message Http3ProtocolOptions {
 }

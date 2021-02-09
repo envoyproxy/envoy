@@ -21,6 +21,13 @@ Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name) {
   return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, watermark_factory_);
 }
 
+Event::DispatcherPtr
+Impl::allocateDispatcher(const std::string& name,
+                         const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) {
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, scaled_timer_factory,
+                                                 watermark_factory_);
+}
+
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name,
                                               Buffer::WatermarkFactoryPtr&& factory) {
   return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, std::move(factory));
