@@ -214,6 +214,13 @@ public:
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
+   * Sets the cached route for the current request.
+   * TODO point to DelgatingRoute
+   * TODO point out wouldn't survive a clearRouteCache()
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+
+  /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
    * view of clusterInfo after a route is picked/repicked.
