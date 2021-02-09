@@ -134,6 +134,8 @@ private:
     Buffer::Instance* buffer() override;
   };
 
+  using RequestFilterBasePtr = std::unique_ptr<RequestFilterBase>;
+
   struct ResponseFilterBase : FilterBase {
     ResponseFilterBase(PlatformBridgeFilter& parent)
         : FilterBase(parent, parent.platform_filter_.on_response_headers,
@@ -148,11 +150,13 @@ private:
     Buffer::Instance* buffer() override;
   };
 
+  using ResponseFilterBasePtr = std::unique_ptr<ResponseFilterBase>;
+
   Event::Dispatcher& dispatcher_;
   const std::string filter_name_;
   envoy_http_filter platform_filter_;
-  RequestFilterBase request_filter_base_;
-  ResponseFilterBase response_filter_base_;
+  RequestFilterBasePtr request_filter_base_{};
+  ResponseFilterBasePtr response_filter_base_{};
   envoy_http_filter_callbacks platform_request_callbacks_{};
   envoy_http_filter_callbacks platform_response_callbacks_{};
   bool error_response_{};

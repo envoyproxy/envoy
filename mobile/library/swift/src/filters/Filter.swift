@@ -26,7 +26,7 @@ extension EnvoyHTTPFilter {
         case .continue(let headers):
           return [kEnvoyFilterHeadersStatusContinue, headers.headers]
         case .stopIteration:
-          return [kEnvoyFilterHeadersStatusStopIteration, envoyHeaders]
+          return [kEnvoyFilterHeadersStatusStopIteration, NSNull()]
         }
       }
 
@@ -36,9 +36,9 @@ extension EnvoyHTTPFilter {
         case .continue(let data):
           return [kEnvoyFilterDataStatusContinue, data]
         case .stopIterationAndBuffer:
-          return [kEnvoyFilterDataStatusStopIterationAndBuffer, data]
+          return [kEnvoyFilterDataStatusStopIterationAndBuffer, NSNull()]
         case .stopIterationNoBuffer:
-          return [kEnvoyFilterDataStatusStopIterationNoBuffer, data]
+          return [kEnvoyFilterDataStatusStopIterationNoBuffer, NSNull()]
         case .resumeIteration(let headers, let data):
           return [kEnvoyFilterDataStatusResumeIteration, data, headers?.headers as Any]
         }
@@ -50,7 +50,7 @@ extension EnvoyHTTPFilter {
         case .continue(let trailers):
           return [kEnvoyFilterTrailersStatusContinue, trailers.headers]
         case .stopIteration:
-          return [kEnvoyFilterTrailersStatusStopIteration, envoyTrailers]
+          return [kEnvoyFilterTrailersStatusStopIteration, NSNull()]
         case .resumeIteration(let headers, let data, let trailers):
           return [
             kEnvoyFilterTrailersStatusResumeIteration,
@@ -70,7 +70,7 @@ extension EnvoyHTTPFilter {
         case .continue(let headers):
           return [kEnvoyFilterHeadersStatusContinue, headers.headers]
         case .stopIteration:
-          return [kEnvoyFilterHeadersStatusStopIteration, envoyHeaders]
+          return [kEnvoyFilterHeadersStatusStopIteration, NSNull()]
         }
       }
 
@@ -80,9 +80,9 @@ extension EnvoyHTTPFilter {
         case .continue(let data):
           return [kEnvoyFilterDataStatusContinue, data]
         case .stopIterationAndBuffer:
-          return [kEnvoyFilterDataStatusStopIterationAndBuffer, data]
+          return [kEnvoyFilterDataStatusStopIterationAndBuffer, NSNull()]
         case .stopIterationNoBuffer:
-          return [kEnvoyFilterDataStatusStopIterationNoBuffer, data]
+          return [kEnvoyFilterDataStatusStopIterationNoBuffer, NSNull()]
         case .resumeIteration(let headers, let data):
           return [kEnvoyFilterDataStatusResumeIteration, data, headers?.headers as Any]
         }
@@ -94,7 +94,7 @@ extension EnvoyHTTPFilter {
         case .continue(let trailers):
           return [kEnvoyFilterTrailersStatusContinue, trailers.headers]
         case .stopIteration:
-          return [kEnvoyFilterTrailersStatusStopIteration, envoyTrailers]
+          return [kEnvoyFilterTrailersStatusStopIteration, NSNull()]
         case .resumeIteration(let headers, let data, let trailers):
           return [
             kEnvoyFilterTrailersStatusResumeIteration,
