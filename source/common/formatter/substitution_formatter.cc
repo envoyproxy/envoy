@@ -885,7 +885,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [hostname](const StreamInfo::StreamInfo&) { return hostname; });
   } else if (field_name == "FILTER_CHAIN_NAME") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info)  -> absl::optional<std::string> {
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
           if (!stream_info.filterChainName().empty()) {
             return stream_info.filterChainName();
           }
