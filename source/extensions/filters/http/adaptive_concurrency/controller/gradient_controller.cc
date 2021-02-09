@@ -113,9 +113,11 @@ void GradientController::updateMinRTT() {
 
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
-    min_rtt_ = processLatencySamplesAndClear();
-    stats_.min_rtt_msecs_.set(
-        std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
+    if (hist_sample_count(latency_sample_hist_.get()) != 0) {
+        min_rtt_ = processLatencySamplesAndClear();
+        stats_.min_rtt_msecs_.set(
+            std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
+    }
     updateConcurrencyLimit(deferred_limit_value_.load());
     deferred_limit_value_.store(0);
     stats_.min_rtt_calculation_active_.set(0);
