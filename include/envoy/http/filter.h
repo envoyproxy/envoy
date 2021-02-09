@@ -218,7 +218,7 @@ public:
    * TODO point to DelgatingRoute
    * TODO point out wouldn't survive a clearRouteCache()
    */
-  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+  virtual void setRoute(const Router::RouteConstSharedPtr route) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.
