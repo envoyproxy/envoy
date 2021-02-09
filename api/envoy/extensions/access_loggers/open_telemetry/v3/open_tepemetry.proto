@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.open_telemetry.v3;
 
 import "api/envoy/extensions/access_loggers/grpc/v3/als.proto";
+import "opentelemetry/proto/collector/common/v1/common.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -21,4 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.access_loggers.open_telemetry]
 message OpenTelemetryAccessLogConfig {
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+  AnyValue body = 2;
+  KeyValue attributes = 3;
+  KeyValue resource_attributes = 4;
 }
