@@ -138,10 +138,9 @@ message VirtualHost {
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  // [#comment: If an entry's value is wrapped in a
-  // :ref:`OptionalFilterConfig<envoy_api_msg_config.route.v3.OptionalFilterConfig>`
-  // message, then clients that do not support this filter will ignore that
-  // entry rather than rejecting the config.]
+  // [#comment: An entry's value may be wrapped in a
+  // :ref:`FilterConfig<envoy_api_msg_config.route.v3.FilterConfig>`
+  // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 15;
 
   // Decides whether the :ref:`x-envoy-attempt-count
@@ -252,10 +251,9 @@ message Route {
   // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  // [#comment: If an entry's value is wrapped in a
-  // :ref:`OptionalFilterConfig<envoy_api_msg_config.route.v3.OptionalFilterConfig>`
-  // message, then clients that do not support this filter will ignore that
-  // entry rather than rejecting the config.]
+  // [#comment: An entry's value may be wrapped in a
+  // :ref:`FilterConfig<envoy_api_msg_config.route.v3.FilterConfig>`
+  // message to specify additional options.]
   map<string, google.protobuf.Any> typed_per_filter_config = 13;
 
   // Specifies a set of headers that will be added to requests matching this
@@ -370,10 +368,9 @@ message WeightedCluster {
     // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    // [#comment: If an entry's value is wrapped in a
-    // :ref:`OptionalFilterConfig<envoy_api_msg_config.route.v3.OptionalFilterConfig>`
-    // message, then clients that do not support this filter will ignore that
-    // entry rather than rejecting the config.]
+    // [#comment: An entry's value may be wrapped in a
+    // :ref:`FilterConfig<envoy_api_msg_config.route.v3.FilterConfig>`
+    // message to specify additional options.]
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
   }
 
@@ -1962,9 +1959,14 @@ message InternalRedirectPolicy {
 // :ref:`VirtualHost.typed_per_filter_config<envoy_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`,
 // :ref:`Route.typed_per_filter_config<envoy_api_field_config.route.v3.Route.typed_per_filter_config>`,
 // or :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
-// to indicate that the filter is optional. In this case, if the client does not support the filter,
-// it may ignore the map entry rather than rejecting the config.
+// to add additional flags to the filter.
 // [#not-implemented-hide:]
-message OptionalFilterConfig {
+message FilterConfig {
+  // The filter config.
   google.protobuf.Any config = 1;
+
+  // If true, the filter is optional, meaning that if the client does
+  // not support the specified filter, it may ignore the map entry rather
+  // than rejecting the config.
+  bool is_optional = 2;
 }
