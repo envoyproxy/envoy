@@ -19,36 +19,49 @@
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace HttpGrpc {
+namespace OpenTelemetry {
+
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(open_telemetry_access_logger_cache);
+
+GrpcAccessLoggerCacheSharedPtr
+getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
+  return context.singletonManager().getTyped<GrpcAccessLoggerCacheImpl>(
+      SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_access_logger_cache), [&context] {
+        return std::make_shared<GrpcAccessLoggerCacheImpl>(
+            context.clusterManager().grpcAsyncClientManager(), context.scope(),
+            context.threadLocal(), context.localInfo());
+      });
+}
 
 AccessLog::InstanceSharedPtr
-HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                                  AccessLog::FilterPtr&& filter,
-                                                  Server::Configuration::FactoryContext& context) {
-  GrpcCommon::validateProtoDescriptors();
+OpenTelemetry::createAccessLogInstance(const Protobuf::Message& config,
+                                       AccessLog::FilterPtr&& filter,
+                                       Server::Configuration::FactoryContext& context) {
+  // GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
+      const envoy::extensions::access_loggers::grpc::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<OtGrpc::OtGrpcAccessLog>(
+  return std::make_shared<OpenTelemetry::AccessLog>(
       std::move(filter), proto_config, context.threadLocal(),
-      GrpcCommon::getGrpcOpenTelemetryAccessLoggerCacheSingleton(context), context.scope());
+      getAccessLoggerCacheSingleton(context), context.scope());
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig>();
 }
 
-std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get().HttpGrpc; }
+std::string AccessLogFactory::name() const { return AccessLogNames::get().OpenTelemetry; }
 
 /**
- * Static registration for the HTTP gRPC access log. @see RegisterFactory.
+ * Static registration for the OpenTelemetry (gRPC) access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(HttpGrpcAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.http_grpc_access_log"};
+REGISTER_FACTORY(AccessLogFactory, Server::Configuration::AccessLogInstanceFactory){
+    "envoy.open_telemetry_access_log"};
 
-} // namespace HttpGrpc
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

@@ -112,21 +112,3 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/service/accesslog/v3:pkg_cc_proto",
     ],
 )
-
-
-envoy_extension_cc_test(
-    name = "grpc_ot_access_log_impl_test",
-    srcs = ["grpc_ot_access_log_impl_test.cc"],
-    extension_name = "envoy.access_loggers.http_grpc",
-    deps = [
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/extensions/access_loggers/grpc:grpc_ot_access_log_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_cc_proto",
-    ],
-)
-

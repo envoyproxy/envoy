@@ -13,7 +13,6 @@
 #include "extensions/access_loggers/grpc/config_utils.h"
 #include "extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
-#include "extensions/access_loggers/grpc/ot_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
@@ -31,9 +30,9 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
       const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<OtGrpc::OtGrpcAccessLog>(
-      std::move(filter), proto_config, context.threadLocal(),
-      GrpcCommon::getGrpcOpenTelemetryAccessLoggerCacheSingleton(context), context.scope());
+  return std::make_shared<HttpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
+                                             GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
+                                             context.scope());
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {

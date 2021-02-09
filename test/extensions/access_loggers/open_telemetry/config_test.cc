@@ -1,10 +1,11 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/open_telemetry.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
+#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -18,10 +19,10 @@ using testing::Invoke;
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace HttpGrpc {
+namespace OpenTelemetry {
 namespace {
 
-class HttpGrpcAccessLogConfigTest : public testing::Test {
+class OpenTelemetryAccessLogConfigTest : public testing::Test {
 public:
   void SetUp() override {
     factory_ =
@@ -56,11 +57,11 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   AccessLog::InstanceSharedPtr instance =
       factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
   EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
+  EXPECT_NE(nullptr, dynamic_cast<OtGrpc::OtGrpcAccessLog*>(instance.get()));
 }
 
 } // namespace
-} // namespace HttpGrpc
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

@@ -7,12 +7,12 @@
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace HttpGrpc {
+namespace OpenTelemetry {
 
 /**
- * Config registration for the HTTP gRPC access log. @see AccessLogInstanceFactory.
+ * Config registration for the OpenTelemetry (gRPC) access log. @see AccessLogInstanceFactory.
  */
-class HttpGrpcAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class AccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
@@ -23,7 +23,7 @@ public:
   std::string name() const override;
 };
 
-} // namespace HttpGrpc
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

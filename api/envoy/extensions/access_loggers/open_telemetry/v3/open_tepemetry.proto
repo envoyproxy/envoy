@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.open_telemetry.v3;
+
+import "api/envoy/extensions/access_loggers/grpc/v3/als.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.grpc.v3";
+option java_outer_classname = "OpenTelemetryProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OpenTelemetry (gRPC) Access Log ]
+
+// Configuration for the built-in *envoy.access_loggers.open_telemetry*
+// :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
+// populate :ref:`StreamAccessLogsMessage.http_logs
+// <envoy_api_field_service.accesslog.v3.StreamAccessLogsMessage.http_logs>`.
+// [#extension: envoy.access_loggers.open_telemetry]
+message OpenTelemetryAccessLogConfig {
+  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+}
