@@ -6,16 +6,31 @@
 namespace Envoy {
 namespace Platform {
 
+namespace {
+
+void c_on_engine_running(void* context) {
+  EngineCallbacks* engine_callbacks = static_cast<EngineCallbacks*>(context);
+  engine_callbacks->on_engine_running();
+}
+
+void c_on_exit(void* context) {
+  // NOTE: this function is intentionally empty
+  // as we don't actually do any post-processing on exit.
+  (void)context;
+}
+
+} // namespace
+
 Engine::Engine(envoy_engine_t engine, const std::string& configuration, LogLevel log_level,
-               std::function<void()> on_engine_running)
-    : engine_(engine), on_engine_running_(on_engine_running) {
-  envoy_engine_callbacks callbacks{
-      .on_engine_running = &Engine::c_on_engine_running,
-      .on_exit = &Engine::c_on_exit,
-      .context = this,
+               EngineCallbacksSharedPtr callbacks)
+    : engine_(engine), callbacks_(callbacks) {
+  envoy_engine_callbacks envoy_callbacks{
+      .on_engine_running = &c_on_engine_running,
+      .on_exit = &c_on_exit,
+      .context = &this->callbacks_,
   };
 
-  run_engine(this->engine_, callbacks, configuration.c_str(),
+  run_engine(this->engine_, envoy_callbacks, configuration.c_str(),
              log_level_to_string(log_level).c_str());
 
   this->stream_client_ = std::make_shared<StreamClient>(this->engine_);
@@ -26,17 +41,6 @@ Engine::~Engine() { terminate_engine(this->engine_); }
 
 StreamClientSharedPtr Engine::stream_client() { return this->stream_client_; }
 PulseClientSharedPtr Engine::pulse_client() { return this->pulse_client_; }
-
-void Engine::c_on_engine_running(void* context) {
-  Engine* engine = static_cast<Engine*>(context);
-  engine->on_engine_running_();
-}
-
-void Engine::c_on_exit(void* context) {
-  // NOTE: this function is intentionally empty
-  // as we don't actually do any post-processing on exit.
-  (void)context;
-}
 
 } // namespace Platform
 } // namespace Envoy

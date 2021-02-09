@@ -12,7 +12,7 @@ namespace Platform {
 
 class Stream {
 public:
-  Stream(envoy_stream_t handle, EnvoyHttpCallbacksAdapterSharedPtr adapter);
+  Stream(envoy_stream_t handle, StreamCallbacksSharedPtr callbacks);
 
   Stream& send_headers(RequestHeadersSharedPtr headers, bool end_stream);
   Stream& send_data(envoy_data data);
@@ -22,7 +22,7 @@ public:
 
 private:
   envoy_stream_t handle_;
-  EnvoyHttpCallbacksAdapterSharedPtr adapter_;
+  StreamCallbacksSharedPtr callbacks_;
 };
 
 using StreamSharedPtr = std::shared_ptr<Stream>;
