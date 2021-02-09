@@ -124,6 +124,7 @@ message GrpcService {
 
         string name = 1;
 
+        // [#protodoc-extension: envoy.filters.network]
         oneof config_type {
           google.protobuf.Any typed_config = 3;
         }
