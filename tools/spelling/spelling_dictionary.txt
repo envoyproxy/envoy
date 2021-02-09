@@ -27,6 +27,9 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
 OWS
@@ -34,6 +37,7 @@ Preconnecting
 STATNAME
 SkyWalking
 TIDs
+WASI
 ceil
 CCM
 CHACHA
@@ -442,6 +446,7 @@ bools
 boringssl
 borks
 broadcasted
+brotli
 buf
 buflen
 bugprone
@@ -545,6 +550,7 @@ deflater
 deletable
 deleter
 delim
+denylist
 deque
 deprecations
 dereference
@@ -591,6 +597,7 @@ enqueued
 enqueues
 enum
 enums
+environ
 epoll
 errno
 etag
@@ -886,6 +893,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix

@@ -457,6 +457,35 @@ std::string StringUtil::escape(const std::string& source) {
   return ret;
 }
 
+// TODO(kbaichoo): If needed, add support for escaping chars < 32 and >= 127.
+void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
+  for (const char c : view) {
+    switch (c) {
+    case '\r':
+      os << "\\r";
+      break;
+    case '\n':
+      os << "\\n";
+      break;
+    case '\t':
+      os << "\\t";
+      break;
+    case '"':
+      os << "\\\"";
+      break;
+    case '\'':
+      os << "\\\'";
+      break;
+    case '\\':
+      os << "\\\\";
+      break;
+    default:
+      os << c;
+      break;
+    }
+  }
+}
+
 const std::string& getDefaultDateFormat() {
   CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
 }
