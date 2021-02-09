@@ -49,7 +49,7 @@ void EnvoyQuicClientSession::OnCanWrite() {
   if (quic::VersionUsesHttp3(transport_version())) {
     quic::QuicSpdyClientSession::OnCanWrite();
   } else {
-    SendBufferMonitor::ScopedWatermarkBufferUpdater updator(headers_stream(), this);
+    SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
     quic::QuicSpdyClientSession::OnCanWrite();
   }
   maybeApplyDelayClosePolicy();
