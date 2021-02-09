@@ -642,7 +642,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
-  // Set up ext_authz filter
+  // Set up ext_authz filter.
   initializeConfig();
 
   // Use h1, set up the test.
@@ -660,7 +660,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
                        Http::TestRequestHeaderMapImpl{},
                        Headers{{"downstream2", "downstream-should-see-me"}});
 
-  // Wait for the upstream response
+  // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
 
   // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.

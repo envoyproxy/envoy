@@ -303,7 +303,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
       {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, "", TestCommon::makeHeaderValueOption({}),
+      CheckStatus::OK, Http::Code::OK, EMPTY_STRING TestCommon::makeHeaderValueOption({}),
       TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", false}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
