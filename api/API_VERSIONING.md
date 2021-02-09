@@ -99,6 +99,7 @@ implementations within a major version should set explicit values for these fiel
 
 # API lifecycle
 
+## Major version lifecycle
 A new major version is a significant event in the xDS API ecosystem, inevitably requiring support
 from clients (Envoy, gRPC) and a large number of control planes, ranging from simple in-house custom
 management servers to xDS-as-a-service offerings run by vendors. The [xDS API
@@ -112,6 +113,25 @@ new major version subject to the following constraints:
   process; the API shepherds retain the right to move forward with a new major API version after
   weighing this input with the first two considerations above.
 
+Following the release of a new major version, the API lifecycle follows a deprecation clock.
+Envoy will support at most three major versions of any API package at all times:
+* The current stable major version, e.g. v3.
+* The previous stable major version, e.g. v2. This is needed to ensure that we provide at least 1
+  year for a supported major version to sunset. By supporting two stable major versions
+  simultaneously, this makes it easier to coordinate control plane and Envoy
+  rollouts as well. This previous stable major version will be supported for exactly 1
+  year after the introduction of the new current stable major version, after which it will be
+  removed from the Envoy implementation.
+* Optionally, the next experimental alpha major version, e.g. v4alpha. This is a release candidate
+  for the next stable major version. This is only generated when the current stable major version
+  requires a breaking change at the next cycle, e.g. a deprecation or field rename. This release
+  candidate is mechanically generated via the
+  [protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool from the
+  current stable major version, making use of annotations such as `deprecated = true`. This is not a
+  human editable artifact.
+
+## Minor version lifecycle
+
 A new API minor version is expected to be released once a year, at the Q2 release. This
 allows for gradual introduction of new capabilities and features that will be supported
 by clients, and by control planes.
@@ -121,9 +141,13 @@ entails that it may take between 1 to 2 years for a deprecated field to have
 support removed, depending on when the deprecation occurred in relation to the
 minor API version release.
 
+## Patch version lifecycle
+
 The patch version will be incremented upon changes to the API proto files, such
 as adding a new enum value, or setting a field as deprecated. We expect frequent
 updates to the patch version.
+
+## Lifecycle example
 
 The following is a an example of the API versioning lifecycle. Assume that the
 current API version is v3.7.18. Assume that a new change (pull-request) updates the API as follows:
@@ -146,8 +170,16 @@ version becomes v3.8.0. The client will now support a new minor versions range
 (7 to 8), and features deprecated in minor version 6 will be removed.
 When the API version becomes v3.9.0, `field1` will be removed from the API.
 
-Patch version updates and minor version releases, is done using tools (TBD) that
-maintain the consistency of the API proto files.
+Assume the [xDS API shepherds](https://github.com/orgs/envoyproxy/teams/api-shepherds) decide that
+at the end of December in 2020, if a v4 major version is justified, we might freeze
+`envoy.config.bootstrap.v4alpha` and this package would then become the current stable major version
+`envoy.config.bootstrap.v4`. The `envoy.config.bootstrap.v3` package will become the previous stable
+major version and support for `envoy.config.bootstrap.v2` will be dropped from the Envoy
+implementation. Note that some transitively referenced package, e.g.
+`envoy.config.filter.network.foo.v2` may remain at version 2 during this release, if no changes were
+made to the referenced package. If no major version is justified at this point, the decision to cut
+v4 might occur at some point in 2021 or beyond, however v2 support will still be removed at the end
+of 2020.
 
 # New API features
 
