@@ -93,7 +93,7 @@ public:
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
-  void preShutdown() override;
+  void shutdown() override;
 
   // FatalErrorInterface
   void onFatalError(std::ostream& os) const override;

@@ -294,7 +294,10 @@ public:
    */
   virtual void updateApproximateMonotonicTime() PURE;
 
-  virtual void preShutdown() PURE;
+  /**
+   * Shutdown the dispatcher by removing posted callbacks.
+   */
+  virtual void shutdown() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

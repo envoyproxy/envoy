@@ -673,5 +673,128 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
 }
 
+// Test CDS with SDS.
+class SdsCdsIntegrationTest : public SdsDynamicIntegrationBaseTest {
+public:
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Create the dynamic cluster. This cluster will be using sds.
+      dynamic_cluster_ = bootstrap.mutable_static_resources()->clusters(0);
+      dynamic_cluster_.set_name("dynamic");
+      dynamic_cluster_.mutable_connect_timeout()->MergeFrom(
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(500000));
+      auto* transport_socket = dynamic_cluster_.mutable_transport_socket();
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      auto* secret_config =
+          tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+      setUpSdsConfig(secret_config, "client_cert");
+
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+      // Add cds cluster first.
+      auto* cds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      cds_cluster->set_name("cds_cluster");
+      ConfigHelper::setHttp2(*cds_cluster);
+      // Then add sds cluster first.
+      auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      sds_cluster->set_name("sds_cluster");
+      ConfigHelper::setHttp2(*sds_cluster);
+
+      const std::string cds_yaml = R"EOF(
+    resource_api_version: V3
+    api_config_source:
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+        envoy_grpc:
+          cluster_name: cds_cluster
+      set_node_on_first_message_only: true
+)EOF";
+      auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+      TestUtility::loadFromYaml(cds_yaml, *cds);
+    });
+
+    HttpIntegrationTest::initialize();
+    // registerTestServerPorts({"http"});
+  }
+
+  void TearDown() override {
+    cleanUpXdsConnection();
+    cleanupUpstreamAndDownstream();
+    codec_client_.reset();
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    // Static cluster.
+    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    // Cds Cluster.
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    // Sds Cluster.
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+  }
+
+  void sendCdsResponse() {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {dynamic_cluster_}, {dynamic_cluster_}, {}, "55");
+  }
+
+  void sendSdsResponse2(const envoy::extensions::transport_sockets::tls::v3::Secret& secret,
+                        FakeStream& sds_stream) {
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+    discovery_response.set_version_info("1");
+    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.add_resources()->PackFrom(secret);
+    sds_stream.sendGrpcMessage(discovery_response);
+  }
+  envoy::config::cluster::v3::Cluster dynamic_cluster_;
+  FakeHttpConnectionPtr sds_connection_;
+  FakeStreamPtr sds_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsCdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
+  on_server_init_function_ = [this]() {
+    {
+      // CDS.
+      AssertionResult result =
+          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse();
+    }
+    {
+      // SDS.
+      AssertionResult result =
+          fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, sds_connection_);
+      RELEASE_ASSERT(result, result.message());
+
+      result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      sds_stream_->startGrpcStream();
+      sendSdsResponse2(getClientSecret(), *sds_stream_);
+    }
+  };
+  initialize();
+
+  test_server_->waitForCounterGe(
+      "cluster.dynamic.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+}
+
 } // namespace Ssl
 } // namespace Envoy

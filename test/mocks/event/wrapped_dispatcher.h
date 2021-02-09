@@ -122,7 +122,7 @@ public:
 
   bool isThreadSafe() const override { return impl_.isThreadSafe(); }
 
-  void preShutdown() override { impl_.preShutdown(); }
+  void shutdown() override { impl_.shutdown(); }
 
 protected:
   Dispatcher& impl_;

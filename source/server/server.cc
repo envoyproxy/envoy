@@ -139,7 +139,7 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
-  dispatcher_->preShutdown();
+  dispatcher_->shutdown();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
