@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/cert_validator/default/default_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include <array>
 #include <deque>
@@ -141,22 +141,23 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     }
   }
 
-  if (config_ != nullptr) {
-    if (!config_->verifySubjectAltNameList().empty()) {
-      verify_subject_alt_name_list_ = config_->verifySubjectAltNameList();
+  const Envoy::Ssl::CertificateValidationContextConfig* cert_validation_config = config_;
+  if (cert_validation_config != nullptr) {
+    if (!cert_validation_config->verifySubjectAltNameList().empty()) {
+      verify_subject_alt_name_list_ = cert_validation_config->verifySubjectAltNameList();
       verify_mode = verify_mode_validation_context;
     }
 
-    if (!config_->subjectAltNameMatchers().empty()) {
+    if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::type::matcher::v3::StringMatcher& matcher :
-           config_->subjectAltNameMatchers()) {
+           cert_validation_config->subjectAltNameMatchers()) {
         subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
 
-    if (!config_->verifyCertificateHashList().empty()) {
-      for (auto hash : config_->verifyCertificateHashList()) {
+    if (!cert_validation_config->verifyCertificateHashList().empty()) {
+      for (auto hash : cert_validation_config->verifyCertificateHashList()) {
         // Remove colons from the 95 chars long colon-separated "fingerprint"
         // in order to get the hex-encoded string.
         if (hash.size() == 95) {
@@ -171,8 +172,8 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       verify_mode = verify_mode_validation_context;
     }
 
-    if (!config_->verifyCertificateSpkiList().empty()) {
-      for (const auto& hash : config_->verifyCertificateSpkiList()) {
+    if (!cert_validation_config->verifyCertificateSpkiList().empty()) {
+      for (const auto& hash : cert_validation_config->verifyCertificateSpkiList()) {
         const auto decoded = Base64::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
           throw EnvoyException(absl::StrCat("Invalid base64-encoded SHA-256 ", hash));

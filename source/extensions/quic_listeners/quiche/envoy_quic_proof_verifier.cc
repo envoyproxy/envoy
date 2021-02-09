@@ -1,7 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "extensions/transport_sockets/tls/cert_validator/default/default_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
 

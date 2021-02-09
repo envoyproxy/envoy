@@ -11,10 +11,12 @@ envoy_extension_package()
 envoy_cc_library(
     name = "cert_validator_lib",
     srcs = [
+        "default_validator.cc",
         "factory.cc",
     ],
     hdrs = [
         "cert_validator.h",
+        "default_validator.h",
         "factory.h",
         "well_known_names.h",
     ],

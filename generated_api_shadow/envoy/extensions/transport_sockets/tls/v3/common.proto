@@ -213,7 +213,6 @@ message TlsSessionTicketKeys {
 }
 
 // [#next-free-field: 13]
-// .. _extension_envoy.tls.cert_validator.default:
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";

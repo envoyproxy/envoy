@@ -107,7 +107,6 @@ envoy_cc_library(
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
-        "//source/extensions/transport_sockets/tls/cert_validator/default:config",
     ],
 )
 

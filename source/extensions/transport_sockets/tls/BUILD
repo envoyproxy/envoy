@@ -167,7 +167,6 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
-        "//source/extensions/transport_sockets/tls/cert_validator/default:config",
         "//source/extensions/transport_sockets/tls/ocsp:ocsp_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

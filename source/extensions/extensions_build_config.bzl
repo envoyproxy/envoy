@@ -246,7 +246,6 @@ EXTENSIONS = {
     # TLS peer certification validators
     #
 
-    "envoy.tls.cert_validator.default":                 "//source/extensions/transport_sockets/tls/cert_validator/default:config",
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 }
 

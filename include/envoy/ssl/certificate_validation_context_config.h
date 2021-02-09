@@ -74,7 +74,7 @@ public:
       trustChainVerification() const PURE;
 
   /**
-   * @return  the configuration for the custom certificate validator if configured.
+   * @return the configuration for the custom certificate validator if configured.
    */
   virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
   customValidatorConfig() const PURE;
