@@ -17,6 +17,28 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
 
+// Configuration for restricting Proxy-Wasm capabilities available to modules.
+message CapabilityRestrictionConfig {
+  // The Proxy-Wasm capabilities which will be allowed. Capabilities are mapped by
+  // name. The *SanitizationConfig* which each capability maps to is currently unimplemented and ignored,
+  // and so should be left empty.
+  //
+  // The capability names are given in the
+  // `Proxy-Wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`_.
+  // Additionally, the following WASI capabilities from
+  // `this list <https://github.com/WebAssembly/WASI/blob/master/phases/snapshot/docs.md#modules>`_
+  // are implemented and can be allowed:
+  // *fd_write*, *fd_read*, *fd_seek*, *fd_close*, *fd_fdstat_get*, *environ_get*, *environ_sizes_get*,
+  // *args_get*, *args_sizes_get*, *proc_exit*, *clock_time_get*, *random_get*.
+  map<string, SanitizationConfig> allowed_capabilities = 1;
+}
+
+// Configuration for sanitization of inputs to an allowed capability.
+//
+// NOTE: This is currently unimplemented.
+message SanitizationConfig {
+}
+
 // Configuration for a Wasm VM.
 // [#next-free-field: 7]
 message VmConfig {
@@ -73,7 +95,7 @@ message VmConfig {
 }
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same *vm_id* and *root_id* and for
@@ -104,6 +126,9 @@ message PluginConfig {
   // during xDS updates the xDS configuration will be rejected and when on_start or on_configuration return false on initial
   // startup the proxy will not start.
   bool fail_open = 5;
+
+  // Configuration for restricting Proxy-Wasm capabilities available to modules.
+  CapabilityRestrictionConfig capability_restriction_config = 6;
 }
 
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`WasmService
