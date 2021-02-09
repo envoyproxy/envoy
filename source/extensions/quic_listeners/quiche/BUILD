@@ -356,6 +356,7 @@ envoy_cc_library(
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:transport_socket_config_interface",

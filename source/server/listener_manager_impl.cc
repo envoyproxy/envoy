@@ -33,6 +33,7 @@
 #include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -1018,6 +1019,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
+  if (transport_socket.name() == Extensions::TransportSockets::TransportSocketNames::get().Quic &&
+      typeid(Quic::QuicServerTransportSocketConfigFactory) != typeid(config_factory)) {
+    throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
+                                     "transport socket specified for quic transport socket."));
+  }
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
 
