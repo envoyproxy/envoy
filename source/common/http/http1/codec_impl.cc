@@ -10,7 +10,9 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/cleanup.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracker.h"
 #include "common/common/statusor.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -67,7 +69,6 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 
   return nullptr;
 }
-
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -77,7 +78,7 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      connect_request_(false), is_response_to_head_request_(false),
+      connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
       is_response_to_connect_request_(false), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
@@ -261,8 +262,8 @@ void StreamEncoderImpl::endEncode() {
 
   connection_.flushOutput(true);
   connection_.onEncodeComplete();
-  // With CONNECT, half-closing the connection is used to signal end stream.
-  if (connect_request_) {
+  // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
+  if (connect_request_ || is_tcp_tunneling_) {
     connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
   }
 }
@@ -512,7 +513,7 @@ Status ConnectionImpl::completeLastHeader() {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders));
     const absl::string_view header_type =
         processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
-    return codecProtocolError(absl::StrCat(header_type, " size exceeds limit"));
+    return codecProtocolError(absl::StrCat(header_type, " count exceeds limit"));
   }
 
   header_parsing_state_ = HeaderParsingState::Field;
@@ -569,6 +570,8 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
+  // Add self to the Dispatcher's tracked object stack.
+  ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
   // http_parser exits early with an error code.
@@ -861,6 +864,73 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   ASSERT(!reset_stream_called_);
   reset_stream_called_ = true;
   onResetStream(reason);
+}
+
+void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
+     << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
+     << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
+     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
+     << DUMP_MEMBER(buffered_body_.length());
+
+  // Dump header parsing state, and any progress on headers.
+  os << DUMP_MEMBER(header_parsing_state_);
+  os << DUMP_MEMBER_AS(current_header_field_, current_header_field_.getStringView());
+  os << DUMP_MEMBER_AS(current_header_value_, current_header_value_.getStringView());
+
+  // Dump Child
+  os << '\n';
+  dumpAdditionalState(os, indent_level);
+
+  // Dump the first slice of the dispatching buffer if not drained escaping
+  // certain characters. We do this last as the slice could be rather large.
+  if (current_dispatching_buffer_ == nullptr || dispatching_slice_already_drained_) {
+    // Buffer is either null or already drained (in the body).
+    // Use the macro for consistent formatting.
+    os << DUMP_NULLABLE_MEMBER(current_dispatching_buffer_, "drained");
+    return;
+  } else {
+    absl::string_view front_slice = [](Buffer::RawSlice slice) {
+      return absl::string_view(static_cast<const char*>(slice.mem_), slice.len_);
+    }(current_dispatching_buffer_->frontSlice());
+
+    // Dump buffer data escaping \r, \n, \t, ", ', and \.
+    // This is not the most performant implementation, but we're crashing and
+    // cannot allocate memory.
+    os << spaces << "current_dispatching_buffer_ front_slice length: " << front_slice.length()
+       << " contents: \"";
+    StringUtil::escapeToOstream(os, front_slice);
+    os << "\"\n";
+  }
+}
+
+void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << DUMP_MEMBER_AS(active_request_.request_url_,
+                       active_request_.has_value() &&
+                               !active_request_.value().request_url_.getStringView().empty()
+                           ? active_request_.value().request_url_.getStringView()
+                           : "null");
+  os << '\n';
+
+  // Dump header map, it may be null if it was moved to the request, and
+  // request_url.
+  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
+  }
+}
+
+void ClientConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  // Dump header map, it may be null if it was moved to the request.
+  if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_));
+  }
 }
 
 ServerConnectionImpl::ServerConnectionImpl(

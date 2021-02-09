@@ -313,6 +313,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/http/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
