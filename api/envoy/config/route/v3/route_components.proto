@@ -1119,7 +1119,7 @@ message RetryPolicy {
 
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // [#protodoc-extension: envoy.retry_priority]
+    // [#protodoc-extension: envoy.retry_priorities]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
