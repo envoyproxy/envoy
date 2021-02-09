@@ -36,6 +36,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:bad_signature_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
+        "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
     external_deps = ["abseil_optional"],
     deps = [
@@ -49,6 +50,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/common/wasm/test_data:test_context_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_cpp_plugin",
+        "//test/extensions/common/wasm/test_data:test_restriction_cpp_plugin",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",

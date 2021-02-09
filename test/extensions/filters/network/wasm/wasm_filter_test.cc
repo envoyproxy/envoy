@@ -22,6 +22,7 @@ using Envoy::Extensions::Common::Wasm::Context;
 using Envoy::Extensions::Common::Wasm::Plugin;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
+using proxy_wasm::AllowedCapabilitiesMap;
 using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
@@ -45,7 +46,8 @@ public:
   WasmNetworkFilterTest() = default;
   ~WasmNetworkFilterTest() override = default;
 
-  void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false) {
+  void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
+                   AllowedCapabilitiesMap allowed_capabilities = {}) {
     if (code.empty()) {
       setupWasmCode(vm_configuration);
     } else {
@@ -56,7 +58,8 @@ public:
         [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
           return new TestRoot(wasm, plugin);
         },
-        "" /* root_id */, "" /* vm_configuration */, fail_open);
+        "" /* root_id */, "" /* vm_configuration */, fail_open, "" /* plugin configuration*/,
+        allowed_capabilities);
   }
 
   void setupFilter() { setupFilterBase<TestFilter>(); }
@@ -188,6 +191,85 @@ TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
   Buffer::OwnedImpl fake_downstream_data("Fake");
   // No logging expected.
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_downstream_data, false));
+}
+
+TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  AllowedCapabilitiesMap allowed_capabilities = {
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizationConfig()},
+      {"proxy_log", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_new_connection", proxy_wasm::SanitizationConfig()}};
+  setupConfig("", "logging", false, allowed_capabilities);
+  setupFilter();
+
+  // Expect this call, because proxy_on_new_connection is allowed
+  EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+
+  // Do not expect this call, because proxy_on_downstream_connection_close is not allowed
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))))
+      .Times(0);
+  read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  // Noop.
+  read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  filter().testClose();
+}
+
+TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  AllowedCapabilitiesMap allowed_capabilities = {
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizationConfig()},
+      {"proxy_log", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizationConfig()}};
+  setupConfig("", "logging", false, allowed_capabilities);
+  setupFilter();
+
+  // Do not expect this call, because proxy_on_new_connection is not allowed
+  EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))))
+      .Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+
+  // Expect this call, because proxy_on_downstream_connection_close allowed
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))));
+  read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  // Noop.
+  read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  filter().testClose();
+}
+
+TEST_P(WasmNetworkFilterTest, RestrictLog) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  AllowedCapabilitiesMap allowed_capabilities = {
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_new_connection", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizationConfig()}};
+  setupConfig("", "logging", false, allowed_capabilities);
+  setupFilter();
+
+  // Do not expect this call, because proxy_log is not allowed
+  EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))))
+      .Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+
+  // Do not expect this call, because proxy_log is not allowed
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))))
+      .Times(0);
+  read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  // Noop.
+  read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  filter().testClose();
 }
 
 } // namespace Wasm

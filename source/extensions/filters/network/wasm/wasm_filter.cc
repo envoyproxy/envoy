@@ -24,9 +24,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
   };
 
   if (!Common::Wasm::createWasm(
-          config.config().vm_config(), plugin_, context.scope().createScope(""),
-          context.clusterManager(), context.initManager(), context.dispatcher(), context.api(),
-          context.lifecycleNotifier(), remote_data_provider_, std::move(callback))) {
+          config.config().vm_config(), config.config().capability_restriction_config(), plugin_,
+          context.scope().createScope(""), context.clusterManager(), context.initManager(),
+          context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
+          std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm network filter {}", plugin->name_));
   }
