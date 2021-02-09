@@ -391,6 +391,31 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
+// Catch exceptions in secondary cluster initialization callbacks. These are not caught in the main
+// initialization try/catch.
+TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of secondary cluster: API configs must have either "
+                      "a gRPC service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/health_check_nullptr.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
+}
+
+// Catch exceptions in HDS cluster initialization callbacks.
+TEST_P(ServerInstanceImplTest, HdsClusterException) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: API configs must have either a gRPC "
+                      "service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/hds_exception.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
+}
+
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
   absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
@@ -812,9 +837,12 @@ TEST_P(ServerInstanceImplTest,
 // set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
+  // are caught and will result in server shutdown.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
+                      "protocol versions are deprecated",
+                      initialize("test/server/test_data/server/hds_v2.yaml"));
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
