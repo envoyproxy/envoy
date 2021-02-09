@@ -715,25 +715,31 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       time_source_(time_source),
       hosts_in_slow_start_(
           std::make_shared<absl::btree_set<HostSharedPtr, orderByCreateDateDesc>>()),
-      is_slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)) {
+      slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
-  priority_set.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
-        if (is_slow_start_enabled_) {
-          recalculateHostsInSlowStart(hosts_added, hosts_removed);
-        }
-        refresh(priority);
-      });
-  priority_set.addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
-        if (is_slow_start_enabled_) {
-          recalculateHostsInSlowStart(hosts_added, hosts_removed);
-        }
-      });
+  priority_set.addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                          const HostVector& hosts_removed) {
+    // In case endpoint warming policy is `NO_WAIT`, we recalculate hosts in slow start as they join
+    // the cluster.
+    if (slow_start_enabled_ &&
+        endpoint_warming_policy_ == envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT) {
+      recalculateHostsInSlowStart(hosts_added);
+    }
+    refresh(priority);
+  });
+  priority_set.addMemberUpdateCb([this](const HostVector& hosts_added,
+                                        const HostVector& hosts_removed) -> void {
+    // In case endpoint warming policy is `NO_WAIT`, we recalculate hosts in slow start as they join
+    // the cluster.
+    if (slow_start_enabled_ &&
+        endpoint_warming_policy_ == envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT) {
+      recalculateHostsInSlowStart(hosts_added);
+    }
+  });
 }
 
 void EdfLoadBalancerBase::initialize() {
@@ -742,10 +748,9 @@ void EdfLoadBalancerBase::initialize() {
   }
 }
 
-void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
-                                                      const HostVector& hosts_removed) {
+void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
   auto current_time = time_source_.monotonicTime();
-  for (const auto& host : hosts_added) {
+  for (const auto& host : hosts) {
     auto host_create_duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(current_time - host->creationTime());
     // Check if host existence time is within slow start window.
@@ -839,6 +844,13 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         HostsSource(priority, HostsSource::SourceType::LocalityDegradedHosts, locality_index),
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
+  // If endpoint warming policy is `WAIT_FOR_FIRST_PASSING_HC`,
+  // then we need to recheck all hosts in priority for possible health state change.
+  if (slow_start_enabled_ &&
+      endpoint_warming_policy_ ==
+          envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC) {
+    recalculateHostsInSlowStart(host_set->hosts());
+  }
 }
 
 bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
@@ -848,9 +860,8 @@ bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
     return true;
   case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
     // Check health status of host. It should be marked as healthy and have first passed
-    // healthcheck. TODO(nezdolik) is this equivalent to "host has passed first HC" ?
-    if (host.health() == Upstream::Host::Health::Healthy &&
-        !host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    // healthcheck.
+    if (host.health() == Upstream::Host::Health::Healthy) {
       return true;
     } else {
       return false;

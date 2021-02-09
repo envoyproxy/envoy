@@ -397,8 +397,7 @@ protected:
   bool noHostsAreInSlowStart();
   bool adheresToEndpointWarmingPolicy(const Host& host);
 
-  virtual void recalculateHostsInSlowStart(const HostVector& hosts_added,
-                                           const HostVector& hosts_removed);
+  virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
 
   // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
@@ -439,7 +438,7 @@ protected:
   // That check could be done inline by comparing host creation date to slow start window
   // and by checking if hosts adheres to endpoint warming policy.
   std::shared_ptr<absl::btree_set<HostSharedPtr, orderByCreateDateDesc>> hosts_in_slow_start_;
-  bool is_slow_start_enabled_;
+  bool slow_start_enabled_;
 };
 
 /**
@@ -469,7 +468,7 @@ private:
     peekahead_index_ = 0;
   }
   double hostWeight(const Host& host) override {
-    if (is_slow_start_enabled_) {
+    if (slow_start_enabled_) {
       auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           time_source_.monotonicTime() - host.creationTime());
       if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(host)) {
