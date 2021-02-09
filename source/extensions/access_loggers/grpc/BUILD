@@ -18,31 +18,11 @@ envoy_cc_library(
     hdrs = ["config_utils.h"],
     deps = [
         ":grpc_access_log_lib",
-        ":grpc_ot_access_log_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/singleton:instance_interface",
     ],
 )
-
-
-
-envoy_cc_library(
-    name = "grpc_ot_access_log_lib",
-    srcs = ["grpc_ot_access_log_impl.cc"],
-    hdrs = ["grpc_ot_access_log_impl.h"],
-    deps = [
-      "//include/envoy/event:dispatcher_interface",
-      "//include/envoy/grpc:async_client_manager_interface",
-      "//include/envoy/thread_local:thread_local_interface",
-      "//source/common/config:utility_lib",
-      "//source/common/grpc:typed_async_client_lib",
-      "//source/extensions/access_loggers/common:grpc_access_logger",
-      "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
-      "@opentelemetry_proto//:logs_cc_proto",
-    ],
-)
-
 
 envoy_cc_library(
     name = "grpc_access_log_lib",

@@ -17,12 +17,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the built-in *envoy.access_loggers.open_telemetry*
 // :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
-// populate :ref:`StreamAccessLogsMessage.http_logs
-// <envoy_api_field_service.accesslog.v3.StreamAccessLogsMessage.http_logs>`.
+// populate :ref:`ExportLogsServiceRequest.resource_logs
+// <opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs>`.
 // [#extension: envoy.access_loggers.open_telemetry]
 message OpenTelemetryAccessLogConfig {
-  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
-  AnyValue body = 2;
-  KeyValue attributes = 3;
-  KeyValue resource_attributes = 4;
+  nvoy.extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig common_config = 1
+      [(validate.rules).message = {required: true}];
+  opentelemetry.proto.common.v1.AnyValue body = 2;
+  opentelemetry.proto.common.v1.KeyValue attributes = 3;
+  opentelemetry.proto.common.v1.KeyValue resource_attributes = 4;
 }

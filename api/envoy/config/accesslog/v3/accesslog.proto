@@ -35,6 +35,7 @@ message AccessLog {
   // #. "envoy.access_loggers.file"
   // #. "envoy.access_loggers.http_grpc"
   // #. "envoy.access_loggers.tcp_grpc"
+  // #. "envoy.access_loggers.open_telemetry"
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.

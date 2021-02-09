@@ -1,5 +1,3 @@
-#include "extensions/access_loggers/grpc/http_config.h"
-
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -12,8 +10,8 @@
 
 #include "extensions/access_loggers/grpc/config_utils.h"
 #include "extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
-#include "extensions/access_loggers/grpc/ot_grpc_access_log_impl.h"
+#include "extensions/access_loggers/grpc/http_config.h"
+#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {

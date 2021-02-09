@@ -3,11 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
-#include "opentelemetry/proto/logs/v1/logs.pb.h"
-#include "opentelemetry/proto/resource/v1/resource.pb.h"
-
 #include "envoy/access_log/access_log.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -20,6 +15,11 @@
 
 #include "extensions/access_loggers/common/access_log_base.h"
 #include "extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
+
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/logs/v1/logs.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 namespace Envoy {
 namespace Extensions {

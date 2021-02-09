@@ -3,11 +3,6 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
-#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
-#include "opentelemetry/proto/logs/v1/logs.pb.h"
-#include "opentelemetry/proto/resource/v1/resource.pb.h"
-
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -21,6 +16,11 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/logs/v1/logs.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using namespace std::chrono_literals;
 using ::Envoy::AccessLog::FilterPtr;

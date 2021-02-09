@@ -1,11 +1,5 @@
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 
-#include "external/opentelemetry_proto/opentelemetry/proto/common/v1/common.pb.h"
-#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
-#include "opentelemetry/proto/logs/v1/logs.pb.h"
-#include "opentelemetry/proto/resource/v1/resource.pb.h"
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
@@ -19,6 +13,12 @@
 #include "common/stream_info/utility.h"
 
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+
+#include "external/opentelemetry_proto/opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/logs/v1/logs.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 const char BODY_CONFIG[] = R"EOF(
 kvlist_value:
