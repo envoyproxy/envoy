@@ -145,8 +145,8 @@ public:
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
   MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
-  MOCK_METHOD(void, post, (std::function<void()> callback));
-  MOCK_METHOD(void, movePost, (std::function<void()> && callback));
+  MOCK_METHOD(void, post, (const PostCb& callback));
+  MOCK_METHOD(void, post, (PostCb && callback));
   MOCK_METHOD(void, run, (RunType type));
   MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
   MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));

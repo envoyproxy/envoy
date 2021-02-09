@@ -255,7 +255,7 @@ SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb)
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
 
-void DispatcherImpl::post(std::function<void()> callback) {
+void DispatcherImpl::post(const PostCb& callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
@@ -268,7 +268,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
-void DispatcherImpl::movePost(std::function<void()>&& callback) {
+void DispatcherImpl::post(PostCb&& callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
