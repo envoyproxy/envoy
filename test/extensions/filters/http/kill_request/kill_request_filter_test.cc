@@ -82,8 +82,9 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturns
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-TEST_F(KillRequestFilterTest,
-       KillRequestDisabledWhenIsKillRequestEnabledReturnsTrueFromRouteLevelConfiguration) {
+// Kill request should be enabled when isKillRequestEnabled returns true
+// from the route level configuration.
+TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(0);
   setUpTest(kill_request);
@@ -102,8 +103,9 @@ TEST_F(KillRequestFilterTest,
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
-TEST_F(KillRequestFilterTest,
-       KillRequestDisabledWhenIsKillRequestEnabledReturnsFalseFromRouteLevelConfiguration) {
+// Kill request should be disabled when isKillRequestEnabled returns false
+// from the route level configuration.
+TEST_F(KillRequestFilterTest, KillRequestDisabledRouteLevelConfiguration) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(0);
   setUpTest(kill_request);
