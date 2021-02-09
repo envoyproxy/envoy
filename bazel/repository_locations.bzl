@@ -406,6 +406,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-04-14",
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
+    org_brotli = dict(
+        project_name = "brotli",
+        project_desc = "brotli compression library",
+        project_url = "https://brotli.org",
+        # Use the dev branch of brotli to resolve compilation issues.
+        # TODO(rojkov): Remove when brotli > 1.0.9 is released.
+        version = "0cd2e3926e95e7e2930f57ae3f4885508d462a25",
+        sha256 = "93810780e60304b51f2c9645fe313a6e4640711063ed0b860cfa60999dd256c5",
+        strip_prefix = "brotli-{version}",
+        urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = [
+            "envoy.compression.brotli.compressor",
+            "envoy.compression.brotli.decompressor",
+        ],
+        release_date = "2020-09-08",
+        cpe = "cpe:2.3:a:google:brotli:*",
+    ),
     com_github_zlib_ng_zlib_ng = dict(
         project_name = "zlib-ng",
         project_desc = "zlib fork (higher performance)",
@@ -889,8 +907,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "6dab125d7a668c7158848b6f48c67fd827c952e6",
-        sha256 = "b5c73ed053a7079bd8bf53b14c4811e87ae521d9fcf4769ec5b248202a27600d",
+        version = "5a53cf4b231599e1d2a1f2f4598fdfbb727ff948",
+        sha256 = "600dbc651a2837e6f1db964eb7e1078e5e338049a34c9ab47415dfa7f3de5478",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -905,7 +923,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2020-12-16",
+        release_date = "2021-01-12",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
