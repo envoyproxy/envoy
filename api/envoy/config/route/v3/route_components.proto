@@ -1749,6 +1749,7 @@ message RateLimit {
       MetaData metadata = 8;
 
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      // [#protodoc-extension: envoy.rate_limit_descriptors]
       core.v3.TypedExtensionConfig extension = 9;
     }
   }
@@ -1940,6 +1941,7 @@ message InternalRedirectPolicy {
   // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
   // the redirect, causing the response to be proxied to downstream.
+  // [#protodoc-extension: envoy.internal_redirect_predicates]
   repeated core.v3.TypedExtensionConfig predicates = 3;
 
   // Allow internal redirect to follow a target URI with a different scheme than the value of
