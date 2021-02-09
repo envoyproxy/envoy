@@ -1591,9 +1591,10 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
 TEST_P(HttpFilterTestParam, StopIterationWithRouteEntry) {
   NiceMock<Router::MockRouteEntry> route_entry;
   prepareCheck();
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(&route_entry));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
 }
 
 // Test that the request stops at decodeHeaders when filter_callbacks has no route entry, but it
@@ -1601,10 +1602,12 @@ TEST_P(HttpFilterTestParam, StopIterationWithRouteEntry) {
 TEST_P(HttpFilterTestParam, StopIterationWithDirectResponsEntry) {
   NiceMock<Router::MockDirectResponseEntry> direct_response_entry;
   prepareCheck();
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(*filter_callbacks_.route_, directResponseEntry()).WillOnce(Return(&direct_response_entry));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_CALL(*filter_callbacks_.route_, directResponseEntry())
+      .WillOnce(Return(&direct_response_entry));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
 }
 
 // Test that the request continues when filter_callbacks has no route / direct response entry.
