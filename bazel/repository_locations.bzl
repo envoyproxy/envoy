@@ -406,6 +406,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-04-14",
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
+    org_brotli = dict(
+        project_name = "brotli",
+        project_desc = "brotli compression library",
+        project_url = "https://brotli.org",
+        # Use the dev branch of brotli to resolve compilation issues.
+        # TODO(rojkov): Remove when brotli > 1.0.9 is released.
+        version = "0cd2e3926e95e7e2930f57ae3f4885508d462a25",
+        sha256 = "93810780e60304b51f2c9645fe313a6e4640711063ed0b860cfa60999dd256c5",
+        strip_prefix = "brotli-{version}",
+        urls = ["https://github.com/google/brotli/archive/{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = [
+            "envoy.compression.brotli.compressor",
+            "envoy.compression.brotli.decompressor",
+        ],
+        release_date = "2020-09-08",
+        cpe = "cpe:2.3:a:google:brotli:*",
+    ),
     com_github_zlib_ng_zlib_ng = dict(
         project_name = "zlib-ng",
         project_desc = "zlib fork (higher performance)",

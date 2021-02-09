@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"
@@ -19,6 +20,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -30,6 +32,7 @@ using testing::Const;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -1973,6 +1976,109 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedDynamicMetadataTest) {
   EXPECT_EQ("inner_value", fields.at("test_obj.inner_key").string_value());
   EXPECT_EQ("inner_value",
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterClusterMetadataTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
+      {"test_key", "\"test_value\""},
+      {"test_obj", "{\"inner_key\":\"inner_value\"}"},
+      {"test_obj.inner_key", "\"inner_value\""},
+      {"test_obj.non_existing_key", "-"},
+  };
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key: '%CLUSTER_METADATA(com.test:test_key)%'
+    test_obj: '%CLUSTER_METADATA(com.test:test_obj)%'
+    test_obj.inner_key: '%CLUSTER_METADATA(com.test:test_obj:inner_key)%'
+    test_obj.non_existing_key: '%CLUSTER_METADATA(com.test:test_obj:non_existing_key)%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  verifyStructOutput(
+      formatter.format(request_header, response_header, response_trailer, stream_info, body),
+      expected_json_map);
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterTypedClusterMetadataTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key: '%CLUSTER_METADATA(com.test:test_key)%'
+    test_obj: '%CLUSTER_METADATA(com.test:test_obj)%'
+    test_obj.inner_key: '%CLUSTER_METADATA(com.test:test_obj:inner_key)%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, true, false);
+
+  ProtobufWkt::Struct output =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+
+  const auto& fields = output.fields();
+  EXPECT_EQ("test_value", fields.at("test_key").string_value());
+  EXPECT_EQ("inner_value", fields.at("test_obj.inner_key").string_value());
+  EXPECT_EQ("inner_value",
+            fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterClusterMetadataNoClusterInfoTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  absl::node_hash_map<std::string, std::string> expected_json_map = {{"test_key", "-"}};
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    test_key: '%CLUSTER_METADATA(com.test:test_key)%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  // Empty optional (absl::nullopt)
+  {
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
+    verifyStructOutput(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        expected_json_map);
+  }
+  // Empty cluster info (nullptr)
+  {
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
+    verifyStructOutput(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        expected_json_map);
+  }
 }
 
 TEST(SubstitutionFormatterTest, StructFormatterFilterStateTest) {

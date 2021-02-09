@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -361,6 +362,7 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
 
 FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token) {
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
+  static constexpr absl::string_view CLUSTER_META_TOKEN{"CLUSTER_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
@@ -396,6 +398,14 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
 
     parseCommand(token, start, ":", filter_namespace, path, max_length);
     return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
+  } else if (absl::StartsWith(token, CLUSTER_META_TOKEN)) {
+    std::string filter_namespace;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = CLUSTER_META_TOKEN.size();
+
+    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
     std::string key;
     absl::optional<size_t> max_length;
@@ -1161,6 +1171,34 @@ ProtobufWkt::Value DynamicMetadataFormatter::formatValue(const Http::RequestHead
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          absl::string_view) const {
   return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
+}
+
+ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_namespace,
+                                                   const std::vector<std::string>& path,
+                                                   absl::optional<size_t> max_length)
+    : MetadataFormatter(filter_namespace, path, max_length) {}
+
+absl::optional<std::string> ClusterMetadataFormatter::format(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    return absl::nullopt;
+  }
+  return MetadataFormatter::formatMetadata(cluster_info.value()->metadata());
+}
+
+ProtobufWkt::Value ClusterMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo& stream_info,
+                                                         absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    // Let the formatter do its thing with empty metadata.
+    return MetadataFormatter::formatMetadataValue(envoy::config::core::v3::Metadata());
+  }
+  return MetadataFormatter::formatMetadataValue(cluster_info.value()->metadata());
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
