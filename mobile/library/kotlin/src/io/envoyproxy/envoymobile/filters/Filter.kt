@@ -30,7 +30,7 @@ internal class EnvoyHTTPFilterAdapter(
       val result = requestFilter.onRequestHeaders(RequestHeaders(headers), endStream)
       return when (result) {
         is FilterHeadersStatus.Continue -> arrayOf(result.status, result.headers.headers)
-        is FilterHeadersStatus.StopIteration -> arrayOf(result.status, headers)
+        is FilterHeadersStatus.StopIteration -> arrayOf(result.status, emptyMap<String, List<String>>())
       }
     }
     return arrayOf(0, headers)
@@ -41,7 +41,7 @@ internal class EnvoyHTTPFilterAdapter(
       val result = responseFilter.onResponseHeaders(ResponseHeaders(headers), endStream)
       return when (result) {
         is FilterHeadersStatus.Continue -> arrayOf(result.status, result.headers.headers)
-        is FilterHeadersStatus.StopIteration -> arrayOf(result.status, headers)
+        is FilterHeadersStatus.StopIteration -> arrayOf(result.status, emptyMap<String, List<String>>())
       }
     }
     return arrayOf(0, headers)
@@ -52,8 +52,8 @@ internal class EnvoyHTTPFilterAdapter(
       val result = requestFilter.onRequestData(data, endStream)
       return when (result) {
         is FilterDataStatus.Continue<*> -> arrayOf(result.status, result.data)
-        is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, data)
-        is FilterDataStatus.StopIterationNoBuffer<*> -> arrayOf(result.status, data)
+        is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, ByteBuffer.allocate(0))
+        is FilterDataStatus.StopIterationNoBuffer<*> -> arrayOf(result.status, ByteBuffer.allocate(0))
         is FilterDataStatus.ResumeIteration<*> -> arrayOf(result.status, result.data, result.headers?.headers)
       }
     }
@@ -65,8 +65,8 @@ internal class EnvoyHTTPFilterAdapter(
       val result = responseFilter.onResponseData(data, endStream)
       return when (result) {
         is FilterDataStatus.Continue<*> -> arrayOf(result.status, result.data)
-        is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, data)
-        is FilterDataStatus.StopIterationNoBuffer<*> -> arrayOf(result.status, data)
+        is FilterDataStatus.StopIterationAndBuffer<*> -> arrayOf(result.status, ByteBuffer.allocate(0))
+        is FilterDataStatus.StopIterationNoBuffer<*> -> arrayOf(result.status, ByteBuffer.allocate(0))
         is FilterDataStatus.ResumeIteration<*> -> arrayOf(result.status, result.data, result.headers?.headers)
       }
     }
@@ -78,7 +78,7 @@ internal class EnvoyHTTPFilterAdapter(
       val result = requestFilter.onRequestTrailers(RequestTrailers(trailers))
       return when (result) {
         is FilterTrailersStatus.Continue<*, *> -> arrayOf(result.status, result.trailers.headers)
-        is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, trailers)
+        is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, emptyMap<String, List<String>>())
         is FilterTrailersStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.trailers.headers, result.headers?.headers, result.data)
       }
     }
@@ -90,7 +90,7 @@ internal class EnvoyHTTPFilterAdapter(
       val result = responseFilter.onResponseTrailers(ResponseTrailers(trailers))
       return when (result) {
         is FilterTrailersStatus.Continue<*, *> -> arrayOf(result.status, result.trailers.headers)
-        is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, trailers)
+        is FilterTrailersStatus.StopIteration<*, *> -> arrayOf(result.status, emptyMap<String, List<String>>())
         is FilterTrailersStatus.ResumeIteration<*, *> -> arrayOf(result.status, result.trailers.headers, result.headers?.headers, result.data)
       }
     }

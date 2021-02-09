@@ -98,6 +98,10 @@ envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
   envoy_header_size_t length = env->GetArrayLength(headers);
+  if (length == 0) {
+    return envoy_noheaders;
+  }
+
   envoy_header* header_array =
       static_cast<envoy_header*>(safe_malloc(sizeof(envoy_header) * length / 2));
 

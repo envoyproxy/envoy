@@ -61,8 +61,7 @@ PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
 PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr config,
                                            Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher), filter_name_(config->filter_name()),
-      platform_filter_(*config->platform_filter()), request_filter_base_(RequestFilterBase{*this}),
-      response_filter_base_(ResponseFilterBase{*this}) {
+      platform_filter_(*config->platform_filter()) {
   // The initialization above sets platform_filter_ to a copy of the struct stored on the config.
   // In the typical case, this will represent a filter implementation that needs to be intantiated.
   // static_context will contain the necessary platform-specific mechanism to produce a filter
@@ -70,19 +69,23 @@ PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr c
   // context needed for actual filter invocations.
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::PlatformBridgeFilter", filter_name_);
 
-  // If init_filter is missing, zero out the rest of the struct for safety.
-  if (platform_filter_.init_filter == nullptr) {
+  if (platform_filter_.init_filter) {
+    // Set the instance_context to the result of the initialization call. Cleanup will ultimately
+    // occur within the onDestroy() invocation below.
+    ENVOY_LOG(trace, "PlatformBridgeFilter({})->init_filter", filter_name_);
+    platform_filter_.instance_context = platform_filter_.init_filter(&platform_filter_);
+    ASSERT(platform_filter_.instance_context,
+           fmt::format("PlatformBridgeFilter({}): init_filter unsuccessful", filter_name_));
+  } else {
+    // If init_filter is missing, zero out the rest of the struct for safety.
     ENVOY_LOG(debug, "PlatformBridgeFilter({}): missing initializer", filter_name_);
     platform_filter_ = {};
-    return;
   }
 
-  // Set the instance_context to the result of the initialization call. Cleanup will ultimately
-  // occur within the onDestroy() invocation below.
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})->init_filter", filter_name_);
-  platform_filter_.instance_context = platform_filter_.init_filter(platform_filter_.static_context);
-  ASSERT(platform_filter_.instance_context,
-         fmt::format("PlatformBridgeFilter({}): init_filter unsuccessful", filter_name_));
+  // Set directional filters now that the platform_filter_ has been updated (initialized or zero'ed
+  // out).
+  request_filter_base_ = std::make_unique<RequestFilterBase>(*this);
+  response_filter_base_ = std::make_unique<ResponseFilterBase>(*this);
 }
 
 void PlatformBridgeFilter::setDecoderFilterCallbacks(
@@ -90,10 +93,14 @@ void PlatformBridgeFilter::setDecoderFilterCallbacks(
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::setDecoderCallbacks", filter_name_);
   decoder_callbacks_ = &callbacks;
 
+  // TODO(goaway): currently both platform APIs unconditionally set this field, meaning that the
+  // heap allocation below occurs when it could be avoided.
   if (platform_filter_.set_request_callbacks) {
     platform_request_callbacks_.resume_iteration = envoy_filter_callback_resume_decoding;
     platform_request_callbacks_.release_callbacks = envoy_filter_release_callbacks;
     // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
+    // The weak_ptr is heap-allocated, because it must be managed (and eventually released) by
+    // platform code.
     platform_request_callbacks_.callback_context =
         new PlatformBridgeFilterWeakPtr{shared_from_this()};
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->set_request_callbacks", filter_name_);
@@ -107,10 +114,14 @@ void PlatformBridgeFilter::setEncoderFilterCallbacks(
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::setEncoderCallbacks", filter_name_);
   encoder_callbacks_ = &callbacks;
 
+  // TODO(goaway): currently both platform APIs unconditionally set this field, meaning that the
+  // heap allocation below occurs when it could be avoided.
   if (platform_filter_.set_response_callbacks) {
     platform_response_callbacks_.resume_iteration = envoy_filter_callback_resume_encoding;
     platform_response_callbacks_.release_callbacks = envoy_filter_release_callbacks;
     // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
+    // The weak_ptr is heap-allocated, because it must be managed (and eventually released) by
+    // platform code.
     platform_response_callbacks_.callback_context =
         new PlatformBridgeFilterWeakPtr{shared_from_this()};
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->set_response_callbacks", filter_name_);
@@ -122,7 +133,7 @@ void PlatformBridgeFilter::setEncoderFilterCallbacks(
 void PlatformBridgeFilter::onDestroy() {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::onDestroy", filter_name_);
   // If the filter chain is destroyed before a response is received, treat as cancellation.
-  if (!response_filter_base_.stream_complete_ && platform_filter_.on_cancel) {
+  if (!response_filter_base_->stream_complete_ && platform_filter_.on_cancel) {
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_cancel", filter_name_);
     platform_filter_.on_cancel(platform_filter_.instance_context);
   }
@@ -161,6 +172,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   case kEnvoyFilterHeadersStatusStopIteration:
     pending_headers_ = &headers;
     iteration_state_ = IterationState::Stopped;
+    ASSERT(result.headers.length == 0 && result.headers.headers == NULL);
     return Http::FilterHeadersStatus::StopIteration;
 
   default:
@@ -286,6 +298,7 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
   case kEnvoyFilterTrailersStatusStopIteration:
     pending_trailers_ = &trailers;
     iteration_state_ = IterationState::Stopped;
+    ASSERT(result.trailers.length == 0 && result.trailers.headers == NULL);
     return Http::FilterTrailersStatus::StopIteration;
 
   // Resume previously-stopped iteration, possibly forwarding headers and data if iteration was
@@ -326,7 +339,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeade
             end_stream);
 
   // Delegate to base implementation for request and response path.
-  return request_filter_base_.onHeaders(headers, end_stream);
+  return request_filter_base_->onHeaders(headers, end_stream);
 }
 
 Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -365,7 +378,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
   }
 
   // Delegate to base implementation for request and response path.
-  return response_filter_base_.onHeaders(headers, end_stream);
+  return response_filter_base_->onHeaders(headers, end_stream);
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -373,7 +386,7 @@ Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, 
             data.length(), end_stream);
 
   // Delegate to base implementation for request and response path.
-  return request_filter_base_.onData(data, end_stream);
+  return request_filter_base_->onData(data, end_stream);
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -386,14 +399,14 @@ Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, 
   }
 
   // Delegate to base implementation for request and response path.
-  return response_filter_base_.onData(data, end_stream);
+  return response_filter_base_->onData(data, end_stream);
 }
 
 Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeTrailers", filter_name_);
 
   // Delegate to base implementation for request and response path.
-  return request_filter_base_.onTrailers(trailers);
+  return request_filter_base_->onTrailers(trailers);
 }
 
 Http::FilterTrailersStatus
@@ -406,7 +419,7 @@ PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   }
 
   // Delegate to base implementation for request and response path.
-  return response_filter_base_.onTrailers(trailers);
+  return response_filter_base_->onTrailers(trailers);
 }
 
 void PlatformBridgeFilter::resumeDecoding() {
@@ -423,7 +436,7 @@ void PlatformBridgeFilter::resumeDecoding() {
   dispatcher_.post([weak_self]() -> void {
     if (auto self = weak_self.lock()) {
       // Delegate to base implementation for request and response path.
-      self->request_filter_base_.onResume();
+      self->request_filter_base_->onResume();
     }
   });
 }
@@ -435,7 +448,7 @@ void PlatformBridgeFilter::resumeEncoding() {
   dispatcher_.post([weak_self]() -> void {
     if (auto self = weak_self.lock()) {
       // Delegate to base implementation for request and response path.
-      self->response_filter_base_.onResume();
+      self->response_filter_base_->onResume();
     }
   });
 }

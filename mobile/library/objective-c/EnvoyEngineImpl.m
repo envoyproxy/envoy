@@ -20,8 +20,53 @@ static void ios_on_exit(void *context) {
 }
 
 static const void *ios_http_filter_init(const void *context) {
-  EnvoyHTTPFilterFactory *filterFactory = (__bridge EnvoyHTTPFilterFactory *)context;
+  envoy_http_filter *c_filter = (envoy_http_filter *)context;
+  EnvoyHTTPFilterFactory *filterFactory =
+      (__bridge EnvoyHTTPFilterFactory *)c_filter->static_context;
   EnvoyHTTPFilter *filter = filterFactory.create();
+
+  // Unset static functions on the c_struct based on the created filter
+  if (filter.onRequestHeaders == nil) {
+    c_filter->on_request_headers = NULL;
+  }
+  if (filter.onRequestData == nil) {
+    c_filter->on_request_data = NULL;
+  }
+  if (filter.onRequestTrailers == nil) {
+    c_filter->on_request_trailers = NULL;
+  }
+
+  if (filter.onResponseHeaders == nil) {
+    c_filter->on_response_headers = NULL;
+  }
+  if (filter.onResponseData == nil) {
+    c_filter->on_response_data = NULL;
+  }
+  if (filter.onResponseTrailers == nil) {
+    c_filter->on_response_trailers = NULL;
+  }
+
+  if (filter.setRequestFilterCallbacks == nil) {
+    c_filter->set_request_callbacks = NULL;
+  }
+  if (filter.onResumeRequest == nil) {
+    c_filter->on_resume_request = NULL;
+  }
+
+  if (filter.setResponseFilterCallbacks == nil) {
+    c_filter->set_response_callbacks = NULL;
+  }
+  if (filter.onResumeResponse == nil) {
+    c_filter->on_resume_response = NULL;
+  }
+
+  if (filter.onCancel == nil) {
+    c_filter->on_cancel = NULL;
+  }
+  if (filter.onError == nil) {
+    c_filter->on_error = NULL;
+  }
+
   return CFBridgingRetain(filter);
 }
 
@@ -225,6 +270,7 @@ static void ios_http_filter_on_cancel(const void *context) {
 static void ios_http_filter_on_error(envoy_error error, const void *context) {
   EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
   if (filter.onError == nil) {
+    error.message.release(error.message.context);
     return;
   }
 

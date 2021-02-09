@@ -113,9 +113,11 @@ TEST_F(PlatformBridgeFilterTest, PartialNullImplementation) {
   filter_invocations invocations{};
   noop_filter->static_context = &invocations;
   noop_filter->init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   noop_filter->release_filter = [](const void* context) -> void {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
@@ -153,9 +155,11 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestHeaders) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -185,9 +189,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -240,9 +246,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenResumeOnResumeDecoding)
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -304,9 +312,11 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeDecodingIsNoopAfterPreviousResume) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -371,9 +381,11 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream,
                                        const void* context) -> envoy_filter_data_status {
@@ -401,9 +413,11 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream,
                                        const void* context) -> envoy_filter_data_status {
@@ -455,9 +469,11 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream,
                                        const void* context) -> envoy_filter_data_status {
@@ -523,9 +539,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -618,9 +636,11 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnRequestData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_data = [](envoy_data c_data, bool end_stream,
                                        const void* context) -> envoy_filter_data_status {
@@ -657,9 +677,11 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnRequestTrailers) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_trailers = [](envoy_headers c_trailers,
                                            const void* context) -> envoy_filter_trailers_status {
@@ -688,9 +710,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -787,9 +811,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_request_headers = [](envoy_headers c_headers, bool end_stream,
                                           const void* context) -> envoy_filter_headers_status {
@@ -926,9 +952,11 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseHeaders) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
@@ -958,9 +986,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
@@ -1013,9 +1043,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenResumeOnResumeEncoding
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
@@ -1077,9 +1109,11 @@ TEST_F(PlatformBridgeFilterTest, AsyncResumeEncodingIsNoopAfterPreviousResume) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
@@ -1144,9 +1178,11 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream,
                                         const void* context) -> envoy_filter_data_status {
@@ -1174,9 +1210,11 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream,
                                         const void* context) -> envoy_filter_data_status {
@@ -1228,9 +1266,11 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream,
                                         const void* context) -> envoy_filter_data_status {
@@ -1296,9 +1336,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
@@ -1390,9 +1432,11 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnResponseData) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_data = [](envoy_data c_data, bool end_stream,
                                         const void* context) -> envoy_filter_data_status {
@@ -1429,9 +1473,11 @@ TEST_F(PlatformBridgeFilterTest, BasicContinueOnResponseTrailers) {
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_trailers = [](envoy_headers c_trailers,
                                             const void* context) -> envoy_filter_trailers_status {
@@ -1460,9 +1506,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
@@ -1559,9 +1607,11 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
   filter_invocations invocations{};
   platform_filter.static_context = &invocations;
   platform_filter.init_filter = [](const void* context) -> const void* {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
     invocations->init_filter_calls++;
-    return context;
+    return invocations;
   };
   platform_filter.on_response_headers = [](envoy_headers c_headers, bool end_stream,
                                            const void* context) -> envoy_filter_headers_status {
