@@ -257,6 +257,7 @@ private:
   bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);
   bool isDelayEnabled(const Http::RequestHeaderMap& request_headers);
   bool isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers);
+  bool isResponseRateLimitConfigured();
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   AbortHttpAndGrpcStatus abortStatus(const Http::RequestHeaderMap& request_headers);
