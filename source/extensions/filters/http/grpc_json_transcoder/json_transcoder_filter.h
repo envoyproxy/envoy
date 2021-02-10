@@ -78,8 +78,8 @@ public:
    * @param transcoder output parameter for the instance of Transcoder interface.
    * @param method_descriptor output parameter for the method looked up from config.
    * @return status whether the Transcoder instance are successfully created or not. If the method
-   *         is found, status with Code::NOT_FOUND is returned. If the method is found, but fields
-   *         cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
+   *         is not found, status with Code::NOT_FOUND is returned. If the method is found, but
+   * fields cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
    */
   ProtobufUtil::Status
   createTranscoder(const Http::RequestHeaderMap& headers,
@@ -109,7 +109,8 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  bool strict_http_request_validation_{false};
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      RequestValidationOptions strict_http_request_validation_{};
 
 private:
   /**

@@ -961,7 +961,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
       "", true, false, R"({ "theme" : "Children")");
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
   const std::string filter =
       R"EOF(
             name: grpc_json_transcoder
@@ -969,7 +969,61 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              strict_http_request_validation : true
+              strict_http_request_validation:
+                reject_unknown_method: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  // Transcoding does not occur from a request with the gRPC content type.
+  // We verify the request is not transcoded because the upstream receives the same JSON body.
+  // We verify the response is not transcoded because the HTTP status code does not match the gRPC
+  // status.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/100"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/grpc"}},
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
+
+  // Transcoding does not occur when unknown path is called.
+  // The request is rejected.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/unknown/path"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {}, {}, Status(), Http::TestResponseHeaderMapImpl{{":status", "404"}},
+      "Could not resolve /unknown/path to a method.", true, false, "", false);
+
+  // Transcoding does not occur when unknown query param is included.
+  // HTTP Request to is passed directly to gRPC backend.
+  // gRPC response is passed directly to HTTP client.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/100?unknown=1"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
+  const std::string filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              strict_http_request_validation:
+                reject_unknown_query_parameters: true
             )EOF";
   config_helper_.addFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
@@ -1010,8 +1064,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
       "", {}, {}, Status(), Http::TestResponseHeaderMapImpl{{":status", "400"}},
-      "Bad request: Could not find field \"unknown\" in the type \"bookstore.GetShelfRequest\".",
-      true, false, "", false);
+      "Could not find field \"unknown\" in the type \"bookstore.GetShelfRequest\".", true, false,
+      "", false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQueryParam) {
@@ -1022,8 +1076,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              strict_http_request_validation : true
               ignore_unknown_query_parameters : true
+              strict_http_request_validation:
+                reject_unknown_method: true
+                reject_unknown_query_parameters: true
             )EOF";
   config_helper_.addFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
@@ -1038,6 +1094,16 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
       Http::TestResponseHeaderMapImpl{
           {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "");
+
+  // Transcoding does not occur when unknown path is called.
+  // The request is rejected, even though it has unknown query params.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/unknown/path?unknown=1"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {}, {}, Status(), Http::TestResponseHeaderMapImpl{{":status", "404"}},
+      "Could not resolve /unknown/path to a method.", true, false, "", false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {

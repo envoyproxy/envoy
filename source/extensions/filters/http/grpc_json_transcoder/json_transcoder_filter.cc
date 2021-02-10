@@ -444,27 +444,33 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   if (!status.ok()) {
     ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.error_message());
 
-    // If the transcoder cannot be created because the method/url is not found, it is possible that
-    // this url/request should NOT be transcoded by this filter. Pass it through to later filters
-    // in the chain.
-    if (status.code() == Code::NOT_FOUND) {
-      ENVOY_LOG(debug,
-                "Request is passed through without transcoding because method/url is not found.");
+    if (status.code() == Code::NOT_FOUND &&
+        !config_.strict_http_request_validation_.reject_unknown_method()) {
+      ENVOY_LOG(debug, "Request is passed through without transcoding because it cannot be mapped "
+                       "to a gRPC method.");
       return Http::FilterHeadersStatus::Continue;
     }
 
-    if (config_.strict_http_request_validation_) {
-      ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
-      error_ = true;
-      decoder_callbacks_->sendLocalReply(
-          Http::Code::BadRequest, absl::StrCat("Bad request: ", status.error_message().ToString()),
-          nullptr, absl::nullopt,
-          absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
-      return Http::FilterHeadersStatus::StopIteration;
-    } else {
-      ENVOY_LOG(debug, "Request is passed through without transcoding.");
+    if (status.code() == Code::INVALID_ARGUMENT &&
+        !config_.strict_http_request_validation_.reject_unknown_query_parameters()) {
+      ENVOY_LOG(debug, "Request is passed through without transcoding because it contains unknown "
+                       "query parameters.");
       return Http::FilterHeadersStatus::Continue;
     }
+
+    // protobuf::util::Status.error_code is the same as Envoy GrpcStatus
+    // This cast is safe.
+    auto http_code = Envoy::Grpc::Utility::grpcToHttpStatus(
+        static_cast<Envoy::Grpc::Status::GrpcStatus>(status.code()));
+
+    ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
+    error_ = true;
+    decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(http_code),
+                                       status.error_message().ToString(), nullptr, absl::nullopt,
+                                       absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{",
+                                                    MessageUtil::CodeEnumToString(status.code()),
+                                                    "}"));
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   if (method_->request_type_is_http_body_) {
