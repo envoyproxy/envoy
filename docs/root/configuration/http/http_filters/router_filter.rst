@@ -145,8 +145,8 @@ x-envoy-retry-grpc-on
 ^^^^^^^^^^^^^^^^^^^^^
 Setting this header will cause Envoy to attempt to retry failed requests (number of retries defaults
 to 1, and can be controlled by :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>`
-header or the :ref:`route config retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`) or the
-:ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`.
+header or the :ref:`route config retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or the
+:ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`).
 gRPC retries are currently only supported for gRPC status codes in response headers. gRPC status codes in
 trailers will not trigger retry logic. One or more policies can be specified  using a ',' delimited
 list. The supported policies are:
