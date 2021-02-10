@@ -54,11 +54,6 @@ void setDoNotValidateRouteConfig(
 };
 
 TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3 &&
-      version_ == Network::Address::IpVersion::v6) {
-    return;
-  }
-
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
