@@ -633,7 +633,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
 
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(&lock_);
-    connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
+    connection = makeRawConnection(consumeConnection(), timeSystem());
     connection->initialize();
     // Skip enableHalfClose if the connection is already disconnected.
     if (connection->connected()) {
