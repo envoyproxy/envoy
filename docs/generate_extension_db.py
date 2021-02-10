@@ -50,11 +50,6 @@ def GetExtensionMetadata(target):
         % target)
   # evaluate tuples/lists
   # wrap strings in a list
-  # use empty list for missing (this should not be necessary)
-  categories = (
-    '[]'
-    if IsMissing(categories)
-    else categories)
   categories = (
     ast.literal_eval(categories)
     if ('[' in categories
