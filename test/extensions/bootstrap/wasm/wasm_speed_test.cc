@@ -4,6 +4,9 @@
  * Run with:
  * `bazel run --config=libc++ -c opt //test/extensions/bootstrap/wasm:wasm_speed_test`
  */
+#include <string>
+#include <unordered_map>
+
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -59,9 +62,13 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
       name, root_id, vm_id, runtime, plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", runtime), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   std::string code;
   if (runtime == "null") {
     code = "WasmSpeedCpp";

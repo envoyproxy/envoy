@@ -94,6 +94,9 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
   root()->stream_context_id_ = id();
   auto test = root()->test_;
   if (test == "headers") {
+    if (const char* value = std::getenv("ENVOY_HTTP_WASM_TEST_HEADERS")) {
+      logTrace("ENVOY_HTTP_WASM_TEST_HEADERS: " + std::string(value));
+    }
     logDebug(std::string("onRequestHeaders ") + std::to_string(id()) + std::string(" ") + test);
     auto path = getRequestHeader(":path");
     logInfo(std::string("header path ") + std::string(path->view()));

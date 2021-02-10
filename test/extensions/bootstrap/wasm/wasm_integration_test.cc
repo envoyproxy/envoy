@@ -48,6 +48,7 @@ typed_config:
       '@type': type.googleapis.com/google.protobuf.StringValue
       value: ""
     vm_config:
+      env_keys: ["KEY1", "KEY2"]
       vm_id: "my_vm_id"
       runtime: "envoy.wasm.runtime.{}"
       code:

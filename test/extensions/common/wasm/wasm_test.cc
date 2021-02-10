@@ -1,3 +1,5 @@
+#include <unordered_map>
+
 #include "envoy/server/lifecycle_notifier.h"
 
 #include "common/common/hex.h"
@@ -105,9 +107,13 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
       "", "", "", GetParam(), "", false, envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
       local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
-  auto wasm = std::make_shared<WasmHandle>(std::make_unique<Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), "", "vm_configuration", "",
-      allowed_capabilities, scope, cluster_manager, *dispatcher));
+  // clang-format off
+  auto wasm = std::make_shared<WasmHandle>(
+      std::make_unique<Wasm>(absl::StrCat("envoy.wasm.runtime.", GetParam()), "",
+                             "vm_configuration", "", allowed_capabilities, scope, cluster_manager,
+                             *dispatcher, std::unordered_map<std::string, std::string>{}));
+  // clang-format on
+
   auto wasm_base = std::dynamic_pointer_cast<proxy_wasm::WasmHandleBase>(wasm);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVM);
   EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::UnableToCreateVM);
@@ -185,9 +191,13 @@ TEST_P(WasmCommonTest, Logging) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_NE(wasm, nullptr);
   EXPECT_NE(wasm->buildVersion(), "");
   EXPECT_NE(std::unique_ptr<ContextBase>(wasm->createContext(plugin)), nullptr);
@@ -257,9 +267,13 @@ TEST_P(WasmCommonTest, BadSignature) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_FALSE(wasm->initialize(code, false));
   EXPECT_TRUE(wasm->isFailed());
 }
@@ -287,9 +301,13 @@ TEST_P(WasmCommonTest, Segv) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_TRUE(wasm->initialize(code, false));
   TestContext* root_context = nullptr;
   wasm->setCreateContextForTesting(
@@ -331,9 +349,13 @@ TEST_P(WasmCommonTest, DivByZero) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
   EXPECT_TRUE(wasm->initialize(code, false));
@@ -372,9 +394,13 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -413,9 +439,13 @@ TEST_P(WasmCommonTest, Utilities) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -482,9 +512,13 @@ TEST_P(WasmCommonTest, Stats) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -519,9 +553,12 @@ TEST_P(WasmCommonTest, Foreign) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -565,9 +602,12 @@ TEST_P(WasmCommonTest, OnForeign) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -613,9 +653,13 @@ TEST_P(WasmCommonTest, WASI) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
+
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -980,9 +1024,12 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
   // restriction enforced if allowed_capabilities is non-empty
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"foo", proxy_wasm::SanitizationConfig()}};
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
@@ -1030,9 +1077,12 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()}};
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
@@ -1085,9 +1135,12 @@ TEST_P(WasmCommonTest, AllowLog) {
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"proxy_log", proxy_wasm::SanitizationConfig()}};
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   // Restrict capabilities, but allow proxy_log
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1136,9 +1189,12 @@ TEST_P(WasmCommonTest, AllowWASI) {
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"fd_write", proxy_wasm::SanitizationConfig()}};
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   // Restrict capabilities, but allow fd_write
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1188,9 +1244,12 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
       {"proxy_log", proxy_wasm::SanitizationConfig()}};
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   // Restrict capabilities, but allow proxy_log
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1240,9 +1299,12 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"fd_write", proxy_wasm::SanitizationConfig()}};
+  // clang-format off
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      allowed_capabilities, scope, cluster_manager, *dispatcher,
+      std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   // Restrict capabilities
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1283,12 +1345,12 @@ public:
   WasmCommonContextTest() = default;
 
   void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
-    setupBase(
-        GetParam(), code,
-        [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-          return new TestContext(wasm, plugin);
-        },
-        root_id, vm_configuration);
+    setRootId(root_id);
+    setVmConfiguration(vm_configuration);
+    setupBase(GetParam(), code,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new TestContext(wasm, plugin);
+              });
   }
   void setupContext() {
     context_ = std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_);

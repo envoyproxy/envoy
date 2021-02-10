@@ -6,8 +6,21 @@ def _wasm_rust_transition_impl(settings, attr):
         "//command_line_option:platforms": "@io_bazel_rules_rust//rust/platform:wasm",
     }
 
+def _wasi_rust_transition_impl(settings, attr):
+    return {
+        "//command_line_option:platforms": "@io_bazel_rules_rust//rust/platform:wasi",
+    }
+
 wasm_rust_transition = transition(
     implementation = _wasm_rust_transition_impl,
+    inputs = [],
+    outputs = [
+        "//command_line_option:platforms",
+    ],
+)
+
+wasi_rust_transition = transition(
+    implementation = _wasi_rust_transition_impl,
     inputs = [],
     outputs = [
         "//command_line_option:platforms",
@@ -47,6 +60,11 @@ wasm_rust_binary_rule = rule(
     attrs = _wasm_attrs(wasm_rust_transition),
 )
 
+wasi_rust_binary_rule = rule(
+    implementation = _wasm_binary_impl,
+    attrs = _wasm_attrs(wasi_rust_transition),
+)
+
 def envoy_wasm_cc_binary(name, deps = [], tags = [], **kwargs):
     wasm_cc_binary(
         name = name,
@@ -55,7 +73,7 @@ def envoy_wasm_cc_binary(name, deps = [], tags = [], **kwargs):
         **kwargs
     )
 
-def wasm_rust_binary(name, tags = [], **kwargs):
+def wasm_rust_binary(name, tags = [], wasi = False, **kwargs):
     wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
@@ -68,7 +86,11 @@ def wasm_rust_binary(name, tags = [], **kwargs):
         **kwargs
     )
 
-    wasm_rust_binary_rule(
+    bin_rule = wasm_rust_binary_rule
+    if wasi:
+        bin_rule = wasi_rust_binary_rule
+
+    bin_rule(
         name = name,
         precompile = select({
             "@envoy//bazel:linux_x86_64": True,

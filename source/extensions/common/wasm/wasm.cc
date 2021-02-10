@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <unordered_map>
 
 #include "envoy/event/deferred_deletable.h"
 
@@ -99,11 +100,13 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
                                       });
 }
 
+// clang-format off
 Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
            absl::string_view vm_key, proxy_wasm::AllowedCapabilitiesMap allowed_capabilities,
            const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-           Event::Dispatcher& dispatcher)
-    : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key, allowed_capabilities),
+           Event::Dispatcher& dispatcher, std::unordered_map<std::string, std::string> envs)
+    // clang-format on
+    : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key, envs, allowed_capabilities),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{

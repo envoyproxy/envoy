@@ -64,10 +64,8 @@ public:
     };
   }
 
-  void setup(const std::string& code, std::string root_id = "", std::string vm_configuration = "") {
-    setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
-  }
-  void setupTest(std::string root_id = "", std::string vm_configuration = "") {
+  void setupTest(std::string root_id = "", std::string vm_configuration = "",
+                 std::vector<std::string> env_keys = {}) {
     std::string code;
     if (std::get<0>(GetParam()) == "null") {
       code = "HttpWasmTestCpp";
@@ -82,7 +80,11 @@ public:
         code = TestEnvironment::readFileToStringForTest(basic_path + "_rust.wasm");
       }
     }
-    setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
+
+    setRootId(root_id);
+    setEnvKeys(env_keys);
+    setVmConfiguration(vm_configuration);
+    setupBase(std::get<0>(GetParam()), code, createContextFn());
   }
   void setupFilter() { setupFilterBase<TestFilter>(); }
 
@@ -101,15 +103,21 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
 
 // Bad code in initial config.
 TEST_P(WasmHttpFilterTest, BadCode) {
-  setup("bad code");
+  setupBase(std::get<0>(GetParam()), "bad code", createContextFn());
   EXPECT_EQ(wasm_, nullptr);
 }
 
 // Script touching headers only, request that is headers only.
 TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
-  setupTest("", "headers");
+  std::string env_key = "ENVOY_HTTP_WASM_TEST_HEADERS";
+  std::string env_value = "VALUE";
+  TestEnvironment::setEnvVar(env_key, env_value, 0);
+  setupTest("", "headers", {env_key});
   setupFilter();
+
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(filter(), log_(spdlog::level::trace,
+                             Eq(absl::string_view("ENVOY_HTTP_WASM_TEST_HEADERS: VALUE"))));
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));

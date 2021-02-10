@@ -1,9 +1,17 @@
-use log::{debug, error, info, warn};
+use log::{trace, debug, error, info, warn};
 use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::*;
 
 #[no_mangle]
+extern "C" {
+    fn __wasilibc_initialize_environ();
+}
+
+#[no_mangle]
 pub fn _start() {
+    unsafe {
+        __wasilibc_initialize_environ();
+    }
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_http_context(|context_id, _| -> Box<dyn HttpContext> {
         Box::new(TestStream { context_id })
@@ -16,6 +24,9 @@ struct TestStream {
 
 impl HttpContext for TestStream {
     fn on_http_request_headers(&mut self, _: usize) -> Action {
+        if let Ok(value) = std::env::var("ENVOY_HTTP_WASM_TEST_HEADERS") {
+            trace!("ENVOY_HTTP_WASM_TEST_HEADERS: {}", value);
+        }
         debug!("onRequestHeaders {} headers", self.context_id);
         if let Some(path) = self.get_http_request_header(":path") {
             info!("header path {}", path);

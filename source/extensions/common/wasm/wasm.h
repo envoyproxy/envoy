@@ -46,10 +46,14 @@ struct WasmStats {
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
 public:
+  // clang-format off
   Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
        absl::string_view vm_key, proxy_wasm::AllowedCapabilitiesMap allowed_capabilities,
        const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-       Event::Dispatcher& dispatcher);
+       Event::Dispatcher& dispatcher,
+       std::unordered_map<std::string, std::string> envs);
+  // clang-format on
+
   Wasm(std::shared_ptr<WasmHandle> other, Event::Dispatcher& dispatcher);
   ~Wasm() override;
 

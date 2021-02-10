@@ -31,9 +31,11 @@ void bmWasmSpeedTest(benchmark::State& state) {
   Envoy::Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   auto scope = Envoy::Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  // clang-format off
   auto wasm = std::make_unique<Envoy::Extensions::Common::Wasm::Wasm>(
       "envoy.wasm.runtime.null", "", "", "", allowed_capabilities, scope, cluster_manager,
-      *dispatcher);
+      *dispatcher, std::unordered_map<std::string, std::string>{});
+  // clang-format on
 
   auto context = std::make_shared<Envoy::Extensions::Common::Wasm::Context>(wasm.get());
   Envoy::Thread::ThreadFactory& thread_factory{Envoy::Thread::threadFactoryForTest()};

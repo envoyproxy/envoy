@@ -1,5 +1,7 @@
 #include "extensions/common/wasm/wasm_extension.h"
 
+#include <unordered_map>
+
 #include "extensions/common/wasm/context.h"
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/common/wasm/wasm_vm.h"
@@ -58,9 +60,19 @@ WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
       // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
       allowed_capabilities[capability.first] = proxy_wasm::SanitizationConfig();
     }
-    auto wasm = std::make_shared<Wasm>(vm_config.runtime(), vm_config.vm_id(),
-                                       anyToBytes(vm_config.configuration()), vm_key,
-                                       allowed_capabilities, scope, cluster_manager, dispatcher);
+    // clang-format off
+    std::unordered_map<std::string, std::string> envs;
+    // clang-format on
+    for (auto key : vm_config.env_keys()) {
+      auto value = std::getenv(key.data());
+      if (!value) {
+        continue;
+      }
+      envs[key] = std::string(value);
+    }
+    auto wasm = std::make_shared<Wasm>(
+        vm_config.runtime(), vm_config.vm_id(), anyToBytes(vm_config.configuration()), vm_key,
+        allowed_capabilities, scope, cluster_manager, dispatcher, envs);
     wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
   };
