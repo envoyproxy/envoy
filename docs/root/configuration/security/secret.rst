@@ -173,17 +173,17 @@ This example shows how to configure secrets fetched from remote SDS servers:
           name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-              common_tls_context:
-                tls_certificate_sds_secret_configs:
-                - name: client_cert
-                  sds_config:
-                    resource_api_version: V3
-                    api_config_source:
-                      api_type: GRPC
-                      transport_api_version: V3
-                      grpc_services:
-                        google_grpc:
-                          target_uri: unix:/tmp/uds_path
+            common_tls_context:
+              tls_certificate_sds_secret_configs:
+              - name: client_cert
+                sds_config:
+                  resource_api_version: V3
+                  api_config_source:
+                    api_type: GRPC
+                    transport_api_version: V3
+                    grpc_services:
+                      google_grpc:
+                        target_uri: unix:/tmp/uds_path
     listeners:
       ....
       filter_chains:
