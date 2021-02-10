@@ -40,6 +40,10 @@ def api_dependencies():
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
+    external_http_archive(
+        name = "opentelemetry_proto",
+        build_file_content = OPENTELEMETRY_LOGS_BUILD_CONTENT,
+    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
@@ -98,6 +102,28 @@ api_cc_py_proto_library(
 go_proto_library(
     name = "zipkin_go_proto",
     proto = ":zipkin",
+    visibility = ["//visibility:public"],
+)
+"""
+
+OPENTELEMETRY_LOGS_BUILD_CONTENT = """
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+
+proto_library(
+    name = "logs",
+    srcs = [
+        "opentelemetry/proto/collector/logs/v1/logs_service.proto",
+        "opentelemetry/proto/common/v1/common.proto",
+        "opentelemetry/proto/logs/v1/logs.proto",
+        "opentelemetry/proto/resource/v1/resource.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "logs_cc_proto",
+    deps = [":logs"],
     visibility = ["//visibility:public"],
 )
 """
