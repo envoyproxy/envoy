@@ -21,6 +21,7 @@ envoy_cc_extension(
     name = "assertion_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
+    category = "envoy.filters.http",
     repository = "@envoy",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
@@ -37,6 +38,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     repository = "@envoy",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [

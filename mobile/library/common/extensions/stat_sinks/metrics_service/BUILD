@@ -32,6 +32,7 @@ envoy_cc_extension(
     name = "mobile_grpc_streamer",
     srcs = ["mobile_grpc_streamer.cc"],
     hdrs = ["mobile_grpc_streamer.h"],
+    category = "envoy.filters.http",
     repository = "@envoy",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
@@ -45,6 +46,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     repository = "@envoy",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
