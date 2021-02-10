@@ -1117,12 +1117,14 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
-  // Per the `5 + 2 * (opened_streams_ +
-  // max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)`
-  // formula without sending any DATA frames, 1 + 5 + 2 * (1 + 0) = 8
-  // sequential WINDOW_UPDATE frames should trigger flood protection.
+  // See the limit formula in the
+  // `Envoy::Http::Http2::ProtocolConstraints::checkInboundFrameLimits()' method.
+  constexpr uint32_t max_allowed =
+      5 + 2 * (1 + Http2::Utility::OptionsLimits::
+                           DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
+                       0 /* 0 DATA fames */);
   floodServer(Http2Frame::makeWindowUpdateFrame(request_stream_id, 1),
-              "http2.inbound_window_update_frames_flood", 8);
+              "http2.inbound_window_update_frames_flood", max_allowed + 1);
 }
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
@@ -1208,7 +1210,11 @@ TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
     return;
   }
 
-  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), 8,
+  constexpr uint32_t max_allowed =
+      5 + 2 * (1 + Http2::Utility::OptionsLimits::
+                           DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
+                       0 /* 0 DATA fames */);
+  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), max_allowed + 1,
               "cluster.cluster_0.http2.inbound_window_update_frames_flood");
 }
 
