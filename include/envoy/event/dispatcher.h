@@ -258,13 +258,13 @@ public:
    * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
    * of the dispatcher event loop which may be on a different thread than the caller.
    */
-  virtual void post(const PostCb& callback) PURE;
+  virtual void post(PostCb callback) PURE;
 
   /**
-   * Similar to `post(const PostCb&)` but will destroy passed callback. This simulates posting move
-   * only function.
+   * Similar to `post()` but will destroy passed callback. This simulates posting move only
+   * function.
    */
-  virtual void post(PostCb&& callback) PURE;
+  virtual void movePost(PostCb&& callback) PURE;
 
   /**
    * Runs the event loop. This will not return until exit() is called either from within a callback
