@@ -54,6 +54,7 @@ Bug Fixes
 * http: disallowing "host:" in request_headers_to_add for behavioral consistency with rejecting :authority header. This behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_host_like_authority` to false.
 * http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
 * listener: prevent crashing when an unknown listener config proto is received and debug logging is enabled.
+* overload: fix a bug that can cause use-after-free when multiple scaled timers fire in the same event loop iteration.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
 
 Removed Config or Runtime
