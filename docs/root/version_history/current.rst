@@ -55,6 +55,21 @@ Bug Fixes
 * http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
 * listener: prevent crashing when an unknown listener config proto is received and debug logging is enabled.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
+* adaptive concurrency: fixed a bug where concurrent requests on different worker threads could update minRTT back-to-back.
+* config: validate that upgrade configs have a non-empty :ref:`upgrade_type <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.upgrade_type>`, fixing a bug where an errant "-" could result in unexpected behavior.
+* dns: fix a bug where custom resolvers provided in configuration were not preserved after network issues.
+* dns_filter: correctly associate DNS response IDs when multiple queries are received.
+* grpc mux: fix sending node again after stream is reset when ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` is set.
+* http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+* http: reject requests with missing required headers after filter chain processing.
+* http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
+* proxy_proto: fixed a bug where the wrong downstream address got sent to upstream connections.
+* proxy_proto: fixed a bug where network filters would not have the correct downstreamRemoteAddress() when accessed from the StreamInfo. This could result in incorrect enforcement of RBAC rules in the RBAC network filter (but not in the RBAC HTTP filter), or incorrect access log addresses from tcp_proxy.
+* sds: fix a bug that clusters sharing same sds target are marked active immediately.
+* tls: fix detection of the upstream connection close event.
+* tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
+* udp: fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
+* watchdog: touch the watchdog before most event loop operations to avoid misses when handling bursts of callbacks.
 
 Removed Config or Runtime
 -------------------------

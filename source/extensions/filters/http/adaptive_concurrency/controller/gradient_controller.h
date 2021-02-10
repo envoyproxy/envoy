@@ -223,7 +223,7 @@ public:
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
-  void updateMinRTT();
+  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(min_rtt_update_mtx_);
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
@@ -246,6 +246,9 @@ private:
   // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
   // (where the new concurrency limit is determined) do not overlap.
   absl::Mutex sample_mutation_mtx_;
+
+  // Ensures that only a single minRTT update can happen simultaneously by any worker thread.
+  absl::Mutex min_rtt_update_mtx_;
 
   // Stores the value of the concurrency limit prior to entering the minRTT update window. If this
   // is non-zero, then we are actively in the minRTT sampling window.

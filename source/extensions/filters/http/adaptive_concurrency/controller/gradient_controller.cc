@@ -215,10 +215,12 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
     sample_count = hist_sample_count(latency_sample_hist_.get());
   }
 
-  if (inMinRTTSamplingWindow() && sample_count >= config_.minRTTAggregateRequestCount()) {
+  const auto agg_count = config_.minRTTAggregateRequestCount();
+  if (inMinRTTSamplingWindow() && sample_count >= agg_count && min_rtt_update_mtx_.TryLock()) {
     // This sample has pushed the request count over the request count requirement for the minRTT
     // recalculation. It must now be finished.
     updateMinRTT();
+    min_rtt_update_mtx_.Unlock();
   }
 }
 
