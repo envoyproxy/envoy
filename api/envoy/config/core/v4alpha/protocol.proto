@@ -323,7 +323,7 @@ message Http2ProtocolOptions {
   // of WINDOW_UPDATE frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //   max_inbound_window_update_frames_per_data_frame_sent * (outbound_data_frames + opened_streams + 1)
+  //   2 * max_inbound_window_update_frames_per_data_frame_sent * (outbound_data_frames + opened_streams + 1)
   //
   // the connection is terminated. Envoy effectively adds 1 DATA frame for every new stream to accommodate
   // servers that may preemptively send WINDOW_UPDATE before DATA. For downstream connections the `opened_streams`
