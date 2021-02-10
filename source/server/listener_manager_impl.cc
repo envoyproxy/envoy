@@ -1022,7 +1022,9 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   if (transport_socket.name() == Extensions::TransportSockets::TransportSocketNames::get().Quic &&
       typeid(Quic::QuicServerTransportSocketConfigFactory) != typeid(config_factory)) {
     throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
-                                     "transport socket specified for quic transport socket."));
+                                     "transport socket config specified for quic transport socket: "
+                                     "{}. \nUse QuicDownstreamTransport instead.",
+                                     transport_socket.DebugString()));
   }
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);

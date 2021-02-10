@@ -160,7 +160,7 @@ udp_writer_config:
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(listener_proto, "", true), EnvoyException,
-                          "wrong transport socket specified for quic transport socket");
+                          "wrong transport socket config specified for quic transport socket");
 }
 
 } // namespace

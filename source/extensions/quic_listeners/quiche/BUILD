@@ -351,12 +351,16 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
+    # Needed to verify that a quic specific configuration is used for quic transport socket.
+    extra_visibility = [
+        "//source/server:__subpackages__",
+    ],
+    security_posture = "unknown",
     tags = ["nofips"],
-    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:transport_socket_config_interface",
