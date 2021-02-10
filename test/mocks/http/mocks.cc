@@ -90,7 +90,12 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
   Utility::sendLocalReply(
       stream_destroyed_,
       Utility::EncodeFunctions{
-          nullptr, nullptr, nullptr,
+          nullptr, nullptr,
+          [this](ResponseHeaderMap& headers, Code& code, std::string& body,
+                 const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 bool is_head_request) -> void {
+            Utility::toGrpcTrailersOnlyResponse(headers, code, body, grpc_status, is_head_request);
+          },
           [this, modify_headers, details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             if (modify_headers != nullptr) {
               modify_headers(*headers);

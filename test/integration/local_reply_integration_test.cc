@@ -32,12 +32,16 @@ public:
     waitForNextUpstreamRequest();
 
     if (upstream_body_size > 0) {
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", response_code}},
-                                       false);
+      upstream_request_->encodeHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", response_code},
+                                          {"content-type", "application/original"},
+                                          {"content-length", std::to_string(upstream_body_size)}},
+          false);
       upstream_request_->encodeData(upstream_body_size, true);
     } else {
-      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", response_code}},
-                                       true);
+      upstream_request_->encodeHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", response_code}, {"content-length", "0"}},
+          true);
     }
     response->waitForHeaders();
     return response;
@@ -521,7 +525,8 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyNoMatchNoUpstreamBody) {
 
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0, response->headers().get(Http::LowerCaseString("x-upstream-5xx")).size());
-  EXPECT_EQ(response->body(), "");
+  EXPECT_EQ("", response->body());
+  EXPECT_EQ("", response->headers().getContentTypeValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -532,7 +537,9 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyNoMatchWithUpstreamBody) {
 
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0, response->headers().get(Http::LowerCaseString("x-upstream-5xx")).size());
-  EXPECT_EQ(response->body(), std::string(8, 'a'));
+  EXPECT_EQ(std::string(8, 'a'), response->body());
+  EXPECT_EQ("application/original", response->headers().getContentTypeValue());
+  EXPECT_EQ("8", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -558,6 +565,8 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusNoBody) {
 
   EXPECT_EQ("450", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response->body(), "450: via_upstream");
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("17", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -567,7 +576,9 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithBody) {
   auto response = getUpstreamResponse(match_429_rewrite_450_yaml, "429", 512);
 
   EXPECT_EQ("450", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "450: via_upstream");
+  EXPECT_EQ("450: via_upstream", response->body());
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("17", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -592,7 +603,8 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusRemoveEmptyBody)
   auto response = getUpstreamResponse(match_429_rewrite_451_remove_body_yaml, "429", 0);
 
   EXPECT_EQ("451", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "");
+  EXPECT_EQ("", response->body());
+  EXPECT_EQ("", response->headers().getContentTypeValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -602,7 +614,9 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusRemoveNonEmptyBo
   auto response = getUpstreamResponse(match_429_rewrite_451_remove_body_yaml, "429", 512);
 
   EXPECT_EQ("451", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "");
+  EXPECT_EQ("", response->body());
+  EXPECT_EQ("", response->headers().getContentTypeValue());
+  EXPECT_EQ("", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -625,7 +639,9 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithUnmodifiedEm
   auto response = getUpstreamResponse(match_429_rewrite_475_unmodified_body_yaml, "429", 0);
 
   EXPECT_EQ("475", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "");
+  // The unmodified upstream body is empty and has no content type.
+  EXPECT_EQ("", response->body());
+  EXPECT_EQ("", response->headers().getContentTypeValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -636,7 +652,9 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamStatusWithUnmodifiedNo
   auto response = getUpstreamResponse(match_429_rewrite_475_unmodified_body_yaml, "429", 8);
 
   EXPECT_EQ("475", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), std::string(8, 'a'));
+  EXPECT_EQ(std::string(8, 'a'), response->body());
+  EXPECT_EQ("application/original", response->headers().getContentTypeValue());
+  EXPECT_EQ("8", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -660,7 +678,9 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeaderNoBody) {
   auto response = getUpstreamResponse(match_test_header_rewrite_435_yaml, "200", 0);
 
   EXPECT_EQ("435", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "435: via_upstream");
+  EXPECT_EQ("435: via_upstream", response->body());
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("17", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -671,7 +691,93 @@ TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeaderWithBody) {
   auto response = getUpstreamResponse(match_test_header_rewrite_435_yaml, "200", 512);
 
   EXPECT_EQ("435", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(response->body(), "435: via_upstream");
+  EXPECT_EQ("435: via_upstream", response->body());
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("17", response->headers().getContentLengthValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+const std::string match_500_rewrite_content_type_yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 500
+          runtime_key: key_b
+body_format:
+  content_type: application/custom
+  text_format_source:
+    inline_string: "<custom>%RESPONSE_CODE%: %RESPONSE_CODE_DETAILS%</custom>"
+)EOF";
+
+// Should match an http header, rewrite the content type, and modify the upstream response body (no
+// upstream response body)
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeaderRewriteContentTypeNoBody) {
+  auto response = getUpstreamResponse(match_500_rewrite_content_type_yaml, "500", 0);
+
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("<custom>500: via_upstream</custom>", response->body());
+  EXPECT_EQ("application/custom", response->headers().getContentTypeValue());
+  EXPECT_EQ("34", response->headers().getContentLengthValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should match an http header, rewrite the content type, and modify the upstream response body
+// (non-empty upstream response body)
+TEST_P(LocalReplyIntegrationTest, LocalyReplyMatchUpstreamHeaderRewriteContentTypeWithBody) {
+  auto response = getUpstreamResponse(match_500_rewrite_content_type_yaml, "500", 512);
+
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("<custom>500: via_upstream</custom>", response->body());
+  EXPECT_EQ("application/custom", response->headers().getContentTypeValue());
+  EXPECT_EQ("34", response->headers().getContentLengthValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+const std::string match_400_rewrite_json_yaml = R"EOF(
+mappers:
+- filter:
+    status_code_filter:
+      comparison:
+        op: EQ
+        value:
+          default_value: 400
+          runtime_key: key_b
+body_format:
+  json_format:
+    response_code: "%RESPONSE_CODE%"
+    details: "%RESPONSE_CODE_DETAILS%"
+)EOF";
+
+// Should match an http header, rewrite the content type, and modify the upstream response body
+// (non-empty upstream response body)
+TEST_P(LocalReplyIntegrationTest, LocalyReplyRewriteToJsonNoBody) {
+  auto response = getUpstreamResponse(match_400_rewrite_json_yaml, "400", 0);
+
+  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(),
+                                           "{\"response_code\":400,\"details\":\"via_upstream\"}"));
+  EXPECT_EQ("application/json", response->headers().getContentTypeValue());
+  EXPECT_EQ("47", response->headers().getContentLengthValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Should match an http header, rewrite the content type, and modify the upstream response body
+// (non-empty upstream response body)
+TEST_P(LocalReplyIntegrationTest, LocalyReplyRewriteToJsonWithBody) {
+  auto response = getUpstreamResponse(match_400_rewrite_json_yaml, "400", 512);
+
+  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("application/json", response->headers().getContentTypeValue());
+  EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(),
+                                           "{\"response_code\":400,\"details\":\"via_upstream\"}"));
+  EXPECT_EQ("47", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }
@@ -704,7 +810,9 @@ body_format:
   EXPECT_EQ(
       "1",
       response->headers().get(Http::LowerCaseString("x-upstream-500"))[0]->value().getStringView());
-  EXPECT_EQ(response->body(), "");
+  EXPECT_EQ("", response->body());
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("17", response->headers().getContentLengthValue());
 
   cleanupUpstreamAndDownstream();
 }

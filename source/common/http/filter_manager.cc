@@ -1089,7 +1089,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     rewriteResponse();
 
     if (buffered_response_data_) {
-      // If we're going to rewrite the response here, then modified_end_stream can no longer be true
+      // If we have a rewritten response body, then modified_end_stream can no longer be true
       // because we have a body now.
       modified_end_stream = false;
     }
@@ -1307,39 +1307,47 @@ void FilterManager::rewriteResponse() {
   absl::string_view rewritten_content_type{};
   Http::Code rewritten_code{static_cast<Http::Code>(Utility::getResponseStatus(*response_headers))};
 
-  // Start with the local reply body, if we have it.
+  // Start with the local reply body and text/plain content type, if we have it.
   if (local_reply_data_) {
     rewritten_body = local_reply_data_->body_text_;
+    rewritten_content_type = Headers::get().ContentTypeValues.Text;
   }
+
+  // Get rid of any buffered response data we may have at this point. We're going to use this
+  // as the output parameter for a rewritten body, if any.
+  buffered_response_data_ = nullptr;
 
   ENVOY_STREAM_LOG(trace, "rewriteResponse: calling local_reply_.rewrite with body=\"{}\", code={}",
                    *this, rewritten_body, rewritten_code);
-  const bool did_rewrite =
+  const bool did_body_rewrite =
       local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), *response_headers,
                            stream_info_, rewritten_code, rewritten_body, rewritten_content_type);
   ENVOY_STREAM_LOG(
-      trace, "rewriteResponse: local_reply_.rewrite returned body=\"{}\", content_type={}, code={}",
-      *this, rewritten_body, rewritten_content_type, rewritten_code);
+      trace,
+      "rewriteResponse: local_reply_.rewrite returned did_body_rewrite={}, body=\"{}\", "
+      "content_type={}, code={}",
+      *this, did_body_rewrite, rewritten_body, rewritten_content_type, rewritten_code);
 
   if (local_reply_data_ && local_reply_data_->is_grpc_) {
     // Send a trailers-only grpc response
     Utility::toGrpcTrailersOnlyResponse(*response_headers, rewritten_code, rewritten_body,
                                         local_reply_data_->grpc_status_,
                                         local_reply_data_->is_head_request_);
-    // We're sending a trailers-only response with no body. Make sure there's no buffered
-    // response data nor a content length header.
-    buffered_response_data_ = nullptr;
     return;
   }
 
-  buffered_response_data_ =
-      did_rewrite ? std::make_unique<Buffer::OwnedImpl>(rewritten_body) : nullptr;
-  if (buffered_response_data_) {
-    // Since we overwrote the response body, we need to set the content-length too.
-    response_headers->setContentLength(buffered_response_data_->length());
-  }
-  if (!rewritten_content_type.empty()) {
-    response_headers->setContentType(rewritten_content_type);
+  if (did_body_rewrite) {
+    buffered_response_data_ = std::make_unique<Buffer::OwnedImpl>(rewritten_body);
+
+    // If we rewrote with a non-empty body, set the content length and type.
+    // Otherwise, remove them.
+    if (buffered_response_data_->length() > 0) {
+      response_headers->setContentLength(buffered_response_data_->length());
+      response_headers->setContentType(rewritten_content_type);
+    } else {
+      response_headers->removeContentLength();
+      response_headers->removeContentType();
+    }
   }
 }
 
