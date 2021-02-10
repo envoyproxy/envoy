@@ -1122,7 +1122,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   constexpr uint32_t max_allowed =
       5 + 2 * (1 + Http2::Utility::OptionsLimits::
                            DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
-                       0 /* 0 DATA fames */);
+                       0 /* 0 DATA frames */);
   floodServer(Http2Frame::makeWindowUpdateFrame(request_stream_id, 1),
               "http2.inbound_window_update_frames_flood", max_allowed + 1);
 }
@@ -1213,7 +1213,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
   constexpr uint32_t max_allowed =
       5 + 2 * (1 + Http2::Utility::OptionsLimits::
                            DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
-                       0 /* 0 DATA fames */);
+                       0 /* 0 DATA frames */);
   floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), max_allowed + 1,
               "cluster.cluster_0.http2.inbound_window_update_frames_flood");
 }
