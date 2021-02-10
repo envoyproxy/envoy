@@ -926,13 +926,8 @@ ClusterImplBase::ClusterImplBase(
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
-        dispatcher.movePost(
-            [raii_cluster = std::shared_ptr<const ClusterInfoImpl>(self)]() mutable {
-              ENVOY_LOG(debug, "Destroying cluster info {}. This thread should be master thread.",
-                        raii_cluster->name());
-              raii_cluster = nullptr;
-            });
-        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+        dispatcher.deleteInDispatcherThread(
+            std::unique_ptr<Event::DispatcherThreadDeletable>(const_cast<ClusterInfoImpl*>(self)));
       });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&

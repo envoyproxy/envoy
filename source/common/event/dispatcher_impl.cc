@@ -77,6 +77,10 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 DispatcherImpl::~DispatcherImpl() {
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
   FatalErrorHandler::removeFatalErrorHandler(*this);
+  // These deletable will be deleted anyway but it's violating the shutdown procedure.
+  ASSERT(deletables_in_dispatcher_thread_.empty(),
+         fmt::format("{} dispatcher contains {} dispatcher local deletables after shutdown.",
+                     run_tid_.getId(), deletables_in_dispatcher_thread_.size()));
 }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
@@ -259,7 +263,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
-    do_post = post_callbacks_.empty();
+    do_post = post_callbacks_.empty() || deletables_in_dispatcher_thread_.empty();
     post_callbacks_.push_back(callback);
   }
 
@@ -268,14 +272,12 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
-void DispatcherImpl::movePost(std::function<void()>&& callback) {
+void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) {
   bool do_post;
   {
     Thread::LockGuard lock(post_lock_);
-    do_post = post_callbacks_.empty();
-    post_callbacks_.push_back(std::move(callback));
-    // Poor man's move only function.
-    callback = nullptr;
+    do_post = post_callbacks_.empty() || deletables_in_dispatcher_thread_.empty();
+    deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
   }
 
   if (do_post) {
@@ -298,10 +300,18 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 }
 
 void DispatcherImpl::shutdown() {
-  ENVOY_LOG(debug, "Clearing post callbacks in {}", __FUNCTION__);
+  ENVOY_LOG(debug, "Clearing dispatcher thread deletables in {}", __FUNCTION__);
+  std::list<DispatcherThreadDeletablePtr> to_be_delete;
   {
     Thread::LockGuard lock(post_lock_);
-    post_callbacks_.clear();
+    to_be_delete = std::move(deletables_in_dispatcher_thread_);
+  }
+  while (!to_be_delete.empty()) {
+    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // executing a long list of callbacks.
+    touchWatchdog();
+    // FIFO.
+    to_be_delete.pop_front();
   }
 }
 
@@ -318,6 +328,7 @@ void DispatcherImpl::runPostCallbacks() {
   clearDeferredDeleteList();
 
   std::list<std::function<void()>> callbacks;
+  std::list<DispatcherThreadDeletablePtr> to_be_delete;
   {
     // Take ownership of the callbacks under the post_lock_. The lock must be released before
     // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
@@ -326,6 +337,8 @@ void DispatcherImpl::runPostCallbacks() {
     callbacks = std::move(post_callbacks_);
     // post_callbacks_ should be empty after the move.
     ASSERT(post_callbacks_.empty());
+    to_be_delete = std::move(deletables_in_dispatcher_thread_);
+    ASSERT(deletables_in_dispatcher_thread_.empty());
   }
   // It is important that the execution and deletion of the callback happen while post_lock_ is not
   // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
@@ -338,6 +351,14 @@ void DispatcherImpl::runPostCallbacks() {
     // Pop the front so that the destructor of the callback that just executed runs before the next
     // callback executes.
     callbacks.pop_front();
+  }
+
+  while (!to_be_delete.empty()) {
+    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // executing a long list of callbacks.
+    touchWatchdog();
+    // FIFO.
+    to_be_delete.pop_front();
   }
 }
 
