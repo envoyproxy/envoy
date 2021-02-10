@@ -30,11 +30,6 @@
 namespace Envoy {
 namespace Network {
 
-// TODO(lambdai): Remove below re-declare in C++17.
-constexpr absl::string_view Utility::TCP_SCHEME;
-constexpr absl::string_view Utility::UDP_SCHEME;
-constexpr absl::string_view Utility::UNIX_SCHEME;
-
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));

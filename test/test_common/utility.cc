@@ -353,8 +353,6 @@ void ConditionalInitializer::wait() {
   EXPECT_TRUE(ready_);
 }
 
-constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
-
 namespace Api {
 
 class TestImplProvider {
