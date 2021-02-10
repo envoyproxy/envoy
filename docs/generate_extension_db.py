@@ -6,6 +6,7 @@
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -34,21 +35,18 @@ def IsMissing(value):
 
 
 def NumReadFiltersFuzzed():
-  f = open('test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc', 'r')
+  data = pathlib.Path(
+      'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc').read_text()
   # Hack-ish! We only search the first 50 lines to capture the filters in filterNames().
-  data = ""
-  for i in range(50):
-    data += f.readline()
-  return data.count('NetworkFilterNames::get()')
+  return len(re.findall('NetworkFilterNames::get()', ''.join(data.splitlines()[:50])))
 
 
 def NumRobustToDownstreamNetworkFilters(db):
-  count = 0
-  for extension, metadata in db.items():
-    # Count number of network filters robust to untrusted downstreams.
-    if 'network' in extension and metadata['security_posture'] == 'robust_to_untrusted_downstream':
-      count += 1
-  return count
+  # Count number of network filters robust to untrusted downstreams.
+  return len([
+      ext for ext, data in db.items()
+      if 'network' in ext and data['security_posture'] == 'robust_to_untrusted_downstream'
+  ])
 
 
 def GetExtensionMetadata(target):
