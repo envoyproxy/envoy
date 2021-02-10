@@ -132,7 +132,7 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
     if (size < 0) {
       throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
     }
-    if (static_cast<unsigned int>(size) > max_body_size_bytes) {
+    if (static_cast<uint64_t>(size) > max_body_size_bytes) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
                                        filename, size, max_body_size_bytes));
     }
