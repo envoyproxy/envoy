@@ -1561,7 +1561,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
   common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
       envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC);
-  // Set slow start window to 60 seconds.
+  // Set slow start window to 10 seconds.
   common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_value(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
@@ -1624,6 +1624,56 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
+
+TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
+  common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
+      envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC);
+  // Set slow start window to 10 seconds.
+  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_value(10);
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
+  common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(1);
+
+  init(true);
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble("time_bias", 1.0)).WillRepeatedly(Return(0.5));
+
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:100", simTime(), 1)};
+
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {});
+  const auto hosts_in_slow_start =
+      EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
+  EXPECT_EQ(3, hosts_in_slow_start->size());
+
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  hostSet().healthy_hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hostSet().runCallbacks({}, {});
+
+  EXPECT_EQ(2, hosts_in_slow_start->size());
+
+  // We should see 3:1:1 ratio, as 2 out of 3 hosts are in slow start with 0.5 time bias.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble("time_bias", 1.0)).WillRepeatedly(Return(1));
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  hostSet().runCallbacks({}, {}); // recompute edf schedulers
+  // We should see 1:1:1 ratio with time bias set to 1.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+}
+
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
   LeastRequestLoadBalancer lb_{

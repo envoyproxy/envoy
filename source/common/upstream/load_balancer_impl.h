@@ -428,7 +428,8 @@ protected:
   TimeSource& time_source_;
   struct orderByCreateDateDesc {
     bool operator()(const HostSharedPtr l, const HostSharedPtr r) const {
-      return l->creationTime() < r->creationTime();
+      return (l->creationTime() < r->creationTime()) ||
+             (l->address()->asString() < r->address()->asString());
     }
   };
   // Used exclusively for:

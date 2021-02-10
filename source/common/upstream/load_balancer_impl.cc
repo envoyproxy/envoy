@@ -722,24 +722,13 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_set.addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                          const HostVector& hosts_removed) {
-    // In case endpoint warming policy is `NO_WAIT`, we recalculate hosts in slow start as they join
-    // the cluster.
-    if (slow_start_enabled_ &&
-        endpoint_warming_policy_ == envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT) {
-      recalculateHostsInSlowStart(hosts_added);
-    }
-    refresh(priority);
-  });
-  priority_set.addMemberUpdateCb([this](const HostVector& hosts_added,
-                                        const HostVector& hosts_removed) -> void {
-    // In case endpoint warming policy is `NO_WAIT`, we recalculate hosts in slow start as they join
-    // the cluster.
-    if (slow_start_enabled_ &&
-        endpoint_warming_policy_ == envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT) {
-      recalculateHostsInSlowStart(hosts_added);
-    }
-  });
+                                          const HostVector& hosts_removed) { refresh(priority); });
+  priority_set.addMemberUpdateCb(
+      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
+        if (slow_start_enabled_) {
+          recalculateHostsInSlowStart(hosts_added);
+        }
+      });
 }
 
 void EdfLoadBalancerBase::initialize() {
@@ -846,9 +835,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
   // If endpoint warming policy is `WAIT_FOR_FIRST_PASSING_HC`,
   // then we need to recheck all hosts in priority for possible health state change.
-  if (slow_start_enabled_ &&
-      endpoint_warming_policy_ ==
-          envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC) {
+  if (slow_start_enabled_) {
     recalculateHostsInSlowStart(host_set->hosts());
   }
 }
