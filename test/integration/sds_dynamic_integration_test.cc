@@ -673,7 +673,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_EQ(1, test_server_->counter("sds.client_cert.update_rejected")->value());
 }
 
-// Test CDS with SDS.
+// Test CDS with SDS. A cluster provided by CDS raises new SDS request for upstream cert.
 class SdsCdsIntegrationTest : public SdsDynamicIntegrationBaseTest {
 public:
   void initialize() override {
@@ -697,7 +697,7 @@ public:
       cds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       cds_cluster->set_name("cds_cluster");
       ConfigHelper::setHttp2(*cds_cluster);
-      // Then add sds cluster first.
+      // Then add sds cluster.
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       sds_cluster->set_name("sds_cluster");
@@ -718,10 +718,16 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    // registerTestServerPorts({"http"});
   }
 
   void TearDown() override {
+    {
+      AssertionResult result = sds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = sds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      sds_connection_.reset();
+    }
     cleanUpXdsConnection();
     cleanupUpstreamAndDownstream();
     codec_client_.reset();

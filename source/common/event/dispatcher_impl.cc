@@ -77,10 +77,7 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 DispatcherImpl::~DispatcherImpl() {
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
   FatalErrorHandler::removeFatalErrorHandler(*this);
-  // These deletable will be deleted anyway but it's violating the shutdown procedure.
-  ASSERT(deletables_in_dispatcher_thread_.empty(),
-         fmt::format("{} dispatcher contains {} dispatcher local deletables after shutdown.",
-                     run_tid_.getId(), deletables_in_dispatcher_thread_.size()));
+  // TODO(lambdai): Explore the cases that `deletables_in_dispatcher_thread_` is not empty().
 }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
