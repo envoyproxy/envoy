@@ -31,8 +31,14 @@ public:
     if (handle.has_value()) {
       wasm = handle->wasm().get();
     }
-    if (plugin_->fail_open_ && (!wasm || wasm->isFailed())) {
-      return nullptr;
+    if (!wasm || wasm->isFailed()) {
+      if (plugin_->fail_open_) {
+        // Fail open skips adding this filter to callbacks.
+        return nullptr;
+      } else {
+        // Fail closed is handled by an empty Context.
+        return std::make_shared<Context>(nullptr, 0, plugin_);
+      }
     }
     return std::make_shared<Context>(wasm, handle->config_id(), plugin_);
   }
