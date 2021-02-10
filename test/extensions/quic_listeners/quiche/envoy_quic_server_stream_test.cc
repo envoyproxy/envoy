@@ -195,9 +195,13 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
-        // Verify that the duplicated headers are handled correctly before passing to stream
-        // decoder.
-        EXPECT_EQ("a=b; c=d", headers->getCookieValue());
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.header_map_coalesce_cookie_headers")) {
+          // Verify that the duplicated headers are handled correctly before passing to stream
+          // decoder.
+          EXPECT_EQ("a=b; c=d",
+                    headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
+        }
       }));
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));

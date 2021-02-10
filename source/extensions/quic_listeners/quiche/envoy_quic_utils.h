@@ -42,8 +42,17 @@ template <class T>
 std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
-    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
-    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
+    auto key = Http::LowerCaseString(entry.first);
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.header_map_coalesce_cookie_headers") ||
+        key != Http::Headers::get().Cookie) {
+      // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
+      headers->addCopy(key, entry.second);
+    } else {
+      // QUICHE breaks "cookie" header into crumbs. Coalesce them by appending current one to
+      // existing one if there is any.
+      headers->appendCopy(key, entry.second);
+    }
   }
   return headers;
 }
@@ -54,8 +63,7 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& he
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
-    std::string value(entry.second);
-    headers->addCopy(Http::LowerCaseString(key), value);
+    headers->addCopy(Http::LowerCaseString(key), entry.second);
   }
   return headers;
 }

@@ -741,13 +741,17 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
   ASSERT_EQ(set_cookie_value[1]->value().getStringView(), "bar");
 }
 
-TEST_P(HeaderMapImplTest, CoalesceCookieHeadersWithSemicolon) {
+TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.header_map_coalesce_cookie_headers")) {
+    return;
+  }
   TestRequestHeaderMapImpl headers;
   const std::string foo("foo=1");
   const std::string bar("bar=2");
   const LowerCaseString& cookie = Http::Headers::get().Cookie;
   headers.addReference(cookie, foo);
-  headers.addReference(cookie, bar);
+  headers.appendCopy(cookie, bar);
   EXPECT_EQ(1UL, headers.size());
 
   const auto cookie_value = headers.get(LowerCaseString("cookie"));

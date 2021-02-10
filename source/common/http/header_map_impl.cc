@@ -362,10 +362,8 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
-      const std::string delimiter =
-          (*lookup.value().key_ == Http::Headers::get().Cookie ? "; " : ",");
       const uint64_t added_size =
-          appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
+          appendToHeader((*lookup.value().entry_)->value(), value.getStringView());
       addSize(added_size);
       value.clear();
     }
@@ -430,7 +428,10 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const uint64_t added_size = appendToHeader(entry[0]->value(), value);
+    const std::string delimiter = (key == Http::Headers::get().Cookie ? "; " : ",");
+    const uint64_t added_size = header_map_coalesce_cookie_headers_
+                                    ? appendToHeader(entry[0]->value(), value, delimiter)
+                                    : appendToHeader(entry[0]->value(), value);
     addSize(added_size);
   } else {
     addCopy(key, value);
