@@ -24,7 +24,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:93.8"
 "source/extensions/common/crypto:91.5"
 "source/extensions/common/tap:95.9"
-"source/extensions/common/wasm:95.4"
+"source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/null:77.8"
 "source/extensions/common/wasm/v8:85.4"
 "source/extensions/common:94.4"
@@ -65,7 +65,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wavm:0.0" # Noe enabled in coverage build
 "source/extensions/watchdog:85.7" # Death tests within extensions
 "source/extensions/watchdog/profile_action:85.7"
-"source/server:94.6"
+"source/server:94.5" # flaky: be careful adjusting
 "source/server/admin:95.1"
 "source/server/config_validation:75.6"
 )
