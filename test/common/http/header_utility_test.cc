@@ -692,5 +692,23 @@ TEST(PercentEncoding, ShouldCloseConnection) {
       Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "foo,close"}}));
 }
 
+TEST(RequiredHeaders, IsRemovableHeader) {
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader(":path"));
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader("host"));
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader("Host"));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader(""));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader("hostname"));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
+}
+
+TEST(RequiredHeaders, IsModifiableHeader) {
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader(":path"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader("host"));
+  EXPECT_FALSE(HeaderUtility::isModifiableHeader("Host"));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader(""));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader("hostname"));
+  EXPECT_TRUE(HeaderUtility::isModifiableHeader("Content-Type"));
+}
+
 } // namespace Http
 } // namespace Envoy

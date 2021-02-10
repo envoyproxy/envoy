@@ -7,11 +7,18 @@
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class FactoryContext;
+}
+} // namespace Server
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
@@ -70,7 +77,9 @@ using ActionFactoryCb = std::function<ActionPtr()>;
 
 class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config) PURE;
+  virtual ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config,
+                        Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -142,7 +151,9 @@ using InputMatcherPtr = std::unique_ptr<InputMatcher>;
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual InputMatcherPtr createInputMatcher(const Protobuf::Message& config) PURE;
+  virtual InputMatcherPtr
+  createInputMatcher(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matcher"; }
 };
@@ -209,7 +220,9 @@ public:
   /**
    * Creates a DataInput from the provided config.
    */
-  virtual DataInputPtr<DataType> createDataInput(const Protobuf::Message& config) PURE;
+  virtual DataInputPtr<DataType>
+  createDataInput(const Protobuf::Message& config,
+                  Server::Configuration::FactoryContext& factory_context) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

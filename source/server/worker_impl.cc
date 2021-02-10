@@ -16,7 +16,8 @@ namespace Server {
 
 WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overload_manager,
                                           const std::string& worker_name) {
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(worker_name));
+  Event::DispatcherPtr dispatcher(
+      api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher),
                                       std::make_unique<ConnectionHandlerImpl>(*dispatcher, index),
                                       overload_manager, api_);
@@ -152,7 +153,7 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
 }
 
 void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
-  handler_->setListenerRejectFraction(static_cast<float>(state.value()));
+  handler_->setListenerRejectFraction(state.value());
 }
 
 } // namespace Server

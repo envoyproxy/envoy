@@ -138,6 +138,36 @@ TEST(UtilityTest, TestGetCertificationExtensionValue) {
   EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "foo"));
 }
 
+TEST(UtilityTest, SslErrorDescriptionTest) {
+  const std::vector<std::pair<int, std::string>> test_set = {
+      {0, "NONE"},
+      {1, "SSL"},
+      {2, "WANT_READ"},
+      {3, "WANT_WRITE"},
+      {4, "WANT_X509_LOOKUP"},
+      {5, "SYSCALL"},
+      {6, "ZERO_RETURN"},
+      {7, "WANT_CONNECT"},
+      {8, "WANT_ACCEPT"},
+      {9, "WANT_CHANNEL_ID_LOOKUP"},
+      {11, "PENDING_SESSION"},
+      {12, "PENDING_CERTIFICATE"},
+      {13, "WANT_PRIVATE_KEY_OPERATION"},
+      {14, "PENDING_TICKET"},
+      {15, "EARLY_DATA_REJECTED"},
+      {16, "WANT_CERTIFICATE_VERIFY"},
+      {17, "HANDOFF"},
+      {18, "HANDBACK"},
+  };
+
+  for (const auto& test_data : test_set) {
+    EXPECT_EQ(test_data.second, Utility::getErrorDescription(test_data.first));
+  }
+
+  EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(19), "UNKNOWN_ERROR"),
+                   "Unknown BoringSSL error had occurred");
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets
