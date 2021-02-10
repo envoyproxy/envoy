@@ -320,7 +320,7 @@ message Http2ProtocolOptions {
   // using this formula::
   //
   //   5 + 2 * (opened_streams +
-  //            2 * max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
+  //            max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
   //
   // the connection is terminated. For downstream connections the `opened_streams` is incremented when
   // Envoy receives complete response headers from the upstream server. For upstream connections the
