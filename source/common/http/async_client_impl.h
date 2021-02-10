@@ -341,8 +341,6 @@ private:
     RouteEntryImpl route_entry_;
   };
 
-  using RouteImplConstSharedPtr = std::shared_ptr<const RouteImpl>;
-
   void cleanup();
   void closeRemote(bool end_stream);
   bool complete() { return local_closed_ && remote_closed_; }
@@ -356,7 +354,7 @@ private:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void setRoute(Router::RouteConstSharedPtr r) override {
-    route_ = dynamic_cast<RouteImplConstSharedPtr>(r);
+    route_ = make_shared<RouteImpl>(r->routeEntry()->clusterName(), r->routeEntry()->timeout(), r->routeEntry()->hashPolicy());
   }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
@@ -440,7 +438,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
-  RouteImplConstSharedPtr route_;
+  std::shared_ptr<RouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
