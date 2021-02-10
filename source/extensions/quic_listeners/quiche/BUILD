@@ -380,6 +380,10 @@ envoy_cc_extension(
 # All of these are needed for this extension to function.
 envoy_cc_extension(
     name = "quic_factory_lib",
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     security_posture = "unknown",
     tags = ["nofips"],
     category = (

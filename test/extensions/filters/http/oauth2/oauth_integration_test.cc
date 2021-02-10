@@ -134,7 +134,7 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
           api_->timeSource().systemTime().time_since_epoch() + std::chrono::seconds(10))
           .count());
 
-  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessage(oauth_response));
+  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
   upstream_request_->encodeData(buffer, true);
 
   // We should get an immediate redirect back.

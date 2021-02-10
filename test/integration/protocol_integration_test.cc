@@ -302,24 +302,16 @@ TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
 
   // Send a headers only request.
   IntegrationStreamDecoderPtr response;
-  const std::string error = "envoy bug failure: !state_.local_complete_ || status == "
-                            "FilterHeadersStatus::StopIteration. Details: Filters should return "
-                            "FilterHeadersStatus::StopIteration after sending a local reply.";
-#ifdef NDEBUG
-  EXPECT_LOG_CONTAINS("error", error, {
-    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
-  });
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-#else
-  EXPECT_DEATH(
+  EXPECT_ENVOY_BUG(
       {
         response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
         response->waitForEndStream();
+        EXPECT_TRUE(response->complete());
+        EXPECT_EQ("200", response->headers().getStatusValue());
       },
-      HasSubstr(error));
-#endif
+      "envoy bug failure: !state_.local_complete_ || status == "
+      "FilterHeadersStatus::StopIteration. Details: Filters should return "
+      "FilterHeadersStatus::StopIteration after sending a local reply.");
 }
 
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
@@ -406,7 +398,7 @@ TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
     auto static_resources = bootstrap.mutable_static_resources();
