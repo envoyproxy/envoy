@@ -1210,6 +1210,22 @@ Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
+std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
+    const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
+  absl::optional<double> budget_percent;
+  absl::optional<uint32_t> min_retry_concurrency;
+  if (thresholds.has_retry_budget()) {
+    // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
+    // message set in the cluster config.
+    budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        thresholds.retry_budget(), budget_percent, ResourceManagerImpl::defaultBudgetPercent());
+    min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        thresholds.retry_budget(), min_retry_concurrency,
+        ResourceManagerImpl::defaultMinRetryConcurrency());
+  }
+  return std::make_pair(budget_percent, min_retry_concurrency);
+}
+
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
@@ -1259,15 +1275,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     track_remaining = it->track_remaining();
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
-    if (it->has_retry_budget()) {
-      // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
-      // message set in the cluster config.
-      budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          it->retry_budget(), budget_percent, ResourceManagerImpl::defaultBudgetPercent());
-      min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          it->retry_budget(), min_retry_concurrency,
-          ResourceManagerImpl::defaultMinRetryConcurrency());
-    }
+    std::tie(budget_percent, min_retry_concurrency) = ClusterInfoImpl::getRetryBudgetParams(*it);
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,

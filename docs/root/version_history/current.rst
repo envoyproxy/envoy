@@ -70,6 +70,7 @@ Bug Fixes
 * http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
 * listener: prevent crashing when an unknown listener config proto is received and debug logging is enabled.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
+* upstream: retry budgets will now set default values for xDS configurations.
 
 Removed Config or Runtime
 -------------------------
