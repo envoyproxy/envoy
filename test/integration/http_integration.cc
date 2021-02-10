@@ -247,7 +247,8 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
           downstream_protocol,
           [version](int) {
             return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
+                // FIXME maybe only for UDP?
+                Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
 
