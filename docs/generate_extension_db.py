@@ -24,7 +24,6 @@ _extensions_build_config_spec = spec_from_loader(
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
-
 class ExtensionDbError(Exception):
   pass
 
@@ -32,6 +31,21 @@ class ExtensionDbError(Exception):
 def IsMissing(value):
   return value == '(missing)'
 
+def NumReadFiltersFuzzed():
+  f = open('test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc', 'r')
+  # Hack-ish! We only search the first 50 lines to capture the filters in filterNames().
+  data = ""
+  for i in range(50):
+    data += f.readline()
+  return data.count('NetworkFilterNames::get()')
+
+def NumRobustToDownstreamNetworkFilters(db):
+  count = 0
+  for extension, metadata in db.items():
+    # Count number of network filters robust to untrusted downstreams.
+    if 'network' in extension and metadata['security_posture'] == 'robust_to_untrusted_downstream':
+      count += 1
+  return count
 
 def GetExtensionMetadata(target):
   if not BUILDOZER_PATH:
@@ -60,6 +74,10 @@ if __name__ == '__main__':
   all_extensions.update(extensions_build_config.EXTENSIONS)
   for extension, target in all_extensions.items():
     extension_db[extension] = GetExtensionMetadata(target)
+  if NumRobustToDownstreamNetworkFilters(extension_db) != NumReadFiltersFuzzed():
+    raise ExtensionDbError('Check that all network filters robust against untrusted'
+                           'downstreams are fuzzed by adding them to filterNames() in'
+                           'test/extensions/filters/network/common/uber_per_readfilter.cc')
   # The TLS and generic upstream extensions are hard-coded into the build, so
   # not in source/extensions/extensions_build_config.bzl
   extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
