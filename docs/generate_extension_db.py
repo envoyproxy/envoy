@@ -24,12 +24,14 @@ _extensions_build_config_spec = spec_from_loader(
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
+
 class ExtensionDbError(Exception):
   pass
 
 
 def IsMissing(value):
   return value == '(missing)'
+
 
 def NumReadFiltersFuzzed():
   f = open('test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc', 'r')
@@ -39,6 +41,7 @@ def NumReadFiltersFuzzed():
     data += f.readline()
   return data.count('NetworkFilterNames::get()')
 
+
 def NumRobustToDownstreamNetworkFilters(db):
   count = 0
   for extension, metadata in db.items():
@@ -46,6 +49,7 @@ def NumRobustToDownstreamNetworkFilters(db):
     if 'network' in extension and metadata['security_posture'] == 'robust_to_untrusted_downstream':
       count += 1
   return count
+
 
 def GetExtensionMetadata(target):
   if not BUILDOZER_PATH:
