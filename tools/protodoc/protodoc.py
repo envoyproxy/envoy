@@ -280,17 +280,12 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
   if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
     extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
-  formatted_extension_type = ''
-  if annotations.EXTENSION_TYPE_ANNOTATION in source_code_info.file_level_annotations:
-    raise
-    formatted_extension_type = FormatExtensionType(
-      source_code_info.file_level_annotations[annotations.EXTENSION_TYPE_ANNOTATION])
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
     return anchor + FormatHeader(
         style, source_code_info.file_level_annotations[
-            annotations.DOC_TITLE_ANNOTATION]) + formatted_extension + formatted_extension_type, stripped_comment
+            annotations.DOC_TITLE_ANNOTATION]) + formatted_extension, stripped_comment
 
-  return anchor + FormatHeader(style, proto_name) + formatted_extension + formatted_extension_type, stripped_comment
+  return anchor + FormatHeader(style, proto_name) + formatted_extension, stripped_comment
 
 
 def FormatFieldTypeAsJson(type_context, field):
