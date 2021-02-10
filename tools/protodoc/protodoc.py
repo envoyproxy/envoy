@@ -221,7 +221,7 @@ def FormatExtension(extension):
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
     extension_categories = "\n".join(
-      "  - :ref:`%s <extension_type_%s>`" % (ext, ext)
+      f"  - :ref:`{ext} <extension_type_{ext}>`"
       for ext
       in extension_metadata.get('categories', []))
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
@@ -249,7 +249,7 @@ def FormatExtensionType(extension_type):
   try:
     anchor = FormatAnchor('extension_type_' + extension_type)
     extensions = "\n".join(
-      "  - :ref:`%s <extension_%s>`" % (ext, ext)
+      f"  - :ref:`{ext} <extension_{ext}>`"
       for ext
       in EXTENSION_CATEGORIES[extension_type]
       if ext not in IGNORED_EXTENSIONS)
@@ -282,6 +282,7 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
   if annotations.EXTENSION_TYPE_ANNOTATION in source_code_info.file_level_annotations:
+    raise
     formatted_extension_type = FormatExtensionType(
       source_code_info.file_level_annotations[annotations.EXTENSION_TYPE_ANNOTATION])
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
