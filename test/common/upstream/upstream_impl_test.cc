@@ -2203,7 +2203,7 @@ public:
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
-   public:
+  public:
     static std::pair<absl::optional<double>, absl::optional<uint32_t>> getRetryBudgetParams(
         const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
       return ClusterInfoImpl::getRetryBudgetParams(thresholds);
@@ -2324,27 +2324,27 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   auto threshold = cluster_config_.circuit_breakers().thresholds();
 
   std::tie(budget_percent, min_retry_concurrency) =
-    RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
   EXPECT_EQ(budget_percent, absl::nullopt);
   EXPECT_EQ(min_retry_concurrency, absl::nullopt);
 
   std::tie(budget_percent, min_retry_concurrency) =
-    RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
   EXPECT_EQ(min_retry_concurrency, 3);
 
   std::tie(budget_percent, min_retry_concurrency) =
-    RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
   EXPECT_EQ(min_retry_concurrency, 3);
 
   std::tie(budget_percent, min_retry_concurrency) =
-    RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
   EXPECT_EQ(min_retry_concurrency, 3);
 
   std::tie(budget_percent, min_retry_concurrency) =
-    RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
   EXPECT_EQ(min_retry_concurrency, 123);
 }
