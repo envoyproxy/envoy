@@ -58,7 +58,7 @@ export PYTHONPATH="$TOOLS"
 # Build protoprint and merge_active_shadow_tools for use in proto_sync.py.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint //tools/protoxform:merge_active_shadow
 
-# Copy back the FileDescriptorProtos that protoxform emittted to the source tree. This involves
+# Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint and potentially merging active/shadow versions of protos
 # with merge_active_shadow.
 ./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}"
