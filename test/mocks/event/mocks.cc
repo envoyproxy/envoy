@@ -27,7 +27,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTypedTimer_(_, _))
       .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
-  ON_CALL(*this, post(testing::Matcher<const Event::PostCb&>()))
+  ON_CALL(*this, post(testing::Matcher<const PostCb&>()))
       .WillByDefault(Invoke([](const PostCb& cb) -> void { cb(); }));
   ON_CALL(*this, post(testing::Matcher<PostCb&&>())).WillByDefault(Invoke([](PostCb&& cb) -> void {
     cb();

@@ -363,8 +363,7 @@ rds:
         parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
 
-    EXPECT_CALL(server_factory_context_.dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
-        .WillOnce(SaveArg<0>(&post_cb));
+    EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
     rds->requestVirtualHostsUpdate(
         "testing", local_thread_dispatcher,
         std::make_shared<Http::RouteConfigUpdatedCallback>(

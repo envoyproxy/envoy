@@ -42,7 +42,7 @@ public:
   ThreadLocalInstanceImplTest() {
     tls_.registerThread(main_dispatcher_, true);
     EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
-    EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+    EXPECT_CALL(thread_dispatcher_, post(_));
     tls_.registerThread(thread_dispatcher_, false);
   }
 
@@ -51,7 +51,7 @@ public:
   TestThreadLocalObject& setObject(TypedSlot<>& slot) {
     std::shared_ptr<TestThreadLocalObject> object(new TestThreadLocalObject());
     TestThreadLocalObject& object_ref = *object;
-    EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+    EXPECT_CALL(thread_dispatcher_, post(_));
     EXPECT_CALL(*this, createThreadLocal(Ref(thread_dispatcher_))).WillOnce(ReturnPointee(&object));
     EXPECT_CALL(*this, createThreadLocal(Ref(main_dispatcher_))).WillOnce(ReturnPointee(&object));
     slot.set([this](Event::Dispatcher& dispatcher) -> ThreadLocalObjectSharedPtr {
@@ -71,7 +71,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   InSequence s;
 
   // Free a slot without ever calling set.
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   TypedSlotPtr<> slot1 = TypedSlot<>::makeUnique(tls_);
   slot1.reset();
   EXPECT_EQ(freeSlotIndexesListSize(), 1);
@@ -82,7 +82,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   TestThreadLocalObject& object_ref2 = setObject(*slot2);
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
 
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref2, onDestroy());
   EXPECT_EQ(freeSlotIndexesListSize(), 0);
   slot2.reset();
@@ -116,12 +116,10 @@ struct ThreadStatus {
 class CallbackNotInvokedAfterDeletionTest : public ThreadLocalInstanceImplTest {
 protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
-    EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()))
-        .Times(4)
-        .WillRepeatedly(Invoke([&](Event::PostCb cb) {
-          // Holds the posted callback.
-          holder_.push_back(cb);
-        }));
+    EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly(Invoke([&](Event::PostCb cb) {
+      // Holds the posted callback.
+      holder_.push_back(cb);
+    }));
 
     slot_->set([this](Event::Dispatcher&) {
       // Callbacks happen on the main thread but not the workers, so track the total.
@@ -136,7 +134,7 @@ protected:
     slot_.reset();
     EXPECT_EQ(freeSlotIndexesListSize(), 1);
 
-    EXPECT_CALL(main_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+    EXPECT_CALL(main_dispatcher_, post(_));
     while (!holder_.empty()) {
       holder_.front()();
       holder_.pop_front();
@@ -184,7 +182,7 @@ TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
 
   TestThreadLocalObject& object_ref = setObject(slot);
   auto update_cb = [&update_called](OptRef<ThreadLocalObject>) { ++update_called; };
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   EXPECT_CALL(object_ref, onDestroy());
   slot.runOnAllThreads(update_cb);
 
@@ -203,7 +201,7 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
   TypedSlot<StringSlotObject> slot(tls_);
 
   uint32_t update_called = 0;
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   slot.set([](Event::Dispatcher&) -> std::shared_ptr<StringSlotObject> {
     auto s = std::make_shared<StringSlotObject>();
     s->str_ = "hello";
@@ -216,7 +214,7 @@ TEST_F(ThreadLocalInstanceImplTest, TypedUpdateCallback) {
     EXPECT_TRUE(s.has_value());
     s->str_ = "goodbye";
   };
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
 
   // Tests a few different ways of getting at the slot data.
@@ -234,7 +232,7 @@ TEST_F(ThreadLocalInstanceImplTest, NoDataCallback) {
   TypedSlot<StringSlotObject> slot(tls_);
 
   uint32_t update_called = 0;
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   slot.set([](Event::Dispatcher&) -> std::shared_ptr<StringSlotObject> { return nullptr; });
   EXPECT_FALSE(slot.get().has_value());
 
@@ -242,7 +240,7 @@ TEST_F(ThreadLocalInstanceImplTest, NoDataCallback) {
     ++update_called;
     EXPECT_FALSE(s.has_value());
   };
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
   slot.runOnAllThreads(update_cb);
 
   EXPECT_FALSE(slot.get().has_value());
@@ -260,8 +258,8 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   TypedSlotPtr<> tlsptr = TypedSlot<>::makeUnique(tls_);
   TestThreadLocalObject& object_ref = setObject(*tlsptr);
 
-  EXPECT_CALL(thread_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
-  EXPECT_CALL(main_dispatcher_, post(testing::Matcher<const Event::PostCb&>()));
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  EXPECT_CALL(main_dispatcher_, post(_));
 
   // Ensure that the thread local call back and all_thread_complete call back are called.
   ThreadStatus thread_status;
