@@ -34,16 +34,12 @@ public:
     if (plugin_->fail_open_ && (!wasm || wasm->isFailed())) {
       return nullptr;
     }
-    if (wasm && !root_context_id_) {
-      root_context_id_ = wasm->getRootContext(plugin_, false)->id();
-    }
-    return std::make_shared<Context>(wasm, root_context_id_, plugin_);
+    return std::make_shared<Context>(wasm, handle->config_id(), plugin_);
   }
 
   Wasm* wasmForTest() { return tls_slot_->get()->wasm().get(); }
 
 private:
-  uint32_t root_context_id_{0};
   PluginSharedPtr plugin_;
   ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
