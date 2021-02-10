@@ -1950,7 +1950,7 @@ TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
   EXPECT_TRUE(filter_->upstreamSocketOptions());
   auto iterator = std::find_if(
       filter_->upstreamSocketOptions()->begin(), filter_->upstreamSocketOptions()->end(),
-      [](std::shared_ptr<const Network::Socket::Option> opt) {
+      [this](std::shared_ptr<const Network::Socket::Option> opt) {
         NiceMock<Network::MockConnectionSocket> dummy_socket;
         bool has_value = opt->getOptionDetails(dummy_socket,
                                                envoy::config::core::v3::SocketOption::STATE_PREBIND)
@@ -1959,7 +1959,7 @@ TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
                opt->getOptionDetails(dummy_socket,
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)
                        .value()
-                       .name_ == ENVOY_SOCKET_REDIRECT_RECORDS;
+                       .value_ == redirect_records_data_;
       });
   EXPECT_TRUE(iterator != filter_->upstreamSocketOptions()->end());
 }
