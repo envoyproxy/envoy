@@ -179,12 +179,13 @@ TEST_F(ProtocolConstraintsTest, WindowUpdate) {
   constraints.incrementOutboundDataFrameCount();
   constraints.incrementOutboundDataFrameCount();
 
-  // Per the `2 * max_inbound_window_update_frames_per_data_frame_sent_ * (outbound_data_frames_ +
-  // opened_streams_ + 1)` formula 2 * 2 * (2 + 1 + 1) = 16 WINDOW_UPDATE should NOT fail constraint
-  // check, but 17th should
+  // Per the `5 + 2 * (opened_streams_ +
+  // max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_`
+  // formula 5 + 2 * (1 + 2 * 2) = 15 WINDOW_UPDATE frames should NOT fail constraint
+  // check, but 16th should.
   nghttp2_frame_hd frame;
   frame.type = NGHTTP2_WINDOW_UPDATE;
-  for (uint32_t i = 0; i < 16; ++i) {
+  for (uint32_t i = 0; i < 15; ++i) {
     EXPECT_TRUE(constraints.trackInboundFrames(&frame, 0).ok());
   }
   EXPECT_TRUE(isBufferFloodError(constraints.trackInboundFrames(&frame, 0)));

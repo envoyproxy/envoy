@@ -319,14 +319,14 @@ message Http2ProtocolOptions {
   // of WINDOW_UPDATE frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //   2 * max_inbound_window_update_frames_per_data_frame_sent * (outbound_data_frames + opened_streams + 1)
+  //   5 + 2 * (opened_streams +
+  //            2 * max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
   //
-  // the connection is terminated. Envoy effectively adds 1 DATA frame for every new stream to accommodate
-  // servers that may preemptively send WINDOW_UPDATE before DATA. For downstream connections the `opened_streams`
-  // is incremented when Envoy receives complete response headers from the upstream server. For upstream
-  // connections the `opened_streams` is incremented when Envoy sends the HEADERS frame for a new stream. The
-  // ``http2.inbound_priority_frames_flood`` stat tracks
-  // the number of connections terminated due to flood mitigation. The default limit is 10.
+  // the connection is terminated. For downstream connections the `opened_streams` is incremented when
+  // Envoy receives complete response headers from the upstream server. For upstream connections the
+  // `opened_streams` is incremented when Envoy sends the HEADERS frame for a new stream. The
+  // ``http2.inbound_priority_frames_flood`` stat tracks the number of connections terminated due to
+  // flood mitigation. The default max_inbound_window_update_frames_per_data_frame_sent value is 10.
   // Setting this to 1 should be enough to support HTTP/2 implementations with basic flow control,
   // but more complex implementations that try to estimate available bandwidth require at least 2.
   // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the

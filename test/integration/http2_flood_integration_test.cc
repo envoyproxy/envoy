@@ -1117,12 +1117,12 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   const auto request = Http2Frame::makeRequest(request_stream_id, "host", "/");
   sendFrame(request);
 
-  // Per the `2 *
-  // max_inbound_window_update_frames_per_data_frame_sent_ * (outbound_data_frames_ +
-  // opened_streams_ + 1)` formula without sending any DATA frames, 1 + 2 * 10 * (0 + 1 + 1) = 41
+  // Per the `5 + 2 * (opened_streams_ +
+  // max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)`
+  // formula without sending any DATA frames, 1 + 5 + 2 * (1 + 0) = 8
   // sequential WINDOW_UPDATE frames should trigger flood protection.
   floodServer(Http2Frame::makeWindowUpdateFrame(request_stream_id, 1),
-              "http2.inbound_window_update_frames_flood", 41);
+              "http2.inbound_window_update_frames_flood", 8);
 }
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
@@ -1208,7 +1208,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
     return;
   }
 
-  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), 41,
+  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), 8,
               "cluster.cluster_0.http2.inbound_window_update_frames_flood");
 }
 
