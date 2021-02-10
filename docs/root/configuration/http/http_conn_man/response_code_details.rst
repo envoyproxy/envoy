@@ -41,7 +41,6 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    request_payload_exceeded_retry_buffer_limit, Envoy is doing streaming proxying but too much data arrived while waiting to attempt a retry.
    request_payload_too_large, Envoy is doing non-streaming proxying and the request payload exceeded configured limits.
    response_payload_too_large, Envoy is doing non-streaming proxying and the response payload exceeded configured limits.
-   response_payload_too_large, Envoy is doing non-streaming proxying and the response payload exceeded configured limits.
    route_configuration_not_found, The request was rejected because there was no route configuration found.
    route_not_found, The request was rejected because there was no route found.
    stream_idle_timeout, The per-stream keepalive timeout was exceeded.
