@@ -1212,16 +1212,18 @@ Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
     const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
+  constexpr double default_budget_percent = 20.0;
+  constexpr uint32_t default_retry_concurrency = 3;
+
   absl::optional<double> budget_percent;
   absl::optional<uint32_t> min_retry_concurrency;
   if (thresholds.has_retry_budget()) {
     // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
     // message set in the cluster config.
     budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(thresholds.retry_budget(), budget_percent,
-                                                     ResourceManagerImpl::defaultBudgetPercent());
-    min_retry_concurrency =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(thresholds.retry_budget(), min_retry_concurrency,
-                                        ResourceManagerImpl::defaultMinRetryConcurrency());
+                                                     default_budget_percent);
+    min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
   }
   return std::make_pair(budget_percent, min_retry_concurrency);
 }
