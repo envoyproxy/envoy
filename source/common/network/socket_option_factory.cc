@@ -56,8 +56,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
 std::unique_ptr<Socket::Options>
 SocketOptionFactory::buildWFPRedirectRecordsOptions(const Win32RedirectRecords& redirect_records) {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
-  options->push_back(std::make_shared<Network::Win32RedirectRecordsOptionImpl>(
-      ENVOY_SOCKET_REDIRECT_RECORDS, redirect_records));
+  options->push_back(std::make_shared<Network::Win32RedirectRecordsOptionImpl>(redirect_records));
   return options;
 }
 

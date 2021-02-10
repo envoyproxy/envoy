@@ -5661,7 +5661,6 @@ TEST_F(RouterTest, IpTransparentOptions) {
 }
 
 TEST_F(RouterTest, RedirectRecords) {
-#ifdef WIN32
   auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
   memcpy(redirect_records->buf_, reinterpret_cast<void*>(redirect_records_data_.data()),
          redirect_records_data_.size());
@@ -5686,7 +5685,6 @@ TEST_F(RouterTest, RedirectRecords) {
   auto returned_details = options->at(0)->getOptionDetails(dummy_socket, state);
   EXPECT_TRUE(expected_details == returned_details);
   router_.onDestroy();
-#endif
 }
 
 TEST_F(RouterTest, ApplicationProtocols) {

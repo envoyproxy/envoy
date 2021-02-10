@@ -1946,7 +1946,6 @@ TEST_F(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {
 }
 
 TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
-#ifdef WIN32
   setup(1, true);
   EXPECT_TRUE(filter_->upstreamSocketOptions());
   auto iterator = std::find_if(
@@ -1963,7 +1962,6 @@ TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
                        .name_ == ENVOY_SOCKET_REDIRECT_RECORDS;
       });
   EXPECT_TRUE(iterator != filter_->upstreamSocketOptions()->end());
-#endif
 }
 
 // Tests that downstream connection can access upstream connections filter state.

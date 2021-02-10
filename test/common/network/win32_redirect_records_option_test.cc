@@ -38,8 +38,7 @@ protected:
 
 TEST_F(Win32RedirectRecordsOptionImplTest, IgnoresOptionOnDifferentState) {
 
-  Win32RedirectRecordsOptionImpl socket_option{ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, 10),
-                                               *redirect_records_};
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
   EXPECT_TRUE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
 }
@@ -47,24 +46,29 @@ TEST_F(Win32RedirectRecordsOptionImplTest, IgnoresOptionOnDifferentState) {
 TEST_F(Win32RedirectRecordsOptionImplTest, FailsOnSyscallFailure) {
   EXPECT_CALL(socket_, win32Ioctl(_, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
-  Win32RedirectRecordsOptionImpl socket_option{ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, 10),
-                                               *redirect_records_};
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
   EXPECT_FALSE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
 }
 
 TEST_F(Win32RedirectRecordsOptionImplTest, SetOption) {
-  Win32RedirectRecordsOptionImpl socket_option{ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, 10),
-                                               *redirect_records_};
-  EXPECT_TRUE(socket_option.isSupported());
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
   EXPECT_TRUE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
 }
 
+TEST_F(Win32RedirectRecordsOptionImplTest, IsSupported) {
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
+#ifdef SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS
+  EXPECT_TRUE(socket_option.isSupported());
+#else
+  EXPECT_FALSE(socket_option.isSupported());
+#endif
+}
+
 TEST_F(Win32RedirectRecordsOptionImplTest, HashKey) {
   std::vector<uint8_t> hash;
-  Win32RedirectRecordsOptionImpl socket_option{ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, 10),
-                                               *redirect_records_};
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
   socket_option.hashKey(hash);
   std::vector<uint8_t> expected_hash;
   pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(redirect_records_data_), expected_hash);
@@ -73,10 +77,9 @@ TEST_F(Win32RedirectRecordsOptionImplTest, HashKey) {
 
 TEST_F(Win32RedirectRecordsOptionImplTest, OptionDetails) {
   const auto state = envoy::config::core::v3::SocketOption::STATE_PREBIND;
-  Socket::Option::Details expected_details{ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, 10),
+  Socket::Option::Details expected_details{Win32RedirectRecordsOptionImpl::optionName(),
                                            redirect_records_data_};
-  Win32RedirectRecordsOptionImpl socket_option{ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, 10),
-                                               *redirect_records_};
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
   EXPECT_EQ(expected_details, socket_option.getOptionDetails(socket_, state));
 }
 

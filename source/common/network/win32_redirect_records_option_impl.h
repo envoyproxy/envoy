@@ -11,25 +11,11 @@
 namespace Envoy {
 namespace Network {
 
-// `IOCTL` controls unlike socket options do not have level parameter. So we arbitrarily define one
-// in Envoy.
-#define ENVOY_IOCTL_LEVEL 1
-
-#ifdef SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS
-#define ENVOY_SOCKET_REDIRECT_RECORDS                                                              \
-  ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS)
-#else
-#define ENVOY_SOCKET_REDIRECT_RECORDS Network::SocketOptionName()
-#endif
-
 class Win32RedirectRecordsOptionImpl : public Socket::Option,
                                        Logger::Loggable<Logger::Id::connection> {
 public:
-  Win32RedirectRecordsOptionImpl(Network::SocketOptionName optname,
-                                 const Win32RedirectRecords& redirect_records)
-      : optname_(optname), redirect_records_(redirect_records) {
-    ASSERT(optname_.hasValue());
-  }
+  Win32RedirectRecordsOptionImpl(const Win32RedirectRecords& redirect_records)
+      : redirect_records_(redirect_records) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
@@ -43,11 +29,11 @@ public:
                    envoy::config::core::v3::SocketOption::SocketState) const override;
 
   bool isSupported() const;
+  static const Network::SocketOptionName& optionName();
 
 private:
   static constexpr envoy::config::core::v3::SocketOption::SocketState in_state_ =
       envoy::config::core::v3::SocketOption::STATE_PREBIND;
-  const Network::SocketOptionName optname_;
   Win32RedirectRecords redirect_records_;
 };
 
