@@ -6,6 +6,7 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -37,6 +38,8 @@ class IoHandleImpl final : public Network::IoHandle,
                            protected Logger::Loggable<Logger::Id::io>,
                            NonCopyable {
 public:
+  static const Network::Address::InstanceConstSharedPtr& getCommonInternalAddress();
+
   ~IoHandleImpl() override;
 
   // Network::IoHandle

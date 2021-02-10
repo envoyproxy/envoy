@@ -55,6 +55,7 @@ envoy_cc_library(
         ":file_event_lib",
         ":io_handle_lib",
         "//source/common/event:dispatcher_includes",
+        "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
     ],
 )

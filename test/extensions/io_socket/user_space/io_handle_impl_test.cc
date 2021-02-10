@@ -975,6 +975,19 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   io_handle_peer_->close();
 }
 
+TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
+  const auto& local_address = io_handle_->peerAddress();
+  ASSERT_NE(nullptr, local_address);
+  ASSERT_EQ(nullptr, local_address->ip());
+  ASSERT_EQ(nullptr, local_address->pipe());
+  ASSERT_NE(nullptr, local_address->envoyInternalAddress());
+  const auto& remote_address = io_handle_->peerAddress();
+  ASSERT_NE(nullptr, remote_address);
+  ASSERT_EQ(nullptr, remote_address->ip());
+  ASSERT_EQ(nullptr, remote_address->pipe());
+  ASSERT_NE(nullptr, remote_address->envoyInternalAddress());
+}
+
 TEST_F(IoHandleImplTest, NotSupportingMmsg) { EXPECT_FALSE(io_handle_->supportsMmsg()); }
 
 TEST_F(IoHandleImplTest, NotSupportsUdpGro) { EXPECT_FALSE(io_handle_->supportsUdpGro()); }
@@ -1072,11 +1085,6 @@ TEST_F(IoHandleImplNotImplementedTest, ErrorOnBind) {
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnListen) {
   int back_log_is_ignored = 0;
   EXPECT_THAT(io_handle_->listen(back_log_is_ignored), IsNotSupportedResult());
-}
-
-TEST_F(IoHandleImplNotImplementedTest, ErrorOnAddress) {
-  ASSERT_THROW(io_handle_->peerAddress(), EnvoyException);
-  ASSERT_THROW(io_handle_->localAddress(), EnvoyException);
 }
 
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnSetOption) {

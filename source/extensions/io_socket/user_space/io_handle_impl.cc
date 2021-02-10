@@ -49,6 +49,13 @@ uint64_t move(Buffer::Instance& dst, Buffer::Instance& src, uint64_t max_length)
 }
 } // namespace
 
+const Network::Address::InstanceConstSharedPtr& IoHandleImpl::getCommonInternalAddress() {
+  CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
+                         // std::static_pointer_cast<Network::Address::InstanceSharedPtr>(
+                         std::make_shared<const Network::Address::EnvoyInternalInstance>(
+                             "internal_address_for_user_space_io_handle"));
+}
+
 IoHandleImpl::IoHandleImpl()
     : pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
                              [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}) {}
@@ -286,13 +293,11 @@ Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscal
 absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
 
 Network::Address::InstanceConstSharedPtr IoHandleImpl::localAddress() {
-  // TODO(lambdai): Rewrite when caller accept error as the return value.
-  throw EnvoyException(fmt::format("getsockname failed for IoHandleImpl"));
+  return IoHandleImpl::getCommonInternalAddress();
 }
 
 Network::Address::InstanceConstSharedPtr IoHandleImpl::peerAddress() {
-  // TODO(lambdai): Rewrite when caller accept error as the return value.
-  throw EnvoyException(fmt::format("getsockname failed for IoHandleImpl"));
+  return IoHandleImpl::getCommonInternalAddress();
 }
 
 void IoHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
