@@ -574,7 +574,7 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   EXPECT_FALSE(response->complete());
 }
 
-TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeader) {
+TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeaders) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -589,8 +589,11 @@ TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeader) {
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
-
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(), "a=b; c=d");
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.header_map_coalesce_cookie_headers")) {
+    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(),
+              "a=b; c=d");
+  }
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                                    {"set-cookie", "foo"},
