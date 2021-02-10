@@ -5,6 +5,7 @@
 
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
+#include "common/upstream/weighted_locality.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,7 +39,7 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
-    const envoy::config::endpoint::v3::LocalityLbEndpoints locality_lb_endpoint_;
+    const WeightedLocality weighted_locality_;
     const envoy::config::endpoint::v3::LbEndpoint lb_endpoint_;
     HostMap all_hosts_;
   };

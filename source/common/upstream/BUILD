@@ -216,6 +216,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "weighted_locality_lib",
+    srcs = ["weighted_locality.cc"],
+    hdrs = ["weighted_locality.h"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "health_discovery_service_lib",
     srcs = ["health_discovery_service.cc"],
     hdrs = ["health_discovery_service.h"],
@@ -499,6 +509,7 @@ envoy_cc_library(
     deps = [
         ":cluster_factory_includes",
         ":upstream_includes",
+        ":weighted_locality_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
@@ -515,6 +526,7 @@ envoy_cc_library(
         ":load_balancer_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",
+        ":weighted_locality_lib",
         "//include/envoy/event:timer_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
