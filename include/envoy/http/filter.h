@@ -215,7 +215,7 @@ public:
 
   /**
    * Sets the cached route for the current request.
-   * TODO point to DelgatingRoute
+   * TODO point to DelegatingRoute
    * TODO point out wouldn't survive a clearRouteCache()
    */
   virtual void setRoute(const Router::RouteConstSharedPtr route) PURE;
