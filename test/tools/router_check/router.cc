@@ -182,9 +182,8 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
   bool is_grpc = false;
   bool is_head_request = false;
-  Envoy::Http::Utility::LocalReplyData local_reply_data{is_direct_local_reply, is_grpc,
-                                                        entry.responseCode(),  entry.responseBody(),
-                                                        absl::nullopt,         is_head_request};
+  Envoy::Http::Utility::LocalReplyData local_reply_data{
+      is_grpc, entry.responseCode(), entry.responseBody(), absl::nullopt, is_head_request};
 
   Envoy::Http::Utility::sendLocalReply(false, encode_functions, local_reply_data);
 }
