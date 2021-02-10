@@ -1,5 +1,3 @@
-#include <netinet/in.h>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
@@ -275,7 +273,7 @@ TEST_F(IoHandleImplTest, ReadvMultiSlices) {
 
   auto result = io_handle_->readv(1024, slices, 2);
 
-  EXPECT_EQ(std::string(1024, 'a'), std::string(full_frag, full_frag + sizeof(full_frag)));
+  EXPECT_EQ(absl::string_view(full_frag, 1024), std::string(1024, 'a'));
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(1024, result.rc_);
 }
