@@ -1582,6 +1582,16 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   return cached_route_.value();
 }
 
+// Sets the cached route to the RouteConstSharedPtr argument passed in. Sets the cached cluster
+// info based on this route's routeEntry via getThreadLocalCluster.
+void ConnectionManagerImpl::ActiveStream::setRoute(const Router::RouteConstSharedPtr r) {
+  cached_route_ = r;
+
+  Upstream::ThreadLocalCluster* local_cluster =
+    connection_manager_.cluster_manager_.getThreadLocalCluster(r->routeEntry()->clusterName());
+  cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
+}
+
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
@@ -1589,8 +1599,6 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
     tracing_custom_tags_->clear();
   }
 }
-
-// TODO: add in implemented setRoute() method
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
   connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
