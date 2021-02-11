@@ -917,7 +917,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       false);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
   HttpIntegrationTest::initialize();
 
   // Transcoding does not occur from a request with the gRPC content type.
@@ -969,20 +969,20 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              strict_http_request_validation:
+              request_validation_options:
                 reject_unknown_method: true
             )EOF";
   config_helper_.addFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
-  // Transcoding does not occur from a request with the gRPC content type.
+  // Transcoding does not occur from a request with the gRPC content type, even with an unknown path.
   // We verify the request is not transcoded because the upstream receives the same JSON body.
   // We verify the response is not transcoded because the HTTP status code does not match the gRPC
   // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/shelves/100"},
+                                     {":path", "/unknown/path"},
                                      {":authority", "host"},
                                      {"content-type", "application/grpc"}},
       R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
@@ -1022,20 +1022,20 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              strict_http_request_validation:
+              request_validation_options:
                 reject_unknown_query_parameters: true
             )EOF";
   config_helper_.addFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
-  // Transcoding does not occur from a request with the gRPC content type.
+  // Transcoding does not occur from a request with the gRPC content type, even with unknown query params.
   // We verify the request is not transcoded because the upstream receives the same JSON body.
   // We verify the response is not transcoded because the HTTP status code does not match the gRPC
   // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/shelves/100"},
+                                     {":path", "/shelves/100?unknown=1"},
                                      {":authority", "host"},
                                      {"content-type", "application/grpc"}},
       R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
@@ -1068,7 +1068,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
       "", false);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQueryParam) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, EnableRequestValidationIgnoreQueryParam) {
   const std::string filter =
       R"EOF(
             name: grpc_json_transcoder
@@ -1077,7 +1077,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
-              strict_http_request_validation:
+              request_validation_options:
                 reject_unknown_method: true
                 reject_unknown_query_parameters: true
             )EOF";
