@@ -215,13 +215,8 @@ private:
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(
         const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
-        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-            hash_policy)
-        : cluster_name_(cluster_name), timeout_(timeout) {
-      if (!hash_policy.empty()) {
-        hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
-      }
-    }
+        const HashPolicy* hash_policy)
+        : cluster_name_(cluster_name), timeout_(timeout), hash_policy_(hash_policy) {}
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -233,7 +228,7 @@ private:
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
-    const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+    const HashPolicy* hashPolicy() const override { return hash_policy_; }
     const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -302,7 +297,6 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
-    std::unique_ptr<const HashPolicyImpl> hash_policy_;
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -318,6 +312,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
+    const HashPolicy* hash_policy_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
   };
@@ -325,8 +320,7 @@ private:
   struct RouteImpl : public Router::Route {
     RouteImpl(const std::string& cluster_name,
               const absl::optional<std::chrono::milliseconds>& timeout,
-              const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-                  hash_policy)
+              const HashPolicy* hash_policy)
         : route_entry_(cluster_name, timeout, hash_policy) {}
 
     // Router::Route
@@ -354,7 +348,9 @@ private:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void setRoute(Router::RouteConstSharedPtr r) override {
-    route_ = make_shared<RouteImpl>(r->routeEntry()->clusterName(), r->routeEntry()->timeout(), r->routeEntry()->hashPolicy());
+    // TODO decide: either implement setRoute (and make cascading modifications to hashPolicy constructor parameter)
+    // OR just have this method be NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    route_ = std::make_shared<AsyncStreamImpl::RouteImpl>(r->routeEntry()->clusterName(), r->routeEntry()->timeout(), r->routeEntry()->hashPolicy());
   }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
