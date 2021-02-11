@@ -70,14 +70,20 @@ message GrpcJsonTranscoder {
   }
 
   message RequestValidationOptions {
-    // When true, rejects HTTP requests with a path that cannot be mapped to a gRPC method.
-    // ``HTTP 404 Not Found`` will be returned to the downstream client.
+    // By default, a request that cannot be mapped to any specified gRPC
+    // :ref:`services <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.services>`
+    // will pass-through this filter.
+    // When set to true, the request will be rejected with a ``HTTP 404 Not Found``.
     bool reject_unknown_method = 1;
 
-    // When true, rejects HTTP requests that contain unknown query parameters.
-    // ``HTTP 400 Bad Request`` will be returned to the downstream client.
+    // By default, a request with query parameters that cannot be mapped to the gRPC request message
+    // will pass-through this filter.
+    // When set to true, the request will be rejected with a ``HTTP 400 Bad Request``.
     //
-    // The fields ``ignore_unknown_query_parameters`` and ``ignored_query_parameters``
+    // The fields
+    // :ref:`ignore_unknown_query_parameters <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignore_unknown_query_parameters>`
+    // and
+    // :ref:`ignored_query_parameters <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignored_query_parameters>`
     // have priority over this strict validation behavior.
     bool reject_unknown_query_parameters = 2;
   }
@@ -104,8 +110,9 @@ message GrpcJsonTranscoder {
   //
   // By default, the filter will pass through requests that do not map to any specified services.
   // If the list of services is empty, filter is considered disabled.
-  // However, this behavior changes if ``reject_unknown_method`` is
-  // enabled.
+  // However, this behavior changes if
+  // :ref:`reject_unknown_method <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions.reject_unknown_method>`
+  // is enabled.
   repeated string services = 2;
 
   // Control options for response JSON. These options are passed directly to
@@ -224,5 +231,5 @@ message GrpcJsonTranscoder {
   // the TCP connection. The downstream will then
   // receive a ``HTTP 503 Service Unavailable`` due to the upstream connection reset.
   // This incorrect error message may conflict with other Envoy components, such as retry policies.
-  RequestValidationOptions strict_http_request_validation = 11;
+  RequestValidationOptions request_validation_options = 11;
 }
