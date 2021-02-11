@@ -1,5 +1,5 @@
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.validate.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -25,7 +25,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
           "envoy.resource_monitors.injected_resource");
   ASSERT_NE(factory, nullptr);
 
-  envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
+  envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));

@@ -1,4 +1,4 @@
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -24,7 +24,7 @@ namespace {
 class TestableInjectedResourceMonitor : public InjectedResourceMonitor {
 public:
   TestableInjectedResourceMonitor(
-      const envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig&
+      const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context)
       : InjectedResourceMonitor(config, context), dispatcher_(context.dispatcher()) {}
@@ -61,7 +61,7 @@ protected:
   void updateResource(double pressure) { updateResource(absl::StrCat(pressure)); }
 
   std::unique_ptr<InjectedResourceMonitor> createMonitor() {
-    envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
+    envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(
         *dispatcher_, *api_, ProtobufMessage::getStrictValidationVisitor());

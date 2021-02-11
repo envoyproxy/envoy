@@ -18,7 +18,7 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
-        "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/resource_monitors/injected_resource/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +39,6 @@ envoy_cc_extension(
         "//source/common/common:assert_lib",
         "//source/extensions/resource_monitors:well_known_names",
         "//source/extensions/resource_monitors/common:factory_base_lib",
-        "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/resource_monitors/injected_resource/v3:pkg_cc_proto",
     ],
 )

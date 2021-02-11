@@ -7,4 +7,5 @@ Resource monitors
   :glob:
   :maxdepth: 2
 
+  ../../extensions/resource_monitors/*/v3/*
   */v2alpha/*

@@ -24,7 +24,7 @@ unhealthy, successes required before marking a host healthy, etc.):
   failure. Optionally, Envoy can perform EXISTS on a user-specified key. If the key does not exist
   it is considered a passing healthcheck. This allows the user to mark a Redis instance for
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
-  :ref:`redis_key <envoy_v3_api_msg_config.health_checker.redis.v2.Redis>`.
+  :ref:`redis_key <envoy_v3_api_msg_extensions.health_checkers.redis.v3.Redis>`.
 
 Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
 using a TLS-enabled transport socket, the health check will also occur over TLS. The

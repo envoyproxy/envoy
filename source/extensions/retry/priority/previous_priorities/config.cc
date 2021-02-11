@@ -1,7 +1,7 @@
 #include "extensions/retry/priority/previous_priorities/config.h"
 
-#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.h"
-#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.validate.h"
+#include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
+#include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
@@ -15,8 +15,8 @@ Upstream::RetryPrioritySharedPtr PreviousPrioritiesRetryPriorityFactory::createR
 
     uint32_t max_retries) {
   return std::make_shared<PreviousPrioritiesRetryPriority>(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::retry::previous_priorities::PreviousPrioritiesConfig&>(
+      MessageUtil::downcastAndValidate<const envoy::extensions::retry::priority::
+                                           previous_priorities::v3::PreviousPrioritiesConfig&>(
           config, validation_visitor)
           .update_frequency(),
       max_retries);
