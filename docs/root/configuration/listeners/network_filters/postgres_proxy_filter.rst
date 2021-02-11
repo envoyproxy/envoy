@@ -72,7 +72,8 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   messages_frontend, Counter, Number of frontend messages detected by the filter
   messages_unknown, Counter, Number of times the filter successfully decoded a message but did not know what to do with it
   sessions, Counter, Total number of successful logins
-  sessions_encrypted, Counter, Number of times the filter detected encrypted sessions
+  sessions_encrypted, Counter, Number of times the filter detected and passed upstream encrypted sessions
+  sessions_terminated_ssl, Counter, Number of times the filter terminated SSL sessions
   sessions_unencrypted, Counter, Number of messages indicating unencrypted successful login
   statements, Counter, Total number of SQL statements
   statements_delete, Counter, Number of DELETE statements
