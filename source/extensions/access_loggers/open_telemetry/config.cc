@@ -8,9 +8,8 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/access_loggers/grpc/config_utils.h"
-#include "extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
-#include "extensions/access_loggers/grpc/http_config.h"
+#include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
+#include "extensions/access_loggers/open_telemetry/config.h"
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
@@ -34,21 +33,21 @@ getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
 
 AccessLog::InstanceSharedPtr
 OpenTelemetry::createAccessLogInstance(const Protobuf::Message& config,
-                                       AccessLog::FilterPtr&& filter,
+                                       ::Envoy::AccessLog::FilterPtr&& filter,
                                        Server::Configuration::FactoryContext& context) {
   // GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::access_loggers::grpc::v3::OpenTelemetryAccessLogConfig&>(
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<OpenTelemetry::AccessLog>(
-      std::move(filter), proto_config, context.threadLocal(),
-      getAccessLoggerCacheSingleton(context), context.scope());
+  return std::make_shared<AccessLog>(std::move(filter), proto_config, context.threadLocal(),
+                                     getAccessLoggerCacheSingleton(context), context.scope());
 }
 
-ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig>();
+ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {
+  return std::make_unique<
+      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig>();
 }
 
 std::string AccessLogFactory::name() const { return AccessLogNames::get().OpenTelemetry; }

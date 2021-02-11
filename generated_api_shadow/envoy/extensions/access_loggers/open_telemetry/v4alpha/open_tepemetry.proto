@@ -1,27 +1,31 @@
 syntax = "proto3";
 
-package envoy.extensions.access_loggers.open_telemetry.v3;
+package envoy.extensions.access_loggers.open_telemetry.v4alpha;
 
-import "envoy/extensions/access_loggers/grpc/v3/als.proto";
-import "opentelemetry/proto/collector/common/v1/common.proto";
+import "envoy/extensions/access_loggers/grpc/v4alpha/als.proto";
 
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3";
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v4alpha";
 option java_outer_classname = "OpenTepemetryProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: OpenTelemetry (gRPC) Access Log ]
 
 // Configuration for the built-in *envoy.access_loggers.open_telemetry*
-// :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
+// :ref:`AccessLog <envoy_api_msg_config.accesslog.v4alpha.AccessLog>`. This configuration will
 // populate :ref:`ExportLogsServiceRequest.resource_logs
 // <opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs>`.
 // [#extension: envoy.access_loggers.open_telemetry]
 message OpenTelemetryAccessLogConfig {
-  grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig";
+
+  grpc.v4alpha.CommonGrpcAccessLogConfig common_config = 1
+      [(validate.rules).message = {required: true}];
   // opentelemetry.proto.common.v1.AnyValue body = 2;
   // opentelemetry.proto.common.v1.KeyValue attributes = 3;
   // opentelemetry.proto.common.v1.KeyValue resource_attributes = 4;

@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3/open_telemetry.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"

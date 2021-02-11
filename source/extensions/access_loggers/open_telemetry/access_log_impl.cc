@@ -12,7 +12,7 @@
 #include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
 
-#include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+// #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 #include "external/opentelemetry_proto/opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"

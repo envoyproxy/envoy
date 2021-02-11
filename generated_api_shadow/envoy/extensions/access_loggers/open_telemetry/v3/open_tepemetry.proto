@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.open_telemetry.v3;
 
 import "envoy/extensions/access_loggers/grpc/v3/als.proto";
-import "opentelemetry/proto/collector/common/v1/common.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";

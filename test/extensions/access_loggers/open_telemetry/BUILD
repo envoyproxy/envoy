@@ -1,9 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
-    "envoy_extension_cc_test",
     "envoy_package",
 )
+
+# load(
+#     "//test/extensions:extensions_build_system.bzl",
+#     "envoy_extension_cc_test",
+# )
 
 licenses(["notice"])  # Apache 2
 
@@ -29,7 +33,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
-    # extension_name = "envoy.access_loggers.http_grpc",
+    # extension_name = "envoy.access_loggers.open_telemetry",
     deps = [
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
@@ -42,18 +46,20 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_cc_proto",
     ],
 )
 
-envoy_extension_cc_test(
+envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    # extension_name = "envoy.access_loggers.open_telemetry",
     deps = [
         "//source/extensions/access_loggers/open_telemetry:config",
         "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
     ],
 )
