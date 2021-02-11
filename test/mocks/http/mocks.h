@@ -526,7 +526,6 @@ public:
   MOCK_METHOD(bool, alwaysSetRequestIdInResponse, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
-  MOCK_METHOD(uint32_t, maxRequestsConnection, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(bool, isRoutable, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));

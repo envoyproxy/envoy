@@ -214,7 +214,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.common_http_protocol_options(), max_headers_count,
           context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
                                                   Http::DEFAULT_MAX_HEADERS_COUNT))),
-      max_requests_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_connection, 0)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),

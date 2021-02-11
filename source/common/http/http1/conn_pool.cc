@@ -73,7 +73,7 @@ void ActiveClient::StreamWrapper::onResetStream(StreamResetReason, absl::string_
 
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
     : Envoy::Http::ActiveClient(
-          parent, parent.host()->cluster().maxRequestsPerConnection(),
+          parent, parent.host()->cluster().commonHttpProtocolOptions().max_requests_connection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
@@ -81,7 +81,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
 
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data)
     : Envoy::Http::ActiveClient(
-          parent, parent.host()->cluster().maxRequestsPerConnection(),
+          parent, parent.host()->cluster().commonHttpProtocolOptions().max_requests_connection(),
           1, // HTTP1 always has a concurrent-request-limit of 1 per connection.
           data) {
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();

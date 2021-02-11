@@ -177,7 +177,6 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  uint32_t maxRequestsConnection() const override { return max_requests_connection_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -233,7 +232,6 @@ private:
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
   const uint32_t max_request_headers_count_;
-  const uint32_t max_requests_connection_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;

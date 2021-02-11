@@ -291,10 +291,6 @@ public:
   virtual uint32_t maxRequestHeadersCount() const PURE;
 
   /**
-   * @return maximum requests for a downstream connection.
-   */
-  virtual uint32_t maxRequestsConnection() const PURE;
-  /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
    *         disabled idle timeout.
    */

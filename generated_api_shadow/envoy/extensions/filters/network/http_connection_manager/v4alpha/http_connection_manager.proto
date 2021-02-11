@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 44]
+// [#next-free-field: 43]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -581,10 +581,6 @@ message HttpConnectionManager {
   // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
-
-  // Optional maximum requests for a downstream connection.
-  // If not specified, there is no limit.
-  google.protobuf.UInt32Value max_requests_connection = 43;
 }
 
 // The configuration to customize local reply returned by Envoy.

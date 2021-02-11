@@ -40,7 +40,7 @@ message UpstreamHttpProtocolOptions {
   bool auto_san_validation = 2;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -104,6 +104,10 @@ message HttpProtocolOptions {
   // If this setting is not specified, the value defaults to ALLOW.
   // Note: upstream responses are not affected by this setting.
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
+
+  // Optional maximum requests for a downstream connection.
+  // If not specified, there is no limit.
+  google.protobuf.UInt32Value max_requests_connection = 6;
 }
 
 // [#next-free-field: 8]

@@ -743,11 +743,9 @@ message Cluster {
   // members will be considered healthy at all times.
   repeated core.v4alpha.HealthCheck health_checks = 8;
 
-  // Optional maximum requests for a single upstream connection. This parameter
-  // is respected by both the HTTP/1.1 and HTTP/2 connection pool
-  // implementations. If not specified, there is no limit. Setting this
-  // parameter to 1 will effectively disable keep alive.
-  google.protobuf.UInt32Value max_requests_per_connection = 9;
+  reserved 9;
+
+  reserved "max_requests_per_connection";
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;
