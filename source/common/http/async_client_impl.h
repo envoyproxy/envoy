@@ -213,9 +213,9 @@ private:
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
-    RouteEntryImpl(
-        const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
-        const HashPolicy* hash_policy)
+    RouteEntryImpl(const std::string& cluster_name,
+                   const absl::optional<std::chrono::milliseconds>& timeout,
+                   const HashPolicy* hash_policy)
         : cluster_name_(cluster_name), timeout_(timeout), hash_policy_(hash_policy) {}
 
     // Router::RouteEntry
@@ -348,9 +348,10 @@ private:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void setRoute(Router::RouteConstSharedPtr r) override {
-    // TODO decide: either implement setRoute (and make cascading modifications to hashPolicy constructor parameter)
-    // OR just have this method be NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    route_ = std::make_shared<AsyncStreamImpl::RouteImpl>(r->routeEntry()->clusterName(), r->routeEntry()->timeout(), r->routeEntry()->hashPolicy());
+    // TODO decide: either implement setRoute (and make cascading modifications to hashPolicy
+    // constructor parameter) OR just have this method be NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    route_ = std::make_shared<AsyncStreamImpl::RouteImpl>(
+        r->routeEntry()->clusterName(), r->routeEntry()->timeout(), r->routeEntry()->hashPolicy());
   }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}

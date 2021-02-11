@@ -83,14 +83,16 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
-      tracing_config_(Tracing::EgressConfig::get()),
-      send_xff_(options.send_xff) {
+      tracing_config_(Tracing::EgressConfig::get()), send_xff_(options.send_xff) {
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
 
-  std::unique_ptr<const HashPolicyImpl> hash_policy = !options.hash_policy.empty() ? std::make_unique<HashPolicyImpl>(options.hash_policy) : nullptr;
-  route_ = std::make_shared<AsyncStreamImpl::RouteImpl>(parent_.cluster_->name(), options.timeout, hash_policy.get());
+  std::unique_ptr<const HashPolicyImpl> hash_policy =
+      !options.hash_policy.empty() ? std::make_unique<HashPolicyImpl>(options.hash_policy)
+                                   : nullptr;
+  route_ = std::make_shared<AsyncStreamImpl::RouteImpl>(parent_.cluster_->name(), options.timeout,
+                                                        hash_policy.get());
 
   router_.setDecoderFilterCallbacks(*this);
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.

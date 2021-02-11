@@ -1588,7 +1588,7 @@ void ConnectionManagerImpl::ActiveStream::setRoute(const Router::RouteConstShare
   cached_route_ = r;
 
   Upstream::ThreadLocalCluster* local_cluster =
-    connection_manager_.cluster_manager_.getThreadLocalCluster(r->routeEntry()->clusterName());
+      connection_manager_.cluster_manager_.getThreadLocalCluster(r->routeEntry()->clusterName());
   cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
 }
 
