@@ -36,14 +36,6 @@ void ActiveClient::onGoAway(Http::GoAwayErrorCode) {
 // not considering http/2 connections connected until the SETTINGS frame is
 // received, but that would result in a latency penalty instead.
 void ActiveClient::onSettings(ReceivedSettings& settings) {
-  std::cerr << "runtime flag "
-            << Runtime::runtimeFeatureEnabled(
-                   "envoy.reloadable_features.improved_stream_limit_handling")
-            << " maxConcurrent "
-            << (settings.maxConcurrentStreams().has_value()
-                    ? settings.maxConcurrentStreams().value()
-                    : -42)
-            << " concurrent " << concurrent_stream_limit_ << "\n";
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.improved_stream_limit_handling") &&
       settings.maxConcurrentStreams().has_value() &&
       settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
@@ -57,8 +49,6 @@ void ActiveClient::onSettings(ReceivedSettings& settings) {
     parent_.decrClusterStreamCapacity(delta);
     ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
     negative_capacity_ += delta;
-    std::cerr << "old capacity " << old_unused_capacity << " delta " << delta << " negative "
-              << negative_capacity_ << "\n";
   }
   // As we don't increase stream limits when maxConcurrentStreams goes up, treat
   // a stream limit of 0 as a GOAWAY.
