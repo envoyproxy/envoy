@@ -89,4 +89,3 @@ New Features
 
 Deprecated
 ----------
-* cluster: :ref:`max_requests_per_connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` is deprecated in favor of :ref:`max_requests_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_connection>`.

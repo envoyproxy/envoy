@@ -738,8 +738,7 @@ message Cluster {
   //
   // .. attention::
   //   This field has been deprecated in favor of the :ref:`max_requests_connection <envoy_api_field_config.core.v3.HttpProtocolOptions.max_requests_connection>` field
-  google.protobuf.UInt32Value max_requests_per_connection = 9
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  google.protobuf.UInt32Value max_requests_per_connection = 9 [deprecated = true];
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;
