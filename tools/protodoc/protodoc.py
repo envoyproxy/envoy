@@ -153,7 +153,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     formatted_extension = FormatExtension(extension)
   formatted_extension_category = ''
   if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
-    formatted_extension_category = FormatExtensionType(comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
+    formatted_extension_category = FormatExtensionCategory(comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
   return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_category
 
 
@@ -216,22 +216,28 @@ def FormatExtension(extension):
     anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
-    extension_categories = "\n".join(
-      f"  - :ref:`{ext} <extension_category_{ext}>`"
-      for ext
-      in extension_metadata.get('categories', []))
+    categories = FormatExtensionList(extension_metadata["categories"], "extension_category")
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
                                          extension=extension,
                                          status=status,
                                          security_posture=security_posture,
-                                         categories="%s\n  \n" % extension_categories)
+                                         categories=extension_categories)
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
     exit(1)  # Raising the error buries the above message in tracebacks.
 
 
-def FormatExtensionType(extension_category):
+def FormatExtensionList(items, prefix="extension", indent=2):
+  indent = " " * indent
+  formatted_list = "\n".join(
+    f"{indent}- :ref:`{ext} <{prefix}_{ext}>`"
+    for ext
+    in items)
+  return f"%s\n{indent}\n" % formatted_list)
+
+
+def FormatExtensionCategory(extension_category):
   """Format extension metadata as RST.
 
   Args:
@@ -243,18 +249,14 @@ def FormatExtensionType(extension_category):
   IGNORED_EXTENSIONS = [
     "envoy.tracers.xray", "envoy.filters.http.cache.simple_http_cache"]
   try:
-    anchor = FormatAnchor('extension_category_' + extension_category)
-    extensions = "\n".join(
-      f"  - :ref:`{ext} <extension_{ext}>`"
-      for ext
-      in EXTENSION_CATEGORIES[extension_category]
-      if ext not in IGNORED_EXTENSIONS)
-    return EXTENSION_CATEGORY_TEMPLATE.substitute(anchor=anchor,
-                                              extensions="%s\n  \n" % extensions)
+    extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
     sys.stderr.write(
         '\n\nUnable to find extension category: %s\n\n' % extension_category)
     exit(1)  # Raising the error buries the above message in tracebacks.
+  anchor = FormatAnchor('extension_category_' + extension_category)
+  extensions = FormatExtensionList([x for x in extensions if x not in IGNORED_EXTENSIONS])
+  return EXTENSION_CATEGORY_TEMPLATE.substitute(anchor=anchor, extensions=extensions)
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):
