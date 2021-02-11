@@ -78,7 +78,7 @@ BAZEL_BUILD_OPTIONS+=(
 ./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
 
 # Generate extension category database.
-./docs/generate_extension_cats_db.py "${EXTENSION_DB_PATH}" "${EXTENSION_CAT_DB_PATH}"
+./docs/generate_extension_cat_db.py "${EXTENSION_DB_PATH}" "${EXTENSION_CAT_DB_PATH}"
 
 
 # Generate RST for the lists of trusted/untrusted extensions in
