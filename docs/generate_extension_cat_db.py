@@ -5,21 +5,21 @@ import sys
 
 
 def main():
-    extension_db = sys.argv[1]
-    extension_cat_db = sys.argv[2]
+  extension_db = sys.argv[1]
+  extension_cat_db = sys.argv[2]
 
-    with open(extension_db) as f:
-        data = json.load(f)
+  with open(extension_db) as f:
+    data = json.load(f)
 
-    categories = {}
-    for k, v in data.items():
-        for cat in v['categories']:
-            categories[cat] = categories.get(cat, [])
-            categories[cat].append(k)
+  categories = {}
+  for k, v in data.items():
+    for cat in v['categories']:
+      categories[cat] = categories.get(cat, [])
+      categories[cat].append(k)
 
-    with open(extension_cat_db, 'w') as f:
-        json.dump(categories, f)
+  with open(extension_cat_db, 'w') as f:
+    json.dump(categories, f)
 
 
 if __name__ == '__main__':
-    main()
+  main()
