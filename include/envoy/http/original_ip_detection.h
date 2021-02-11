@@ -15,7 +15,7 @@ struct OriginalIPDetectionParams {
   // Note: headers will be sanitized after the OriginalIPDetection::detect() call.
   Http::RequestHeaderMap& request_headers;
   // The downstream directly connected address.
-  Network::Address::InstanceConstSharedPtr downstream_remote_address;
+  Network::Address::InstanceConstSharedPtr& downstream_remote_address;
 };
 
 /**
