@@ -67,7 +67,6 @@ $categories
 
 """)
 
-
 EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
 
 .. tip::
@@ -76,7 +75,6 @@ EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
 $extensions
 
 """)
-
 
 # A map from the extension security postures (as defined in the
 # envoy_cc_extension build macro) to human readable text for extension docs.
@@ -107,9 +105,7 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-EXTENSION_CATEGORIES = json.loads(
-  pathlib.Path(
-    os.getenv('EXTENSION_CAT_DB_PATH')).read_text())
+EXTENSION_CATEGORIES = json.loads(pathlib.Path(os.getenv('EXTENSION_CAT_DB_PATH')).read_text())
 
 
 class ProtodocError(Exception):
@@ -154,7 +150,8 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   formatted_extension_category = ''
   if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
     formatted_extension_category = FormatExtensionCategory(comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
-  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_category
+  comment = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
+  return comment + formatted_extension + formatted_extension_category
 
 
 def MapLines(f, s):
@@ -230,10 +227,7 @@ def FormatExtension(extension):
 
 def FormatExtensionList(items, prefix="extension", indent=2):
   indent = " " * indent
-  formatted_list = "\n".join(
-    f"{indent}- :ref:`{ext} <{prefix}_{ext}>`"
-    for ext
-    in items)
+  formatted_list = "\n".join(f"{indent}- :ref:`{ext} <{prefix}_{ext}>`" for ext in items)
   return f"{formatted_list}\n{indent}\n"
 
 
@@ -246,13 +240,11 @@ def FormatExtensionCategory(extension_category):
   Returns:
     RST formatted extension category description.
   """
-  IGNORED_EXTENSIONS = [
-    "envoy.tracers.xray", "envoy.filters.http.cache.simple_http_cache"]
+  IGNORED_EXTENSIONS = ["envoy.tracers.xray", "envoy.filters.http.cache.simple_http_cache"]
   try:
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
-    sys.stderr.write(
-        '\n\nUnable to find extension category: %s\n\n' % extension_category)
+    sys.stderr.write(f"\n\nUnable to find extension category:  {extension_category}\n\n")
     exit(1)  # Raising the error buries the above message in tracebacks.
   anchor = FormatAnchor('extension_category_' + extension_category)
   extensions = FormatExtensionList([x for x in extensions if x not in IGNORED_EXTENSIONS])
