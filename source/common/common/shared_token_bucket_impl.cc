@@ -32,7 +32,7 @@ std::chrono::milliseconds SharedTokenBucketImpl::nextTokenAvailable() {
   return impl_.nextTokenAvailable();
 };
 
-void SharedTokenBucketImpl::reset(uint64_t num_tokens) {
+void SharedTokenBucketImpl::maybeReset(uint64_t num_tokens) {
   Thread::LockGuard lock(mutex_);
   // Don't reset if reset once before.
   if (reset_once_) {
@@ -40,7 +40,7 @@ void SharedTokenBucketImpl::reset(uint64_t num_tokens) {
   }
   reset_once_ = true;
   synchronizer_.syncPoint(ResetCheckSyncPoint);
-  impl_.reset(num_tokens);
+  impl_.maybeReset(num_tokens);
 };
 
 } // namespace Envoy

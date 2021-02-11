@@ -25,7 +25,7 @@ public:
   uint64_t consume(uint64_t tokens, bool allow_partial,
                    std::chrono::milliseconds& time_to_next_token) override;
   std::chrono::milliseconds nextTokenAvailable() override;
-  void reset(uint64_t num_tokens) override;
+  void maybeReset(uint64_t num_tokens) override;
 
 private:
   const double max_tokens_;

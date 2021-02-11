@@ -38,7 +38,7 @@ public:
    * Since the token bucket is shared, only the first reset call will work.
    * Subsequent calls to reset method will be ignored.
    */
-  void reset(uint64_t num_tokens) override;
+  void maybeReset(uint64_t num_tokens) override;
 
 private:
   Thread::MutexBasicLockable mutex_;

@@ -104,7 +104,7 @@ TEST_F(SharedTokenBucketImplTest, Reset) {
   synchronizer(token_bucket).enable();
   // Start a thread and call consume. This will wait post checking reset_once flag.
   synchronizer(token_bucket).waitOn(SharedTokenBucketImpl::ResetCheckSyncPoint);
-  std::thread thread([&] { token_bucket.reset(1); });
+  std::thread thread([&] { token_bucket.maybeReset(1); });
 
   // Wait until the thread is actually waiting.
   synchronizer(token_bucket).barrierOn(SharedTokenBucketImpl::ResetCheckSyncPoint);
@@ -120,7 +120,7 @@ TEST_F(SharedTokenBucketImplTest, Reset) {
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
 
   // Reset again. Should be ignored for shared bucket.
-  token_bucket.reset(5);
+  token_bucket.maybeReset(5);
   EXPECT_EQ(0, token_bucket.consume(5, true, time_to_next_token));
 }
 
@@ -178,7 +178,7 @@ TEST_F(SharedTokenBucketImplTest, SynchronizedConsumeAndNextToken) {
 
   EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
 
-  token_bucket.reset(10);
+  token_bucket.maybeReset(10);
   // Exhaust all tokens.
   std::chrono::milliseconds time_to_next_token(0);
   EXPECT_EQ(10, token_bucket.consume(20, true, time_to_next_token));

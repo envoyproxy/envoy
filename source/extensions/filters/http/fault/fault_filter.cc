@@ -539,7 +539,7 @@ void StreamRateLimiter::onTokenTimer() {
     // full 1s of data right away which might not introduce enough delay for a stream that doesn't
     // have enough data to span more than 1s of rate allowance). Once we reset, we will subsequently
     // allow for bursting within the second to account for our data provider being bursty.
-    token_bucket_.reset(1);
+    token_bucket_.maybeReset(1);
     saw_data_ = true;
   }
 
