@@ -13,6 +13,8 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
