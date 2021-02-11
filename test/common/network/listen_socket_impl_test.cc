@@ -172,6 +172,14 @@ TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {
   EXPECT_EQ(Address::IpVersion::v4, socket.ipVersion());
 }
 
+TEST_P(ListenSocketImplTestTcp, Win32Ioctl) {
+#ifndef WIN32
+  TestListenSocket socket(Utility::getIpv4AnyAddress());
+  unsigned long bytes = 0;
+  ASSERT_DEATH(socket.win32Ioctl(-1, nullptr, 0, nullptr, 0, &bytes), "panic: not implemented");
+#endif
+}
+
 TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
 
 // Validate that we get port allocation when binding to port zero.
