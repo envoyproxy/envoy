@@ -1038,6 +1038,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
+  // Request body is more than 8 bytes.
   config_helper_.setBufferLimits(2 << 20, 8);
   HttpIntegrationTest::initialize();
 
@@ -1049,11 +1050,14 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
       R"({ "theme" : "Children")", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "413"}},
       "Request rejected because the transcoder's internal buffer size exceeds the configured "
-      "limit.", true, false, "", true);
+      "limit.",
+      true, false, "", true);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
-  // TODO: Set buffer limit.
+  // Request body is less than 35 bytes.
+  // Response body is more than 35 bytes.
+  config_helper_.setBufferLimits(2 << 20, 35);
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1061,11 +1065,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
       R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
-      {R"(id: 20 theme: "Children that overflow the response buffer" )"}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "500"},
-                                      {"content-type", "application/json"},
-                                      {"content-length", "30"},
-                                      {"grpc-status", "0"}},
+      {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "99"}},
       "Response not transcoded because the transcoder's internal buffer size exceeds the "
       "configured limit.");
 }
