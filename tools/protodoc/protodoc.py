@@ -63,19 +63,19 @@ This extension may be referenced by the qualified name *$extension*
 
   $security_posture
 
-  This extension extends the following extension type:
+  This extension extends the following extension category:
 
 $categories
 
 """)
 
 
-EXTENSION_TYPE_TEMPLATE = string.Template("""$anchor
+EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
 
 .. tip::
-  EXTENSION_TYPE_MARKER
+  EXTENSION_CATEGORY_MARKER
 
-  This extension type has the following known extensions
+  This extension category has the following known extensions
 
 $extensions
 
@@ -155,10 +155,10 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   if annotations.EXTENSION_ANNOTATION in comment.annotations:
     extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
-  formatted_extension_type = ''
-  if annotations.EXTENSION_TYPE_ANNOTATION in comment.annotations:
-    formatted_extension_type = FormatExtensionType(comment.annotations[annotations.EXTENSION_TYPE_ANNOTATION])
-  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_type
+  formatted_extension_category = ''
+  if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
+    formatted_extension_category = FormatExtensionType(comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
+  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_category
 
 
 def MapLines(f, s):
@@ -221,7 +221,7 @@ def FormatExtension(extension):
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
     extension_categories = "\n".join(
-      f"  - :ref:`{ext} <extension_type_{ext}>`"
+      f"  - :ref:`{ext} <extension_category_{ext}>`"
       for ext
       in extension_metadata.get('categories', []))
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
@@ -235,29 +235,29 @@ def FormatExtension(extension):
     exit(1)  # Raising the error buries the above message in tracebacks.
 
 
-def FormatExtensionType(extension_type):
+def FormatExtensionType(extension_category):
   """Format extension metadata as RST.
 
   Args:
-    extension_type: the name of the extension_type, e.g. com.acme.
+    extension_category: the name of the extension_category, e.g. com.acme.
 
   Returns:
-    RST formatted extension type description.
+    RST formatted extension category description.
   """
   IGNORED_EXTENSIONS = [
     "envoy.tracers.xray", "envoy.filters.http.cache.simple_http_cache"]
   try:
-    anchor = FormatAnchor('extension_type_' + extension_type)
+    anchor = FormatAnchor('extension_category_' + extension_category)
     extensions = "\n".join(
       f"  - :ref:`{ext} <extension_{ext}>`"
       for ext
-      in EXTENSION_CATEGORIES[extension_type]
+      in EXTENSION_CATEGORIES[extension_category]
       if ext not in IGNORED_EXTENSIONS)
-    return EXTENSION_TYPE_TEMPLATE.substitute(anchor=anchor,
+    return EXTENSION_CATEGORY_TEMPLATE.substitute(anchor=anchor,
                                               extensions="%s\n  \n" % extensions)
   except KeyError as e:
     sys.stderr.write(
-        '\n\nUnable to find extension type: %s\n\n' % extension_type)
+        '\n\nUnable to find extension category: %s\n\n' % extension_category)
     exit(1)  # Raising the error buries the above message in tracebacks.
 
 
@@ -284,7 +284,6 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
     return anchor + FormatHeader(
         style, source_code_info.file_level_annotations[
             annotations.DOC_TITLE_ANNOTATION]) + formatted_extension, stripped_comment
-
   return anchor + FormatHeader(style, proto_name) + formatted_extension, stripped_comment
 
 

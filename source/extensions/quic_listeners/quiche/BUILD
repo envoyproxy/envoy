@@ -378,11 +378,6 @@ envoy_cc_extension(
     security_posture = "unknown",
     tags = ["nofips"],
 
-    category = (
-        "envoy.transport_sockets.downstream",
-        "envoy.transport_sockets.upstream",
-    ),
-
     # QUICHE can't build against FIPS BoringSSL until the FIPS build
     # is on a new enough version to have QUIC support. Remove it from
     # the build until then. Re-enable as part of #7433.
