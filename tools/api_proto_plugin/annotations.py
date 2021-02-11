@@ -11,7 +11,7 @@ ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
 DOC_TITLE_ANNOTATION = 'protodoc-title'
 
 # Specify the type of extensions at extension points
-EXTENSION_TYPE_ANNOTATION = 'extension-category'
+EXTENSION_CATEGORY_ANNOTATION = 'extension-category'
 
 # When documenting an extension, this should be used to specify the qualified
 # name that the extension registers as in the static registry, e.g.
@@ -35,7 +35,7 @@ COMMENT_ANNOTATION = 'comment'
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     EXTENSION_ANNOTATION,
-    EXTENSION_TYPE_ANNOTATION,
+    EXTENSION_CATEGORY_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
