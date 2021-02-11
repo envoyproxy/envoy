@@ -394,13 +394,13 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  tryForward(controller, true);
-  sampleLatency(controller, std::chrono::milliseconds(1));
-  tryForward(controller, true);
-  sampleLatency(controller, std::chrono::milliseconds(1));
-  updateMinRTT(controller);
-  enterMinRTTSamplingWindow(controller);
-  updateMinRTT(controller);
+  tryForward(controller, true); // thread 1
+  sampleLatency(controller, std::chrono::milliseconds(1)); // thread 1
+  tryForward(controller, true); // thread 2
+  sampleLatency(controller, std::chrono::milliseconds(1)); // thread 2
+  updateMinRTT(controller); // thread 1
+  enterMinRTTSamplingWindow(controller); // any thread
+  updateMinRTT(controller); // thread 2
 
   verifyMinRTTValue(std::chrono::milliseconds(1));
 }
