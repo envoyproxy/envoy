@@ -21,7 +21,7 @@ void registerApi(std::string name, void* api) { registry_[name] = api; }
 // before any reads occur.
 void* retrieveApi(std::string name) {
   void* api = registry_[name];
-  ASSERT(api);
+  ASSERT(api, fmt::format("{} not registered", name));
   return api;
 }
 

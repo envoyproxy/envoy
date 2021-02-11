@@ -199,6 +199,20 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingStringAccessorToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual("hello", config.stringAccessors["name"]?.getEnvoyString())
+      expectation.fulfill()
+    }
+
+    _ = try EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addStringAccessor(name: "name", accessor: { "hello" })
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testResolvesYAMLWithIndividuallySetValues() throws {
     let filterFactory = EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init)
     let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
@@ -214,7 +228,8 @@ final class EngineBuilderTests: XCTestCase {
                                       [EnvoyNativeFilterConfig(name: "filter_name",
                                                                typedConfig: "test_config"),
                                       ],
-                                    platformFilterChain: [filterFactory])
+                                    platformFilterChain: [filterFactory],
+                                    stringAccessors: [:])
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.envoyproxy.io"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
@@ -242,7 +257,8 @@ final class EngineBuilderTests: XCTestCase {
                                     appId: "com.envoymobile.ios",
                                     virtualClusters: "[test]",
                                     nativeFilterChain: [],
-                                    platformFilterChain: [])
+                                    platformFilterChain: [],
+                                    stringAccessors: [:])
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }
 }

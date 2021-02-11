@@ -21,10 +21,11 @@ public final class EngineBuilder: NSObject {
   private var statsFlushSeconds: UInt32 = 60
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var virtualClusters: String = "[]"
   private var onEngineRunning: (() -> Void)?
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
+  private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
+  private var stringAccessors: [String: EnvoyStringAccessor] = [:]
 
   // MARK: - Public
 
@@ -142,6 +143,19 @@ public final class EngineBuilder: NSObject {
     return self
   }
 
+  /// Add a string accessor to this Envoy Client.
+  ///
+  /// - parameter name: the name of the accessor.
+  /// - parameter accessor: lambda to access a string from the platform layer.
+  ///
+  /// - returns this builder.
+  @discardableResult
+  public func addStringAccessor(name: String,
+                                accessor: @escaping () -> String) -> EngineBuilder {
+    self.stringAccessors[name] = EnvoyStringAccessor(block: accessor)
+    return self
+  }
+
   /// Set a closure to be called when the engine finishes its async startup and begins running.
   ///
   /// - parameter closure: The closure to be called.
@@ -202,7 +216,8 @@ public final class EngineBuilder: NSObject {
         appId: self.appId,
         virtualClusters: self.virtualClusters,
         nativeFilterChain: self.nativeFilterChain,
-        platformFilterChain: self.platformFilterChain)
+        platformFilterChain: self.platformFilterChain,
+        stringAccessors: self.stringAccessors)
 
     switch self.base {
     case .custom(let yaml):

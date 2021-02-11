@@ -654,9 +654,9 @@ static const void* jvm_http_filter_init(const void* context) {
 
 // EnvoyStringAccessor
 
-static envoy_data jvm_get_string(void* context) {
+static envoy_data jvm_get_string(const void* context) {
   JNIEnv* env = get_env();
-  jobject j_context = static_cast<jobject>(context);
+  jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_JvmStringAccessorContext = env->GetObjectClass(j_context);
   jmethodID jmid_getString =
       env->GetMethodID(jcls_JvmStringAccessorContext, "getString", "()Ljava/nio/ByteBuffer;");

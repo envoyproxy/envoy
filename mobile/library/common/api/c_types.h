@@ -8,7 +8,7 @@
 extern "C" { // function pointers
 #endif
 
-typedef envoy_data (*envoy_get_string_f)(void* context);
+typedef envoy_data (*envoy_get_string_f)(const void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -21,5 +21,5 @@ typedef envoy_data (*envoy_get_string_f)(void* context);
 //       types.
 typedef struct {
   envoy_get_string_f get_string;
-  void* context;
+  const void* context;
 } envoy_string_accessor;
