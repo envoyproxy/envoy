@@ -68,7 +68,7 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
 }
 
 // Change the default route to be restrictive, and send a request to an alternate route.
-TEST_P(ProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
+TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 TEST_P(ProtocolIntegrationTest, RouterVirtualClusters) { testRouterVirtualClusters(); }
 
@@ -108,7 +108,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 }
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
-TEST_P(ProtocolIntegrationTest, RouterRedirect) {
+TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
@@ -135,7 +135,7 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
 }
 
 // Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
+TEST_P(DownstreamProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
 name: health_check
 typed_config:
@@ -156,7 +156,7 @@ typed_config:
 }
 
 // Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(ProtocolIntegrationTest, ModifyBuffer) {
+TEST_P(DownstreamProtocolIntegrationTest, ModifyBuffer) {
   config_helper_.addFilter(R"EOF(
 name: health_check
 typed_config:
@@ -253,7 +253,7 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
 
 // Tests a filter that returns a FilterHeadersStatus::Continue after a local reply. In debug mode,
 // this fails on ENVOY_BUG. In opt mode, the status is corrected and the failure is logged.
-TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
+TEST_P(DownstreamProtocolIntegrationTest, ContinueAfterLocalReply) {
   config_helper_.addFilter(R"EOF(
   name: continue-after-local-reply-filter
   typed_config:
@@ -390,7 +390,7 @@ TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
 }
 
-TEST_P(ProtocolIntegrationTest, MissingHeadersLocalReply) {
+TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
@@ -1088,7 +1088,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 }
 
 // Verify that request with headers containing underscores is rejected when configured.
-TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1598,6 +1598,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
 //                          codec behavior)
 // H2            H2         Success
 TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
+  // There will be no upstream connections for HTTP/1 downstream, we need to
+  // test the full mesh regardless.
+  testing_upstream_intentionally_ = true;
   const std::string long_method = std::string(48 * 1024, 'a');
   const Http::TestRequestHeaderMapImpl request_headers{{":method", long_method},
                                                        {":path", "/test/long/url"},
@@ -1971,7 +1974,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
 }
 
 // Test connection is closed if no http requests were processed
-TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
+TEST_P(DownstreamProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
