@@ -115,11 +115,11 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       First, you need to create the service. Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``. After you create the service you
       can start it.
       
-      From an **administrator** prompt run the following commands (note that you need replace C:\EnvoyProxy\ with the path to the envoy.exe binary):
+      From an **administrator** prompt run the following commands (note that you need replace C:\EnvoyProxy\ with the path to the envoy.exe binary and the config file):
 
       .. substitution-code-block:: console
 
-         > sc create EnvoyProxy binpath="C:\EnvoyProxy\envoy.exe --config-path envoy-demo.yaml"
+         > sc create EnvoyProxy binpath="C:\EnvoyProxy\envoy.exe --config-path C:\EnvoyProxy\envoy-demo.yaml" start=auto depend=Tcpip/Afd
             [SC] CreateService SUCCESS
          > sc start EnvoyProxy
             SERVICE_NAME: envoyproxy
@@ -136,7 +136,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
             SERVICE_NAME: envoyproxy
                TYPE               : 10  WIN32_OWN_PROCESS
                STATE              : 4  RUNNING
-                                       (STOPPABLE, PAUSABLE, ACCEPTS_SHUTDOWN)
+                                       (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)
                WIN32_EXIT_CODE    : 0  (0x0)
                SERVICE_EXIT_CODE  : 0  (0x0)
                CHECKPOINT         : 0x0

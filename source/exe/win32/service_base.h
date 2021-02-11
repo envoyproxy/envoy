@@ -22,8 +22,7 @@ public:
    */
   static bool TryRunAsService(ServiceBase& service);
 
-  ServiceBase(DWORD controlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN |
-                                       SERVICE_CONTROL_PRESHUTDOWN);
+  ServiceBase(DWORD controlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PRESHUTDOWN);
   /**
    * Start the service.
    * @return exit code of Envoy.

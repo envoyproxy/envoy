@@ -136,8 +136,8 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
   }
 
   // Windows Services can get their arguments in two different ways
-  // 1. With arguments coming from StartServiceA.
-  // 2. With command line arguments that have been registered when the service gets created.
+  // 1. With command line arguments that have been registered when the service gets created.
+  // 2. With arguments coming from StartServiceA.
   // We merge the two cases into one vector of arguments that we provide to main common.
   auto cli = std::wstring(::GetCommandLineW());
   int envoyArgCount = 0;
