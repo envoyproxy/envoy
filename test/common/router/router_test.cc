@@ -17,7 +17,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/context_impl.h"
 #include "common/network/application_protocol.h"
-#include "common/network/redirect_records_filter_state.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/upstream_server_name.h"
 #include "common/network/upstream_subject_alt_names.h"
@@ -5666,9 +5666,13 @@ TEST_F(RouterTest, RedirectRecords) {
          redirect_records_data_.size());
   redirect_records->buf_size_ = redirect_records_data_.size();
   router_.downstream_connection_.stream_info_.filterState()->setData(
-      Network::Win32RedirectRecordsFilterState::key(),
-      std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
+      Network::UpstreamSocketOptionsFilterState::key(),
+      std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  router_.downstream_connection_.stream_info_.filterState()
+      ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
+          Network::UpstreamSocketOptionsFilterState::key())
+      .addOption(Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");

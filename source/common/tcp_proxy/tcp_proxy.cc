@@ -24,7 +24,7 @@
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/redirect_records_filter_state.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
@@ -440,23 +440,21 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
 
-    if (downstreamConnection()
-            ->streamInfo()
-            .filterState()
-            .hasData<Network::Win32RedirectRecordsFilterState>(
-                Network::Win32RedirectRecordsFilterState::key())) {
-      // See how to perform bind or connect redirection on MSDN
-      // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
-      auto redirect_records = downstreamConnection()
-                                  ->streamInfo()
-                                  .filterState()
-                                  .getDataReadOnly<Network::Win32RedirectRecordsFilterState>(
-                                      Network::Win32RedirectRecordsFilterState::key())
-                                  .value();
-      const Network::Socket::OptionsSharedPtr wfp_socket_options =
-          Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
+    auto has_options_from_downstream =
+        downstreamConnection() && downstreamConnection()
+                                      ->streamInfo()
+                                      .filterState()
+                                      .hasData<Network::UpstreamSocketOptionsFilterState>(
+                                          Network::UpstreamSocketOptionsFilterState::key());
+    if (has_options_from_downstream) {
+      auto downstream_options = downstreamConnection()
+                                    ->streamInfo()
+                                    .filterState()
+                                    .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                        Network::UpstreamSocketOptionsFilterState::key())
+                                    .value();
       upstream_options_ = std::make_shared<Network::Socket::Options>();
-      Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
+      Network::Socket::appendOptions(upstream_options_, downstream_options);
     }
   }
 

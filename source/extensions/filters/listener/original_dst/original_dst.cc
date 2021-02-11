@@ -3,7 +3,8 @@
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
-#include "common/network/redirect_records_filter_state.h"
+#include "common/network/upstream_socket_options_filter_state.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -44,11 +45,21 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
                       status.errno_);
             return Network::FilterStatus::StopIteration;
           }
-          cb.filterState().setData(
-              Network::Win32RedirectRecordsFilterState::key(),
-              std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
-              StreamInfo::FilterState::StateType::ReadOnly,
-              StreamInfo::FilterState::LifeSpan::Connection);
+
+          StreamInfo::FilterState& filter_state = cb.filterState();
+          auto has_options = filter_state.hasData<Network::UpstreamSocketOptionsFilterState>(
+              Network::UpstreamSocketOptionsFilterState::key());
+          if (!has_options) {
+            filter_state.setData(Network::UpstreamSocketOptionsFilterState::key(),
+                                 std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
+                                 StreamInfo::FilterState::StateType::Mutable,
+                                 StreamInfo::FilterState::LifeSpan::Connection);
+          }
+          filter_state
+              .getDataMutable<Network::UpstreamSocketOptionsFilterState>(
+                  Network::UpstreamSocketOptionsFilterState::key())
+              .addOption(
+                  Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
         }
       }
 #endif

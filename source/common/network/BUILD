@@ -497,10 +497,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "redirect_records_filter_state_lib",
-    srcs = ["redirect_records_filter_state.cc"],
-    hdrs = ["redirect_records_filter_state.h"],
+    name = "upstream_socket_options_filter_state_lib",
+    srcs = ["upstream_socket_options_filter_state.cc"],
+    hdrs = ["upstream_socket_options_filter_state.h"],
     deps = [
+        ":socket_interface_lib",
+        ":socket_option_factory_lib",
         "//include/envoy/network:io_handle_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",

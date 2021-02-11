@@ -15,7 +15,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/application_protocol.h"
-#include "common/network/redirect_records_filter_state.h"
+#include "common/network/upstream_socket_options_filter_state.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/network/win32_redirect_records_option_impl.h"
@@ -966,10 +967,16 @@ public:
         redirect_records->buf_size_ = redirect_records_data_.size();
 
         filter_callbacks_.connection_.streamInfo().filterState()->setData(
-            Network::Win32RedirectRecordsFilterState::key(),
-            std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
+            Network::UpstreamSocketOptionsFilterState::key(),
+            std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
             StreamInfo::FilterState::StateType::Mutable,
             StreamInfo::FilterState::LifeSpan::Connection);
+        filter_callbacks_.connection_.streamInfo()
+            .filterState()
+            ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
+                Network::UpstreamSocketOptionsFilterState::key())
+            .addOption(
+                Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));

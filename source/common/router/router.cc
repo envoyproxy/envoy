@@ -29,7 +29,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
-#include "common/network/redirect_records_filter_state.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
@@ -495,26 +495,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
 
-  auto has_downstream_connection_with_redirect_records =
+  auto has_options_from_downstream =
       downstreamConnection() && downstreamConnection()
                                     ->streamInfo()
                                     .filterState()
-                                    .hasData<Network::Win32RedirectRecordsFilterState>(
-                                        Network::Win32RedirectRecordsFilterState::key());
+                                    .hasData<Network::UpstreamSocketOptionsFilterState>(
+                                        Network::UpstreamSocketOptionsFilterState::key());
 
-  if (has_downstream_connection_with_redirect_records) {
-    auto redirect_records = downstreamConnection()
-                                ->streamInfo()
-                                .filterState()
-                                .getDataReadOnly<Network::Win32RedirectRecordsFilterState>(
-                                    Network::Win32RedirectRecordsFilterState::key())
-                                .value();
-    const Network::Socket::OptionsSharedPtr wfp_socket_options =
-        Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
+  if (has_options_from_downstream) {
+    auto downstream_options = downstreamConnection()
+                                  ->streamInfo()
+                                  .filterState()
+                                  .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                      Network::UpstreamSocketOptionsFilterState::key())
+                                  .value();
     if (!upstream_options_) {
       upstream_options_ = std::make_shared<Network::Socket::Options>();
     }
-    Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
+    Network::Socket::appendOptions(upstream_options_, downstream_options);
   }
 
   if (upstream_options_ && callbacks_->getUpstreamSocketOptions()) {
