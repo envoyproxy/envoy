@@ -24,7 +24,7 @@ namespace {
 
 TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
-  std::string expectedServerName("www.example.com");
+  absl::string_view expectedServerName("www.example.com");
   auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
   auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr);
   conn_socket_.setRequestedServerName(serverName);
