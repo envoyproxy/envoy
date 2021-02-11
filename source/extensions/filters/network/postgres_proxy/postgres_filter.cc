@@ -11,10 +11,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
+PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& config_options,
                                            Stats::Scope& scope)
-    : enable_sql_parsing_(enable_sql_parsing), scope_{scope}, stats_{generateStats(stat_prefix,
-                                                                                   scope)} {}
+    : enable_sql_parsing_(config_options.enable_sql_parsing_),
+      terminate_ssl_(config_options.terminate_ssl_), scope_{scope},
+      stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -29,9 +30,12 @@ Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
 
   // Frontend Buffer
   frontend_buffer_.add(data);
-  doDecode(frontend_buffer_, true);
-
-  return Network::FilterStatus::Continue;
+  Network::FilterStatus result = doDecode(frontend_buffer_, true);
+  if (result == Network::FilterStatus::StopIteration) {
+    ASSERT(frontend_buffer_.length() == 0);
+    data.drain(data.length());
+  }
+  return result;
 }
 
 Network::FilterStatus PostgresFilter::onNewConnection() { return Network::FilterStatus::Continue; }
@@ -45,9 +49,7 @@ Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  doDecode(backend_buffer_, false);
-
-  return Network::FilterStatus::Continue;
+  return doDecode(backend_buffer_, false);
 }
 
 DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
@@ -186,12 +188,58 @@ void PostgresFilter::processQuery(const std::string& sql) {
   }
 }
 
-void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
+bool PostgresFilter::onSSLRequest() {
+  if (!config_->terminate_ssl_) {
+    // Signal to the decoder to continue.
+    return true;
+  }
+  // Send single bytes 'S' to indicate switch to TLS.
+  // Refer to official documentation for protocol details:
+  // https://www.postgresql.org/docs/current/protocol-flow.html
+  Buffer::OwnedImpl buf;
+  buf.add("S");
+  // Add callback to be notified when the reply message has been
+  // transmitted.
+  read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+    // Wait until 'S' has been transmitted.
+    if (bytes >= 1) {
+      if (!read_callbacks_->connection().startSecureTransport()) {
+        ENVOY_CONN_LOG(info, "postgres_proxy: cannot enable secure transport. Check configuration.",
+                       read_callbacks_->connection());
+        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      } else {
+        // Unsubscribe the callback.
+        config_->stats_.sessions_terminated_ssl_.inc();
+        ENVOY_CONN_LOG(trace, "postgres_proxy: enabled SSL termination.",
+                       read_callbacks_->connection());
+        // Switch to TLS has been completed.
+        // Signal to the decoder to stop processing the current message (SSLRequest).
+        // Because Envoy terminates SSL, the message was consumed and should not be
+        // passed to other filters in the chain.
+        return false;
+      }
+    }
+    return true;
+  });
+  read_callbacks_->connection().write(buf, false);
+
+  return false;
+}
+
+Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says
   // that it cannot process data in the buffer.
-  while ((0 < data.length()) && (decoder_->onData(data, frontend))) {
-    ;
+  while (0 < data.length()) {
+    switch (decoder_->onData(data, frontend)) {
+    case Decoder::NeedMoreData:
+      return Network::FilterStatus::Continue;
+    case Decoder::ReadyForNext:
+      continue;
+    case Decoder::Stopped:
+      return Network::FilterStatus::StopIteration;
+    }
   }
+  return Network::FilterStatus::Continue;
 }
 
 } // namespace PostgresProxy
