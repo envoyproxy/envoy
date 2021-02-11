@@ -91,7 +91,7 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
       stream_destroyed_,
       Utility::EncodeFunctions{
           nullptr, nullptr,
-          [this](ResponseHeaderMap& headers, Code& code, std::string& body,
+          [](ResponseHeaderMap& headers, Code& code, std::string& body,
                  const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  bool is_head_request) -> void {
             Utility::toGrpcTrailersOnlyResponse(headers, code, body, grpc_status, is_head_request);

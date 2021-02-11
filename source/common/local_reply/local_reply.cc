@@ -152,7 +152,8 @@ using ResponseMapperPtr = std::unique_ptr<ResponseMapper>;
 
 class LocalReplyImpl : public LocalReply {
 public:
-  LocalReplyImpl() : body_formatter_(std::make_unique<BodyFormatter>()) {}
+  LocalReplyImpl()
+      : body_formatter_(std::make_unique<BodyFormatter>()), has_configured_body_formatter_(false) {}
 
   LocalReplyImpl(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
