@@ -1421,6 +1421,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
   }
   ClientStreamImpl& stream_ref = *stream;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
+  protocol_constraints_.incrementOpenedStreamCount();
   return stream_ref;
 }
 
@@ -1522,6 +1523,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,
                                        active_streams_.front().get());
+  protocol_constraints_.incrementOpenedStreamCount();
   return okStatus();
 }
 
