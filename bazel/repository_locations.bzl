@@ -644,7 +644,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "ccd87c254b6aebc5077e4e6977d08d4be888e7eb672c6630a26a15d58b59b528",
         strip_prefix = "llvm-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
-        release_date = "2021-01-05",
+        release_date = "2020-12-18",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wavm"],
         cpe = "cpe:2.3:a:llvm:*:*",
@@ -830,7 +830,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        release_date = "2021-01-05",
+        release_date = "2020-12-18",
         use_category = ["test_only"],
     ),
     upb = dict(
