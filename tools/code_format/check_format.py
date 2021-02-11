@@ -333,9 +333,9 @@ class FormatChecker:
           "installed, but the binary name is different or it's not available in "
           "PATH, please use CLANG_FORMAT environment variable to specify the path. "
           "Examples:\n"
-          "    export CLANG_FORMAT=clang-format-10.0.0\n"
-          "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
-          "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(
+          "    export CLANG_FORMAT=clang-format-11.0.1\n"
+          "    export CLANG_FORMAT=/opt/bin/clang-format-11\n"
+          "    export CLANG_FORMAT=/usr/local/opt/llvm@11/bin/clang-format".format(
               CLANG_FORMAT_PATH))
 
     def checkBazelTool(name, path, var):
