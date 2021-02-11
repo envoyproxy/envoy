@@ -68,9 +68,11 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           const std::string empty_body{};
           const auto expected_headers =
               Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({});
+          const auto expected_downstream_headers =
+              Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({});
           auto check_response = Filters::Common::ExtAuthz::TestCommon::makeCheckResponse(
               Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body,
-              expected_headers);
+              expected_headers, expected_downstream_headers);
           // Give response to the grpc_client by calling onSuccess().
           grpc_client_impl->onSuccess(std::move(check_response), span_);
           return async_request_.get();

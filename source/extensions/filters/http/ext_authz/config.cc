@@ -39,8 +39,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                 &context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           context.clusterManager(), client_config);
-      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
-          std::make_shared<Filter>(filter_config, std::move(client))});
+      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   } else if (proto_config.grpc_service().has_google_grpc()) {
     // Google gRPC client.
@@ -65,8 +64,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           async_client_cache->getAsyncClient(), std::chrono::milliseconds(timeout_ms),
           transport_api_version);
-      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
-          std::make_shared<Filter>(filter_config, std::move(client))});
+      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   } else {
     // Envoy gRPC client.
@@ -88,8 +86,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           async_client_factory->create(), std::chrono::milliseconds(timeout_ms),
           transport_api_version);
-      callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
-          std::make_shared<Filter>(filter_config, std::move(client))});
+      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
     };
   }
 
