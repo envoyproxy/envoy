@@ -40,7 +40,7 @@ public:
         return std::make_shared<Context>(nullptr, 0, plugin_);
       }
     }
-    return std::make_shared<Context>(wasm, handle->config_id(), plugin_);
+    return std::make_shared<Context>(wasm, handle->configId(), plugin_);
   }
 
   Wasm* wasmForTest() { return tls_slot_->get()->wasm().get(); }

@@ -150,7 +150,7 @@ public:
 
   WasmSharedPtr& wasm() { return wasm_handle_->wasm(); }
   WasmHandleSharedPtr& wasmHandleForTest() { return wasm_handle_; }
-  uint32_t config_id() { return config_id_; }
+  uint32_t configId() { return config_id_; }
 
 private:
   WasmHandleSharedPtr wasm_handle_;
