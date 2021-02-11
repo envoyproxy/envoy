@@ -189,6 +189,7 @@ message Bootstrap {
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
+  // [#extension-category: envoy.guarddog_actions]
   Watchdogs watchdogs = 27;
 
   // Configuration for an external tracing provider.

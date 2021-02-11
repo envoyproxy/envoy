@@ -159,6 +159,7 @@ message Cluster {
     google.protobuf.Struct match = 2;
 
     // The configuration of the transport socket.
+    // [#extension-category: envoy.transport_sockets.upstream]
     core.v3.TransportSocket transport_socket = 3;
   }
 

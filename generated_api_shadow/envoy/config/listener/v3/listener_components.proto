@@ -35,6 +35,7 @@ message Filter {
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
+  // [#extension-category: envoy.filters.network]
   oneof config_type {
     // Filter specific configuration which depends on the filter being
     // instantiated. See the supported filters for further documentation.
