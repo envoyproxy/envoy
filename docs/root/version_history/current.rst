@@ -15,6 +15,7 @@ Bug Fixes
 
 * aggregate cluster: fixed a crash due to a TLS initialization issue.
 * lua: fixed crash when Lua script contains streamInfo():downstreamSslConnection().
+* overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
 * tls: fix detection of the upstream connection close event.
 
 Removed Config or Runtime
