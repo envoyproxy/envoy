@@ -26,6 +26,17 @@ envoy_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "assert2_test",
+    srcs = ["assert2_test.cc"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -196,6 +207,7 @@ envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
     deps = [
+        "//source/common/common:interval_value",
         "//source/common/common:random_generator_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:environment_lib",
@@ -360,4 +372,16 @@ envoy_cc_test(
     name = "interval_value_test",
     srcs = ["interval_value_test.cc"],
     deps = ["//source/common/common:interval_value"],
+)
+
+envoy_cc_test(
+    name = "scope_tracker_test",
+    srcs = ["scope_tracker_test.cc"],
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/common/common:scope_tracker",
+        "//source/common/event:dispatcher_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:utility_lib",
+    ],
 )

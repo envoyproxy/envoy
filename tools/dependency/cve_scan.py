@@ -42,6 +42,17 @@ IGNORES_CVES = set([
     # Node.js issue unrelated to http-parser, see
     # https://github.com/mhart/StringStream/issues/7.
     'CVE-2018-21270',
+    # These should not affect Curl 7.74.0, but we see false positives due to the
+    # relative release date and CPE wildcard.
+    'CVE-2020-8169',
+    'CVE-2020-8177',
+    'CVE-2020-8284',
+    # Node.js issue unrelated to http-parse (Node TLS).
+    'CVE-2020-8265',
+    # Node.js request smuggling.
+    # https://github.com/envoyproxy/envoy/pull/14686 validates that this does
+    # not apply to Envoy.
+    'CVE-2020-8287',
 ])
 
 # Subset of CVE fields that are useful below.

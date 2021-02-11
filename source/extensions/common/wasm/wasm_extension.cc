@@ -39,13 +39,6 @@ RegisterWasmExtension::RegisterWasmExtension(WasmExtension* extension) {
   wasm_extension = extension;
 }
 
-std::unique_ptr<EnvoyWasmVmIntegration>
-EnvoyWasm::createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope,
-                                        absl::string_view runtime,
-                                        absl::string_view short_runtime) {
-  return std::make_unique<EnvoyWasmVmIntegration>(scope, runtime, short_runtime);
-}
-
 PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
   return [](const WasmHandleSharedPtr& base_wasm,
             absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
@@ -55,13 +48,19 @@ PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
 }
 
 WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
-  return [](const VmConfig vm_config, const Stats::ScopeSharedPtr& scope,
-            Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
-            Server::ServerLifecycleNotifier& lifecycle_notifier,
+  return [](const VmConfig vm_config,
+            const CapabilityRestrictionConfig capability_restriction_config,
+            const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
+            Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
+    proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+    for (auto& capability : capability_restriction_config.allowed_capabilities()) {
+      // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
+      allowed_capabilities[capability.first] = proxy_wasm::SanitizationConfig();
+    }
     auto wasm = std::make_shared<Wasm>(vm_config.runtime(), vm_config.vm_id(),
-                                       anyToBytes(vm_config.configuration()), vm_key, scope,
-                                       cluster_manager, dispatcher);
+                                       anyToBytes(vm_config.configuration()), vm_key,
+                                       allowed_capabilities, scope, cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
   };

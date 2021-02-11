@@ -25,6 +25,8 @@ public:
   static const char NO_TRAILERS[];
   // Prevents upstream from finishing response.
   static const char NO_END_STREAM[];
+  // Closes the underlying connection after a given response is sent.
+  static const char CLOSE_AFTER_RESPONSE[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);
@@ -58,9 +60,11 @@ using AutonomousHttpConnectionPtr = std::unique_ptr<AutonomousHttpConnection>;
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {
 public:
-  AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& address,
+  AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                     const Network::Address::InstanceConstSharedPtr& address,
                      const FakeUpstreamConfig& config, bool allow_incomplete_streams)
-      : FakeUpstream(address, config), allow_incomplete_streams_(allow_incomplete_streams),
+      : FakeUpstream(std::move(transport_socket_factory), address, config),
+        allow_incomplete_streams_(allow_incomplete_streams),
         response_trailers_(std::make_unique<Http::TestResponseTrailerMapImpl>()),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}

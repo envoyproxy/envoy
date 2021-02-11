@@ -16,6 +16,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.network",
     security_posture = "robust_to_untrusted_downstream",
     # This is core Envoy config.
     visibility = ["//visibility:public"],
@@ -38,9 +39,7 @@ envoy_cc_extension(
         "//source/common/http:default_server_string_lib",
         "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/local_reply:local_reply_lib",

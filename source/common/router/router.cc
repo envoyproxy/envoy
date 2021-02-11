@@ -12,6 +12,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
@@ -491,7 +492,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
@@ -595,19 +596,33 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+std::unique_ptr<GenericConnPool>
+Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
-    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().value());
-  } else {
+    ENVOY_BUG(factory != nullptr,
+              fmt::format("invalid factory type '{}', failing over to default upstream",
+                          cluster_->upstreamConfig().value().DebugString()));
+  }
+  if (!factory) {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.http.generic");
   }
-  const bool should_tcp_proxy =
-      route_entry_->connectConfig().has_value() &&
-      downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
-  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_,
+
+  bool should_tcp_proxy = false;
+
+  if (route_entry_->connectConfig().has_value()) {
+    auto method = downstream_headers_->getMethodValue();
+    should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
+
+    // Allow POST for proxying raw TCP if it is configured.
+    if (!should_tcp_proxy && route_entry_->connectConfig().value().allow_post()) {
+      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
+    }
+  }
+  return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
 
@@ -1192,7 +1207,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
-    upstream_request.upstreamHost()->healthChecker().setUnhealthy();
+    upstream_request.upstreamHost()->healthChecker().setUnhealthy(
+        Upstream::HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
   }
 
   bool could_not_retry = false;
@@ -1533,7 +1549,14 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
+  const auto cluster = config_.cm_.getThreadLocalCluster(route_entry_->clusterName());
+  std::unique_ptr<GenericConnPool> generic_conn_pool;
+  if (cluster != nullptr) {
+    cluster_ = cluster->info();
+    generic_conn_pool = createConnPool(*cluster);
+  }
+
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();

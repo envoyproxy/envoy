@@ -208,7 +208,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // hit route with destination_ip (10.10.10.10/32)
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.10");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.10.10.10"));
     EXPECT_EQ(std::string("with_destination_ip_list"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -216,15 +217,18 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.11");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.10.10.11"));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (10.10.11.0/24)
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
     EXPECT_EQ(std::string("with_destination_ip_list"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -232,15 +236,18 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.12.12");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.10.12.12"));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (10.11.0.0/16)
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.11.11.11");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.11.11.11"));
     EXPECT_EQ(std::string("with_destination_ip_list"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -248,15 +255,18 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.12.12.12");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.12.12.12"));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (11.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11"));
     EXPECT_EQ(std::string("with_destination_ip_list"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -264,15 +274,18 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall-through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (128.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("128.255.255.255");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("128.255.255.255"));
     EXPECT_EQ(std::string("with_destination_ip_list"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -280,7 +293,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // hit route with destination port range
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 12345);
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 12345));
     EXPECT_EQ(std::string("with_destination_ports"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -288,16 +302,20 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with source port range
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23459);
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23459));
     EXPECT_EQ(std::string("with_source_ports"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -305,17 +323,20 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23458);
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23458));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit the route with all criteria present
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
-    connection.remote_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("20.0.0.0", 20000);
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("20.0.0.0", 20000));
     EXPECT_EQ(std::string("with_everything"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -323,16 +344,18 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
-    connection.remote_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("30.0.0.0", 20000);
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("30.0.0.0", 20000));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (::1/128)
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("::1");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv6Instance>("::1"));
     EXPECT_EQ(std::string("with_v6_destination"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -340,8 +363,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // hit route with destination_ip ("2001:abcd/64")
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ =
-        std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::"));
     EXPECT_EQ(std::string("with_v6_destination"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -349,10 +372,10 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // hit route with destination_ip ("2002::/32") and source_ip ("2003::/64")
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ =
-        std::make_shared<Network::Address::Ipv6Instance>("2002:0:0:0:0:0::1");
-    connection.remote_address_ =
-        std::make_shared<Network::Address::Ipv6Instance>("2003:0:0:0:0::5");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv6Instance>("2002:0:0:0:0:0::1"));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv6Instance>("2003:0:0:0:0::5"));
     EXPECT_EQ(std::string("with_v6_source_and_destination"),
               config_obj.getRouteFromEntries(connection)->clusterName());
   }
@@ -360,8 +383,10 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   {
     // fall through
     NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("2004::");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv6Instance>("::");
+    connection.stream_info_.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv6Instance>("2004::"));
+    connection.stream_info_.downstream_address_provider_->setRemoteAddress(
+        std::make_shared<Network::Address::Ipv6Instance>("::"));
     EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 }
@@ -821,7 +846,8 @@ TEST(ConfigTest, AccessLogConfig) {
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
-    file_access_log.mutable_log_format()->set_text_format("the format specifier");
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "the format specifier");
     log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
@@ -849,6 +875,12 @@ public:
             [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
         .WillByDefault(ReturnPointee(&upstream_host_));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
+        .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
+          upstream_cluster_ = cluster_info;
+        }));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
+        .WillByDefault(ReturnPointee(&upstream_cluster_));
     factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
@@ -878,7 +910,8 @@ public:
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
-    file_access_log.mutable_log_format()->set_text_format(access_log_format);
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        access_log_format);
     access_log->mutable_typed_config()->PackFrom(file_access_log);
     return config;
   }
@@ -897,12 +930,9 @@ public:
       upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
       conn_pool_handles_.push_back(
           std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
-
-      ON_CALL(*upstream_hosts_.at(i), cluster())
-          .WillByDefault(ReturnPointee(
-              factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
       ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
-      upstream_connections_.at(i)->local_address_ = upstream_local_address_;
+      upstream_connections_.at(i)->stream_info_.downstream_address_provider_->setLocalAddress(
+          upstream_local_address_);
       EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
           .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
     }
@@ -910,7 +940,7 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -922,7 +952,7 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
           .WillRepeatedly(Return(nullptr));
     }
 
@@ -933,10 +963,6 @@ public:
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
       filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
           filter_callbacks_.connection_.ssl());
-      filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
-          filter_callbacks_.connection_.localAddress());
-      filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
-          filter_callbacks_.connection_.remoteAddress());
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -997,6 +1023,7 @@ public:
   std::list<std::function<Tcp::ConnectionPool::Cancellable*(Tcp::ConnectionPool::Cancellable*)>>
       new_connection_functions_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
 };
 
 TEST_F(TcpProxyTest, DefaultRoutes) {
@@ -1090,10 +1117,6 @@ TEST_F(TcpProxyTest, BadFactory) {
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
       filter_callbacks_.connection_.ssl());
-  filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
-      filter_callbacks_.connection_.localAddress());
-  filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
-      filter_callbacks_.connection_.remoteAddress());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 
@@ -1168,8 +1191,7 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrant) {
   // cancellation call.
   EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
       .Times(0);
-  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
-      .Times(1);
+  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1406,8 +1428,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
-    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
-        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -1430,8 +1452,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(2));
-    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
-        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -1469,8 +1491,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -1523,8 +1545,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -1723,10 +1745,10 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
 
 // Test that access log fields %DOWNSTREAM_PEER_URI_SAN% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
-  filter_callbacks_.connection_.local_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
-  filter_callbacks_.connection_.remote_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
 
   const std::vector<std::string> uriSan{"someSan"};
   auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
@@ -1741,10 +1763,10 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
 
 // Test that access log fields %DOWNSTREAM_TLS_SESSION_ID% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
-  filter_callbacks_.connection_.local_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
-  filter_callbacks_.connection_.remote_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
 
   const std::string tlsSessionId{
       "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
@@ -1761,10 +1783,10 @@ TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
 // Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
 // %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
 TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
-  filter_callbacks_.connection_.local_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
-  filter_callbacks_.connection_.remote_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
@@ -1913,14 +1935,10 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   setup(1);
 
   raiseEventUpstreamConnected(0);
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamLocalAddress(),
-            filter_callbacks_.connection().localAddress());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamRemoteAddress(),
-            filter_callbacks_.connection().remoteAddress());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamSslConnection(),
             filter_callbacks_.connection().ssl());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
-            upstream_connections_.at(0)->localAddress());
+            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamSslConnection());
 }
@@ -1971,10 +1989,11 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
   initializeFilter();
 
   // Port 10000 is outside the specified destination port range.
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000));
 
   // Expect filter to try to open a connection to the fallback cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fallback_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1993,10 +2012,11 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
   initializeFilter();
 
   // Port 9999 is within the specified destination port range.
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -2017,8 +2037,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -2036,11 +2055,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+          Invoke([](Upstream::ResourcePriority,
                     Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
             Network::TransportSocketOptionsSharedPtr transport_socket_options =
                 context->upstreamTransportSocketOptions();
             EXPECT_NE(transport_socket_options, nullptr);
@@ -2050,7 +2068,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
           }));
 
   // Port 9999 is within the specified destination port range.
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   filter_->onNewConnection();
 }
@@ -2068,11 +2087,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+          Invoke([](Upstream::ResourcePriority,
                     Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
             Network::TransportSocketOptionsSharedPtr transport_socket_options =
                 context->upstreamTransportSocketOptions();
             EXPECT_NE(transport_socket_options, nullptr);
@@ -2084,7 +2102,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
           }));
 
   // Port 9999 is within the specified destination port range.
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   filter_->onNewConnection();
 }
@@ -2110,10 +2129,11 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   initializeFilter();
 
   // Port 9999 is within the specified destination port range.
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999));
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -2165,17 +2185,18 @@ public:
 TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   setup();
   initializeFilter();
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+          Invoke([](Upstream::ResourcePriority,
                     Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
             EXPECT_TRUE(context->computeHashKey().has_value());
             return nullptr;
           }));
 
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222);
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222));
 
   filter_->onNewConnection();
 }

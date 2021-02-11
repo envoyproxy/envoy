@@ -65,7 +65,8 @@ InstanceImpl::InstanceImpl(
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
     ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+    Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
@@ -75,7 +76,8 @@ InstanceImpl::InstanceImpl(
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt)),
+                                         : absl::nullopt,
+                         watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
@@ -87,7 +89,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      main_thread_id_(std::this_thread::get_id()), server_contexts_(*this) {
+      hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -139,7 +141,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroyed listener manager");
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -238,10 +243,11 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_, timeSource());
+  auto& stats_config = config_.statsConfig();
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
-    stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+    stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
 }
 
@@ -350,10 +356,17 @@ void InstanceImpl::initialize(const Options& options,
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
+  const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
+  server_compilation_settings_stats_ =
+      std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
+          CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(
+              POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
@@ -382,6 +395,9 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
+  if (VersionInfo::sslFipsCompliant()) {
+    server_compilation_settings_stats_->fips_mode_.set(1);
+  }
 
   bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");
@@ -400,8 +416,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
@@ -554,14 +570,21 @@ void InstanceImpl::initialize(const Options& options,
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
-  for (Stats::SinkPtr& sink : config_.statsSinks()) {
+  auto& stats_config = config_.statsConfig();
+  for (const Stats::SinkPtr& sink : stats_config.sinks()) {
     stats_store_.addSink(*sink);
   }
+  if (!stats_config.flushOnAdmin()) {
+    // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
+    // Just setup the timer.
+    stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
+    stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
 
-  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
-  // Just setup the timer.
-  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized();
+  }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
@@ -578,21 +601,33 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
+  // Initializing can throw exceptions, so catch these.
+  try {
+    clusterManager().initializeSecondaryClusters(bootstrap_);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
+    shutdown();
+  }
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        stats_store_,
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_, false)
-            ->create(),
-        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, info_factory_, access_log_manager_,
-        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
+    try {
+      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+          stats_store_,
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
+                                                         stats_store_, false)
+              ->create(),
+          Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
+          Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
+          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
+          *api_);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+      shutdown();
+    }
   }
 
   // If there is no global limit to the number of active connections, warn on startup.
@@ -606,15 +641,22 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*worker_guard_dog_);
-  initialization_timer_->complete();
-  // Update server stats as soon as initialization is done.
-  updateServerStats();
-  workers_started_ = true;
-  // At this point we are ready to take traffic and all listening ports are up. Notify our parent
-  // if applicable that they can stop listening and drain.
-  restarter_.drainParentListeners();
-  drain_manager_->startParentShutdownSequence();
+  // The callback will be called after workers are started.
+  listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+    if (isShutdown()) {
+      return;
+    }
+
+    initialization_timer_->complete();
+    // Update server stats as soon as initialization is done.
+    updateServerStats();
+    workers_started_ = true;
+    hooks_.onWorkersStarted();
+    // At this point we are ready to take traffic and all listening ports are up. Notify our
+    // parent if applicable that they can stop listening and drain.
+    restarter_.drainParentListeners();
+    drain_manager_->startParentShutdownSequence();
+  });
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
@@ -807,7 +849,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

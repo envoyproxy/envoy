@@ -43,10 +43,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.stats_sinks",
     security_posture = "data_plane_agnostic",
     deps = [
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/metrics_service:metrics_proto_descriptors_lib",
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",

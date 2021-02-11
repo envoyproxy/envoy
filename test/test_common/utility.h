@@ -28,6 +28,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
@@ -80,6 +81,16 @@ namespace Envoy {
   EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception,                                        \
                              ::testing::Not(::testing::ContainsRegex(regex_str)))
 
+// Expect that the statement hits an ENVOY_BUG containing the specified message.
+#ifdef NDEBUG
+// ENVOY_BUGs in release mode log error.
+#define EXPECT_ENVOY_BUG(statement, message) EXPECT_LOG_CONTAINS("error", message, statement)
+#else
+// ENVOY_BUGs in debug mode is fatal.
+#define EXPECT_ENVOY_BUG(statement, message)                                                       \
+  EXPECT_DEBUG_DEATH(statement, ::testing::HasSubstr(message))
+#endif
+
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
   try {                                                                                            \
     statement;                                                                                     \
@@ -107,6 +118,11 @@ namespace Envoy {
 #else
 #define DEPRECATED_FEATURE_TEST(X) DISABLED_##X
 #endif
+
+class TestEnvoyBug {
+public:
+  static void callEnvoyBug() { ENVOY_BUG(false, ""); }
+};
 
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
@@ -810,8 +826,21 @@ namespace Http {
  * All of the inline header functions that just pass through to the child header map.
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
-public:                                                                                            \
   const HeaderEntry* name() const override { return header_map_->name(); }                         \
+  size_t remove##name() override {                                                                 \
+    const size_t headers_removed = header_map_->remove##name();                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+    return headers_removed;                                                                        \
+  }                                                                                                \
+  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }  \
+  void set##name(absl::string_view value) override {                                               \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+  }
+
+#define DEFINE_TEST_INLINE_STRING_HEADER_FUNCS(name)                                               \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     header_map_->append##name(data, delimiter);                                                    \
     header_map_->verifyByteSizeInternalForTest();                                                  \
@@ -819,21 +848,15 @@ public:                                                                         
   void setReference##name(absl::string_view value) override {                                      \
     header_map_->setReference##name(value);                                                        \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  void set##name(absl::string_view value) override {                                               \
-    header_map_->set##name(value);                                                                 \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
+  }
+
+#define DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS(name)                                              \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void set##name(uint64_t value) override {                                                        \
     header_map_->set##name(value);                                                                 \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  size_t remove##name() override {                                                                 \
-    const size_t headers_removed = header_map_->remove##name();                                    \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-    return headers_removed;                                                                        \
-  }                                                                                                \
-  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }
+  }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -854,6 +877,11 @@ public:
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void copyFrom(const TestHeaderMapImplBase& rhs) { copyFrom(*rhs.header_map_); }
+  void copyFrom(const HeaderMap& rhs) {
     HeaderMapImpl::copyFrom(*header_map_, rhs);
     header_map_->verifyByteSizeInternalForTest();
   }
@@ -997,8 +1025,10 @@ class TestRequestHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_REQ_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_REQ_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;
@@ -1008,9 +1038,12 @@ class TestResponseHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 class TestResponseTrailerMapImpl
@@ -1018,7 +1051,8 @@ class TestResponseTrailerMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's

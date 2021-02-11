@@ -36,14 +36,14 @@ public:
 
   void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
-    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
     EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
-    EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
+    EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
-    EXPECT_CALL(callbacks_, streamInfo()).Times(1).WillOnce(ReturnRef(req_info_));
+    EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
-    EXPECT_CALL(req_info_, startTime()).Times(1).WillOnce(Return(SystemTime()));
+    EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
   }
 
   void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
@@ -107,8 +107,8 @@ public:
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -124,8 +124,8 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -254,12 +254,12 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
                                                  {":path", "/bar"}};
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())

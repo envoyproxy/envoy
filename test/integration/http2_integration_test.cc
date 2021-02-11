@@ -111,7 +111,9 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
         hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
       });
   initialize();
-  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
   http2_options.mutable_initial_stream_window_size()->set_value(65535);
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -957,6 +959,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
     auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
     std::chrono::milliseconds timeout(1000);
     auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);

@@ -284,11 +284,6 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
-config_setting(
-    name = "enable_legacy_codecs_in_integration_tests",
-    values = {"define": "use_new_codecs_in_integration_tests=false"},
-)
-
 cc_proto_library(
     name = "grpc_health_proto",
     deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
@@ -470,7 +465,21 @@ config_setting(
 
 config_setting(
     name = "libfuzzer",
-    values = {"define": "FUZZING_ENGINE=libfuzzer"},
+    define_values = {"FUZZING_ENGINE": "libfuzzer"},
+)
+
+config_setting(
+    name = "oss_fuzz",
+    define_values = {"FUZZING_ENGINE": "oss-fuzz"},
+)
+
+alias(
+    name = "fuzzing_engine",
+    actual = select({
+        ":libfuzzer": "@rules_fuzzing//fuzzing/engines:libfuzzer",
+        ":oss_fuzz": "@rules_fuzzing_oss_fuzz//:oss_fuzz_engine",
+        "//conditions:default": "//test/fuzz:fuzz_runner_engine",
+    }),
 )
 
 alias(

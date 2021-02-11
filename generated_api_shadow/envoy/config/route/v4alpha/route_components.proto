@@ -14,7 +14,6 @@ import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -743,13 +742,16 @@ message RouteAction {
         "envoy.config.route.v3.RouteAction.UpgradeConfig";
 
     // Configuration for sending data upstream as a raw data payload. This is used for
-    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    // CONNECT or POST requests, when forwarding request payload as raw TCP.
     message ConnectConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig";
 
       // If present, the proxy protocol header will be prepended to the CONNECT payload sent upstream.
       core.v4alpha.ProxyProtocolConfig proxy_protocol_config = 1;
+
+      // If set, the route will also allow forwarding POST payload as raw TCP.
+      bool allow_post = 2;
     }
 
     // The case-insensitive name of this upgrade, e.g. "websocket".
@@ -988,7 +990,7 @@ message RouteAction {
   //
   // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
   // is configured, this timeout is scaled according to the value for
-  // :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
+  // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
 
   // Indicates that the route has a retry policy. Note that if this is set,
@@ -1340,7 +1342,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RedirectAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.RedirectAction";
@@ -1412,6 +1414,31 @@ message RedirectAction {
     //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_config.route.v4alpha.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Indicates that during redirect, portions of the path that match the
+    // pattern should be rewritten, even allowing the substitution of capture
+    // groups from the pattern into the new path as specified by the rewrite
+    // substitution string. This is useful to allow application paths to be
+    // rewritten in a way that is aware of segments with variable content like
+    // identifiers.
+    //
+    // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
+    //
+    // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
+    //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``
+    //   into ``/v1/api/instance/foo``.
+    //
+    // * The pattern ``one`` paired with a substitution string of ``two`` would
+    //   transform ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/two/zzz``.
+    //
+    // * The pattern ``^(.*?)one(.*)$`` paired with a substitution string of
+    //   ``\1two\2`` would replace only the first occurrence of ``one``,
+    //   transforming path ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/one/zzz``.
+    //
+    // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
+    //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
+    //   ``/aaa/yyy/bbb``.
+    type.matcher.v4alpha.RegexMatchAndSubstitute regex_rewrite = 9;
   }
 
   // The HTTP status code to use in the redirect response. The default response
@@ -1532,10 +1559,11 @@ message VirtualCluster {
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
+// Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RateLimit";
 
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RateLimit.Action";
@@ -1739,6 +1767,9 @@ message RateLimit {
 
       // Rate limit on metadata.
       MetaData metadata = 8;
+
+      // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      core.v4alpha.TypedExtensionConfig extension = 9;
     }
   }
 

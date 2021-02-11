@@ -2,6 +2,7 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -37,7 +38,7 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
 
 // TODO(#11622): Implement baggage storage for zipkin spans
 void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
-std::string ZipkinSpan::getBaggage(absl::string_view) { return std::string(); }
+std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
 void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
@@ -193,13 +194,11 @@ void ReporterImpl::flushSpans() {
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
 
-    if (collector_cluster_.exists()) {
+    if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          driver_.clusterManager()
-              .httpAsyncClientForCluster(collector_cluster_.info()->name())
-              .send(std::move(message), *this,
-                    Http::AsyncClient::RequestOptions().setTimeout(
-                        std::chrono::milliseconds(timeout)));
+          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+              std::move(message), *this,
+              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
       if (request) {
         active_requests_.add(*request);
       }

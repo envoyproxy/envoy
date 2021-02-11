@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -49,6 +50,18 @@
 
 namespace Envoy {
 namespace Server {
+namespace CompilationSettings {
+/**
+ * All server compilation settings stats. @see stats_macros.h
+ */
+#define ALL_SERVER_COMPILATION_SETTINGS_STATS(COUNTER, GAUGE, HISTOGRAM)                           \
+  GAUGE(fips_mode, NeverImport)
+
+struct ServerCompilationSettingsStats {
+  ALL_SERVER_COMPILATION_SETTINGS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                                        GENERATE_HISTOGRAM_STRUCT)
+};
+} // namespace CompilationSettings
 
 /**
  * All server wide stats. @see stats_macros.h
@@ -176,9 +189,7 @@ public:
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return server_.statsFlushInterval();
-  }
+  Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -217,7 +228,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               std::unique_ptr<ProcessContext> process_context,
+               Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
 
@@ -260,14 +272,12 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
 
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
 
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
-  }
-
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
   }
 
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -324,6 +334,8 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  std::unique_ptr<CompilationSettings::ServerCompilationSettingsStats>
+      server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
@@ -364,10 +376,10 @@ private:
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
-  const std::thread::id main_thread_id_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+  ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
 

@@ -14,7 +14,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -37,6 +36,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace Router {
@@ -453,20 +453,22 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 /**
  * All virtual cluster stats. @see stats_macro.h
  */
-#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_total)
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(other)                                                                                  \
+  STATNAME(vcluster)                                                                               \
+  STATNAME(vhost)
 
 /**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
-struct VirtualClusterStats {
-  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -486,8 +488,9 @@ public:
    */
   virtual VirtualClusterStats& stats() const PURE;
 
-  static VirtualClusterStats generateStats(Stats::Scope& scope) {
-    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  static VirtualClusterStats generateStats(Stats::Scope& scope,
+                                           const VirtualClusterStatNames& stat_names) {
+    return VirtualClusterStats(stat_names, scope);
   }
 };
 
@@ -1146,6 +1149,13 @@ public:
    * manager level.
    */
   virtual bool mostSpecificHeaderMutationsWins() const PURE;
+
+  /**
+   * @return uint32_t The maximum bytes of the response direct response body size. The default value
+   * is 4096.
+   * TODO(dio): To allow overrides at different levels (e.g. per-route, virtual host, etc).
+   */
+  virtual uint32_t maxDirectResponseBodySizeBytes() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -1255,8 +1265,9 @@ public:
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */
-class GenericUpstream : public Event::DeferredDeletable {
+class GenericUpstream {
 public:
+  virtual ~GenericUpstream() = default;
   /**
    * Encode a data frame.
    * @param data supplies the data to encode. The data may be moved by the encoder.
@@ -1306,7 +1317,7 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

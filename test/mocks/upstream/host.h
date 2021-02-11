@@ -74,7 +74,7 @@ public:
   MockHealthCheckHostMonitor();
   ~MockHealthCheckHostMonitor() override;
 
-  MOCK_METHOD(void, setUnhealthy, ());
+  MOCK_METHOD(void, setUnhealthy, (UnhealthyType));
 };
 
 class MockHostDescription : public HostDescription {
@@ -113,7 +113,7 @@ public:
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
@@ -174,9 +174,7 @@ public:
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(void, healthFlagClear, (HealthFlag flag));
   MOCK_METHOD(bool, healthFlagGet, (HealthFlag flag), (const));
-  MOCK_METHOD(ActiveHealthFailureType, getActiveHealthFailureType, (), (const));
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
-  MOCK_METHOD(void, setActiveHealthFailureType, (ActiveHealthFailureType type));
   MOCK_METHOD(Host::Health, health, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
@@ -199,7 +197,7 @@ public:
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 

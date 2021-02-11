@@ -28,6 +28,7 @@ public:
   // Http::RequestEncoder
   MOCK_METHOD(Status, encodeHeaders, (const RequestHeaderMap& headers, bool end_stream));
   MOCK_METHOD(void, encodeTrailers, (const RequestTrailerMap& trailers));
+  MOCK_METHOD(void, enableTcpTunneling, ());
 
   // Http::StreamEncoder
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
