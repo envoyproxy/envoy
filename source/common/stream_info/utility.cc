@@ -25,11 +25,11 @@ const std::string ResponseFlagUtils::RATELIMIT_SERVICE_ERROR = "RLSE";
 const std::string ResponseFlagUtils::STREAM_IDLE_TIMEOUT = "SI";
 const std::string ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS = "IH";
 const std::string ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR = "DPE";
-const std::string ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR = "UPE";
 const std::string ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED = "UMSDR";
 const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
 const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
 const std::string ResponseFlagUtils::DURATION_TIMEOUT = "DT";
+const std::string ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR = "UPE";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -135,6 +135,10 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     appendString(result, DURATION_TIMEOUT);
   }
 
+  if (stream_info.hasResponseFlag(ResponseFlag::UpstreamProtocolError)) {
+    appendString(result, UPSTREAM_PROTOCOL_ERROR);
+  }
+
   return result.empty() ? NONE : result;
 }
 
@@ -161,12 +165,12 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
       {ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS, ResponseFlag::InvalidEnvoyRequestHeaders},
       {ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR, ResponseFlag::DownstreamProtocolError},
-      {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
       {ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED,
        ResponseFlag::UpstreamMaxStreamDurationReached},
       {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
       {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
       {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
+      {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {

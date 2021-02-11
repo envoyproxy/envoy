@@ -255,7 +255,9 @@ enum class StreamResetReason {
   // The stream was reset because of a resource overflow.
   Overflow,
   // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
-  ConnectError
+  ConnectError,
+  // Received payload did not conform to HTTP protocol.
+  ProtocolError
 };
 
 /**

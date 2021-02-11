@@ -452,6 +452,33 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
+void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& expected_code) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
+  auto response = std::move(encoder_decoder.second);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
+  // be fixed.
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
+  ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(expected_code, response->headers().getStatusValue());
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr(expected_code));
+  EXPECT_THAT(log, HasSubstr("UPE"));
+}
+
 IntegrationStreamDecoderPtr
 HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
                                            int upstream_index, const std::string& path,

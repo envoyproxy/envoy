@@ -81,6 +81,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs",
+    "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
     "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.tls_use_io_handle_bio",

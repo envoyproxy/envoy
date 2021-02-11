@@ -101,11 +101,19 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
+    StreamResetReason reason;
+    if (connected_) {
+      reason = StreamResetReason::ConnectionTermination;
+      if (connection_->streamInfo().hasResponseFlag(
+              StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+        reason = StreamResetReason::ProtocolError;
+      }
+    } else {
+      reason = StreamResetReason::ConnectionFailure;
+    }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
-      active_requests_.front()->encoder_->getStream().resetStream(
-          connected_ ? StreamResetReason::ConnectionTermination
-                     : StreamResetReason::ConnectionFailure);
+      active_requests_.front()->encoder_->getStream().resetStream(reason);
     }
   }
 }
@@ -138,7 +146,6 @@ void CodecClient::onData(Buffer::Instance& data) {
 
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
-    close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!isPrematureResponseError(status) ||
@@ -148,7 +155,6 @@ void CodecClient::onData(Buffer::Instance& data) {
       protocol_error_ = true;
       connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
     }
-    ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();
   }
 

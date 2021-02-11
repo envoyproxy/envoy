@@ -1042,7 +1042,11 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   }
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
-  chargeUpstreamAbort(Http::Code::BadGateway, dropped, upstream_request);
+  Http::Code error_code = Runtime::runtimeFeatureEnabled(
+                              "envoy.reloadable_features.return_502_for_upstream_protocol_errors")
+                              ? Http::Code::BadGateway
+                              : Http::Code::ServiceUnavailable;
+  chargeUpstreamAbort(error_code, dropped, upstream_request);
   upstream_request.removeFromList(upstream_requests_);
 
   // If there are other in-flight requests that might see an upstream response,
@@ -1069,7 +1073,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string details = absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
       transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
-  onUpstreamAbort(Http::Code::BadGateway, response_flags, body, dropped, details);
+  onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 
 void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
@@ -1094,6 +1098,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::ConnectError:
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
+  case Http::StreamResetReason::ProtocolError:
+    return StreamInfo::ResponseFlag::UpstreamProtocolError;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
