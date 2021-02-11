@@ -71,7 +71,7 @@ message GrpcJsonTranscoder {
 
   message RequestValidationOptions {
     // By default, a request that cannot be mapped to any specified gRPC
-    // :ref:`services <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.services>`
+    // :ref:`services <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.services>`
     // will pass-through this filter.
     // When set to true, the request will be rejected with a ``HTTP 404 Not Found``.
     bool reject_unknown_method = 1;
@@ -81,9 +81,9 @@ message GrpcJsonTranscoder {
     // When set to true, the request will be rejected with a ``HTTP 400 Bad Request``.
     //
     // The fields
-    // :ref:`ignore_unknown_query_parameters <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignore_unknown_query_parameters>`
+    // :ref:`ignore_unknown_query_parameters <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignore_unknown_query_parameters>`
     // and
-    // :ref:`ignored_query_parameters <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignored_query_parameters>`
+    // :ref:`ignored_query_parameters <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.ignored_query_parameters>`
     // have priority over this strict validation behavior.
     bool reject_unknown_query_parameters = 2;
   }
@@ -111,7 +111,7 @@ message GrpcJsonTranscoder {
   // By default, the filter will pass through requests that do not map to any specified services.
   // If the list of services is empty, filter is considered disabled.
   // However, this behavior changes if
-  // :ref:`reject_unknown_method <envoy_api_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions.reject_unknown_method>`
+  // :ref:`reject_unknown_method <envoy_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.RequestValidationOptions.reject_unknown_method>`
   // is enabled.
   repeated string services = 2;
 
