@@ -48,7 +48,7 @@ public:
   /**
    * Reset the bucket with a specific number of tokens. Refill will begin again from the time that
    * this routine is called.
-   * Note: The reset call might not be honored only the first time this method is called. Check the
+   * Note: The reset call might be honored only the first time this method is called. Check the
    * concrete implementation to confirm.
    */
   virtual void maybeReset(uint64_t num_tokens) PURE;
