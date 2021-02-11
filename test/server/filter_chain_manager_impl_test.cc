@@ -84,7 +84,7 @@ public:
     mock_socket->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*mock_socket, requestedServerName())
-        .WillByDefault(Return(absl::string_view(absl::AsciiStrToLower(server_name))));
+        .WillByDefault(Return(absl::AsciiStrToLower(server_name)));
     ON_CALL(*mock_socket, detectedTransportProtocol())
         .WillByDefault(Return(absl::string_view(transport_protocol)));
     ON_CALL(*mock_socket, requestedApplicationProtocols())
