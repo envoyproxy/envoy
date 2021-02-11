@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/open_tepemetry.pb.h"
 
 #include "common/common/assert.h"
 #include "common/formatter/substitution_formatter.h"
@@ -60,10 +61,11 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 AccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-AccessLog::AccessLog(::Envoy::AccessLog::FilterPtr&& filter,
-                     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-                     ThreadLocal::SlotAllocator& tls,
-                     GrpcAccessLoggerCacheSharedPtr access_logger_cache, Stats::Scope& scope)
+AccessLog::AccessLog(
+    ::Envoy::AccessLog::FilterPtr&& filter,
+    envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
+    ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+    Stats::Scope& scope)
     : Common::ImplBase(std::move(filter)), scope_(scope), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 

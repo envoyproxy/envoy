@@ -41,6 +41,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_cc_proto",
     ],
 )
