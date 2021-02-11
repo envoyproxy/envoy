@@ -976,8 +976,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
-  // Transcoding does not occur from a request with the gRPC content type, even with an unknown path.
-  // We verify the request is not transcoded because the upstream receives the same JSON body.
+  // Transcoding does not occur from a request with the gRPC content type, even with an unknown
+  // path. We verify the request is not transcoded because the upstream receives the same JSON body.
   // We verify the response is not transcoded because the HTTP status code does not match the gRPC
   // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -1029,10 +1029,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
-  // Transcoding does not occur from a request with the gRPC content type, even with unknown query params.
-  // We verify the request is not transcoded because the upstream receives the same JSON body.
-  // We verify the response is not transcoded because the HTTP status code does not match the gRPC
-  // status.
+  // Transcoding does not occur from a request with the gRPC content type, even with unknown query
+  // params. We verify the request is not transcoded because the upstream receives the same JSON
+  // body. We verify the response is not transcoded because the HTTP status code does not match the
+  // gRPC status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/shelves/100?unknown=1"},
