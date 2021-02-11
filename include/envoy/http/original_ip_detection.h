@@ -37,8 +37,7 @@ public:
    * @return Address::InstanceConstSharedPtr an address that represents the detected address or
    * nullptr.
    */
-  virtual Network::Address::InstanceConstSharedPtr
-  detect(struct OriginalIPDetectionParams& params) PURE;
+  virtual Network::Address::InstanceConstSharedPtr detect(OriginalIPDetectionParams& params) PURE;
 };
 
 using OriginalIPDetectionSharedPtr = std::shared_ptr<OriginalIPDetection>;
