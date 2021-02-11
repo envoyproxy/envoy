@@ -61,7 +61,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.always_nodelay",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
@@ -100,6 +99,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // TODO(alyssawilk) either sort out pinterest changes or revert this as low-priority
+    "envoy.reloadable_features.always_nodelay",
     // v2 is fatal-by-default.
     "envoy.reloadable_features.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
