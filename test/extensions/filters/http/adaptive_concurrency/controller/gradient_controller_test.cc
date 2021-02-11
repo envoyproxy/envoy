@@ -398,6 +398,8 @@ min_rtt_calc_params:
   auto controller = makeController(yaml);
   tryForward(controller, true);
   sampleLatency(controller, std::chrono::milliseconds(1));
+  tryForward(controller, true);
+  sampleLatency(controller, std::chrono::milliseconds(1));
   updateMinRTT(controller);
   enterMinRTTSamplingWindow(controller);
   updateMinRTT(controller);
