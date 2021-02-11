@@ -12,7 +12,10 @@ namespace Envoy {
 namespace Http {
 
 struct OriginalIPDetectionParams {
+  // Note: headers will be sanitized after the OriginalIPDetection::detect() call.
   Http::RequestHeaderMap& request_headers;
+  // The downstream directly connected address.
+  Network::Address::InstanceConstSharedPtr downstream_remote_address;
 };
 
 /**
@@ -25,7 +28,14 @@ public:
   /**
    * Detect the final remote address.
    *
+   * Note that, when an extension is configured, this method will be called
+   * ahead of the attempt to extract the downstream remote address from the
+   * x-forwarded-for header. If the call fails to detect the original IP address,
+   * the HCM will then fallback to the standard IP detection mechanisms.
+   *
    * @param param supplies the OriginalIPDetectionParams params for detection.
+   * @return Address::InstanceConstSharedPtr an address that represents the detected address or
+   * nullptr.
    */
   virtual Network::Address::InstanceConstSharedPtr
   detect(struct OriginalIPDetectionParams& params) PURE;

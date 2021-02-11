@@ -582,7 +582,7 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 
-  // The configuration of the original IP detection extension.
+  // The configuration of the original-IP detection extension.
   //
   // If not set, Envoy uses the default remote IP detection mechanism.
   //
@@ -598,11 +598,13 @@ message HttpConnectionManager {
   // option allows for a custom extension to be provided.
   //
   // If configured, the custom extension will be called along with the
-  // request headers when the HCM needs to populate the remote address.
-  // The extension will then rely on the available headers to decide the
-  // value of the request's remote address.
+  // request headers and the downstream directly connected address when the
+  // HCM needs to populate the final remote address. The extension will then rely
+  // on these parameters to decide the value of the request's final remote address.
+  // If the extension fails to detect the original IP address, the HCM will then fallback
+  // to the standard detection mechanisms.
   //
-  // An example extension could lookup at a configured header name to figure out the
+  // An example extension could look up at a configured header name to figure out the
   // remote address as detected by a CDN or some other preceding network.
   config.core.v3.TypedExtensionConfig original_ip_detection = 43;
 }

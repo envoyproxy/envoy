@@ -135,7 +135,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // used for determining internal/external status (see below).
     auto original_ip_detection = config.originalIpDetection();
     if (original_ip_detection) {
-      struct OriginalIPDetectionParams params = {request_headers};
+      struct OriginalIPDetectionParams params = {request_headers,
+                                                 connection.addressProvider().remoteAddress()};
       final_remote_address = original_ip_detection->detect(params);
     }
 

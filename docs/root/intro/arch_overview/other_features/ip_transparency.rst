@@ -23,7 +23,10 @@ These techniques vary in complexity and applicability.
 Envoy also supports an
 :ref:`extension mechanism<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection>`
 for detecting the original IP address. This might be useful if none of the techniques below is
-applicable to your setup.
+applicable to your setup. Note that, if configured, an extension will be called ahead of the
+attempt to extract the downstream remote address from the
+:ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. If the extension
+fails to detect the original IP address, the standard detection mechanisms will then be exercised.
 
 HTTP Headers
 ------------
