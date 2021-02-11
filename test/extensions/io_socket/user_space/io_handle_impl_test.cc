@@ -185,7 +185,7 @@ TEST_F(IoHandleImplTest, ReadContent) {
 TEST_F(IoHandleImplTest, ReadThrottling) {
   {
     // Prepare data to read.
-    Buffer::OwnedImpl buf_to_write(std::string(12 * FRAGMENT_SIZE, 'a'));
+    Buffer::OwnedImpl buf_to_write(std::string(13 * FRAGMENT_SIZE, 'a'));
     while (buf_to_write.length() > 0) {
       io_handle_peer_->write(buf_to_write);
     }
@@ -223,13 +223,28 @@ TEST_F(IoHandleImplTest, ReadThrottling) {
   }
   {
     // Verify that read() returns FRAGMENT_SIZE bytes if the prepared buf is 1 byte away from high
-    // watermark.
+    // watermark. The buf highWatermarkTriggered is true before the read.
     buf.drain(FRAGMENT_SIZE + 1);
     EXPECT_EQ(buf.length(), buf.highWatermark() - 1);
     EXPECT_TRUE(buf.highWatermarkTriggered());
     auto result2 = io_handle_->read(buf, 8 * FRAGMENT_SIZE + 1);
     EXPECT_TRUE(result2.ok());
     EXPECT_EQ(result2.rc_, FRAGMENT_SIZE);
+    EXPECT_TRUE(buf.highWatermarkTriggered());
+    EXPECT_EQ(buf.toString(), std::string(buf.highWatermark() - 1 + FRAGMENT_SIZE, 'a'));
+  }
+  {
+    // Verify that read() returns FRAGMENT_SIZE bytes if the prepared buf is 1 byte away from high
+    // watermark. The buf highWatermarkTriggered is false before the read.
+    buf.drain(buf.length());
+    buf.add(std::string(buf.highWatermark() - 1, 'a'));
+    EXPECT_EQ(buf.length(), buf.highWatermark() - 1);
+    // Buffer is populated from below low watermark to high watermark - 1, so the high watermark is
+    // not triggered yet.
+    EXPECT_FALSE(buf.highWatermarkTriggered());
+    auto result3 = io_handle_->read(buf, 8 * FRAGMENT_SIZE + 1);
+    EXPECT_TRUE(result3.ok());
+    EXPECT_EQ(result3.rc_, FRAGMENT_SIZE);
     EXPECT_TRUE(buf.highWatermarkTriggered());
     EXPECT_EQ(buf.toString(), std::string(buf.highWatermark() - 1 + FRAGMENT_SIZE, 'a'));
   }
