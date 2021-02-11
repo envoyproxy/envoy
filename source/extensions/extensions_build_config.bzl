@@ -176,6 +176,7 @@ EXTENSIONS = {
     #
     # Listener
     #
+
     "envoy.listener.quic":                              "//source/extensions/quic_listeners/quiche:quic_factory_lib",
 
     #
