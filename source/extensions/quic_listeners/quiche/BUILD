@@ -360,7 +360,7 @@ envoy_cc_extension(
         "envoy.transport_sockets.upstream",
     ),
     # Needed to verify that a quic specific configuration is used for quic transport socket.
-    extra_visibility = [
+    visibility = [
         "//source/server:__subpackages__",
     ],
     security_posture = "unknown",
