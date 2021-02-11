@@ -1,7 +1,11 @@
-#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3/als.pb.validate.h"
+#include "extensions/access_loggers/open_telemetry/config.h"
+
+#include "envoy/extensions/access_loggers/opentelemetry/v3/open_telemetry.pb.h"
+// #include "envoy/extensions/access_loggers/opentelemetry/v3/open_telemetry.pb.validate.h"
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/access_log_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"
@@ -9,7 +13,6 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
-#include "extensions/access_loggers/open_telemetry/config.h"
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
@@ -31,10 +34,9 @@ getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
       });
 }
 
-AccessLog::InstanceSharedPtr
-OpenTelemetry::createAccessLogInstance(const Protobuf::Message& config,
-                                       ::Envoy::AccessLog::FilterPtr&& filter,
-                                       Server::Configuration::FactoryContext& context) {
+::Envoy::AccessLog::InstanceSharedPtr
+createAccessLogInstance(const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
+                        Server::Configuration::FactoryContext& context) {
   // GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

@@ -75,6 +75,6 @@ envoy_cc_extension(
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/open_telemetry:grpc_access_log_lib",
-        "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
     ],
 )

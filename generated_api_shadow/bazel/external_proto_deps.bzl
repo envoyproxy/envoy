@@ -14,7 +14,7 @@ EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
     "metrics.proto": "@prometheus_metrics_model//:client_model",
     "opencensus/proto/trace/v1/trace.proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto",
     "opencensus/proto/trace/v1/trace_config.proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
-    "opentelemetry/proto/collector/common/v1/common.proto":  "@opentelemetry_proto//:logs",
+    "opentelemetry/proto/common/v1/common.proto":  "@opentelemetry_proto//:logs",
 }
 
 # This maps from the Bazel proto_library target to the Go language binding target for external dependencies.

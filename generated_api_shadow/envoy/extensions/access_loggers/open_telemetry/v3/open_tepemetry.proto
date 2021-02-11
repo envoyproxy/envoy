@@ -4,11 +4,13 @@ package envoy.extensions.access_loggers.open_telemetry.v3;
 
 import "envoy/extensions/access_loggers/grpc/v3/als.proto";
 
+import "opentelemetry/proto/common/v1/common.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3";
-option java_outer_classname = "OpenTepemetryProto";
+option java_outer_classname = "OpenTelemetryProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
@@ -21,7 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.access_loggers.open_telemetry]
 message OpenTelemetryAccessLogConfig {
   grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
-  // opentelemetry.proto.common.v1.AnyValue body = 2;
-  // opentelemetry.proto.common.v1.KeyValue attributes = 3;
-  // opentelemetry.proto.common.v1.KeyValue resource_attributes = 4;
+
+  opentelemetry.proto.common.v1.AnyValue body = 2;
+
+  opentelemetry.proto.common.v1.KeyValue attributes = 3;
+
+  opentelemetry.proto.common.v1.KeyValue resource_attributes = 4;
 }
