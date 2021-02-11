@@ -262,8 +262,8 @@ public:
   virtual void post(PostCb callback) PURE;
 
   /**
-   * Similar to `post()` but will destroy passed callback. This simulates posting move only
-   * function.
+   * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on
+   * the dispatcher's thread before dispatcher destroy. This is safe cross thread.
    */
   virtual void deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) PURE;
 
@@ -296,7 +296,7 @@ public:
   virtual void updateApproximateMonotonicTime() PURE;
 
   /**
-   * Shutdown the dispatcher by removing posted callbacks.
+   * Shutdown the dispatcher by clear dispatcher thread deletable.
    */
   virtual void shutdown() PURE;
 };

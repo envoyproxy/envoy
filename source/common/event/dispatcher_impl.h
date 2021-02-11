@@ -129,6 +129,8 @@ private:
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
+  void runThreadLocalDelete();
+
   // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
   void touchWatchdog();
 
@@ -147,13 +149,19 @@ private:
   Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
-  SchedulableCallbackPtr deferred_delete_cb_;
-  SchedulableCallbackPtr post_cb_;
-  Thread::MutexBasicLockable post_lock_;
+
+  SchedulableCallbackPtr thread_local_delete_cb_;
+  Thread::MutexBasicLockable thread_local_deletable_lock_;
   // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.
   std::list<DispatcherThreadDeletablePtr>
-      deletables_in_dispatcher_thread_ ABSL_GUARDED_BY(post_lock_);
+      deletables_in_dispatcher_thread_ ABSL_GUARDED_BY(thread_local_deletable_lock_);
+
+  SchedulableCallbackPtr deferred_delete_cb_;
+
+  SchedulableCallbackPtr post_cb_;
+  Thread::MutexBasicLockable post_lock_;
   std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
