@@ -24,9 +24,9 @@
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 

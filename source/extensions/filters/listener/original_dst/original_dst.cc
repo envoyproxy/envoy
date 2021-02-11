@@ -3,8 +3,8 @@
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
-#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
