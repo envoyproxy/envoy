@@ -104,8 +104,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     StreamResetReason reason;
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
-      if (connection_->streamInfo().hasResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+      if (protocol_error_) {
         reason = StreamResetReason::ProtocolError;
       }
     } else {
@@ -153,7 +152,6 @@ void CodecClient::onData(Buffer::Instance& data) {
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
       host_->cluster().stats().upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
-      connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
     }
     close();
   }
