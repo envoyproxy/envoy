@@ -17,7 +17,7 @@ enum class ClientLoginResponseType : uint8_t {
   Ok = 1,
   Err = 2,
   AuthSwitch = 3,
-  AuthMoreData = 4
+  AuthMoreData = 4,
 };
 
 // ClientLoginResponse could be
@@ -143,7 +143,12 @@ public:
    * can be used.
    */
   ClientLoginResponseType type() const { return type_; }
-  void type(ClientLoginResponseType);
+  // init message_ from ClientLoginResponseType
+  void type(ClientLoginResponseType type);
+
+private:
+  // init message_ from resp_code
+  void type(uint8_t resp_code);
 
 private:
   ClientLoginResponseType type_{};

@@ -1,5 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -16,31 +17,53 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-void ClientLoginResponse::type(ClientLoginResponseType type) {
-  if (type == type_) {
+void ClientLoginResponse::type(uint8_t resp_code) {
+  switch (resp_code) {
+  case MYSQL_RESP_OK:
+    type(ClientLoginResponseType::Ok);
+    return;
+  case MYSQL_RESP_ERR:
+    type(ClientLoginResponseType::Err);
+    return;
+  case MYSQL_RESP_AUTH_SWITCH:
+    type(ClientLoginResponseType::AuthSwitch);
+    return;
+  case MYSQL_RESP_MORE:
+    type(ClientLoginResponseType::AuthMoreData);
+    return;
+  default:
     return;
   }
-  // Need to use placement new because of the union.
-  type_ = type;
-  switch (type_) {
+}
+
+void ClientLoginResponse::type(ClientLoginResponseType ty) {
+  switch (ty) {
   case ClientLoginResponseType::Ok:
-    message_ = std::make_unique<OkMessage>(); // std::make_unique<OkMessage>();
+    type_ = ClientLoginResponseType::Ok;
+    message_ = std::make_unique<OkMessage>();
     break;
   case ClientLoginResponseType::Err:
+    type_ = ClientLoginResponseType::Err;
     message_ = std::make_unique<ErrMessage>();
     break;
   case ClientLoginResponseType::AuthSwitch:
+    type_ = ClientLoginResponseType::AuthSwitch;
     message_ = std::make_unique<AuthSwitchMessage>();
     break;
   case ClientLoginResponseType::AuthMoreData:
+    type_ = ClientLoginResponseType::AuthMoreData;
     message_ = std::make_unique<AuthMoreMessage>();
     break;
   default:
+    type_ = ClientLoginResponseType::Null;
     break;
   }
 }
 
 ClientLoginResponse::ClientLoginResponse(const ClientLoginResponse& other) {
+  if (other.message_ == nullptr) {
+    return;
+  }
   type(other.type_);
   *(message_.get()) = *(other.message_.get());
 }
@@ -71,24 +94,12 @@ DecodeStatus ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint32_
     ENVOY_LOG(info, "error parsing response code in mysql Login response msg");
     return DecodeStatus::Failure;
   }
-  switch (resp_code) {
-  case MYSQL_RESP_AUTH_SWITCH:
-    type(ClientLoginResponseType::AuthSwitch);
-    return message_->parseMessage(buffer, len - sizeof(uint8_t));
-  case MYSQL_RESP_OK:
-    type(ClientLoginResponseType::Ok);
-    return message_->parseMessage(buffer, len - sizeof(uint8_t));
-  case MYSQL_RESP_ERR:
-    type(ClientLoginResponseType::Err);
-    return message_->parseMessage(buffer, len - sizeof(uint8_t));
-  case MYSQL_RESP_MORE:
-    type(ClientLoginResponseType::AuthMoreData);
-    return message_->parseMessage(buffer, len - sizeof(uint8_t));
-  default:
-    break;
+  type(resp_code);
+  if (message_ == nullptr) {
+    ENVOY_LOG(info, "unknown mysql Login resp code");
+    return DecodeStatus::Failure;
   }
-  ENVOY_LOG(info, "unknown mysql Login resp msg type");
-  return DecodeStatus::Failure;
+  return message_->parseMessage(buffer, len - sizeof(uint8_t));
 }
 
 // https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::AuthSwitchRequest
@@ -177,22 +188,10 @@ DecodeStatus ClientLoginResponse::AuthMoreMessage::parseMessage(Buffer::Instance
 }
 
 void ClientLoginResponse::encode(Buffer::Instance& out) {
-  switch (type_) {
-  case ClientLoginResponseType::AuthSwitch:
-    message_->encode(out);
-    break;
-  case ClientLoginResponseType::Ok:
-    message_->encode(out);
-    break;
-  case ClientLoginResponseType::Err:
-    message_->encode(out);
-    break;
-  case ClientLoginResponseType::AuthMoreData:
-    message_->encode(out);
-    break;
-  default:
-    break;
+  if (message_ == nullptr) {
+    return;
   }
+  message_->encode(out);
 }
 
 void ClientLoginResponse::AuthSwitchMessage::encode(Buffer::Instance& out) {
