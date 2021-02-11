@@ -70,13 +70,11 @@ protected:
   }
 
   void enterMinRTTSamplingWindow(const GradientControllerSharedPtr& controller) {
-      //absl::MutexLock ml(&controller->sample_mutation_mtx_);
-      controller->enterMinRTTSamplingWindow();
+    // absl::MutexLock ml(&controller->sample_mutation_mtx_);
+    controller->enterMinRTTSamplingWindow();
   }
 
-  void updateMinRTT(const GradientControllerSharedPtr& controller) {
-    controller->updateMinRTT();
-  }
+  void updateMinRTT(const GradientControllerSharedPtr& controller) { controller->updateMinRTT(); }
 
   // Helper function that will attempt to pull forwarding decisions.
   void tryForward(const GradientControllerSharedPtr& controller,
@@ -403,7 +401,6 @@ min_rtt_calc_params:
   updateMinRTT(controller);
   enterMinRTTSamplingWindow(controller);
   updateMinRTT(controller);
-
 
   verifyMinRTTValue(std::chrono::milliseconds(1));
 }

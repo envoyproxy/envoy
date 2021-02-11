@@ -91,7 +91,7 @@ void GradientController::enterMinRTTSamplingWindow() {
     return;
   }
 
- // deferred_limit_value_ == 0
+  // deferred_limit_value_ == 0
   absl::MutexLock ml(&sample_mutation_mtx_);
 
   stats_.min_rtt_calculation_active_.set(1);
