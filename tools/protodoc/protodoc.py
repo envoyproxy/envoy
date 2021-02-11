@@ -234,7 +234,7 @@ def FormatExtensionList(items, prefix="extension", indent=2):
     f"{indent}- :ref:`{ext} <{prefix}_{ext}>`"
     for ext
     in items)
-  return f"%s\n{indent}\n" % formatted_list)
+  return f"{formatted_list}\n{indent}\n"
 
 
 def FormatExtensionCategory(extension_category):
