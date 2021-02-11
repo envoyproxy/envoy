@@ -74,7 +74,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
   parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
 }
 
-bool ActiveClient::closingWithIncompleteStream() const { return closed_with_active_rq_; }
+bool ActiveClient::closingWithIncompleteStream() const {
+  return closed_with_active_rq_;
+}
 
 RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
   return codec_client_->newStream(response_decoder);
