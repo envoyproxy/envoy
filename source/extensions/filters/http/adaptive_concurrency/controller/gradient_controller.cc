@@ -219,6 +219,9 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   // enforce this with the 'min_rtt_update_mtx_'.
   if (min_rtt_update_mtx_.TryLock()) {
     if (inMinRTTSamplingWindow() && sample_count >= config_.minRTTAggregateRequestCount()) {
+      // Testing hook.
+      synchronizer_.syncPoint("pre_minrtt_update");
+
       // This sample has pushed the request count over the request count requirement for the minRTT
       // recalculation. It must now be finished.
       updateMinRTT();
