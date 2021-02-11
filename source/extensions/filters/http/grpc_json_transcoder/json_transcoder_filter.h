@@ -110,7 +110,7 @@ public:
   bool disabled() const { return disabled_; }
 
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
-      RequestValidationOptions strict_http_request_validation_{};
+      RequestValidationOptions request_validation_options_{};
 
 private:
   /**
