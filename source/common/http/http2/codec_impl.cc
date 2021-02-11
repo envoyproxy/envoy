@@ -653,6 +653,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() {
     dispatching_ = false;
     current_slice_ = nullptr;
+    current_stream_id_.reset();
   });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     current_slice_ = &slice;
@@ -676,6 +677,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
     current_slice_ = nullptr;
     dispatching_ = false;
+    current_stream_id_.reset();
   }
 
   ENVOY_CONN_LOG(trace, "dispatched {} bytes", connection_, data.length());
@@ -738,6 +740,7 @@ Status ConnectionImpl::protocolErrorForTest() {
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
+  current_stream_id_ = hd->stream_id;
 
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -1010,6 +1013,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
     }
 
     stream->destroy();
+    current_stream_id_.reset();
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
@@ -1408,9 +1412,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   // Dump the protocol constraints
   DUMP_DETAILS(&protocol_constraints_);
 
-  os << spaces << "Number of active streams: " << active_streams_.size() << " Active Streams:\n";
-  std::for_each_n(active_streams_.begin(), std::min<size_t>(active_streams_.size(), 100),
-                  [&](auto& stream) { DUMP_DETAILS(stream); });
+  // Dump either a targeted stream or several of the active streams.
+  dumpStreams(os, indent_level);
 
   // Dump the active slice
   if (current_slice_ == nullptr) {
@@ -1423,6 +1426,69 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
     os << spaces << "current slice length: " << slice_view.length() << " contents: \"";
     StringUtil::escapeToOstream(os, slice_view);
     os << "\"\n";
+  }
+}
+
+void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+
+  // Try to dump details for the current stream.
+  // If none, dump a subset of our active streams.
+  os << spaces << "current_stream_id_: ";
+  if (current_stream_id_.has_value()) {
+    os << current_stream_id_.value() << ",";
+  } else {
+    os << "null,";
+  }
+  os << " Number of active streams: " << active_streams_.size();
+
+  if (current_stream_id_.has_value()) {
+    os << " Dumping current stream:\n";
+    for (auto& stream : active_streams_) {
+      if (stream->stream_id_ == current_stream_id_.value()) {
+        DUMP_DETAILS(stream);
+        break;
+      }
+    }
+  } else {
+    const auto streams_to_dump = std::min<size_t>(active_streams_.size(), 25);
+    os << " Dumping " << streams_to_dump << " Active Streams:\n";
+    std::for_each_n(active_streams_.begin(), streams_to_dump,
+                    [&](auto& stream) { DUMP_DETAILS(stream); });
+  }
+}
+
+void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
+  ConnectionImpl::dumpStreams(os, indent_level);
+
+  if (!current_stream_id_.has_value()) {
+    return;
+  }
+
+  // Try to dump the downstream request information, corresponding to the
+  // stream we were processing.
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Dumping corresponding downstream request for upstream stream "
+     << current_stream_id_.value() << ":\n";
+
+  for (auto& stream : active_streams_) {
+    if (stream->stream_id_ == current_stream_id_.value()) {
+      ClientStreamImpl* client_stream = static_cast<ClientStreamImpl*>(stream.get());
+      Router::UpstreamToDownstream* upstream_to_downstream =
+          dynamic_cast<Router::UpstreamToDownstream*>(&client_stream->response_decoder_);
+
+      // Guard incase the dynamic cast fails.
+      if (upstream_to_downstream == nullptr) {
+        os << spaces << " upstream_to_downstream dynamic cast failed!\n";
+        return;
+      }
+
+      const auto addressProvider = upstream_to_downstream->connection().addressProviderSharedPtr();
+      const Http::RequestHeaderMap* request_headers = upstream_to_downstream->downstreamHeaders();
+      DUMP_DETAILS(addressProvider);
+      DUMP_DETAILS(request_headers);
+      break;
+    }
   }
 }
 

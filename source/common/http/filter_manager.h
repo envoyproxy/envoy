@@ -716,6 +716,14 @@ public:
     return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
   }
 
+  void dumpState(std::ostream& os, int indent_level) const override {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
+       << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
+       << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
+       << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
+  }
+
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
 };

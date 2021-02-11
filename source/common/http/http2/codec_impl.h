@@ -489,6 +489,9 @@ protected:
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
+  // Tracks the stream id of the current stream we're processing.
+  // This should only be set while we're in the context of dispatching to nghttp2.
+  absl::optional<int32_t> current_stream_id_;
   nghttp2_session* session_{};
   CodecStats& stats_;
   Network::Connection& connection_;
@@ -522,6 +525,9 @@ protected:
   // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
   // flag.
   const bool skip_encoding_empty_trailers_;
+
+  // dumpState helper method.
+  virtual void dumpStreams(std::ostream& os, int indent_level) const;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
@@ -590,6 +596,7 @@ private:
   ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override;
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
 
+  void dumpStreams(std::ostream& os, int indent_level) const override;
   Http::ConnectionCallbacks& callbacks_;
 };
 

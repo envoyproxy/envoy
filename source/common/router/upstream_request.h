@@ -66,6 +66,7 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
+  const Http::RequestHeaderMap* downstreamHeaders() const override;
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();

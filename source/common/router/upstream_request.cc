@@ -175,6 +175,10 @@ const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
 }
 
+const Http::RequestHeaderMap* UpstreamRequest::downstreamHeaders() const {
+  return parent_.downstreamHeaders();
+}
+
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   parent_.onUpstreamMetadata(std::move(metadata_map));
 }
