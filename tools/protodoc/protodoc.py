@@ -149,7 +149,8 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     formatted_extension = FormatExtension(extension)
   formatted_extension_category = ''
   if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
-    formatted_extension_category = FormatExtensionCategory(comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
+    formatted_extension_category = FormatExtensionCategory(
+      comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
   comment = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
   return comment + formatted_extension + formatted_extension_category
 
