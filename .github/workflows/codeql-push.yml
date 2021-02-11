@@ -52,7 +52,7 @@ jobs:
 
     - name: Build
       run: |
-       bazel/setup_clang.sh bin/clang10
+       bazel/setup_clang.sh bin/clang11
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
        echo -e "Built targets...\n$BUILD_TARGETS"
