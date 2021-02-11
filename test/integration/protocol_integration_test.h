@@ -4,6 +4,26 @@
 
 namespace Envoy {
 
+// Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
+// downstream and H1/H2 upstreams.
+class ProtocolIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void TearDown() override {
+    std::string counter = "cluster.cluster_0.upstream_rq_total";
+    if (!testing_upstream_intentionally_ && test_server_ &&
+        (!test_server_->counter(counter) || test_server_->counter(counter)->value() == 0)) {
+      // Avoid the CPU cost of running the test for both HTTP/1 and HTTP/2
+      // upstreams if no upstream connections are used.
+      FAIL() << "This test does not appear to use upstream connections."
+             << "Please use DownstreamProtocolIntegrationTest instead of ProtocolIntegrationTest.";
+    }
+  }
+  // Allow exceptions to the rule. There are some tests which will do upstream
+  // calls for some downstream protocols and not for others, and those still
+  // need the full mesh.
+  bool testing_upstream_intentionally_{};
+};
+
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols
 // (H1/H2 downstream) but only H1 upstreams.
 //
@@ -37,9 +57,5 @@ protected:
   const int added_decoded_data_size_ = 1;
   const int buffer_limit_ = 100;
 };
-
-// Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
-// downstream and H1/H2 upstreams.
-using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
 } // namespace Envoy
