@@ -50,6 +50,7 @@ public:
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length);
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
+  void incrementOpenedStreamCount() { ++opened_streams_; }
 
   Status checkOutboundFrameLimits();
 
@@ -87,8 +88,12 @@ private:
   // a payload. Initialized from corresponding http2_protocol_options. Default value is 1.
   const uint32_t max_consecutive_inbound_frames_with_empty_payload_;
 
-  // This counter keeps track of the number of inbound streams.
-  uint32_t inbound_streams_ = 0;
+  // This counter keeps track of the number of opened streams.
+  // For downstream connection this is incremented when the first HEADERS frame with the new
+  // stream ID is received from the client.
+  // For upstream connections this is incremented when the first HEADERS frame with the new
+  // stream ID is sent to the upstream server.
+  uint32_t opened_streams_ = 0;
   // This counter keeps track of the number of inbound PRIORITY frames. If this counter exceeds
   // the value calculated using this formula:
   //
