@@ -25,8 +25,6 @@ class IoHandleImplPlatformTest : public testing::Test {
 public:
   IoHandleImplPlatformTest() {
     std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
-    io_handle_->setPeerHandle(io_handle_peer_.get());
-    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
   ~IoHandleImplPlatformTest() override {
@@ -44,7 +42,10 @@ public:
   MockFileEventCallback cb_;
 };
 
-TEST_F(IoHandleImplPlatformTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
+// Confirm that PlatformDefaultTriggerType is not level trigger type because IoHandle doesn't
+// support level trigger type. Specifically, windows platform user could use EmulatedEdge or
+// edge trigger type.
+TEST_F(IoHandleImplPlatformTest, CreatePlatformDefaultTriggerType) {
   // schedulable_cb will be destroyed by IoHandle.
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());

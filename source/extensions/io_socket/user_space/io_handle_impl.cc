@@ -30,7 +30,7 @@ Api::SysCallIntResult makeInvalidSyscallResult() {
  * @param max_length supplies the max bytes the call can move.
  * @return number of bytes this call moves.
  */
-uint64_t move(Buffer::Instance& dst, Buffer::Instance& src, uint64_t max_length) {
+uint64_t moveUpTo(Buffer::Instance& dst, Buffer::Instance& src, uint64_t max_length) {
   ASSERT(src.length() > 0);
   if (dst.highWatermark() != 0) {
     if (dst.length() < dst.highWatermark()) {
@@ -120,8 +120,8 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
 
 Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
                                            absl::optional<uint64_t> max_length_opt) {
-  // Do not read too many bytes in each attempt.
-  uint64_t max_length = max_length_opt.value_or(8 * FRAGMENT_SIZE);
+  // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
+  uint64_t max_length = max_length_opt.value_or(MAX_FRAGMENT * FRAGMENT_SIZE);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
   }
@@ -137,7 +137,7 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
                                  Network::IoSocketError::deleteIoError)};
     }
   }
-  const uint64_t bytes_to_read = move(buffer, pending_received_data_, max_length);
+  const uint64_t bytes_to_read = moveUpTo(buffer, pending_received_data_, max_length);
   return {bytes_to_read, Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError)};
 }
 
@@ -215,7 +215,9 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
   }
   const uint64_t max_bytes_to_write = buffer.length();
   const uint64_t total_bytes_to_write =
-      move(*peer_handle_->getWriteBuffer(), buffer, 8 * FRAGMENT_SIZE);
+      moveUpTo(*peer_handle_->getWriteBuffer(), buffer,
+               // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
+               MAX_FRAGMENT * FRAGMENT_SIZE);
   peer_handle_->setNewDataAvailable();
   ENVOY_LOG(trace, "socket {} write {} bytes of {}", static_cast<void*>(this), total_bytes_to_write,
             max_bytes_to_write);

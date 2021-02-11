@@ -44,11 +44,7 @@ class IoHandleImplTest : public testing::Test {
 public:
   IoHandleImplTest() : buf_(1024) {
     std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
-    io_handle_->setPeerHandle(io_handle_peer_.get());
-    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
-
-  ~IoHandleImplTest() override = default;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
 
@@ -230,6 +226,7 @@ TEST_F(IoHandleImplTest, ReadThrottling) {
     // watermark.
     buf.drain(FRAGMENT_SIZE + 1);
     EXPECT_EQ(buf.length(), buf.highWatermark() - 1);
+    EXPECT_TRUE(buf.highWatermarkTriggered());
     auto result2 = io_handle_->read(buf, 8 * FRAGMENT_SIZE + 1);
     EXPECT_TRUE(result2.ok());
     EXPECT_EQ(result2.rc_, FRAGMENT_SIZE);
@@ -1034,8 +1031,6 @@ class IoHandleImplNotImplementedTest : public testing::Test {
 public:
   IoHandleImplNotImplementedTest() {
     std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
-    io_handle_->setPeerHandle(io_handle_peer_.get());
-    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
   ~IoHandleImplNotImplementedTest() override {

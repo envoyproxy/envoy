@@ -21,6 +21,9 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
+// Align with Buffer::Reservation::MAX_SLICES_
+constexpr uint32_t MAX_FRAGMENT = 8;
+// Align with Buffer::Slice::default_slice_size_
 constexpr uint64_t FRAGMENT_SIZE = 16 * 1024;
 
 /**
@@ -38,8 +41,6 @@ class IoHandleImpl final : public Network::IoHandle,
                            protected Logger::Loggable<Logger::Id::io>,
                            NonCopyable {
 public:
-  static const Network::Address::InstanceConstSharedPtr& getCommonInternalAddress();
-
   ~IoHandleImpl() override;
 
   // Network::IoHandle
@@ -147,13 +148,13 @@ private:
   friend class IoHandleFactory;
   IoHandleImpl();
 
+  static const Network::Address::InstanceConstSharedPtr& getCommonInternalAddress();
+
   // Support isOpen() and close(). Network::IoHandle owner must invoke close() to avoid potential
   // resource leak.
   bool closed_{false};
 
-  // The attached file event with this socket. The event is not owned by the socket in the current
-  // Envoy model. Multiple events can be created during the life time of this IO handle but at any
-  // moment at most 1 event is attached.
+  // The attached file event with this socket.
   std::unique_ptr<FileEventImpl> user_file_event_;
 
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
@@ -175,7 +176,10 @@ using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;
 class IoHandleFactory {
 public:
   static std::pair<IoHandleImplPtr, IoHandleImplPtr> createIoHandlePair() {
-    return std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(), new IoHandleImpl()};
+    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(), new IoHandleImpl()};
+    p.first->setPeerHandle(p.second.get());
+    p.second->setPeerHandle(p.first.get());
+    return p;
   }
 };
 } // namespace UserSpace
