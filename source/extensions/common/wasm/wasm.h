@@ -146,15 +146,15 @@ public:
       : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle),
                          std::static_pointer_cast<PluginBase>(plugin)),
         wasm_handle_(wasm_handle),
-        config_id_(wasm_handle->wasm()->getRootContext(plugin, false)->id()) {}
+        root_context_id_(wasm_handle->wasm()->getRootContext(plugin, false)->id()) {}
 
   WasmSharedPtr& wasm() { return wasm_handle_->wasm(); }
   WasmHandleSharedPtr& wasmHandleForTest() { return wasm_handle_; }
-  uint32_t configId() { return config_id_; }
+  uint32_t rootContextId() { return root_context_id_; }
 
 private:
   WasmHandleSharedPtr wasm_handle_;
-  const uint32_t config_id_;
+  const uint32_t root_context_id_;
 };
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;

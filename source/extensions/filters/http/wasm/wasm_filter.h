@@ -40,7 +40,7 @@ public:
         return std::make_shared<Context>(nullptr, 0, plugin_);
       }
     }
-    return std::make_shared<Context>(wasm, handle->configId(), plugin_);
+    return std::make_shared<Context>(wasm, handle->rootContextId(), plugin_);
   }
 
 private:
