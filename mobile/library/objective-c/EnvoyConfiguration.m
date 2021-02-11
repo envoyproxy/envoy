@@ -14,8 +14,9 @@
                               appId:(NSString *)appId
                     virtualClusters:(NSString *)virtualClusters
                   nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
-                platformFilterChain:
-                    (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories {
+                platformFilterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
+                    stringAccessors:
+                        (NSDictionary<NSString *, EnvoyStringAccessor *> *)stringAccessors {
   self = [super init];
   if (!self) {
     return nil;
@@ -26,12 +27,13 @@
   self.dnsRefreshSeconds = dnsRefreshSeconds;
   self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
-  self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.statsFlushSeconds = statsFlushSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
   self.virtualClusters = virtualClusters;
   self.nativeFilterChain = nativeFilterChain;
+  self.httpPlatformFilterFactories = httpPlatformFilterFactories;
+  self.stringAccessors = stringAccessors;
   return self;
 }
 

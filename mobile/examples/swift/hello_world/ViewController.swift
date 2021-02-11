@@ -26,6 +26,7 @@ final class ViewController: UITableViewController {
                          // swiftlint:disable:next line_length
                          typedConfig: "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
         .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
+        .addStringAccessor(name: "string_accessor", accessor: { return "DemoStringAccessor" })
         .build()
       self.streamClient = engine.streamClient()
       self.pulseClient = engine.pulseClient()
