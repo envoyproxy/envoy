@@ -773,6 +773,8 @@ class RequestOrResponseHeaderMap : public HeaderMap {
 public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
+
+  virtual bool isRequest() const PURE;
 };
 
 // Request headers.
@@ -782,6 +784,8 @@ class RequestHeaderMap
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
+
+  bool isRequest() const override { return true; }
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
 using RequestHeaderMapOptRef = OptRef<RequestHeaderMap>;
@@ -811,6 +815,7 @@ class ResponseHeaderMap
 public:
   INLINE_RESP_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_RESP_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
+  bool isRequest() const override { return false; }
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
 using ResponseHeaderMapOptRef = OptRef<ResponseHeaderMap>;
