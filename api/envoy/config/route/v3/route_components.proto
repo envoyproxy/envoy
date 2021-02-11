@@ -1119,7 +1119,7 @@ message RetryPolicy {
 
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // [#protodoc-extension: envoy.retry_priorities]
+    // [#extension-category: envoy.retry_priorities]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
@@ -1135,7 +1135,7 @@ message RetryPolicy {
 
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // [#protodoc-extension: envoy.retry_host_predicates]
+    // [#extension-category: envoy.retry_host_predicates]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
@@ -1749,7 +1749,7 @@ message RateLimit {
       MetaData metadata = 8;
 
       // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
-      // [#protodoc-extension: envoy.rate_limit_descriptors]
+      // [#extension-category: envoy.rate_limit_descriptors]
       core.v3.TypedExtensionConfig extension = 9;
     }
   }
@@ -1941,7 +1941,7 @@ message InternalRedirectPolicy {
   // Specifies a list of predicates that are queried when an upstream response is deemed
   // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
   // the redirect, causing the response to be proxied to downstream.
-  // [#protodoc-extension: envoy.internal_redirect_predicates]
+  // [#extension-category: envoy.internal_redirect_predicates]
   repeated core.v3.TypedExtensionConfig predicates = 3;
 
   // Allow internal redirect to follow a target URI with a different scheme than the value of
