@@ -439,7 +439,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
 
