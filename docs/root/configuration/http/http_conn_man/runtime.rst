@@ -7,11 +7,21 @@ The HTTP connection manager supports the following runtime settings:
 
 .. _config_http_conn_man_runtime_normalize_path:
 
-http_connection_manager.normalize_path
-  % of requests that will have path normalization applied if not already configured in
-  :ref:`normalize_path <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.normalize_path>`.
+http_connection_manager.normalize_path % of requests that will have path normalization applied if
+  not already configured in :ref:`normalize_path
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.normalize_path>`
+  or :ref:`path_normalization_options
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_normalization_options>`.
   This is evaluated at configuration load time and will apply to all requests for a given
-  configuration.
+  configuration. This will apply to the forwarded *:path* header unless :ref:`policy
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_normalization_options.policy` or runtime feature `http_connection_manager.forward_normalized_path`
+  specifies otherwise.
+
+.. _config_http_conn_man_runtime_forward_normalized_path:
+
+http_connection_manager.forward_normalized_path
+  normalization will apply to the forwarded *:path* header in addition to internally for
+  matching and routing. Defaults to true.
 
 .. _config_http_conn_man_runtime_client_enabled:
 
