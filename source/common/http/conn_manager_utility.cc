@@ -133,11 +133,10 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
+    OriginalIPDetectionParams params = {request_headers,
+                                        connection.addressProvider().remoteAddress()};
     auto original_ip_detection = config.originalIpDetection();
     if (original_ip_detection) {
-      OriginalIPDetectionParams params = {request_headers,
-                                          connection.addressProvider().remoteAddress()};
-
       auto result = original_ip_detection->detect(params);
       if (result.detected_remote_address) {
         final_remote_address = result.detected_remote_address;
@@ -145,11 +144,12 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
       }
     }
 
-    // If there's no extension or it failed to detect, give XFF a try.
+    // If there's no extension or it failed to detect, try the default extension (XFF).
     if (!final_remote_address) {
-      auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
-      final_remote_address = ret.address_;
-      allow_trusted_address_checks = ret.single_address_;
+      auto default_ip_detection = config.defaultIpDetection();
+      auto result = default_ip_detection->detect(params);
+      final_remote_address = result.detected_remote_address;
+      allow_trusted_address_checks = result.allow_trusted_address_checks;
     }
   }
 

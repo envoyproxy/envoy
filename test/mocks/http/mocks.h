@@ -568,6 +568,7 @@ public:
               headersWithUnderscoresAction, (), (const));
   MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));
   MOCK_METHOD(OriginalIPDetectionSharedPtr, originalIpDetection, ());
+  MOCK_METHOD(OriginalIPDetectionSharedPtr, defaultIpDetection, ());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

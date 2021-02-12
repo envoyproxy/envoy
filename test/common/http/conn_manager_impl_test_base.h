@@ -141,6 +141,7 @@ public:
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
   Http::OriginalIPDetectionSharedPtr originalIpDetection() override { return nullptr; };
+  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return nullptr; };
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;

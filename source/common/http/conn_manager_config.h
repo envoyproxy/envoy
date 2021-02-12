@@ -472,6 +472,11 @@ public:
    * @return OriginalIPDetectionSharedPtr original IP detection extension if available.
    */
   virtual OriginalIPDetectionSharedPtr originalIpDetection() PURE;
+
+  /**
+   * @return OriginalIPDetectionSharedPtr the IP detection extension (namely XFF).
+   */
+  virtual OriginalIPDetectionSharedPtr defaultIpDetection() PURE;
 };
 } // namespace Http
 } // namespace Envoy

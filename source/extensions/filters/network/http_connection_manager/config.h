@@ -181,6 +181,7 @@ public:
   Http::OriginalIPDetectionSharedPtr originalIpDetection() override {
     return original_ip_detection_;
   }
+  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return default_ip_detection_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -260,6 +261,7 @@ private:
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
   Http::OriginalIPDetectionSharedPtr original_ip_detection_{nullptr};
+  Http::OriginalIPDetectionSharedPtr default_ip_detection_{nullptr};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

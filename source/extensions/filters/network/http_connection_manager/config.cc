@@ -37,6 +37,7 @@
 #include "common/tracing/http_tracer_manager_impl.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
+#include "extensions/original_ip_detection/xff/xff.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -297,6 +298,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     original_ip_detection_ = factory->createExtension(typed_config);
   }
+
+  // Create the default IP detection extension.
+  default_ip_detection_ =
+      std::make_shared<OriginalIPDetection::Xff::XffIPDetection>(xff_num_trusted_hops_);
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.

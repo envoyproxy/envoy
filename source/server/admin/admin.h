@@ -181,6 +181,7 @@ public:
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
   Http::OriginalIPDetectionSharedPtr originalIpDetection() override { return nullptr; };
+  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return nullptr; };
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
