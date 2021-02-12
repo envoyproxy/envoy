@@ -10,6 +10,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/thread_synchronizer.h"
+
 #include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/base/thread_annotations.h"
@@ -33,7 +35,8 @@ namespace Controller {
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(min_rtt_msecs, NeverImport)                                                                \
-  GAUGE(sample_rtt_msecs, NeverImport)
+  GAUGE(sample_rtt_msecs, NeverImport)                                                             \
+  COUNTER(empty_histogram)
 
 /**
  * Wrapper struct for gradient controller stats. @see stats_macros.h
@@ -214,6 +217,9 @@ public:
                      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
                      Random::RandomGenerator& random, TimeSource& time_source);
 
+  // Used in unit tests to validate worker thread interactions.
+  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
+
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(MonotonicTime rq_send_time) override;
@@ -283,6 +289,9 @@ private:
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
+
+  // Used for testing only.
+  mutable Thread::ThreadSynchronizer synchronizer_;
 };
 using GradientControllerSharedPtr = std::shared_ptr<GradientController>;
 

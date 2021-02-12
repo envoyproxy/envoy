@@ -114,9 +114,11 @@ void GradientController::updateMinRTT() {
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
     if (hist_sample_count(latency_sample_hist_.get()) != 0) {
-        min_rtt_ = processLatencySamplesAndClear();
-        stats_.min_rtt_msecs_.set(
+      min_rtt_ = processLatencySamplesAndClear();
+      stats_.min_rtt_msecs_.set(
             std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
+    } else {
+      stats_.empty_histogram_.inc();
     }
     updateConcurrencyLimit(deferred_limit_value_.load());
     deferred_limit_value_.store(0);
@@ -220,6 +222,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   if (inMinRTTSamplingWindow() && sample_count >= config_.minRTTAggregateRequestCount()) {
     // This sample has pushed the request count over the request count requirement for the minRTT
     // recalculation. It must now be finished.
+    synchronizer_.syncPoint("pre_minrtt_update");
     updateMinRTT();
   }
 }

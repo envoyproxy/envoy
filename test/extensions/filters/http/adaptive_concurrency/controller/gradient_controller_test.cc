@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <thread>
 
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
@@ -92,6 +93,12 @@ protected:
     EXPECT_EQ(
         min_rtt.count(),
         stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
+  }
+
+  void verifyEmptyHistogram(int empty_histogram_cnt) {
+    EXPECT_EQ(
+        empty_histogram_cnt,
+        stats_.counter("test_prefix.empty_histogram").value());
   }
 
   void verifyMinRTTActive() {
@@ -784,6 +791,59 @@ min_rtt_calc_params:
                                    Event::Dispatcher::RunType::Block);
     EXPECT_GE(controller->concurrencyLimit(), last_concurrency);
   }
+}
+
+// Verify interactions in multi-thread latency samples.
+TEST_F(GradientControllerTest, MultiThreadSampleInteractions) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  jitter:
+    value: 0.0
+  interval: 3600s
+  request_count: 5
+  buffer:
+    value: 0
+  min_concurrency: 100
+)EOF";
+
+  auto controller = makeController(yaml);
+  auto& synchronizer = controller->synchronizer();
+  synchronizer.enable();
+
+  for (int i = 0; i < 4; ++i) {
+    tryForward(controller, true);
+    sampleLatency(controller, std::chrono::microseconds(1337));
+  }
+
+  // The next sample will trigger the minrtt value update. We'll spin off a thread and block before
+  // the actual function call to update the value.
+  synchronizer.waitOn("pre_minrtt_update");
+  std::thread t1([this, &controller]() {
+    tryForward(controller, true);
+    sampleLatency(controller, std::chrono::microseconds(1337));
+  });
+
+  // Wait for the thread to wait.
+  synchronizer.barrierOn("pre_minrtt_update");
+
+  // We can now kick off another thread to sample another request, but we don't expect this one to
+  // block since there is another thread in that critical section. We can just immediately join
+  // after.
+  std::thread t2([this, &controller]() {
+    tryForward(controller, true);
+    sampleLatency(controller, std::chrono::microseconds(1337));
+  });
+  t2.join();
+
+  // Complete the minRTT update in t1 and verify we've exited the window.
+  synchronizer.signal("pre_minrtt_update");
+  t1.join();
+  verifyEmptyHistogram(1);
 }
 
 } // namespace
