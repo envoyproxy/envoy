@@ -43,9 +43,7 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
   auto headers = T::create();
   for (const auto& entry : header_list) {
     auto key = Http::LowerCaseString(entry.first);
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.header_map_coalesce_cookie_headers") ||
-        key != Http::Headers::get().Cookie) {
+    if (key != Http::Headers::get().Cookie) {
       // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
       headers->addCopy(key, entry.second);
     } else {

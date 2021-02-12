@@ -196,7 +196,7 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
         if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.header_map_coalesce_cookie_headers")) {
+                "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
           // Verify that the duplicated headers are handled correctly before passing to stream
           // decoder.
           EXPECT_EQ("a=b; c=d",

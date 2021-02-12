@@ -590,7 +590,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeaders) {
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_map_coalesce_cookie_headers")) {
+          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
     EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(),
               "a=b; c=d");
   }

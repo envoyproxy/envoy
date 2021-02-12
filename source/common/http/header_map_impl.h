@@ -325,8 +325,8 @@ protected:
   HeaderList headers_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
-  const bool header_map_coalesce_cookie_headers_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.header_map_coalesce_cookie_headers");
+  const bool header_map_correctly_coalesce_cookies_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.header_map_correctly_coalesce_cookies");
 };
 
 /**

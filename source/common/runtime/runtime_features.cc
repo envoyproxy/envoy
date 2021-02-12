@@ -89,7 +89,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
-    "envoy.reloadable_features.header_map_coalesce_cookie_headers",
+    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 };
 
 // This is a section for officially sanctioned runtime features which are too

@@ -743,7 +743,7 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
 
 TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_map_coalesce_cookie_headers")) {
+          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
     return;
   }
   TestRequestHeaderMapImpl headers;
