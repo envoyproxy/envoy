@@ -1135,7 +1135,7 @@ TEST_P(Http2CodecImplTest, DumpClientFrame) {
 
   EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, false)).WillOnce(InvokeWithoutArgs([&]() {
     // dumpState here while decodingHeaders in the client. This means we're
-    // working on a particular stream, whose cooresponding request, we'll dump.
+    // working on a particular stream, whose corresponding request, we'll dump.
     // No Memory should be allocated.
     Stats::TestUtil::MemoryTest memory_test;
     client_->dumpState(ostream, 1);

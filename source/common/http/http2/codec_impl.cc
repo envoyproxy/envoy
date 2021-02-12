@@ -1477,7 +1477,7 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
       Router::UpstreamToDownstream* upstream_to_downstream =
           dynamic_cast<Router::UpstreamToDownstream*>(&client_stream->response_decoder_);
 
-      // Guard incase the dynamic cast fails.
+      // Guard in case the dynamic cast fails.
       if (upstream_to_downstream == nullptr) {
         os << spaces << " upstream_to_downstream dynamic cast failed!\n";
         return;
