@@ -10,7 +10,7 @@ namespace CustomHeader {
 CustomHeaderIPDetection::CustomHeaderIPDetection(
     const envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig& config)
     : header_name_(config.header_name()),
-      allow_trusted_address_checks_(config.allow_trusted_address_checks()) {}
+      allow_trusted_address_checks_(config.common_config().allow_trusted_address_checks()) {}
 
 Http::OriginalIPDetectionResult
 CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {

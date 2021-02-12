@@ -18,7 +18,7 @@ protected:
   CustomHeaderTest() {
     envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
-    config.set_allow_trusted_address_checks(true);
+    config.mutable_common_config()->set_allow_trusted_address_checks(true);
     custom_header_extension_ = std::make_shared<CustomHeaderIPDetection>(config);
   }
 

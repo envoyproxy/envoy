@@ -1,0 +1,29 @@
+#include "envoy/extensions/original_ip_detection/xff/v3/xff.pb.h"
+#include "envoy/registry/registry.h"
+
+#include "extensions/original_ip_detection/xff/config.h"
+
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace OriginalIPDetection {
+namespace Xff {
+
+TEST(CustomHeaderFactoryTest, Basic) {
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::OriginalIPDetectionFactory>::getFactory(
+      "envoy.original_ip_detection.xff");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::extensions::original_ip_detection::xff::v3::XffConfig config;
+  config.set_xff_num_trusted_hops(1);
+
+  EXPECT_NE(factory->createExtension(config), nullptr);
+}
+
+} // namespace Xff
+} // namespace OriginalIPDetection
+} // namespace Extensions
+} // namespace Envoy

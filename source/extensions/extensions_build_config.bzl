@@ -249,6 +249,7 @@ EXTENSIONS = {
     #
 
     "envoy.original_ip_detection.custom_header":        "//source/extensions/original_ip_detection/custom_header:config",
+    "envoy.original_ip_detection.xff":                  "//source/extensions/original_ip_detection/xff:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

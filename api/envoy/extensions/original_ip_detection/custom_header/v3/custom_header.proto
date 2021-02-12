@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.original_ip_detection.custom_header.v3;
 
-import "envoy/type/v3/http_status.proto";
+import "envoy/extensions/original_ip_detection/common/v3/original_ip_detection.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -26,15 +26,6 @@ message CustomHeaderConfig {
   // The name for the header containing the original downstream remote address, if present.
   string header_name = 1;
 
-  // Is the detected address trusted (e.g.: can it be used to determine if this is an internal
-  // request).
-  bool allow_trusted_address_checks = 2;
-
-  // If true, requests for which either the configured header is missing or parsing an IP from its
-  // value fails will be rejected.
-  bool reject_request_if_detection_fails = 3;
-
-  // If reject_request_if_detection_fails is set, this Sets the HTTP status that is returned to the client
-  // when detection fails. The default status is HTTP 403 Forbidden.
-  type.v3.HttpStatus status_on_error = 4;
+  // Common configuration across detection extensions.
+  common.v3.OriginalIPDetectionCommonConfig common_config = 2;
 }
