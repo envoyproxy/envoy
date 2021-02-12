@@ -183,11 +183,12 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
     } else if (complete() && !hasTrailers() && !bufferedData()) {
-      // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
-      // byte data frame, we need to create an empty buffer to make sure that when commonContinue
-      // is called, the pipeline resumes with an empty data frame with end_stream = true
-      ASSERT(end_stream_);
-      bufferedData() = createBuffer();
+      if (end_stream_) {
+        // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
+        // byte data frame, we need to create an empty buffer to make sure that when commonContinue
+        // is called, the pipeline resumes with an empty data frame with end_stream = true
+        bufferedData() = createBuffer();
+      }
     }
 
     return false;

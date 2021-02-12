@@ -56,7 +56,8 @@ protected:
                        const std::string& expected_response_body, bool full_response = true,
                        bool always_send_trailers = false,
                        const std::string expected_upstream_request_body = "",
-                       bool expect_connection_to_upstream = true) {
+                       bool expect_connection_to_upstream = true,
+                       bool expect_response_complete = true) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response;
@@ -135,7 +136,7 @@ protected:
     }
 
     response->waitForEndStream();
-    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(response->complete(), expect_response_complete);
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
@@ -1070,6 +1071,38 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
           {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "99"}},
       "Response not transcoded because the transcoder's internal buffer size exceeds the "
       "configured limit.");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) {
+  config_helper_.setBufferLimits(2 << 20, 60);
+  HttpIntegrationTest::initialize();
+
+  // Under limit: A single response message is less than 60 bytes.
+  // Messages streamed to the client successfully.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"}, {R"(id: 1 author: "Neal Stephenson" title: "Readme")"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
+
+  // Over limit: The server streams two response messages. Even through the transcoder
+  // handles them independently, portions of the first message are still in the
+  // internal buffers while the second one is processed.
+  //
+  // Because the headers and body is already sent, the stream is closed with
+  // an incomplete response.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      // Incomplete response, not valid JSON.
+      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", true, false, "", true,
+      /*expect_response_complete=*/false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
