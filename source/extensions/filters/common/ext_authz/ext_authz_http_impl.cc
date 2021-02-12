@@ -47,11 +47,10 @@ struct SuccessResponse {
   SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
                   const MatcherSharedPtr& append_matchers,
                   const MatcherSharedPtr& response_matchers,
-                  const MatcherSharedPtr& dynamic_metadata_matchers,
-                  Response&& response)
+                  const MatcherSharedPtr& dynamic_metadata_matchers, Response&& response)
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
         response_matchers_(response_matchers),
-        dynamic_metadata_matchers_(dynamic_metadata_matchers), 
+        dynamic_metadata_matchers_(dynamic_metadata_matchers),
         response_(std::make_unique<Response>(response)) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
@@ -340,13 +339,15 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING,
-                                Http::Code::OK, ProtobufWkt::Struct{}}};
+                                Http::HeaderVector{}, Http::HeaderVector{},
+                                std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
+                                ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
-  SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
+  SuccessResponse denied{message->headers(),
+                         config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
                          config_->clientHeaderOnSuccessMatchers(),
                          config_->dynamicMetadataMatchers(),
