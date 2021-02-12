@@ -93,17 +93,17 @@ public:
   const MatcherSharedPtr& clientHeaderMatchers() const { return client_header_matchers_; }
 
   /**
-   * Returns a list of matchers used for selecting the headers to emit as dynamic metadata.
-   */
-  const MatcherSharedPtr& dynamicMetadataMatchers() const { return dynamic_metadata_matchers_; }
-
-  /**
    * Returns a list of matchers used for selecting the authorization response headers that
    * should be send back to the client on a successful (i.e. non-denied) response.
    */
   const MatcherSharedPtr& clientHeaderOnSuccessMatchers() const {
     return client_header_on_success_matchers_;
   }
+
+  /**
+   * Returns a list of matchers used for selecting the headers to emit as dynamic metadata.
+   */
+  const MatcherSharedPtr& dynamicMetadataMatchers() const { return dynamic_metadata_matchers_; }
 
   /**
    * Returns a list of matchers used for selecting the authorization response headers that
@@ -135,15 +135,16 @@ private:
   toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr
-  toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list);
+  static MatcherSharedPtr
+  toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
 
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
-  const MatcherSharedPtr dynamic_metadata_matchers_;
   const MatcherSharedPtr client_header_on_success_matchers_;
+  const MatcherSharedPtr dynamic_metadata_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
   const MatcherSharedPtr upstream_header_to_append_matchers_;
   const std::string cluster_name_;
