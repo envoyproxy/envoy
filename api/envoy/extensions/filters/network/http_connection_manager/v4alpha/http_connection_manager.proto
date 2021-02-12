@@ -287,9 +287,9 @@ message HttpConnectionManager {
     google.protobuf.BoolValue merge_slashes = 3;
   }
 
-  reserved 27, 11, 30, 33;
+  reserved 27, 11;
 
-  reserved "idle_timeout", "normalize_path", "merge_slashes";
+  reserved "idle_timeout";
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -555,6 +555,26 @@ message HttpConnectionManager {
 
   repeated UpgradeConfig upgrade_configs = 23;
 
+  // Should paths be normalized according to RFC 3986 before any processing of
+  // requests by HTTP filters or routing? This affects the upstream *:path* header
+  // as well. For paths that fail this check, Envoy will respond with 400 to
+  // paths that are malformed. This defaults to false currently but will default
+  // true in the future. When not specified, this value may be overridden by the
+  // runtime variable
+  // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`_
+  // for details of normalization.
+  // Note that Envoy does not perform
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
+  google.protobuf.BoolValue normalize_path = 30;
+
+  // Determines if adjacent slashes in the path are merged into one before any processing of
+  // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
+  // setting this option, incoming requests with path `//dir///file` will not match against route
+  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+  bool merge_slashes = 33;
+
   // The configuration of the request ID extension. This includes operations such as
   // generation, validation, and associated tracing operations.
   //
@@ -610,10 +630,10 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 
-  // Path normalization configuration. This includes configurations for
-  // transformations (e.g. RFC 3986 normalization or merge adjacent slashes) and
-  // the policy to apply them. The policy determines whether transformations
-  // affect the forwarded *:path* header.
+  // [#not-implemented-hide:] Path normalization configuration. This includes
+  // configurations for transformations (e.g. RFC 3986 normalization or merge
+  // adjacent slashes) and the policy to apply them. The policy determines
+  // whether transformations affect the forwarded *:path* header.
   PathNormalizationOptions path_normalization_options = 43;
 }
 
