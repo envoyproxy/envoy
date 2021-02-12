@@ -253,13 +253,14 @@ message HttpConnectionManager {
     // *:path* header destined for the upstream.
     enum NormalizationPolicy {
       // Normalizations apply internally before any processing of requests by HTTP
-      // filters, routing, and matching, and will affect the upstream *:path* header
+      // filters, routing, and matching, *and* will affect the upstream *:path* header
       // as well.
-      ALL = 0;
+      FORWARD = 0;
 
-      // Normalizations only apply internally. The original *:path* header will be
-      // sent upstream.  WARNING: Do not set NormalizationPolicy::Internal if a
-      // filter rewrites the *:path* header.
+      // Normalizations only apply internally. The original *:path* header will
+      // be sent upstream *unless* the path has been mutated by a filter. Any
+      // regex rewrites that the router performs will be on the upstream *:path*
+      // header.
       INTERNAL = 1;
     }
 

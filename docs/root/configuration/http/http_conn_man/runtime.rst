@@ -21,7 +21,8 @@ http_connection_manager.normalize_path % of requests that will have path normali
 
 http_connection_manager.forward_normalized_path
   normalization will apply to the forwarded *:path* header in addition to internally for
-  matching and routing. Defaults to true.
+  matching and routing. If false, the original path will be forwarded upstream, unless a filter
+  has changed the *:path* header during processing. Defaults to true.
 
 .. _config_http_conn_man_runtime_client_enabled:
 
