@@ -33,7 +33,7 @@ The minor version enables API stability and support, and to safely deprecate old
 features and reduce the tech debt. A client can support a range of minor API
 versions, and can request xDS resources that match this range, using the resource
 [context parameters](https://github.com/cncf/udpa/blob/master/xds/core/v3/context_params.proto).
-Deprecated features, from previous minor or major versions (and their code), can be safely removed
+Deprecated features, from previous major versions (and their code), can be removed
 from the client. In general, within a major and minor API version, we do not allow any breaking
 changes to the protobuf definitions for the API (more details below).
 The minor version will be reset to 0 upon a release of a new major version.
@@ -100,6 +100,7 @@ implementations within a major version should set explicit values for these fiel
 # API lifecycle
 
 ## Major version lifecycle
+
 A new major version is a significant event in the xDS API ecosystem, inevitably requiring support
 from clients (Envoy, gRPC) and a large number of control planes, ranging from simple in-house custom
 management servers to xDS-as-a-service offerings run by vendors. The [xDS API
@@ -134,7 +135,7 @@ Envoy will support at most three major versions of any API package at all times:
 
 A new API minor version is expected to be released once a year, at the Q2 release. This
 allows for gradual introduction of new capabilities and features that will be supported
-by clients, and by control planes.
+by the clients, and by the control management servers.
 Following the release of a new minor version, the API lifecycle follows a deprecation clock.
 Envoy will support the most recent 2 minor versions, including the current. This
 entails that it may take between 1 to 2 years for a deprecated field to have
@@ -167,8 +168,8 @@ In addition, the client will provide patch version (19) as part of the xDS resou
 This allows the control plane to send either resources with `field1` or with `field2`.
 In the next year's Q2 release, the current API minor version will be cut, and the API
 version becomes v3.8.0. The client will now support a new minor versions range
-(7 to 8), and features deprecated in minor version 6 will be removed.
-When the API version becomes v3.9.0, `field1` will be removed from the API.
+(7 to 8), and features deprecated in minor version 6 will no longer be supported.
+When the API version becomes v3.9.0, `field1` will no longer be supported by the client.
 
 Assume the [xDS API shepherds](https://github.com/orgs/envoyproxy/teams/api-shepherds) decide that
 at the end of December in 2020, if a v4 major version is justified, we might freeze
@@ -203,19 +204,20 @@ A feature can be deprecated by annotating the corresponding field or enum value 
 `[deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "X.Y"]` (or
 `(envoy.annotations.deprecated_at_minor_version_enum)` for enum values), where X and Y are the
 major and minor versions, respectively, on which the feature was deprecated. The
-[protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool will ensure that
-all deprecated features have a `envoy.annotations.deprecated_at_minor_version` set, and add an
-annotation with the current API minor version to the ones that do not.
+`protoxform` tool will ensure that all deprecated features have a
+`envoy.annotations.deprecated_at_minor_version` set, and add an annotation with the current
+API minor version to the ones that do not.
 This implies that the feature is deprecated during the current minor version, `Y`.
-When the minor version is cut (starting with minor version `Y+1`), the protoxform tool will first
-verify that all deprecated fields have a `minor_version` annotations and remove any field or enum
-value with minor version `Y-1`. Note that the API should not contain features of
-version smaller than or equal to `Y-1` after the a new minor version is introduced.
+When the minor version is cut (starting with minor version `Y+1`), the `protoxform` tool will
+verify that all deprecated fields have a `deprecated_at_minor_version` annotations, and add that annotation
+to the fields that do not have it with the value `X.Y`. Note that although the API protos will
+still include the deprecated fields (to avoid breaking compatibility within the same major version),
+the client is not required to support these features.
 
 For example, if the current API version is 3.7.19, then
 new deprecated fields or enum values will be tagged with the value "3.7" in their
 deprecated at minor version annotation. Upon a new minor version release (8), all features that
-are annotated with minor version 6 will be removed.
+are annotated with minor version 6 will no longer be supported.
 
 # When can an API change be made to a package's previous stable major version?
 
