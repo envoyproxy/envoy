@@ -15,6 +15,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.dispatcher().timeSource()),
+      load_assignment_{
+          cluster.has_load_assignment()
+              ? cluster.load_assignment()
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())},
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -24,11 +28,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
-  const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment()
-          ? cluster.load_assignment()
-          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
 
@@ -48,7 +48,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+      load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 }
 
 void StrictDnsClusterImpl::startPreInit() {
