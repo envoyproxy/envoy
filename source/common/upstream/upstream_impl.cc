@@ -1286,37 +1286,39 @@ PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
                                            PrioritySet::HostUpdateCb* update_cb)
     : parent_(cluster), local_info_node_(local_info.node()), update_cb_(update_cb) {}
 
-void PriorityStateManager::initializePriorityFor(const WeightedLocality& weighted_locality) {
-  const uint32_t priority = weighted_locality.priority();
+void PriorityStateManager::initializePriorityFor(
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) {
+  const uint32_t priority = locality_lb_endpoint.priority();
   if (priority_state_.size() <= priority) {
     priority_state_.resize(priority + 1);
   }
   if (priority_state_[priority].first == nullptr) {
     priority_state_[priority].first = std::make_unique<HostVector>();
   }
-  if (weighted_locality.isWeightSet()) {
-    priority_state_[priority].second[weighted_locality.locality()] =
-        weighted_locality.loadBalancingWeight();
+  if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+    priority_state_[priority].second[locality_lb_endpoint.locality()] =
+        locality_lb_endpoint.load_balancing_weight().value();
   }
 }
 
 void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
-    const WeightedLocality& weighted_locality,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
   auto metadata = lb_endpoint.has_metadata()
                       ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
                       : nullptr;
   const HostSharedPtr host(new HostImpl(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
-      weighted_locality.locality(), lb_endpoint.endpoint().health_check_config(),
-      weighted_locality.priority(), lb_endpoint.health_status(), time_source));
-  registerHostForPriority(host, weighted_locality);
+      locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
+      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source));
+  registerHostForPriority(host, locality_lb_endpoint);
 }
 
-void PriorityStateManager::registerHostForPriority(const HostSharedPtr& host,
-                                                   const WeightedLocality& weighted_locality) {
-  const uint32_t priority = weighted_locality.priority();
+void PriorityStateManager::registerHostForPriority(
+    const HostSharedPtr& host,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) {
+  const uint32_t priority = locality_lb_endpoint.priority();
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
   priority_state_[priority].first->emplace_back(host);

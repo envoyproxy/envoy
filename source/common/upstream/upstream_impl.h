@@ -52,7 +52,6 @@
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/transport_socket_match_impl.h"
-#include "common/upstream/weighted_locality.h"
 
 #include "server/transport_socket_config_impl.h"
 
@@ -851,21 +850,22 @@ public:
                        PrioritySet::HostUpdateCb* update_cb);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
-  void initializePriorityFor(const WeightedLocality& weighted_locality);
+  void initializePriorityFor(
+      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint);
 
   // Registers a host based on its address to the PriorityState based on the specified priority (the
   // priority is specified by locality_lb_endpoint.priority()).
   //
   // The specified health_checker_flag is used to set the registered-host's health-flag when the
   // lb_endpoint health status is unhealthy, draining or timeout.
-  void registerHostForPriority(const std::string& hostname,
-                               Network::Address::InstanceConstSharedPtr address,
-                               const WeightedLocality& weighted_locality,
-                               const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-                               TimeSource& time_source);
+  void registerHostForPriority(
+      const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
 
-  void registerHostForPriority(const HostSharedPtr& host,
-                               const WeightedLocality& weighted_locality);
+  void registerHostForPriority(
+      const HostSharedPtr& host,
+      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint);
 
   void
   updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,

@@ -73,10 +73,10 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   // duplicated hosts inside a priority. And if we want to enforce this behavior, it should be done
   // inside the priority state manager.
   for (const ResolveTargetPtr& target : resolve_targets_) {
-    priority_state_manager.initializePriorityFor(target->weighted_locality_);
+    priority_state_manager.initializePriorityFor(target->locality_lb_endpoint_);
     for (const HostSharedPtr& host : target->hosts_) {
-      if (target->weighted_locality_.priority() == current_priority) {
-        priority_state_manager.registerHostForPriority(host, target->weighted_locality_);
+      if (target->locality_lb_endpoint_.priority() == current_priority) {
+        priority_state_manager.registerHostForPriority(host, target->locality_lb_endpoint_);
       }
     }
   }
@@ -94,7 +94,7 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
-      weighted_locality_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -133,8 +133,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 Network::Utility::getAddressWithPort(*(resp.address_), port_),
                 // TODO(zyfjeff): Created through metadata shared pool
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
-                lb_endpoint_.load_balancing_weight().value(), weighted_locality_.locality(),
-                lb_endpoint_.endpoint().health_check_config(), weighted_locality_.priority(),
+                lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
+                lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
             all_new_hosts.emplace(new_hosts.back()->address()->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
@@ -146,9 +146,9 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                                             updated_hosts, all_hosts_, all_new_hosts)) {
             ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
             ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
-              return host->priority() == weighted_locality_.priority();
+              return host->priority() == locality_lb_endpoint_.priority();
             }));
-            parent_.updateAllHosts(hosts_added, hosts_removed, weighted_locality_.priority());
+            parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
           } else {
             parent_.info_->stats().update_no_rebuild_.inc();
           }
