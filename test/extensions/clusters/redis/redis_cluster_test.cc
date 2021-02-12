@@ -3,9 +3,9 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
@@ -107,15 +107,15 @@ protected:
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    envoy::config::cluster::redis::RedisClusterConfig config;
+    envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
         cluster_config,
-        TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
-            config),
+        TestUtility::downcastAndValidate<
+            const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
         cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
@@ -137,7 +137,7 @@ protected:
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    envoy::config::cluster::redis::RedisClusterConfig config;
+    envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            validation_visitor_, config);

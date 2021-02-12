@@ -35,6 +35,7 @@ const Response& errorResponse() {
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
+                                            Http::HeaderVector{},
                                             {{}},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
@@ -45,10 +46,10 @@ const Response& errorResponse() {
 struct SuccessResponse {
   SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
                   const MatcherSharedPtr& append_matchers,
-                  const MatcherSharedPtr& dynamic_metadata_matchers, Response&& response)
+                  const MatcherSharedPtr& response_matchers, Response&& response)
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
-        dynamic_metadata_matchers_(dynamic_metadata_matchers),
-        response_(std::make_unique<Response>(response)) {
+        dynamic_metadata_matchers_(dynamic_metadata_matchers), 
+        response_matchers_(response_matchers), response_(std::make_unique<Response>(response)) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
@@ -71,6 +72,11 @@ struct SuccessResponse {
         std::string value{header.value().getStringView()};
         (*response_->dynamic_metadata.mutable_fields())[key] = ValueUtil::stringValue(value);
       }
+      if (response_matchers_->matches(header.key().getStringView())) {
+        response_->response_headers_to_add.emplace_back(
+            Http::LowerCaseString{std::string(header.key().getStringView())},
+            std::string(header.value().getStringView()));
+      }
       return Http::HeaderMap::Iterate::Continue;
     });
   }
@@ -79,6 +85,7 @@ struct SuccessResponse {
   const MatcherSharedPtr& matchers_;
   const MatcherSharedPtr& append_matchers_;
   const MatcherSharedPtr& dynamic_metadata_matchers_;
+  const MatcherSharedPtr& response_matchers_;
   ResponsePtr response_;
 };
 
@@ -114,8 +121,13 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
       client_header_matchers_(toClientMatchers(
           config.http_service().authorization_response().allowed_client_headers())),
+<<<<<<< HEAD
       dynamic_metadata_matchers_(toDynamicMetadataMatchers(
           config.http_service().authorization_response().dynamic_metadata_from_headers())),
+=======
+      client_header_on_success_matchers_(toClientMatchersOnSuccess(
+          config.http_service().authorization_response().allowed_client_headers_on_success())),
+>>>>>>> origin/main
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers())),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
@@ -143,7 +155,11 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
 }
 
 MatcherSharedPtr
+<<<<<<< HEAD
 ClientConfig::toDynamicMetadataMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+=======
+ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list) {
+>>>>>>> origin/main
   std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
@@ -316,20 +332,34 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
+<<<<<<< HEAD
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        config_->upstreamHeaderToAppendMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
                                 Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING,
                                 Http::Code::OK, ProtobufWkt::Struct{}}};
+=======
+    SuccessResponse ok{
+        message->headers(), config_->upstreamHeaderMatchers(),
+        config_->upstreamHeaderToAppendMatchers(), config_->clientHeaderOnSuccessMatchers(),
+        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
+                 Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
+                 ProtobufWkt::Struct{}}};
+>>>>>>> origin/main
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
+<<<<<<< HEAD
                          config_->dynamicMetadataMatchers(),
+=======
+                         config_->clientHeaderOnSuccessMatchers(),
+>>>>>>> origin/main
                          Response{CheckStatus::Denied,
+                                  Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
