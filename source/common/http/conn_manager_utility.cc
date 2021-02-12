@@ -95,11 +95,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
-  bool single_xff_address = false;
+  bool allow_trusted_address_checks = false;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
 
   if (config.useRemoteAddress()) {
-    single_xff_address = request_headers.ForwardedFor() == nullptr;
+    allow_trusted_address_checks = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by
     // the xff_num_trusted_hops configuration option), get the trusted client address
     // from the XFF before we append to XFF.
@@ -137,14 +137,19 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     if (original_ip_detection) {
       struct OriginalIPDetectionParams params = {request_headers,
                                                  connection.addressProvider().remoteAddress()};
-      final_remote_address = original_ip_detection->detect(params);
+      auto result = original_ip_detection->detect(params);
+
+      if (result.detected_remote_address) {
+        final_remote_address = result.detected_remote_address;
+        allow_trusted_address_checks = result.allow_trusted_address_checks;
+      }
     }
 
     // If there's no extension or it failed to detect, give XFF a try.
     if (!final_remote_address) {
       auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
       final_remote_address = ret.address_;
-      single_xff_address = ret.single_address_;
+      allow_trusted_address_checks = ret.single_address_;
     }
   }
 
@@ -165,7 +170,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   //               we can't change it at this point. In the future we will likely need to add
   //               additional inference modes and make this mode legacy.
   const bool internal_request =
-      single_xff_address && final_remote_address != nullptr &&
+      allow_trusted_address_checks && final_remote_address != nullptr &&
       config.internalAddressConfig().isInternalAddress(*final_remote_address);
 
   // After determining internal request status, if there is no final remote address, due to no XFF,

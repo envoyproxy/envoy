@@ -1760,13 +1760,14 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
 }
 
 class TestIPDetection : public Http::OriginalIPDetection {
-  Network::Address::InstanceConstSharedPtr
-  detect(struct Http::OriginalIPDetectionParams&) override {
-    return nullptr;
+public:
+  Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams&) override {
+    return {nullptr, false};
   }
 };
 
 class TestIPDetectionFactory : public Http::OriginalIPDetectionFactory {
+public:
   Http::OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message&) const override {
     return std::make_shared<TestIPDetection>();
   }

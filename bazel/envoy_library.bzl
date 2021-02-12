@@ -83,6 +83,7 @@ EXTENSION_CATEGORIES = [
     "envoy.health_checkers",
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
+    "envoy.original_ip_detection",
     "envoy.rate_limit_descriptors",
     "envoy.resolvers",
     "envoy.resource_monitors",

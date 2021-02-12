@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.original_ip_detection.custom_header.v3;
+
+import "envoy/type/v3/http_status.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.original_ip_detection.custom_header.v3";
+option java_outer_classname = "CustomHeaderProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Custom header original IP detection extension]
+//
+// This extension allows for the original dowstream remote IP to be detected
+// by reading the value for a configured header name. If the value is successfully parsed
+// as an IP, it'll be treated as the effective downstream remote address and seen as such
+// by all filters. If the detection or parsing of the header value fails, Envoy will fallback
+// to its default detection extension.
+//
+// [#extension: envoy.original_ip_detection.custom_header]
+message CustomHeaderConfig {
+  // The name for the header containing the original downstream remote address, if present.
+  string header_name = 1;
+
+  // Is the detected address trusted (e.g.: can it be used to determine if this is an internal
+  // request).
+  bool allow_trusted_address_checks = 2;
+
+  // If true, requests for which either the configured header is missing or parsing an IP from its
+  // value fails will be rejected.
+  bool reject_request_if_detection_fails = 3;
+
+  // If reject_request_if_detection_fails is set, this Sets the HTTP status that is returned to the client
+  // when detection fails. The default status is HTTP 403 Forbidden.
+  type.v3.HttpStatus status_on_error = 4;
+}

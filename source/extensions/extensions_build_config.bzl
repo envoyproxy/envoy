@@ -243,6 +243,12 @@ EXTENSIONS = {
     #
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+
+    #
+    # Original IP detection
+    #
+
+    "envoy.original_ip_detection.custom_header":        "//source/extensions/original_ip_detection/custom_header:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

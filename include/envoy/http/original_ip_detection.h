@@ -12,10 +12,20 @@ namespace Envoy {
 namespace Http {
 
 struct OriginalIPDetectionParams {
-  // Note: headers will be sanitized after the OriginalIPDetection::detect() call.
+  // Note that while extensions can modify the headers, they will undergo standard Envoy
+  // sanitation after the detect() call so additions made here may be removed before
+  // filters have access to headers.
   Http::RequestHeaderMap& request_headers;
   // The downstream directly connected address.
   const Network::Address::InstanceConstSharedPtr& downstream_remote_address;
+};
+
+struct OriginalIPDetectionResult {
+  // An address that represents the detected address or nullptr if detection failed.
+  Network::Address::InstanceConstSharedPtr detected_remote_address;
+  // Is the detected address trusted (e.g.: can it be used to determine if this is an internal
+  // request).
+  bool allow_trusted_address_checks;
 };
 
 /**
@@ -34,10 +44,10 @@ public:
    * the HCM will then fallback to the standard IP detection mechanisms.
    *
    * @param param supplies the OriginalIPDetectionParams params for detection.
-   * @return Address::InstanceConstSharedPtr an address that represents the detected address or
-   * nullptr.
+   * @return OriginalIPDetectionResult the result of the extension's attempt to detect
+   * the final remote address.
    */
-  virtual Network::Address::InstanceConstSharedPtr detect(OriginalIPDetectionParams& params) PURE;
+  virtual OriginalIPDetectionResult detect(OriginalIPDetectionParams& params) PURE;
 };
 
 using OriginalIPDetectionSharedPtr = std::shared_ptr<OriginalIPDetection>;
@@ -56,6 +66,8 @@ public:
    * @return OriginalIPDetectionSharedPtr the extension instance.
    */
   virtual OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message& config) const PURE;
+
+  std::string category() const override { return "envoy.original_ip_detection"; }
 };
 
 using OriginalIPDetectionFactoryPtr = std::unique_ptr<OriginalIPDetectionFactory>;
