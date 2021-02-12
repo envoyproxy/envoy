@@ -18,6 +18,7 @@ protected:
   CustomHeaderTest() {
     envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
+    config.set_allow_trusted_address_checks(true);
     custom_header_extension_ = std::make_shared<CustomHeaderIPDetection>(config);
   }
 
@@ -52,7 +53,7 @@ TEST_F(CustomHeaderTest, Detection) {
     auto result = custom_header_extension_->detect(params);
 
     EXPECT_EQ("1.2.3.4:0", result.detected_remote_address->asString());
-    EXPECT_FALSE(result.allow_trusted_address_checks);
+    EXPECT_TRUE(result.allow_trusted_address_checks);
   }
 }
 

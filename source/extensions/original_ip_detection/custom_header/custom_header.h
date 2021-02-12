@@ -18,6 +18,7 @@ public:
 
 private:
   std::string header_name_;
+  bool allow_trusted_address_checks_;
 };
 
 } // namespace CustomHeader

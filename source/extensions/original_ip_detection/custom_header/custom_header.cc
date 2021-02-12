@@ -9,7 +9,8 @@ namespace CustomHeader {
 
 CustomHeaderIPDetection::CustomHeaderIPDetection(
     const envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig& config)
-    : header_name_(config.header_name()) {}
+    : header_name_(config.header_name()),
+      allow_trusted_address_checks_(config.allow_trusted_address_checks()) {}
 
 Http::OriginalIPDetectionResult
 CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {
@@ -19,7 +20,8 @@ CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {
   }
   auto header_value = hdr[0]->value().getStringView();
   try {
-    return {Network::Utility::parseInternetAddress(std::string(header_value)), false};
+    return {Network::Utility::parseInternetAddress(std::string(header_value)),
+            allow_trusted_address_checks_};
   } catch (const EnvoyException&) {
   }
 
