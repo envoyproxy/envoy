@@ -3779,7 +3779,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoFeatureSu
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
                             , EnvoyException,
                             "[Windows] Envoy was compiled without support for `SO_ORIGINAL_DST`, "
-                            "the original destination filter can not be used");
+                            "the original destination filter cannot be used");
 #endif
 }
 
