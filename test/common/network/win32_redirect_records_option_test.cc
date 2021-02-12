@@ -75,6 +75,24 @@ TEST_F(Win32RedirectRecordsOptionImplTest, HashKey) {
   EXPECT_EQ(hash, expected_hash);
 }
 
+TEST_F(Win32RedirectRecordsOptionImplTest, HashKeyDifferent) {
+  std::vector<uint8_t> hash;
+  Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
+  socket_option.hashKey(hash);
+
+  std::string other_redirect_records_data = "some other data";
+  auto other_redirect_records = std::make_shared<Network::Win32RedirectRecords>();
+  memcpy(other_redirect_records->buf_, reinterpret_cast<void*>(other_redirect_records_data.data()),
+         other_redirect_records_data.size());
+  other_redirect_records->buf_size_ = other_redirect_records_data.size();
+
+  std::vector<uint8_t> other_hash;
+  Win32RedirectRecordsOptionImpl other_socket_option{*other_redirect_records};
+  other_socket_option.hashKey(other_hash);
+
+  EXPECT_NE(hash, other_hash);
+}
+
 TEST_F(Win32RedirectRecordsOptionImplTest, OptionDetails) {
   const auto state = envoy::config::core::v3::SocketOption::STATE_PREBIND;
   Socket::Option::Details expected_details{Win32RedirectRecordsOptionImpl::optionName(),
