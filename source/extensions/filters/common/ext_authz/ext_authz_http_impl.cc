@@ -50,7 +50,7 @@ struct SuccessResponse {
                   const MatcherSharedPtr& dynamic_metadata_matchers, Response&& response)
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
         response_matchers_(response_matchers),
-        dynamic_metadata_matchers_(dynamic_metadata_matchers),
+        to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
         response_(std::make_unique<Response>(response)) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
@@ -74,7 +74,7 @@ struct SuccessResponse {
             Http::LowerCaseString{std::string(header.key().getStringView())},
             std::string(header.value().getStringView()));
       }
-      if (dynamic_metadata_matchers_->matches(header.key().getStringView())) {
+      if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
         const std::string key{header.key().getStringView()};
         const std::string value{header.value().getStringView()};
         (*response_->dynamic_metadata.mutable_fields())[key] = ValueUtil::stringValue(value);
@@ -84,10 +84,11 @@ struct SuccessResponse {
   }
 
   const Http::HeaderMap& headers_;
+  // All matchers below are used on headers_.
   const MatcherSharedPtr& matchers_;
   const MatcherSharedPtr& append_matchers_;
   const MatcherSharedPtr& response_matchers_;
-  const MatcherSharedPtr& dynamic_metadata_matchers_;
+  const MatcherSharedPtr& to_dynamic_metadata_matchers_;
   ResponsePtr response_;
 };
 
@@ -125,7 +126,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_client_headers())),
       client_header_on_success_matchers_(toClientMatchersOnSuccess(
           config.http_service().authorization_response().allowed_client_headers_on_success())),
-      dynamic_metadata_matchers_(toDynamicMetadataMatchers(
+      to_dynamic_metadata_matchers_(toDynamicMetadataMatchers(
           config.http_service().authorization_response().dynamic_metadata_from_headers())),
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers())),

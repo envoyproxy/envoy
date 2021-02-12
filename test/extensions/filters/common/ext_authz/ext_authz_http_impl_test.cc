@@ -447,8 +447,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithDynamicMetadata) {
   (*metadata_fields)["x-metadata-header-2"] = ValueUtil::stringValue("4");
 
   // When we call onSuccess() at the bottom of the test we expect that all the
-  // headers-to-remove in that http response to have been correctly extracted
-  // and inserted into the authz Response just below.
+  // dynamic metadata values that we set above to be present in the authz Response
+  // below.
   Response authz_response;
   authz_response.status = CheckStatus::OK;
   authz_response.dynamic_metadata = expected_dynamic_metadata;

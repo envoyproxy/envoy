@@ -103,7 +103,7 @@ public:
   /**
    * Returns a list of matchers used for selecting the headers to emit as dynamic metadata.
    */
-  const MatcherSharedPtr& dynamicMetadataMatchers() const { return dynamic_metadata_matchers_; }
+  const MatcherSharedPtr& dynamicMetadataMatchers() const { return to_dynamic_metadata_matchers_; }
 
   /**
    * Returns a list of matchers used for selecting the authorization response headers that
@@ -144,7 +144,7 @@ private:
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr client_header_on_success_matchers_;
-  const MatcherSharedPtr dynamic_metadata_matchers_;
+  const MatcherSharedPtr to_dynamic_metadata_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
   const MatcherSharedPtr upstream_header_to_append_matchers_;
   const std::string cluster_name_;
