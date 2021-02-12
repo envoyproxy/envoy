@@ -452,6 +452,7 @@ and security team to ensure they still qualify for inclusion on the list.
 | google-internal-envoy-security@google.com             | Google        | No       | 12/19       |
 | argoprod@us.ibm.com                                   | IBM           | No       | 12/19       |
 | istio-security-vulnerability-reports@googlegroups.com | Istio         | No       | 12/19       |
+| envoy-security@microsoft.com                          | Microsoft     | No       | 2/21        |
 | secalert@redhat.com                                   | Red Hat       | No       | 12/19       |
 | envoy-security@solo.io                                | solo.io       | No       | 12/19       |
 | envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
