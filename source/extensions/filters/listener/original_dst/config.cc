@@ -36,7 +36,7 @@ public:
     }
     if (!Network::win32SupportsOriginalDestination()) {
       throw EnvoyException("[Windows] Envoy was compiled without support for `SO_ORIGINAL_DST`, "
-                           "the original destination filter can not be used");
+                           "the original destination filter cannot be used");
     }
 #endif
 

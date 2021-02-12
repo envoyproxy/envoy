@@ -28,7 +28,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     // In this case the listener handles the connection directly and does not hand it off.
     if (original_local_address) {
 #ifdef WIN32
-      // See how to perform bind or connect redirection on MSDN
+      // See how to perform bind or connect redirection here:
       // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
       if constexpr (Network::win32SupportsOriginalDestination()) {
         if (traffic_direction_ == envoy::config::core::v3::OUTBOUND) {
