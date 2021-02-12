@@ -135,10 +135,10 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // used for determining internal/external status (see below).
     auto original_ip_detection = config.originalIpDetection();
     if (original_ip_detection) {
-      struct OriginalIPDetectionParams params = {request_headers,
-                                                 connection.addressProvider().remoteAddress()};
-      auto result = original_ip_detection->detect(params);
+      OriginalIPDetectionParams params = {request_headers,
+                                          connection.addressProvider().remoteAddress()};
 
+      auto result = original_ip_detection->detect(params);
       if (result.detected_remote_address) {
         final_remote_address = result.detected_remote_address;
         allow_trusted_address_checks = result.allow_trusted_address_checks;
