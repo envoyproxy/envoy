@@ -1762,7 +1762,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
 class TestIPDetection : public Http::OriginalIPDetection {
 public:
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams&) override {
-    return {nullptr, false};
+    return {nullptr, false, absl::nullopt};
   }
 };
 

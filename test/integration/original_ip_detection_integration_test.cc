@@ -19,14 +19,14 @@ class CustomHeaderDetection : public Http::OriginalIPDetection {
 public:
   CustomHeaderDetection(const std::string& header_name) : header_name_(header_name) {}
 
-  Network::Address::InstanceConstSharedPtr
-  detect(struct Http::OriginalIPDetectionParams& params) override {
+  Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override {
     auto hdr = params.request_headers.get(Http::LowerCaseString(header_name_));
     if (hdr.empty()) {
-      return nullptr;
+      return {nullptr, false, absl::nullopt};
     }
     auto header_value = hdr[0]->value().getStringView();
-    return std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value));
+    return {std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value)), false,
+            absl::nullopt};
   }
 
 private:

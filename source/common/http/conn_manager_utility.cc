@@ -63,7 +63,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
   }
 }
 
-Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
+ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
     const LocalInfo::LocalInfo& local_info) {
@@ -138,6 +138,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     auto original_ip_detection = config.originalIpDetection();
     if (original_ip_detection) {
       auto result = original_ip_detection->detect(params);
+
+      if (result.reject_options.has_value()) {
+        return {nullptr, result.reject_options};
+      }
+
       if (result.detected_remote_address) {
         final_remote_address = result.detected_remote_address;
         allow_trusted_address_checks = result.allow_trusted_address_checks;
@@ -228,7 +233,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   mutateXfccRequestHeader(request_headers, connection, config);
 
-  return final_remote_address;
+  return {final_remote_address, absl::nullopt};
 }
 
 void ConnectionManagerUtility::cleanInternalHeaders(

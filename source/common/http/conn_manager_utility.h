@@ -46,6 +46,15 @@ public:
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                       headers_with_underscores_action);
 
+  /* The result after calling mutateRequestHeaders(), containing the final remote address. Note that
+   * an extension used for detecting the original IP of the request might decide it should be
+   * rejected if the detection failed. In this case, the reject_request optional will be set.
+   */
+  struct MutateRequestHeadersResult {
+    Network::Address::InstanceConstSharedPtr final_remote_address;
+    absl::optional<OriginalIPRejectRequestOptions> reject_request;
+  };
+
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
    * complexity for ease of testing. See the method itself for detailed comments on what
@@ -54,13 +63,16 @@ public:
    * Note this function may be called twice on the response path if there are
    * 100-Continue headers.
    *
-   * @return the final trusted remote address. This depends on various settings and the
-   *         existence of the x-forwarded-for header. Again see the method for more details.
+   * @return MutateRequestHeadersResult containing the final trusted remote address if detected.
+   *         This depends on various settings and the existence of the x-forwarded-for header.
+   *         Note that an extension might also be used. If detection fails, the result may contain
+   *         options for rejecting the request.
    */
-  static Network::Address::InstanceConstSharedPtr
-  mutateRequestHeaders(RequestHeaderMap& request_headers, Network::Connection& connection,
-                       ConnectionManagerConfig& config, const Router::Config& route_config,
-                       const LocalInfo::LocalInfo& local_info);
+  static MutateRequestHeadersResult mutateRequestHeaders(RequestHeaderMap& request_headers,
+                                                         Network::Connection& connection,
+                                                         ConnectionManagerConfig& config,
+                                                         const Router::Config& route_config,
+                                                         const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,

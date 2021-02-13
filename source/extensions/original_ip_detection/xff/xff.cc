@@ -16,7 +16,7 @@ XffIPDetection::XffIPDetection(uint32_t xff_num_trusted_hops)
 
 Http::OriginalIPDetectionResult XffIPDetection::detect(Http::OriginalIPDetectionParams& params) {
   auto ret = Http::Utility::getLastAddressFromXFF(params.request_headers, xff_num_trusted_hops_);
-  return {ret.address_, ret.single_address_};
+  return {ret.address_, ret.single_address_, absl::nullopt};
 }
 
 } // namespace Xff

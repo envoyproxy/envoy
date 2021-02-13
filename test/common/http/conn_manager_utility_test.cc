@@ -116,9 +116,9 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(RequestHeaderMap& headers, Protocol) {
     MutateRequestRet ret;
-    ret.downstream_address_ = ConnectionManagerUtility::mutateRequestHeaders(
-                                  headers, connection_, config_, route_config_, local_info_)
-                                  ->asString();
+    const auto result = ConnectionManagerUtility::mutateRequestHeaders(
+        headers, connection_, config_, route_config_, local_info_);
+    ret.downstream_address_ = result.final_remote_address->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
@@ -1551,10 +1551,11 @@ public:
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override {
     auto hdr = params.request_headers.get(LowerCaseString(header_name_));
     if (hdr.empty()) {
-      return {nullptr, false};
+      return {nullptr, false, absl::nullopt};
     }
     auto header_value = hdr[0]->value().getStringView();
-    return {std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value)), false};
+    return {std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value)), false,
+            absl::nullopt};
   }
 
 private:
