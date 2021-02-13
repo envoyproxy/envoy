@@ -10,6 +10,9 @@
 namespace Envoy {
 namespace {
 
+using envoy::extensions::filters::common::dependency::v3::Dependency;
+using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
+
 class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
   TestHttpFilterConfigFactory() = default;
@@ -25,6 +28,14 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
+  FilterDependencies dependencies() override {
+    FilterDependencies dependencies;
+    Dependency* d = dependencies.add_decode_required();
+    d->set_name("foobar");
+    d->set_type(Dependency::FILTER_STATE_KEY);
+    return dependencies;
+  }
+
   std::string name() const override { return "envoy.test.http_filter"; }
   std::string configType() override { return ""; };
 };
@@ -36,6 +47,17 @@ TEST(NamedHttpFilterConfigFactoryTest, CreateFilterFactory) {
   ProtobufTypes::MessagePtr message{new Envoy::ProtobufWkt::Struct()};
 
   factory.createFilterFactoryFromProto(*message, stats_prefix, context);
+}
+
+TEST(NamedHttpFilterConfigFactoryTest, Dependencies) {
+  TestHttpFilterConfigFactory factory;
+  const std::string stats_prefix = "foo";
+  Server::Configuration::MockFactoryContext context;
+  ProtobufTypes::MessagePtr message{new Envoy::ProtobufWkt::Struct()};
+
+  factory.createFilterFactoryFromProto(*message, stats_prefix, context);
+
+  EXPECT_EQ(factory.dependencies().decode_required().size(), 1);
 }
 
 } // namespace

@@ -8,6 +8,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"
@@ -201,6 +202,15 @@ public:
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
   virtual bool isTerminalFilter() { return false; }
+
+  /**
+   * @return FilterDependencies specification of dependencies required or
+   * provided on the decode and encode paths.
+   */
+  virtual envoy::extensions::filters::common::dependency::v3::FilterDependencies dependencies() {
+    envoy::extensions::filters::common::dependency::v3::FilterDependencies dependency;
+    return dependency;
+  }
 };
 
 } // namespace Configuration
