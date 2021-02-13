@@ -17,6 +17,7 @@
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
+#include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -26,7 +27,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "config_test_base.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
