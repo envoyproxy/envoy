@@ -245,6 +245,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/original_ip_detection/xff:xff_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",

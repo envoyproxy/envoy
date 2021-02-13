@@ -13,8 +13,8 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "custom_header_detection_test",
-    extension_name = "envoy.original_ip_detection.custom_header",
     srcs = ["custom_header_test.cc"],
+    extension_name = "envoy.original_ip_detection.custom_header",
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/original_ip_detection/custom_header:custom_header_lib",
@@ -25,8 +25,8 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "config_test",
-    extension_name = "envoy.original_ip_detection.custom_header",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.original_ip_detection.custom_header",
     deps = [
         "//include/envoy/registry",
         "//source/extensions/original_ip_detection/custom_header:config",

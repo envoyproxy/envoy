@@ -1,8 +1,8 @@
 #include "envoy/extensions/original_ip_detection/custom_header/v3/custom_header.pb.h"
 
-#include "extensions/original_ip_detection/custom_header/custom_header.h"
-
 #include "common/network/utility.h"
+
+#include "extensions/original_ip_detection/custom_header/custom_header.h"
 
 #include "test/test_common/utility.h"
 

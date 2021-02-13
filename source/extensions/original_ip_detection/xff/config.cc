@@ -1,10 +1,11 @@
 #include "extensions/original_ip_detection/xff/config.h"
-#include "extensions/original_ip_detection/xff/xff.h"
 
 #include "envoy/extensions/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/original_ip_detection/xff/v3/xff.pb.validate.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/registry/registry.h"
+
+#include "extensions/original_ip_detection/xff/xff.h"
 
 namespace Envoy {
 namespace Extensions {

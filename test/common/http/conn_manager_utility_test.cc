@@ -13,6 +13,8 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "extensions/original_ip_detection/xff/xff.h"
+
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -85,6 +87,8 @@ class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest()
       : request_id_extension_(std::make_shared<NiceMock<MockRequestIDExtension>>(random_)),
+        default_detection_(
+            std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0)),
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
@@ -100,6 +104,7 @@ public:
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
     ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));
+    ON_CALL(config_, defaultIpDetection()).WillByDefault(Return(default_detection_));
   }
 
   struct MutateRequestRet {
@@ -127,6 +132,7 @@ public:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Random::MockRandomGenerator> random_;
   std::shared_ptr<NiceMock<MockRequestIDExtension>> request_id_extension_;
+  std::shared_ptr<Extensions::OriginalIPDetection::Xff::XffIPDetection> default_detection_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -314,6 +320,10 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 
 // Verify that xff_num_trusted_hops works when not using remote address.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
+  // Reconfigure XFF detecton.
+  default_detection_ = std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(1);
+  ON_CALL(config_, defaultIpDetection()).WillByDefault(Return(default_detection_));
+
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));

@@ -13,8 +13,8 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "xff_detection_test",
-    extension_name = "envoy.original_ip_detection.xff",
     srcs = ["xff_test.cc"],
+    extension_name = "envoy.original_ip_detection.xff",
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/original_ip_detection/xff:xff_lib",
@@ -25,8 +25,8 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "config_test",
-    extension_name = "envoy.original_ip_detection.xff",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.original_ip_detection.xff",
     deps = [
         "//include/envoy/registry",
         "//source/extensions/original_ip_detection/xff:config",
