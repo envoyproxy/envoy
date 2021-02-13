@@ -5,8 +5,6 @@ package envoy.extensions.original_ip_detection.xff.v3;
 import "envoy/extensions/original_ip_detection/common/v3/original_ip_detection.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.original_ip_detection.xff.v3";
 option java_outer_classname = "XffProto";
@@ -14,7 +12,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: XFF original IP detection extension]
-//
+
 // This extension allows for the original downstream remote IP to be detected
 // by reading the :ref:`config_http_conn_man_headers_x-forwarded-for` header.
 //
