@@ -17,7 +17,6 @@
 #include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
-#include "library/common/extensions/stat_sinks/metrics_service/config.h"
 
 namespace Envoy {
 class ExtensionRegistry {
