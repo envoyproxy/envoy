@@ -175,9 +175,7 @@ void AuthenticatorImpl::startVerify() {
   if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
     clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
   }
-  const uint64_t unix_timestamp =
-      std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
-          .count();
+  const uint64_t unix_timestamp = DateUtil::nowToSeconds(timeSource());
   status = jwt_->verifyTimeConstraint(unix_timestamp, clock_skew_seconds);
   if (status != Status::Ok) {
     doneWithStatus(status);
