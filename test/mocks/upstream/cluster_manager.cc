@@ -3,6 +3,8 @@
 #include <chrono>
 #include <functional>
 
+#include "common/upstream/cluster_manager_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -26,6 +28,10 @@ MockClusterManager::MockClusterManager()
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
+  ON_CALL(*this, futureThreadLocalCluster(_))
+      .WillByDefault(testing::WithArg<0>(Invoke([this](absl::string_view name) {
+        return std::make_shared<Upstream::ReadyFutureCluster>(name, *this);
+      })));
 }
 
 MockClusterManager::~MockClusterManager() = default;

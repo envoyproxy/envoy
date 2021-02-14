@@ -243,6 +243,7 @@ envoy_cc_mock(
     hdrs = ["cluster_manager.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/upstream:cluster_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",

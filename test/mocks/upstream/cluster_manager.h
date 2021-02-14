@@ -45,6 +45,8 @@ public:
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
+  MOCK_METHOD(std::shared_ptr<FutureCluster>, futureThreadLocalCluster,
+              (absl::string_view cluster));
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(const envoy::config::core::v3::BindConfig&, bindConfig, (), (const));

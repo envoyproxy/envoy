@@ -82,5 +82,47 @@ public:
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;
 
+class FutureCluster;
+
+// Used by FutureCluster user to operate FutureCluster. This class does not own FutureCluster.
+class FutureClusterHandle {
+public:
+  virtual ~FutureClusterHandle() = default;
+  virtual void cancel() PURE;
+  //   FutureCluster& getCluster() { return future_cluster_; }
+
+  // private:
+  //   FutureCluster& future_cluster_;
+};
+class FutureCluster {
+public:
+  using Handle = FutureClusterHandle;
+  using ResumeCb = std::function<void(FutureCluster&)>;
+  FutureCluster(absl::string_view cluster_name, ClusterManager& cluster_manager)
+      : cluster_manager_(cluster_manager), cluster_name_(cluster_name) {}
+  virtual ~FutureCluster() = default;
+  virtual bool isReady() PURE;
+
+  // Obtain the underlying cluster. This can be called only if the future is ready. Notes that a
+  // ready future cluster doesn't always mean the thread local cluster is legit. The returned value
+  // is ONLY safe to use in the context of the owning call. See
+  // ClusterManager::getTThreadLocalCluster().
+  ThreadLocalCluster* getThreadLocalCluster();
+
+  absl::string_view getClusterName() { return cluster_name_; }
+
+  virtual std::unique_ptr<Handle> await(Event::Dispatcher& dispatcher, ResumeCb cb) PURE;
+  //   UNREFERENCED_PARAMETER(dispatcher);
+  //   ASSERT(cb_ == nullptr);
+  //   cb_ = cb;
+  //   return std::make_unique<FutureClusterHandle>(*this);
+  // }
+
+private:
+  ResumeCb cb_;
+  ClusterManager& cluster_manager_;
+  std::string cluster_name_;
+};
+
 } // namespace Upstream
 } // namespace Envoy

@@ -222,6 +222,12 @@ public:
   virtual ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) PURE;
 
   /**
+   * @return std::shared_ptr<FutureCluster> the FutureCluster supplies ready check.
+   */
+  virtual std::shared_ptr<FutureCluster>
+  futureThreadLocalCluster(absl::string_view cluster_name) PURE;
+
+  /**
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
    * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
    * removed.

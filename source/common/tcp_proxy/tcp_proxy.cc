@@ -226,6 +226,13 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 }
 
 Filter::~Filter() {
+  // This filter is destroyed while the future cluster is pending. Destroy the handle_ to prevent
+  // the future cluster callback.
+  if (future_cluster_handle_ != nullptr) {
+    future_cluster_handle_ = nullptr;
+    // TODO(lambdai): Add a new ResponseFlag and a metric.
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+  }
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
@@ -387,9 +394,22 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
 
-  Upstream::ThreadLocalCluster* thread_local_cluster =
-      cluster_manager_.getThreadLocalCluster(cluster_name);
+  std::shared_ptr<Upstream::FutureCluster> future =
+      cluster_manager_.futureThreadLocalCluster(cluster_name);
+  if (future->isReady()) {
+    onClusterReady(*future);
+  } else {
+    future_cluster_handle_ =
+        future->await(read_callbacks_->connection().dispatcher(),
+                      [this](Upstream::FutureCluster& f) { onClusterReady(f); });
+  }
+  return Network::FilterStatus::StopIteration;
+}
 
+void Filter::onClusterReady(Upstream::FutureCluster& future) {
+  future_cluster_handle_ = nullptr;
+  Upstream::ThreadLocalCluster* thread_local_cluster = future.getThreadLocalCluster();
+  absl::string_view cluster_name = future.getClusterName();
   if (thread_local_cluster) {
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
@@ -398,7 +418,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     config_->stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NoRoute);
-    return Network::FilterStatus::StopIteration;
+    return;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
@@ -410,7 +430,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
-    return Network::FilterStatus::StopIteration;
+    return;
   }
 
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
@@ -418,7 +438,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::ConnectFailed);
-    return Network::FilterStatus::StopIteration;
+    return;
   }
 
   if (downstreamConnection()) {
@@ -445,7 +465,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
   }
-  return Network::FilterStatus::StopIteration;
 }
 
 bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
@@ -588,6 +607,13 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
         event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
       generic_conn_pool_.reset();
+    }
+  }
+  // The future cluster callback can be waiting. Cancel the future callback.
+  if (future_cluster_handle_) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      future_cluster_handle_.reset();
     }
   }
 }

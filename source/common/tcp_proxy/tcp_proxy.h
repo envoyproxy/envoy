@@ -346,6 +346,8 @@ protected:
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
+  void onClusterReady(Upstream::FutureCluster& future);
+
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
@@ -365,6 +367,7 @@ protected:
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
 
+  std::unique_ptr<Upstream::FutureCluster::Handle> future_cluster_handle_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   // The upstream handle (either TCP or HTTP). This is set in onGenericPoolReady and should persist
