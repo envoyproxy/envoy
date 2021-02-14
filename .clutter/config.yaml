@@ -1,0 +1,8 @@
+scanner:
+  ignore:
+    - "*.svg"
+    - ".git"
+    - "test/extensions/filters/network/common/fuzz/network_readfilter_corpus"
+    - "build_docs"
+    - "bazel-*"
+    - "generated"

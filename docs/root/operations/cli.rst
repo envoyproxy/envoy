@@ -96,7 +96,7 @@ following are the command line options that Envoy supports.
   *(optional)* The comma separated list of logging level per component. Non developers should generally
   never set this option. For example, if you want `upstream` component to run at `debug` level and
   `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to
-  this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
+  this flag. See :clutter:`all_logger_ids` for a list of components.
 
 .. option:: --cpuset-threads
 

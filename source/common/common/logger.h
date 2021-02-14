@@ -26,6 +26,7 @@ namespace Envoy {
 namespace Logger {
 
 // TODO: find out a way for extensions to register new logger IDs
+// [# all_logger_ids #]
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
   FUNCTION(aws)                                                                                    \

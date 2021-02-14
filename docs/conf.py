@@ -72,7 +72,7 @@ sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
     'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
-    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe'
+    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe', 'sphinx_clutter',
 ]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
@@ -280,3 +280,9 @@ htmlhelp_basename = 'envoydoc'
 #  - not sure how diffing will work with master merging in PRs - might need
 #    to be injected dynamically, somehow
 rediraffe_redirects = "redirects.txt"
+
+# Clutter
+import sphinx_clutter
+
+clutter_index_path = '.clutter/index'
+clutter_repo_url_format = sphinx_clutter.github_repo_url_format('envoyproxy', 'envoy')

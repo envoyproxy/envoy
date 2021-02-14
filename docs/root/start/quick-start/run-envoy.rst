@@ -344,4 +344,4 @@ which are set to ``debug`` and ``trace`` respectively.
 
 .. tip::
 
-   See ``ALL_LOGGER_IDS`` in :repo:`logger.h </source/common/common/logger.h#L29>` for a list of components.
+   See :clutter:`all_logger_ids` for a list of components.
