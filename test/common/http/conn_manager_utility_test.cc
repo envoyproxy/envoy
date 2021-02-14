@@ -320,7 +320,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 
 // Verify that xff_num_trusted_hops works when not using remote address.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
-  // Reconfigure XFF detecton.
+  // Reconfigure XFF detection.
   default_detection_ = std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(1);
   ON_CALL(config_, defaultIpDetection()).WillByDefault(Return(default_detection_));
 
