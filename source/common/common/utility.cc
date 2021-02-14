@@ -262,6 +262,12 @@ uint64_t DateUtil::nowToMilliseconds(TimeSource& time_source) {
   return std::chrono::time_point_cast<UnsignedMilliseconds>(now).time_since_epoch().count();
 }
 
+uint64_t DateUtil::nowToSeconds(TimeSource& time_source) {
+  return std::chrono::duration_cast<std::chrono::seconds>(
+             time_source.systemTime().time_since_epoch())
+      .count();
+}
+
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
 const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
