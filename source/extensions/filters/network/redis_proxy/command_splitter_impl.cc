@@ -1,5 +1,7 @@
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
+#include "common/common/logger.h"
+
 #include "extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
@@ -149,6 +151,8 @@ SplitRequestPtr SimpleRequest::create(Router& router,
     request_ptr->handle_ =
         makeSingleServerRequest(route, base_request->asArray()[0].asString(),
                                 base_request->asArray()[1].asString(), base_request, *request_ptr);
+  } else {
+    ENVOY_LOG(debug, "redis: route not found: '{}'", incoming_request->toString());
   }
 
   if (!request_ptr->handle_) {

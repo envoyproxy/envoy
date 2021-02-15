@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/stats/utility.h"
 
 #include "extensions/filters/network/redis_proxy/config.h"
@@ -261,6 +262,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
                                                            config_->readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
+    ENVOY_LOG(debug, "redis: host not found: '{}'", key);
     return nullptr;
   }
   pending_requests_.emplace_back(*this, std::move(request), callbacks);
