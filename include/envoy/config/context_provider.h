@@ -19,7 +19,11 @@ namespace Config {
  */
 class ContextProvider {
 public:
-  using UpdateCb = std::function<void(absl::string_view)>;
+  /**
+   * Callback type for when dynamic context changes. The argument provides the resource type URL for
+   * the update.
+   */
+  using UpdateNotificationCb = std::function<void(absl::string_view)>;
 
   virtual ~ContextProvider() = default;
 
@@ -45,7 +49,7 @@ public:
                                       absl::string_view value) PURE;
 
   /**
-   * Set a dynamic context parameter.
+   * Unset a dynamic context parameter.
    * @param resource_type_url resource type URL for context parameter.
    * @param key parameter key.
    */
@@ -57,7 +61,8 @@ public:
    * @param callback notification callback.
    * @return Common::CallbackHandle* callback handle for removal.
    */
-  virtual Common::CallbackHandle* addDynamicContextUpdateCallback(UpdateCb callback) const PURE;
+  virtual Common::CallbackHandle*
+  addDynamicContextUpdateCallback(UpdateNotificationCb callback) const PURE;
 };
 
 } // namespace Config

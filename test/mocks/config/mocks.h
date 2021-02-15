@@ -181,7 +181,7 @@ public:
                absl::string_view value));
   MOCK_METHOD(void, unsetDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key));
-  MOCK_METHOD(Common::CallbackHandle*, addDynamicContextUpdateCallback, (UpdateCb callback),
+  MOCK_METHOD(Common::CallbackHandle*, addDynamicContextUpdateCallback, (UpdateNotificationCb callback),
               (const));
 
   Common::CallbackManager<absl::string_view> update_cb_handler_;
