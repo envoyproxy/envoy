@@ -480,8 +480,6 @@ private:
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
 
         if (time_bias_ < 0.0) {
-          // ENVOY_LOG(warn, "upstream: invalid time bias supplied (runtime key {}), using 1.0",
-          //           time_bias_runtime_->runtimeKey());
           time_bias_ = 1.0;
         }
         return host.weight() * time_bias_;
@@ -534,8 +532,7 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
-                                 Logger::Loggable<Logger::Id::upstream> {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
@@ -564,8 +561,9 @@ protected:
         active_request_bias_runtime_ != nullptr ? active_request_bias_runtime_->value() : 1.0;
 
     if (active_request_bias_ < 0.0) {
-      ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
-                active_request_bias_runtime_->runtimeKey());
+      ENVOY_LOG_MISC(warn,
+                     "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
+                     active_request_bias_runtime_->runtimeKey());
       active_request_bias_ = 1.0;
     }
 

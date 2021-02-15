@@ -248,7 +248,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
     switch (hs.second) {
     case LoadBalancerBase::HostAvailability::Healthy:
       // Either we selected one of the healthy hosts or we failed to select anything and
-      // default to healthy.
+      // defaulted to healthy.
       EXPECT_TRUE(!hs.first.healthyHosts().empty() ||
                   (hs.first.healthyHosts().empty() && hs.first.degradedHosts().empty()));
       break;
@@ -832,7 +832,7 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   peekThenPick({2});
 
   // Now peek a few extra to push the index forward, alter the host set, and
-  // make sure the index is restored to 0.077
+  // make sure the index is restored to 0.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
 

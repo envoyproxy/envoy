@@ -733,14 +733,13 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
-  priority_set.addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                          const HostVector& hosts_removed) { refresh(priority); });
-  priority_set.addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
-        if (slow_start_enabled_) {
-          recalculateHostsInSlowStart(hosts_added);
-        }
-      });
+  priority_set.addPriorityUpdateCb(
+      [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+  priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) -> void {
+    if (slow_start_enabled_) {
+      recalculateHostsInSlowStart(hosts_added);
+    }
+  });
 }
 
 void EdfLoadBalancerBase::initialize() {
@@ -845,8 +844,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         HostsSource(priority, HostsSource::SourceType::LocalityDegradedHosts, locality_index),
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
-  // If endpoint warming policy is `WAIT_FOR_FIRST_PASSING_HC`,
-  // then we need to recheck all hosts in priority for possible health state change.
   if (slow_start_enabled_) {
     recalculateHostsInSlowStart(host_set->hosts());
   }
@@ -858,8 +855,6 @@ bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
     // Host enters slow start immediately.
     return true;
   case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
-    // Check health status of host. It should be marked as healthy and have first passed
-    // healthcheck.
     if (host.health() == Upstream::Host::Health::Healthy) {
       return true;
     } else {
@@ -885,7 +880,7 @@ bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
         (*(--hosts_in_slow_start_->end()))->creationTime());
     if (std::chrono::duration_cast<std::chrono::milliseconds>(
             current_time - latest_host_added_time) > slow_start_window_) {
-      hosts_in_slow_start_->erase(hosts_in_slow_start_->begin(), hosts_in_slow_start_->end());
+      hosts_in_slow_start_->clear();
       return true;
     } else {
       return false;
@@ -899,11 +894,9 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   }
 
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
-
   if (!hosts_source) {
     return nullptr;
   }
-
   auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
