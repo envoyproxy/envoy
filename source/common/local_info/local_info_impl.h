@@ -52,6 +52,7 @@ public:
       : node_(buildLocalNode(node, zone_name, cluster_name, node_name)), address_(address),
         context_provider_(node_, node_context_params),
         zone_stat_name_storage_(getZoneName(node_, zone_name), symbol_table),
+        zone_stat_name_(zone_stat_name_storage_.statName()),
         dynamic_update_callback_handle_(context_provider_.addDynamicContextUpdateCallback(
             [this](absl::string_view resource_type_url) {
               (*node_.mutable_dynamic_parameters())[resource_type_url].CopyFrom(
