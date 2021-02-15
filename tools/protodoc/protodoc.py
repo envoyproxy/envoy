@@ -241,7 +241,7 @@ def FormatExtensionCategory(extension_category):
   Returns:
     RST formatted extension category description.
   """
-  IGNORED_EXTENSIONS = ["envoy.tracers.xray", "envoy.filters.http.cache.simple_http_cache"]
+  IGNORED_EXTENSIONS = ["envoy.filters.http.cache.simple_http_cache"]
   try:
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
