@@ -145,6 +145,7 @@ envoy_cc_library(
     name = "original_ip_detection_interface",
     hdrs = ["original_ip_detection.h"],
     deps = [
+        ":codes_interface",
         ":header_map_interface",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:address_interface",
