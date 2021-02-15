@@ -17,7 +17,11 @@ TEST(CustomHeaderFactoryTest, Basic) {
       "envoy.original_ip_detection.xff");
   ASSERT_NE(factory, nullptr);
 
-  envoy::extensions::original_ip_detection::xff::v3::XffConfig config;
+  auto empty = factory->createEmptyConfigProto();
+  EXPECT_NE(empty, nullptr);
+
+  auto config =
+      *dynamic_cast<envoy::extensions::original_ip_detection::xff::v3::XffConfig*>(empty.get());
   config.set_xff_num_trusted_hops(1);
 
   EXPECT_NE(factory->createExtension(config), nullptr);

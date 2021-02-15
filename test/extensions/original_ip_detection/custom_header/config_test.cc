@@ -17,7 +17,12 @@ TEST(CustomHeaderFactoryTest, Basic) {
       "envoy.original_ip_detection.custom_header");
   ASSERT_NE(factory, nullptr);
 
-  envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
+  auto empty = factory->createEmptyConfigProto();
+  EXPECT_NE(empty, nullptr);
+
+  auto config = *dynamic_cast<
+      envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig*>(
+      empty.get());
   config.set_header_name("x-real-ip");
 
   EXPECT_NE(factory->createExtension(config), nullptr);
