@@ -75,6 +75,7 @@ TEST_F(CustomHeaderTest, Detection) {
 
     EXPECT_EQ("1.2.3.4:0", result.detected_remote_address->asString());
     EXPECT_TRUE(result.allow_trusted_address_checks);
+    EXPECT_FALSE(result.reject_options.has_value());
   }
 }
 
