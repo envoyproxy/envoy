@@ -66,11 +66,8 @@ def GetExtensionMetadata(target):
         % target)
   # evaluate tuples/lists
   # wrap strings in a list
-  categories = (
-    ast.literal_eval(categories)
-    if ('[' in categories
-        or '(' in categories)
-    else [categories])
+  categories = (ast.literal_eval(categories) if
+                ('[' in categories or '(' in categories) else [categories])
   return {
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
