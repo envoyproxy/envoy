@@ -978,15 +978,8 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : ListenerFilterChainFactoryBuilder(listener.validation_visitor_, listener.parent_.factory_,
-                                        factory_context) {}
-
-ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
-    ProtobufMessage::ValidationVisitor& validator,
-    ListenerComponentFactory& listener_component_factory,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : validator_(validator), listener_component_factory_(listener_component_factory),
-      factory_context_(factory_context) {}
+    : listener_(listener), validator_(listener.validation_visitor_),
+      listener_component_factory_(listener.parent_.factory_), factory_context_(factory_context) {}
 
 Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
@@ -1015,8 +1008,10 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
-  if (transport_socket.name() == Extensions::TransportSockets::TransportSocketNames::get().Quic &&
-      typeid(Quic::QuicServerTransportSocketConfigFactory) != typeid(config_factory)) {
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  const bool is_quic = listener_.udpListenerFactory() != nullptr &&
+                       !listener_.udpListenerFactory()->isTransportConnectionless();
+  if (is_quic && typeid(Quic::QuicServerTransportSocketConfigFactory) != typeid(config_factory)) {
     throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
                                      "transport socket config specified for quic transport socket: "
                                      "{}. \nUse QuicDownstreamTransport instead.",
