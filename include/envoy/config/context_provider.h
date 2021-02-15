@@ -13,6 +13,9 @@ namespace Config {
  * A provider for xDS context parameters. These are currently derived from the bootstrap, but will
  * be set dynamically at runtime in the near future as we add support for dynamic context parameter
  * discovery and updates.
+ *
+ * In general, this is intended to be used only on the main thread, as part of the Server instance
+ * interface and config subsystem.
  */
 class ContextProvider {
 public:
