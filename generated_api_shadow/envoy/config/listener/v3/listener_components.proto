@@ -33,6 +33,7 @@ message Filter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
+  // [#extension-category: envoy.transport_sockets.downstream]
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // [#extension-category: envoy.filters.network]
