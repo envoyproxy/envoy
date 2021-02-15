@@ -32,6 +32,14 @@ const envoy::config::core::v3::Node buildLocalNode(const envoy::config::core::v3
   return local_node;
 }
 
+const absl::string_view getZoneName(const envoy::config::core::v3::Node& node,
+                                    absl::string_view zone_name) {
+  if (zone_name.empty()) {
+    return node.locality().zone();
+  }
+  return zone_name;
+}
+
 } // namespace
 
 class LocalInfoImpl : public LocalInfo {
@@ -43,8 +51,7 @@ public:
                 absl::string_view node_name)
       : node_(buildLocalNode(node, zone_name, cluster_name, node_name)), address_(address),
         context_provider_(node_, node_context_params),
-        zone_stat_name_storage_(zone_name, symbol_table),
-        zone_stat_name_(zone_stat_name_storage_.statName()),
+        zone_stat_name_storage_(getZoneName(node_, zone_name), symbol_table),
         dynamic_update_callback_handle_(context_provider_.addDynamicContextUpdateCallback(
             [this](absl::string_view resource_type_url) {
               (*node_.mutable_dynamic_parameters())[resource_type_url].CopyFrom(

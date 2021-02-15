@@ -7,6 +7,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
@@ -913,16 +914,12 @@ TEST_F(OwnedImplTest, ReserveOverCommit) {
   auto reservation = buffer.reserveForRead();
   const auto reservation_length = reservation.length();
   const auto excess_length = reservation_length + 1;
-#ifdef NDEBUG
-  reservation.commit(excess_length);
-
-  // The length should be the Reservation length, not the value passed to commit.
-  EXPECT_EQ(reservation_length, buffer.length());
-#else
-  EXPECT_DEATH(
-      reservation.commit(excess_length),
-      "length <= length_. Details: commit\\(\\) length must be <= size of the Reservation");
-#endif
+  EXPECT_ENVOY_BUG(
+      {
+        reservation.commit(excess_length);
+        EXPECT_EQ(reservation_length, buffer.length());
+      },
+      "length <= length_. Details: commit() length must be <= size of the Reservation");
 }
 
 // Test behavior when the size to commit() is larger than the reservation.
@@ -931,16 +928,12 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
   auto reservation = buffer.reserveSingleSlice(10);
   const auto reservation_length = reservation.length();
   const auto excess_length = reservation_length + 1;
-#ifdef NDEBUG
-  reservation.commit(excess_length);
-
-  // The length should be the Reservation length, not the value passed to commit.
-  EXPECT_EQ(reservation_length, buffer.length());
-#else
-  EXPECT_DEATH(
-      reservation.commit(excess_length),
-      "length <= slice_.len_. Details: commit\\(\\) length must be <= size of the Reservation");
-#endif
+  EXPECT_ENVOY_BUG(
+      {
+        reservation.commit(excess_length);
+        EXPECT_EQ(reservation_length, buffer.length());
+      },
+      "length <= slice_.len_. Details: commit() length must be <= size of the Reservation");
 }
 
 // Test functionality of the `freelist` (a performance optimization)
