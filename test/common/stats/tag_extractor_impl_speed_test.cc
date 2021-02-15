@@ -55,13 +55,16 @@ namespace {
 using Params = std::tuple<std::string, uint32_t>;
 
 const std::vector<Params> params = {
+#if 0
     {"listener.127.0.0.1_3012.http.http_prefix.downstream_rq_5xx", 3},
     {"cluster.ratelimit.upstream_rq_timeout", 1},
     {"listener.[__1]_0.ssl.cipher.AES256-SHA", 2},
     {"cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256", 2},
     {"listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.cipher.AES256-SHA", 2},
     {"listener.127.0.0.1_0.ssl.cipher.AES256-SHA", 2},
+#endif
     {"mongo.mongo_filter.op_reply", 1},
+#if 0
     {"mongo.mongo_filter.cmd.foo_cmd.reply_size", 2},
     {"mongo.mongo_filter.collection.bar_collection.query.multi_get", 2},
     {"mongo.mongo_filter.collection.bar_collection.callsite.baz_callsite.query.scatter_get", 3},
@@ -86,12 +89,12 @@ const std::vector<Params> params = {
     {"another_long_but_matching_string_which_may_consume_resources_if_missing_end_of_line_lock_rq_"
      "2xx",
      1},
+#endif
 };
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void BM_ExtractTags(benchmark::State& state) {
-  Stats::SymbolTableImpl symbol_table;
-  TagProducerImpl tag_extractors{envoy::config::metrics::v3::StatsConfig(), symbol_table};
+  TagProducerImpl tag_extractors{envoy::config::metrics::v3::StatsConfig()};
   const auto idx = state.range(0);
   const auto& p = params[idx];
   absl::string_view str = std::get<0>(p);

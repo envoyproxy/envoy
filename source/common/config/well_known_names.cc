@@ -128,7 +128,7 @@ TagNameValues::TagNameValues() {
   addRe2(VIRTUAL_HOST, R"(^vhost\.((<NAME>)\.))");
 
   // mongo.(<stat_prefix>.)*
-  addRe2(MONGO_PREFIX, R"(^mongo\.((<NAME>)\.))");
+  addTokenized(MONGO_PREFIX, "mongo.$.*");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
   // Note: <route_config_name> can contain dots thus we have to maintain full
@@ -142,6 +142,10 @@ TagNameValues::TagNameValues() {
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
                            const std::string& substr) {
   descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
+}
+
+void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {
+  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens});
 }
 
 } // namespace Config

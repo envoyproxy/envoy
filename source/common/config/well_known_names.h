@@ -69,6 +69,11 @@ public:
     const Regex::Type re_type_;
   };
 
+  struct TokenizedDescriptor {
+    const std::string name_;
+    const std::string pattern_;
+  };
+
   // Cluster name tag
   const std::string CLUSTER_NAME = "envoy.cluster_name";
   // Listener port tag
@@ -128,11 +133,20 @@ public:
   // Returns the list of descriptors.
   const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
+  // Returns the list of tokenized descriptors.
+  const std::vector<TokenizedDescriptor>& tokenizedDescriptorVec() const {
+    return tokenized_descriptor_vec_;
+  }
+
 private:
   void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
+  void addTokenized(const std::string& name, const std::string& regex);
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;
+
+  // Collection of tokenized tag descriptors.
+  std::vector<TokenizedDescriptor> tokenized_descriptor_vec_;
 };
 
 using TagNames = ConstSingleton<TagNameValues>;
