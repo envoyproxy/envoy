@@ -479,7 +479,7 @@ Custom request/response headers can be added to a request/response at the weight
 route, virtual host, and/or global route configuration level. See the
 :ref:`v3 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` API documentation.
 
-No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
+Neither *:-prefixed* pseudo-headers nor the Host: header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
 :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`, and
@@ -506,7 +506,7 @@ Supported variable names are:
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
-      :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -605,11 +605,17 @@ Supported variable names are:
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_start>`.
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_end>`.
 
 %HOSTNAME%
     The system hostname.

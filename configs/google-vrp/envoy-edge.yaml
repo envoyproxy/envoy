@@ -3,7 +3,7 @@ overload_manager:
   resource_monitors:
   - name: "envoy.resource_monitors.fixed_heap"
     typed_config:
-      "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
+      "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
       # TODO: Tune for your system.
       max_heap_size_bytes: 1073741824 # 1 GiB
   actions:
@@ -27,6 +27,11 @@ static_resources:
         address: 0.0.0.0
         port_value: 10000
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
+    # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
+    # listener_filters:
+    # - name: envoy.filters.listener.proxy_protocol
+    #   typed_config:
+    #     "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
     filter_chains:
     - transport_socket:
         name: envoy.transport_sockets.tls
@@ -36,8 +41,6 @@ static_resources:
             tls_certificates:
             - certificate_chain: { filename: "certs/servercert.pem" }
               private_key: { filename: "certs/serverkey.pem" }
-      # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
-      # use_proxy_proto: true
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:

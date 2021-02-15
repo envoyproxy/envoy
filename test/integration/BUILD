@@ -141,8 +141,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
-    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -328,6 +326,7 @@ envoy_cc_test(
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
+        ":tracked_watermark_buffer_lib",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:backpressure_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
@@ -429,29 +428,42 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "protocol_integration_test",
+envoy_cc_test_library(
+    name = "protocol_integration_test_lib",
     srcs = [
         "protocol_integration_test.cc",
+        "protocol_integration_test.h",
     ],
-    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
-    # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 5,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/common/http/http2:http2_frame",
+        "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "protocol_integration_test",
+    srcs = [
+        "instantiate_protocol_integration_test.cc",
+    ],
+    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
+    shard_count = 5,
+    deps = [
+        ":protocol_integration_test_lib",
     ],
 )
 
@@ -876,6 +888,8 @@ envoy_cc_test(
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:process_context_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -973,9 +987,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test, hangs at
-    # IpVersionsClientType/LoadStatsIntegrationTest.NoLocalLocality/3
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -1078,6 +1089,7 @@ envoy_cc_test(
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
     ],
@@ -1128,7 +1140,10 @@ envoy_cc_test(
     # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
     # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
     # correctly handle symlinks.
-    tags = ["fails_on_windows"],
+    tags = [
+        "fails_on_clang_cl",
+        "fails_on_windows",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
@@ -1253,6 +1268,28 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "tracked_watermark_buffer_lib",
+    srcs = [
+        "tracked_watermark_buffer.cc",
+    ],
+    hdrs = [
+        "tracked_watermark_buffer.h",
+    ],
+    deps = [
+        "//source/common/buffer:watermark_buffer_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tracked_watermark_buffer_test",
+    srcs = ["tracked_watermark_buffer_test.cc"],
+    deps = [
+        ":tracked_watermark_buffer_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "uds_integration_test",
     srcs = [
@@ -1298,8 +1335,6 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    # TODO(envoyproxy/windows-dev): Investigate flakes in #14286.
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1553,6 +1588,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "direct_response_integration_test",
+    srcs = ["direct_response_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "local_reply_integration_test",
     srcs = [
         "local_reply_integration_test.cc",
@@ -1560,6 +1603,18 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "command_formatter_extension_integration_test",
+    srcs = [
+        "command_formatter_extension_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/formatter:command_extension_lib",
         "//test/test_common:utility_lib",
     ],
 )

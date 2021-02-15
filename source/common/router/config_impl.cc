@@ -49,6 +49,8 @@ namespace {
 
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
+constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
+
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -341,7 +343,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      rate_limit_policy_(route.route().rate_limits()),
+      rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       total_cluster_weight_(
@@ -356,7 +358,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
-      direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
+      direct_response_body_(ConfigUtility::parseDirectResponseBody(
+          route, factory_context.api(),
+          vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(),
                           route.hidden_envoy_deprecated_per_filter_config(), factory_context,
                           validator),
@@ -1115,10 +1119,12 @@ VirtualHostImpl::VirtualHostImpl(
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
-    : stat_name_pool_(factory_context.scope().symbolTable()),
-      stat_name_(stat_name_pool_.add(virtual_host.name())),
-      vcluster_scope_(scope.createScope(virtual_host.name() + ".vcluster")),
-      rate_limit_policy_(virtual_host.rate_limits()), global_route_config_(global_route_config),
+    : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+      vcluster_scope_(Stats::Utility::scopeFromStatNames(
+          scope, {stat_name_storage_.statName(),
+                  factory_context.routerContext().virtualClusterStatNames().vcluster_})),
+      rate_limit_policy_(virtual_host.rate_limits(), validator),
+      global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
@@ -1130,7 +1136,8 @@ VirtualHostImpl::VirtualHostImpl(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(stat_name_pool_, *vcluster_scope_) {
+      virtual_cluster_catch_all_(*vcluster_scope_,
+                                 factory_context.routerContext().virtualClusterStatNames()) {
 
   switch (virtual_host.require_tls()) {
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1191,7 +1198,8 @@ VirtualHostImpl::VirtualHostImpl(
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_));
+        VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
+                            factory_context.routerContext().virtualClusterStatNames()));
   }
 
   if (virtual_host.has_cors()) {
@@ -1200,10 +1208,11 @@ VirtualHostImpl::VirtualHostImpl(
 }
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
-    const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool,
-    Stats::Scope& scope)
-    : VirtualClusterBase(pool.add(virtual_cluster.name()),
-                         scope.createScope(virtual_cluster.name())) {
+    const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
+    const VirtualClusterStatNames& stat_names)
+    : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
+      VirtualClusterBase(stat_name_storage_.statName(),
+                         scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
   if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
       virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
@@ -1262,7 +1271,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            const ConfigImpl& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
-    : vhost_scope_(factory_context.scope().createScope("vhost")) {
+    : vhost_scope_(factory_context.scope().scopeFromStatName(
+          factory_context.routerContext().virtualClusterStatNames().vhost_)) {
   absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
   if (validate_clusters) {
     validation_clusters = factory_context.clusterManager().clusters();
@@ -1429,7 +1439,10 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
       uses_vhds_(config.has_vhds()),
-      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {
+      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
+      max_direct_response_body_size_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
+                                          DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context, validator,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));

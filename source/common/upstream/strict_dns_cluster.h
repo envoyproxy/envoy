@@ -38,7 +38,7 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
-    const envoy::config::endpoint::v3::LocalityLbEndpoints locality_lb_endpoint_;
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint_;
     const envoy::config::endpoint::v3::LbEndpoint lb_endpoint_;
     HostMap all_hosts_;
   };
@@ -51,6 +51,9 @@ private:
   // ClusterImplBase
   void startPreInit() override;
 
+  // Keep load assignment as a member to make sure its data referenced in
+  // resolve_targets_ outlives them.
+  const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;

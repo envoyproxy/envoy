@@ -71,6 +71,12 @@ void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly();
  */
 bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name);
 
+/**
+ * Resets all counters for EnvoyBugRegistrationImpl between tests.
+ *
+ */
+void resetEnvoyBugCountersForTest();
+
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
 #define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \

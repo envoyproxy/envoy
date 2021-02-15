@@ -5,13 +5,11 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client_manager.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/assert.h"
-#include "common/config/utility.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/protobuf/utility.h"
 
@@ -145,6 +143,20 @@ public:
 } // namespace Detail
 
 /**
+ * All stats for the grpc access logger. @see stats_macros.h
+ */
+#define ALL_GRPC_ACCESS_LOGGER_STATS(COUNTER)                                                      \
+  COUNTER(logs_written)                                                                            \
+  COUNTER(logs_dropped)
+
+/**
+ * Wrapper struct for the access log stats. @see stats_macros.h
+ */
+struct GrpcAccessLoggerStats {
+  ALL_GRPC_ACCESS_LOGGER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Base class for defining a gRPC logger with the `HttpLogProto` and `TcpLogProto` access log
  * entries and `LogRequest` and `LogResponse` gRPC messages.
  * The log entries and messages are distinct types to support batching of multiple access log
@@ -156,15 +168,95 @@ public:
   using Interface = Detail::GrpcAccessLogger<HttpLogProto, TcpLogProto>;
 
   GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
+                   std::chrono::milliseconds buffer_flush_interval_msec,
+                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
+                   Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogger(std::move(client), service_method, absl::nullopt) {}
+      : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
+                         dispatcher, scope, access_log_prefix, service_method, absl::nullopt) {}
   GrpcAccessLogger(Grpc::RawAsyncClientPtr&& client,
+                   std::chrono::milliseconds buffer_flush_interval_msec,
+                   uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
+                   Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method,
                    envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(std::move(client), service_method, transport_api_version) {}
+      : client_(std::move(client), service_method, transport_api_version),
+        buffer_flush_interval_msec_(buffer_flush_interval_msec),
+        flush_timer_(dispatcher.createTimer([this]() {
+          flush();
+          flush_timer_->enableTimer(buffer_flush_interval_msec_);
+        })),
+        max_buffer_size_bytes_(max_buffer_size_bytes),
+        stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(scope, access_log_prefix))}) {
+    flush_timer_->enableTimer(buffer_flush_interval_msec_);
+  }
+
+  void log(HttpLogProto&& entry) {
+    if (!canLogMore()) {
+      return;
+    }
+    approximate_message_size_bytes_ += entry.ByteSizeLong();
+    addEntry(std::move(entry));
+    if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
+      flush();
+    }
+  }
+
+  void log(TcpLogProto&& entry) {
+    approximate_message_size_bytes_ += entry.ByteSizeLong();
+    addEntry(std::move(entry));
+    if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
+      flush();
+    }
+  }
 
 protected:
   Detail::GrpcAccessLogClient<LogRequest, LogResponse> client_;
+  LogRequest message_;
+
+private:
+  virtual bool isEmpty() PURE;
+  virtual void initMessage() PURE;
+  virtual void addEntry(HttpLogProto&& entry) PURE;
+  virtual void addEntry(TcpLogProto&& entry) PURE;
+  virtual void clearMessage() { message_.Clear(); }
+
+  void flush() {
+    if (isEmpty()) {
+      // Nothing to flush.
+      return;
+    }
+
+    if (!client_.isStreamStarted()) {
+      initMessage();
+    }
+
+    if (client_.log(message_)) {
+      // Clear the message regardless of the success.
+      approximate_message_size_bytes_ = 0;
+      clearMessage();
+    }
+  }
+
+  bool canLogMore() {
+    if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
+      stats_.logs_written_.inc();
+      return true;
+    }
+    flush();
+    if (approximate_message_size_bytes_ < max_buffer_size_bytes_) {
+      stats_.logs_written_.inc();
+      return true;
+    }
+    stats_.logs_dropped_.inc();
+    return false;
+  }
+
+  const std::chrono::milliseconds buffer_flush_interval_msec_;
+  const Event::TimerPtr flush_timer_;
+  const uint64_t max_buffer_size_bytes_;
+  uint64_t approximate_message_size_bytes_ = 0;
+  GrpcAccessLoggerStats stats_;
 };
 
 /**
@@ -178,9 +270,8 @@ public:
   using Interface = Detail::GrpcAccessLoggerCache<GrpcAccessLogger, ConfigProto>;
 
   GrpcAccessLoggerCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
-                        ThreadLocal::SlotAllocator& tls, const LocalInfo::LocalInfo& local_info)
-      : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()),
-        local_info_(local_info) {
+                        ThreadLocal::SlotAllocator& tls)
+      : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()) {
     tls_slot_->set([](Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(dispatcher);
     });
@@ -198,11 +289,11 @@ public:
     }
     const Grpc::AsyncClientFactoryPtr factory =
         async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
-    const auto logger = std::make_shared<GrpcAccessLogger>(
-        factory->create(), config.log_name(),
+    const auto logger = createLogger(
+        config, factory->create(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
-        local_info_, scope, Config::Utility::getAndCheckTransportVersion(config));
+        scope);
     cache.access_loggers_.emplace(cache_key, logger);
     return logger;
   }
@@ -221,10 +312,15 @@ private:
         access_loggers_;
   };
 
+  // Create the specific logger type for this cache.
+  virtual typename GrpcAccessLogger::SharedPtr
+  createLogger(const ConfigProto& config, Grpc::RawAsyncClientPtr&& client,
+               std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+               Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
+
   Grpc::AsyncClientManager& async_client_manager_;
   Stats::Scope& scope_;
   ThreadLocal::SlotPtr tls_slot_;
-  const LocalInfo::LocalInfo& local_info_;
 };
 
 } // namespace Common

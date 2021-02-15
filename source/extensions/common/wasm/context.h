@@ -14,7 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
-#include "extensions/common/wasm/wasm_state.h"
+#include "extensions/filters/common/expr/cel_state.h"
 #include "extensions/filters/common/expr/evaluator.h"
 
 #include "eval/public/activation.h"
@@ -42,6 +42,8 @@ using proxy_wasm::WasmResult;
 using proxy_wasm::WasmStreamType;
 
 using VmConfig = envoy::extensions::wasm::v3::VmConfig;
+using CapabilityRestrictionConfig = envoy::extensions::wasm::v3::CapabilityRestrictionConfig;
+using SanitizationConfig = envoy::extensions::wasm::v3::SanitizationConfig;
 using GrpcService = envoy::config::core::v3::GrpcService;
 
 class Wasm;
@@ -216,7 +218,7 @@ public:
   WasmResult getProperty(absl::string_view path, std::string* result) override;
   WasmResult setProperty(absl::string_view path, absl::string_view value) override;
   WasmResult declareProperty(absl::string_view path,
-                             std::unique_ptr<const WasmStatePrototype> state_prototype);
+                             Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype);
 
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
@@ -475,7 +477,8 @@ protected:
   bool tcp_connection_closed_ = false;
 
   // Filter state prototype declaration.
-  absl::flat_hash_map<std::string, std::unique_ptr<const WasmStatePrototype>> state_prototypes_;
+  absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
+      state_prototypes_;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

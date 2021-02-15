@@ -11,7 +11,6 @@ import "envoy/config/listener/v4alpha/api_listener.proto";
 import "envoy/config/listener/v4alpha/listener_components.proto";
 import "envoy/config/listener/v4alpha/udp_listener_config.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -39,7 +38,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Listener";
 
@@ -63,12 +62,8 @@ message Listener {
     // bind can only receive connections redirected from other listeners that
     // set use_original_dst parameter to true. Default is true.
     //
-    // This is deprecated in v2, all Listeners will bind to their port. An
-    // additional filter chain must be created for every original destination
-    // port this listener may redirect to in v2, with the original port
-    // specified in the FilterChainMatch destination_port field.
-    //
-    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
+    // This is deprecated. Use :ref:`Listener.bind_to_port
+    // <envoy_api_field_config.listener.v4alpha.Listener.bind_to_port>`
     google.protobuf.BoolValue bind_to_port = 1;
   }
 
@@ -137,7 +132,7 @@ message Listener {
   core.v4alpha.Metadata metadata = 6;
 
   // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 7;
+  DeprecatedV1 hidden_envoy_deprecated_deprecated_v1 = 7 [deprecated = true];
 
   // The type of draining to perform at a listener-wide level.
   DrainType drain_type = 8;
@@ -275,4 +270,10 @@ message Listener {
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
+
+  // Whether the listener should bind to the port. A listener that doesn't
+  // bind can only receive connections redirected from other listeners that set
+  // :ref:`use_original_dst <envoy_api_field_config.listener.v4alpha.Listener.use_original_dst>`
+  // to true. Default is true.
+  google.protobuf.BoolValue bind_to_port = 26;
 }

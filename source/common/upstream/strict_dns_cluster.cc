@@ -15,6 +15,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.dispatcher().timeSource()),
+      load_assignment_{
+          cluster.has_load_assignment()
+              ? cluster.load_assignment()
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())},
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -25,11 +29,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
-  const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment()
-          ? cluster.load_assignment()
-          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
 
@@ -49,7 +49,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+      load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 }
 
 void StrictDnsClusterImpl::startPreInit() {
@@ -119,9 +119,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           parent_.info_->stats().update_success_.inc();
 
-          absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
+          HostMap updated_hosts;
           HostVector new_hosts;
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+          absl::flat_hash_set<std::string> all_new_hosts;
           for (const auto& resp : response) {
             // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
             // make a new address that has port in it. We need to both support IPv6 as well as
@@ -136,14 +137,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
-
+            all_new_hosts.emplace(new_hosts.back()->address()->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
           }
 
           HostVector hosts_added;
           HostVector hosts_removed;
           if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                            updated_hosts, all_hosts_)) {
+                                            updated_hosts, all_hosts_, all_new_hosts)) {
             ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
             ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
               return host->priority() == locality_lb_endpoint_.priority();

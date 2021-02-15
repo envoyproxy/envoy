@@ -173,7 +173,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-    const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
+    const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();
@@ -352,10 +352,10 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     span.setTag(tag(), value.string_value());
     return;
   case ProtobufWkt::Value::kListValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.list_value()));
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.list_value()));
     return;
   case ProtobufWkt::Value::kStructValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.struct_value()));
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.struct_value()));
     return;
   default:
     break;

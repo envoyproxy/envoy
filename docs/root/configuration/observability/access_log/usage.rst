@@ -163,6 +163,13 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+%REQUEST_HEADERS_BYTES%
+  HTTP
+    Uncompressed bytes of request headers.
+
+  TCP
+    Not implemented (0).
+
 %BYTES_RECEIVED%
   HTTP
     Body bytes received.
@@ -212,6 +219,20 @@ The following command operators are supported:
   HTTP and TCP
     Connection termination details may provide additional information about why the connection was
     terminated by Envoy for L4 reasons.
+
+%RESPONSE_HEADERS_BYTES%
+  HTTP
+    Uncompressed bytes of response headers.
+
+  TCP
+    Not implemented (0).
+
+%RESPONSE_TRAILERS_BYTES%
+  HTTP
+    Uncompressed bytes of response trailers.
+
+  TCP
+    Not implemented (0).
 
 %BYTES_SENT%
   HTTP
@@ -322,7 +343,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -332,7 +353,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
@@ -342,7 +363,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -352,7 +373,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
@@ -435,6 +456,34 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
+%CLUSTER_METADATA(NAMESPACE:KEY*):Z%
+  HTTP
+    :ref:`Upstream cluster Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following dynamic metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %CLUSTER_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %CLUSTER_METADATA(com.test.my_filter:test_key)% will log: ``"foo"``
+    * %CLUSTER_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+    * %CLUSTER_METADATA(com.unknown_filter)% will log: ``-``
+    * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  TCP
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored
+
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%
@@ -443,8 +492,8 @@ The following command operators are supported:
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
-    F is an optional parameter used to indicate which method FilterState uses for serialization. 
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string. 
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
 
   TCP
@@ -535,17 +584,27 @@ The following command operators are supported:
   TCP
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
 
+.. _config_access_log_format_downstream_peer_cert_v_start:
+
 %DOWNSTREAM_PEER_CERT_V_START%
   HTTP
     The validity start date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_downstream_peer_cert_v_end:
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %HOSTNAME%
   The system hostname.

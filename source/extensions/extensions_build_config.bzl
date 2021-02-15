@@ -23,6 +23,8 @@ EXTENSIONS = {
 
     "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
     "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+    "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
+    "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
 
     #
     # gRPC Credentials Plugins
@@ -229,6 +231,18 @@ EXTENSIONS = {
     "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
     "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
+
+    #
+    # Rate limit descriptors
+    #
+
+    "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
+    
+    #
+    # IO socket
+    #
+
+    "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

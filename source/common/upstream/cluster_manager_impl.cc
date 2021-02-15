@@ -844,27 +844,34 @@ ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view 
   }
 }
 
-void ClusterManagerImpl::maybePrefetch(
+void ClusterManagerImpl::maybePreconnect(
     ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
-    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
-  // TODO(alyssawilk) As currently implemented, this will always just prefetch
-  // one connection ahead of actually needed connections.
-  //
-  // Instead we want to track the following metrics across the entire connection
-  // pool and use the same algorithm we do for per-upstream prefetch:
-  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
-  //  (connecting_stream_capacity_ + num_active_streams_)))
-  //  and allow multiple prefetches per pick.
-  //  Also cap prefetches such that
-  //  num_unused_prefetch < num hosts
-  //  since if we have more prefetches than hosts, we should consider kicking into
-  //  per-upstream prefetch.
-  //
-  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
-  if (cluster_entry.cluster_info_->peekaheadRatio() > 1.0) {
-    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
-    if (prefetch_pool) {
-      prefetch_pool->maybePrefetch(cluster_entry.cluster_info_->peekaheadRatio());
+    const ClusterConnectivityState& state,
+    std::function<ConnectionPool::Instance*()> pick_preconnect_pool) {
+  auto peekahead_ratio = cluster_entry.cluster_info_->peekaheadRatio();
+  if (peekahead_ratio <= 1.0) {
+    return;
+  }
+
+  // 3 here is arbitrary. Just as in ConnPoolImplBase::tryCreateNewConnections
+  // we want to limit the work which can be done on any given preconnect attempt.
+  for (int i = 0; i < 3; ++i) {
+    // See if adding this one new connection
+    // would put the cluster over desired capacity. If so, stop preconnecting.
+    //
+    // We anticipate the incoming stream here, because maybePreconnect is called
+    // before a new stream is established.
+    if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
+            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
+            peekahead_ratio, true)) {
+      return;
+    }
+    ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
+    if (!preconnect_pool || !preconnect_pool->maybePreconnect(peekahead_ratio)) {
+      // Given that the next preconnect pick may be entirely different, we could
+      // opt to try again even if the first preconnect fails. Err on the side of
+      // caution and wait for the next attempt.
+      return;
     }
   }
 }
@@ -876,16 +883,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   // Select a host and create a connection pool for it if it does not already exist.
   auto ret = connPool(priority, protocol, context, false);
 
-  // Now see if another host should be prefetched.
+  // Now see if another host should be preconnected.
   // httpConnPool is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so prefetching must be
+  // have the load balancer context needed to make selection decisions so preconnecting must be
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(*this, [this, &priority, &protocol, &context]() {
+  maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
     return connPool(priority, protocol, context, true);
   });
-
   return ret;
 }
 
@@ -896,13 +902,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   auto ret = tcpConnPool(priority, context, false);
 
   // tcpConnPool is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
   // be performed here in anticipation of the new connection.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  // Now see if another host should be prefetched.
-  maybePrefetch(*this,
-                [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
+  // Now see if another host should be preconnected.
+  maybePreconnect(*this, parent_.cluster_manager_state_,
+                  [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
 
   return ret;
 }
@@ -1246,7 +1252,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    // Close non connection pool TCP connections obtained from tcpConn()
     //
     // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
     // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
@@ -1360,8 +1366,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
@@ -1429,8 +1437,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for TCP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
@@ -1483,9 +1493,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
-  if (protocols.size() == 2 &&
-      ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
-       (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
+  if (protocols.size() == 2) {
+    ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
+           (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);

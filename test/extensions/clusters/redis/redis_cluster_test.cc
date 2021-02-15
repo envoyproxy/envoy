@@ -3,9 +3,9 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
@@ -107,15 +107,15 @@ protected:
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    envoy::config::cluster::redis::RedisClusterConfig config;
+    envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
         cluster_config,
-        TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
-            config),
+        TestUtility::downcastAndValidate<
+            const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
         cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
@@ -137,7 +137,7 @@ protected:
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    envoy::config::cluster::redis::RedisClusterConfig config;
+    envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            validation_visitor_, config);
@@ -977,34 +977,75 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
-  expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
+  expectClusterSlotResponse(twoSlotsPrimariesWithReplica());
 
-  // Verify that both hosts are initially marked with FAILED_ACTIVE_HC, then
+  // Verify that all hosts are initially marked with FAILED_ACTIVE_HC, then
   // clear the flag to simulate that these hosts have been successfully health
   // checked.
   {
     EXPECT_CALL(membership_updated_, ready());
     const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(2UL, hosts.size());
+    EXPECT_EQ(4UL, hosts.size());
 
-    for (size_t i = 0; i < 2; ++i) {
+    for (size_t i = 0; i < 4; ++i) {
       EXPECT_TRUE(hosts[i]->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
       hosts[i]->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
       hosts[i]->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
       health_checker->runCallbacks(hosts[i], Upstream::HealthTransition::Changed);
     }
-    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
+    expectHealthyHosts(std::list<std::string>(
+        {"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.2:22120", "127.0.0.4:22120"}));
   }
 
-  // Failed HC
-  EXPECT_CALL(membership_updated_, ready());
-  EXPECT_CALL(*cluster_callback_, onHostHealthUpdate());
-  const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  hosts[1]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(hosts[1], Upstream::HealthTransition::Changed);
+  // Fail a HC for one of the hosts
+  {
+    EXPECT_CALL(membership_updated_, ready());
+    EXPECT_CALL(*cluster_callback_, onHostHealthUpdate());
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[2]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+    health_checker->runCallbacks(hosts[2], Upstream::HealthTransition::Changed);
 
-  EXPECT_THAT(2U, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_THAT(1U, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+    EXPECT_THAT(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size(), 4U);
+    EXPECT_THAT(cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size(), 3U);
+  }
+
+  // Remove 2nd shard.
+  {
+    expectRedisResolve();
+    EXPECT_CALL(membership_updated_, ready());
+    resolve_timer_->invokeCallback();
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.3", 22120));
+
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+
+    // We expect the host that failed health checks to be instantly removed,
+    // but the other should remain until its health check fails too.
+    EXPECT_THAT(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size(), 3U);
+    expectHealthyHosts(
+        std::list<std::string>({"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.4:22120"}));
+    EXPECT_TRUE(hosts[2]->healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  /*
+  // TODO(#14630) This part of the test doesn't pass, as removal of PENDING_DYNAMIC_REMOVAL hosts
+  // does not seem to be implemented for redis clusters at present.
+
+  // Fail the HC for the remaining removed host
+  {
+    EXPECT_CALL(membership_updated_, ready());
+    EXPECT_CALL(*cluster_callback_, onHostHealthUpdate());
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_TRUE(hosts[2]->healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    hosts[2]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+    health_checker->runCallbacks(hosts[2], Upstream::HealthTransition::Changed);
+
+    // The pending removal host should also have been removed now
+    EXPECT_THAT(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size(), 2U);
+    expectHealthyHosts(std::list<std::string>(
+      {"127.0.0.1:22120", "127.0.0.3:22120"}));
+  }
+  */
 }
 
 } // namespace Redis

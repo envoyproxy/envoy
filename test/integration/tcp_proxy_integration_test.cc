@@ -25,11 +25,21 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
 
 namespace Envoy {
+
+std::vector<TcpProxyIntegrationTestParams> newPoolTestParams() {
+  std::vector<TcpProxyIntegrationTestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
+  }
+  return ret;
+}
 
 std::vector<TcpProxyIntegrationTestParams> getProtocolTestParams() {
   std::vector<TcpProxyIntegrationTestParams> ret;
@@ -91,10 +101,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
+  // Make sure old style nodelay is covered in at least one integration test.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
   upstream_tls_ = true;
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   config_helper_.configureUpstreamTls();
@@ -111,6 +126,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   tcp_client->close();
 
   EXPECT_EQ("world", tcp_client->data());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -148,6 +166,86 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
+  autonomous_upstream_ = true;
+  initialize();
+  const int num_connections = 50;
+  std::vector<IntegrationTcpClientPtr> clients(num_connections);
+
+  for (int i = 0; i < num_connections; ++i) {
+    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
+  }
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
+  for (int i = 0; i < num_connections; ++i) {
+    IntegrationTcpClientPtr& tcp_client = clients[i];
+    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
+    // This particular request will result in the upstream sending a response,
+    // and flush-closing due to the 'close_after_response' header.
+    ASSERT_TRUE(tcp_client->write(
+        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
+        false));
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
+  }
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::list<IntegrationTcpClientPtr> clients;
+
+  // The autonomous upstream parses HTTP, and HTTP headers and sends responses
+  // when full requests are received. basic_request will result in
+  // bidirectional data. request_with_close will result in bidirectional data,
+  // but also the upstream closing the connection.
+  const char* basic_request = "GET / HTTP/1.1\r\nHost: foo\r\ncontent-length: 0\r\n\r\n";
+  const char* request_with_close =
+      "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n";
+  TestRandomGenerator rand;
+
+  // Seed some initial clients
+  for (int i = 0; i < 5; ++i) {
+    clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+  }
+
+  // Now randomly write / add more connections / close.
+  for (int i = 0; i < 50; ++i) {
+    int action = rand.random() % 3;
+
+    if (action == 0) {
+      // Add a new connection.
+      clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+    }
+    if (clients.empty()) {
+      break;
+    }
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    if (action == 1) {
+      // Write to the first connection.
+      ASSERT_TRUE(tcp_client->write(basic_request, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->clearData(tcp_client->data().size());
+    } else if (action == 2) {
+      // Close the first connection.
+      ASSERT_TRUE(tcp_client->write(request_with_close, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->waitForHalfClose();
+      tcp_client->close();
+      clients.pop_front();
+    }
+  }
+
+  while (!clients.empty()) {
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    ASSERT_TRUE(tcp_client->write(request_with_close, false));
+    tcp_client->waitForData("\r\n\r\n", false);
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    clients.pop_front();
+  }
 }
 
 TEST_P(TcpProxyIntegrationTest, NoUpstream) {
@@ -1207,5 +1305,180 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   }
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
+
+// Integration test a Mysql upstream, where the upstream sends data immediately
+// after a connection is established.
+class FakeMysqlUpstream : public FakeUpstream {
+  using FakeUpstream::FakeUpstream;
+
+  bool createNetworkFilterChain(Network::Connection& connection,
+                                const std::vector<Network::FilterFactoryCb>& cb) override {
+    Buffer::OwnedImpl to_write("P");
+    connection.write(to_write, false);
+    return FakeUpstream::createNetworkFilterChain(connection, cb);
+  }
+};
+
+class MysqlIntegrationTest : public TcpProxyIntegrationTest {
+public:
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      Network::TransportSocketFactoryPtr factory =
+          upstream_tls_ ? createUpstreamTlsContext()
+                        : Network::Test::createRawBufferSocketFactory();
+      auto endpoint = upstream_address_fn_(i);
+      fake_upstreams_.emplace_back(
+          new FakeMysqlUpstream(std::move(factory), endpoint, upstreamConfig()));
+    }
+  }
+
+  absl::optional<uint64_t>
+  waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
+                                std::chrono::milliseconds connection_wait_timeout,
+                                FakeRawConnectionPtr& fake_upstream_connection) {
+    AssertionResult result = AssertionFailure();
+    int upstream_index = 0;
+    Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
+    // Loop over the upstreams until the call times out or an upstream request is received.
+    while (!result) {
+      upstream_index = upstream_index % upstream_indices.size();
+      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForRawConnection(
+          fake_upstream_connection, std::chrono::milliseconds(5));
+      if (result) {
+        return upstream_index;
+      } else if (!bound.withinBound()) {
+        RELEASE_ASSERT(0, "Timed out waiting for new connection.");
+        break;
+      }
+      ++upstream_index;
+    }
+    RELEASE_ASSERT(result, result.message());
+    return {};
+  }
+
+  void globalPreconnect() {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_static_resources()
+              ->mutable_clusters(0)
+              ->mutable_preconnect_policy()
+              ->mutable_predictive_preconnect_ratio()
+              ->set_value(1.5);
+        });
+  }
+
+  void perUpstreamPreconnect() {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_static_resources()
+              ->mutable_clusters(0)
+              ->mutable_preconnect_policy()
+              ->mutable_per_upstream_preconnect_ratio()
+              ->set_value(1.5);
+        });
+  }
+
+  void testPreconnect();
+};
+
+// This just verifies that FakeMysqlUpstream works as advertised, and the early data
+// makes it to the client.
+TEST_P(MysqlIntegrationTest, UpstreamWritesFirst) {
+  globalPreconnect();
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  tcp_client->waitForData("P", false);
+
+  ASSERT_TRUE(tcp_client->write("F"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(1));
+
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Make sure that with the connection read disabled, that disconnect detection
+// works.
+// Early close notification does not work for OSX
+#if !defined(__APPLE__)
+TEST_P(MysqlIntegrationTest, DisconnectDetected) {
+  // Switch to per-upstream preconnect.
+  perUpstreamPreconnect();
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  FakeRawConnectionPtr fake_upstream_connection1;
+  // The needed connection.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // The prefetched connection.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
+
+  // Close the prefetched connection.
+  ASSERT_TRUE(fake_upstream_connection1->close());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  tcp_client->close();
+}
+#endif
+
+void MysqlIntegrationTest::testPreconnect() {
+  globalPreconnect();
+  enableHalfClose(false);
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < 5; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(5);
+  initialize();
+  int num_clients = 10;
+
+  std::vector<IntegrationTcpClientPtr> clients{10};
+  std::vector<FakeRawConnectionPtr> fake_connections{15};
+
+  int upstream_index = 0;
+  for (int i = 0; i < num_clients; ++i) {
+    // Start a new request.
+    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
+    waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                  TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+    ++upstream_index;
+
+    // For every other connection, an extra connection should be preconnected.
+    if (i % 2 == 0) {
+      waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                    TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+      ++upstream_index;
+    }
+  }
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+  // Clean up.
+  for (int i = 0; i < num_clients; ++i) {
+    clients[i]->close();
+  }
+}
+
+TEST_P(MysqlIntegrationTest, Preconnect) { testPreconnect(); }
+
+TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
+  upstream_tls_ = true;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  config_helper_.configureUpstreamTls();
+  testPreconnect();
+}
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
+                         testing::ValuesIn(newPoolTestParams()), protocolTestParamsToString);
 
 } // namespace Envoy

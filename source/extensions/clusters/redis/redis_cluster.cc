@@ -1,8 +1,8 @@
 #include "redis_cluster.h"
 
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -17,7 +17,7 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 
 RedisCluster::RedisCluster(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
+    const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
@@ -96,19 +96,22 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
 void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   Upstream::HostVector new_hosts;
+  absl::flat_hash_set<std::string> all_new_hosts;
 
   for (const ClusterSlot& slot : *slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
+    all_new_hosts.emplace(slot.primary()->asString());
     for (auto const& replica : slot.replicas()) {
       new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false, time_source_));
+      all_new_hosts.emplace(replica->asString());
     }
   }
 
-  absl::node_hash_map<std::string, Upstream::HostSharedPtr> updated_hosts;
+  Upstream::HostMap updated_hosts;
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
   const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                                  updated_hosts, all_hosts_);
+                                                  updated_hosts, all_hosts_, all_new_hosts);
   const bool slot_updated =
       lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts) : false;
 
@@ -380,7 +383,7 @@ RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 RedisClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
+    const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Envoy::Stats::ScopePtr&& stats_scope) {

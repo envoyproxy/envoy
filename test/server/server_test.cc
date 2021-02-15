@@ -181,6 +181,11 @@ protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
+    initialize(bootstrap_path, use_intializing_instance, hooks_);
+  }
+
+  void initialize(const std::string& bootstrap_path, const bool use_intializing_instance,
+                  ListenerHooks& hooks) {
     if (options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
@@ -194,7 +199,7 @@ protected:
 
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart_,
         stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
@@ -313,6 +318,18 @@ public:
   std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
+// CustomListenerHooks is used for synchronization between test thread and server thread.
+class CustomListenerHooks : public DefaultListenerHooks {
+public:
+  CustomListenerHooks(std::function<void()> workers_started_cb)
+      : on_workers_started_cb_(workers_started_cb) {}
+
+  void onWorkersStarted() override { on_workers_started_cb_(); }
+
+private:
+  std::function<void()> on_workers_started_cb_;
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -345,6 +362,23 @@ TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   server_thread->join();
 }
 
+// Validates that the "server.fips_mode" stat indicates the FIPS compliance from the Envoy Build
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
+  auto server_thread =
+      startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
+
+  if (VersionInfo::sslFipsCompliant()) {
+    EXPECT_EQ(
+        1L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  } else {
+    EXPECT_EQ(
+        0L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  }
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -355,6 +389,31 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
                                        Stats::Histogram::Unit::Milliseconds)
                   .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+}
+
+// Catch exceptions in secondary cluster initialization callbacks. These are not caught in the main
+// initialization try/catch.
+TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of secondary cluster: API configs must have either "
+                      "a gRPC service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/health_check_nullptr.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
+}
+
+// Catch exceptions in HDS cluster initialization callbacks.
+TEST_P(ServerInstanceImplTest, HdsClusterException) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: API configs must have either a gRPC "
+                      "service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/hds_exception.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
@@ -423,6 +482,37 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
+  bool workers_started = false;
+  absl::Notification workers_started_fired, workers_started_block;
+  // Expect drainParentListeners not to be called before workers start.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+      workers_started_block.WaitForNotification();
+    });
+    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+
+  EXPECT_CALL(restart_, drainParentListeners);
+  workers_started_block.Notify();
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // A test target which never signals that it is ready.
 class NeverReadyTarget : public Init::TargetImpl {
 public:
@@ -460,6 +550,31 @@ TEST_P(ServerInstanceImplTest, NoLifecycleNotificationOnEarlyShutdown) {
 
   // Now shutdown the main dispatcher and trigger server lifecycle notifications.
   server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
+TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
+  // Test that drainParentListeners() should never be called because we will shutdown
+  // early before the server starts worker threads.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/test_data/server/node_bootstrap.yaml");
+
+    auto post_init_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit,
+                                                      [&] { server_->shutdown(); });
+
+    // This shutdown notification should never be called because we will shutdown early.
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    server_->run();
+
+    post_init_handle = nullptr;
+    shutdown_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
   server_thread->join();
 }
 
@@ -685,6 +800,21 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
+// Validate server localInfo().zoneStatName() is set from bootstrap config
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromBootstrap) {
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
+// Validate server localInfo().zoneStatName() can by overridden by option
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
+  options_.service_zone_name_ = "bootstrap_zone_override";
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone_override",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
 // set.
 TEST_P(ServerInstanceImplTest,
@@ -707,9 +837,12 @@ TEST_P(ServerInstanceImplTest,
 // set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
+  // are caught and will result in server shutdown.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
+                      "protocol versions are deprecated",
+                      initialize("test/server/test_data/server/hds_v2.yaml"));
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
@@ -1070,7 +1203,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().localAddress();
+  const auto address = server_->admin().socket().addressProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
@@ -1247,13 +1380,20 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
     return std::make_unique<test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
-        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
-        EXPECT_NE(nullptr, proto);
-        EXPECT_EQ(proto->a(), "foo");
-        return std::make_unique<FooBootstrapExtension>();
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            EXPECT_NE(nullptr, proto);
+            EXPECT_EQ(proto->a(), "foo");
+            auto mock_extension = std::make_unique<MockBootstrapExtension>();
+            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+              // call to cluster manager, to make sure it is not nullptr.
+              ctx.clusterManager().clusters();
+            }));
+            return mock_extension;
+          }));
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -1290,7 +1430,7 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
 #ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
@@ -1299,7 +1439,7 @@ public:
 
 class UnsafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called UnsafeFatalAction" << std::endl;
   }
 
