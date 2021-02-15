@@ -142,8 +142,10 @@ def envoy_dependencies(skip_targets = []):
     _com_github_luajit_luajit()
     _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
+    _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
+    _com_github_nlohmann_json()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -157,10 +159,12 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
+    _org_brotli()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
+    _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
@@ -350,6 +354,19 @@ def _com_github_zlib_ng_zlib_ng():
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
+def _org_brotli():
+    external_http_archive(
+        name = "org_brotli",
+    )
+    native.bind(
+        name = "brotlienc",
+        actual = "@org_brotli//:brotlienc",
+    )
+    native.bind(
+        name = "brotlidec",
+        actual = "@org_brotli//:brotlidec",
+    )
+
 def _com_google_cel_cpp():
     external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
@@ -418,6 +435,18 @@ def _com_github_datadog_dd_opentracing_cpp():
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
     )
 
+def _com_github_skyapm_cpp2sky():
+    external_http_archive(
+        name = "com_github_skyapm_cpp2sky",
+    )
+    external_http_archive(
+        name = "skywalking_data_collect_protocol",
+    )
+    native.bind(
+        name = "cpp2sky",
+        actual = "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
+    )
+
 def _com_github_tencent_rapidjson():
     external_http_archive(
         name = "com_github_tencent_rapidjson",
@@ -426,6 +455,16 @@ def _com_github_tencent_rapidjson():
     native.bind(
         name = "rapidjson",
         actual = "@com_github_tencent_rapidjson//:rapidjson",
+    )
+
+def _com_github_nlohmann_json():
+    external_http_archive(
+        name = "com_github_nlohmann_json",
+        build_file = "@envoy//bazel/external:json.BUILD",
+    )
+    native.bind(
+        name = "json",
+        actual = "@com_github_nlohmann_json//:json",
     )
 
 def _com_github_nodejs_http_parser():
@@ -688,10 +727,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     external_http_archive(
         name = "com_googlesource_googleurl",
-    )
-    native.bind(
-        name = "googleurl",
-        actual = "@com_googlesource_googleurl//url:url",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
 
 def _org_llvm_releases_compiler_rt():
@@ -875,6 +912,14 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+
+def _rules_fuzzing():
+    external_http_archive(
+        name = "rules_fuzzing",
+        repo_mapping = {
+            "@fuzzing_py_deps": "@fuzzing_pip3",
+        },
     )
 
 def _kafka_deps():
