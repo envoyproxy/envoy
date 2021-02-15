@@ -241,14 +241,13 @@ def FormatExtensionCategory(extension_category):
   Returns:
     RST formatted extension category description.
   """
-  IGNORED_EXTENSIONS = ["envoy.filters.http.cache.simple_http_cache"]
   try:
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
     sys.stderr.write(f"\n\nUnable to find extension category:  {extension_category}\n\n")
     exit(1)  # Raising the error buries the above message in tracebacks.
   anchor = FormatAnchor('extension_category_' + extension_category)
-  extensions = FormatExtensionList([x for x in extensions if x not in IGNORED_EXTENSIONS])
+  extensions = FormatExtensionList(extensions)
   return EXTENSION_CATEGORY_TEMPLATE.substitute(anchor=anchor, extensions=extensions)
 
 
