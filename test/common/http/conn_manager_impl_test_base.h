@@ -6,6 +6,7 @@
 #include "common/network/address_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/original_ip_detection/xff/xff.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -141,7 +142,7 @@ public:
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
   Http::OriginalIPDetectionSharedPtr originalIpDetection() override { return nullptr; };
-  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return nullptr; };
+  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return default_detection_; };
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -207,6 +208,8 @@ public:
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
+  std::shared_ptr<Extensions::OriginalIPDetection::Xff::XffIPDetection> default_detection_;
+
   const LocalReply::LocalReplyPtr local_reply_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.

@@ -218,6 +218,7 @@ envoy_cc_test(
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/original_ip_detection/xff:xff_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",

@@ -21,6 +21,7 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
 
       listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
       request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
+      default_detection_(std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0)),
       local_reply_(LocalReply::Factory::createDefault()) {
 
   ON_CALL(route_config_provider_, lastUpdated())
