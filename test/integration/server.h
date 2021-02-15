@@ -416,6 +416,7 @@ public:
 
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
+  void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);
 
   Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {

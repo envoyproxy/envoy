@@ -24,8 +24,8 @@ public:
   MOCK_METHOD(const std::string&, nodeName, (), (const));
   MOCK_METHOD(const Stats::StatName&, zoneStatName, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Node&, node, (), (const));
-  MOCK_METHOD0(contextProvider, Config::ContextProvider&());
-  MOCK_CONST_METHOD0(contextProvider, const Config::ContextProvider&());
+  MOCK_METHOD(Config::ContextProvider&, contextProvider, ());
+  MOCK_METHOD(const Config::ContextProvider&, contextProvider, (), (const));
 
   const Stats::StatName& makeZoneStatName() const;
 

@@ -1467,18 +1467,8 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   testBasicFlow();
 }
 
-class DynamicContextAdsIntegrationTest : public AdsIntegrationTest {};
-
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDelta, DynamicContextAdsIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     // There should be no variation across clients.
-                     testing::Values(Grpc::ClientType::EnvoyGrpc),
-                     // Only delta xDS is supported for DCPs at this point (TODO(htuch): add sotw)
-                     testing::Values(Grpc::SotwOrDelta::Delta)));
-
 // Node is resent on a dynamic context parameter update.
-TEST_P(DynamicContextAdsIntegrationTest, ContextParameterUpdate) {
+TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
   initialize();
 
   // Check that the node is sent in each request.
@@ -1488,16 +1478,17 @@ TEST_P(DynamicContextAdsIntegrationTest, ContextParameterUpdate) {
                                                              {buildCluster("cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {"cluster_0"}, {}, true));
+                                      {"cluster_0"}, {"cluster_0"}, {}, false));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, false));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"cluster_0"}, {}, {}));
+                                      {"cluster_0"}, {}, {}, false));
 
+  // Set a Cluster DCP.
   test_server_->setDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster", "foo",
                                        "bar");
 
@@ -1506,6 +1497,36 @@ TEST_P(DynamicContextAdsIntegrationTest, ContextParameterUpdate) {
                        .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
                        .params()
                        .at("foo"));
+
+  // Modify Cluster DCP.
+  test_server_->setDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster", "foo",
+                                       "baz");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_EQ("baz", last_node_.dynamic_parameters()
+                       .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
+                       .params()
+                       .at("foo"));
+
+  // Modify CLA DCP (some other resource type URL).
+  test_server_->setDynamicContextParam(
+      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment", "a", "b");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {}, {}, true));
+  EXPECT_EQ("b", last_node_.dynamic_parameters()
+                     .at("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment")
+                     .params()
+                     .at("a"));
+
+  // Clear Cluster DCP.
+  test_server_->unsetDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster",
+                                         "foo");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_EQ(0, last_node_.dynamic_parameters()
+                   .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
+                   .params()
+                   .count("foo"));
 };
 
 class XdsTpAdsIntegrationTest : public AdsIntegrationTest {

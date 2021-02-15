@@ -53,6 +53,8 @@ MockContextProvider::MockContextProvider() {
       .WillByDefault(Invoke([this](UpdateNotificationCb update_cb) -> Common::CallbackHandle* {
         return update_cb_handler_.add(update_cb);
       }));
+  ON_CALL(*this, dynamicContext(_))
+      .WillByDefault(ReturnRef(xds::core::v3::ContextParams::default_instance()));
 }
 
 MockContextProvider::~MockContextProvider() = default;

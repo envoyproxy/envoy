@@ -92,6 +92,13 @@ void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_ty
   });
 }
 
+void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_type_url,
+                                                     absl::string_view key) {
+  server().dispatcher().post([this, resource_type_url, key]() {
+    server().localInfo().contextProvider().unsetDynamicContextParam(resource_type_url, key);
+  });
+}
+
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     bool deterministic, bool defer_listener_finalization, ProcessObjectOptRef process_object,

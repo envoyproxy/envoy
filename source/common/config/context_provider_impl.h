@@ -34,7 +34,8 @@ public:
     dynamic_context_[resource_type_url].mutable_params()->erase(key);
     update_cb_helper_.runCallbacks(resource_type_url);
   }
-  Common::CallbackHandle* addDynamicContextUpdateCallback(UpdateNotificationCb callback) const override {
+  Common::CallbackHandle*
+  addDynamicContextUpdateCallback(UpdateNotificationCb callback) const override {
     return update_cb_helper_.add(callback);
   };
 
