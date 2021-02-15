@@ -72,6 +72,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
     ENVOY_LOG(debug, "Oauth response code: {}", response_code);
+    ENVOY_LOG(debug, "Oauth response body: {}", message->bodyAsString());
     parent_->sendUnauthorizedResponse();
     return;
   }

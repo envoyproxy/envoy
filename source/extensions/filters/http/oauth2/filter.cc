@@ -48,7 +48,7 @@ constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
 const char* AuthorizationEndpointFormat =
-    "{}?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
+    "{}?client_id={}&scope={}&response_type=code&redirect_uri={}&state={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -60,6 +60,7 @@ constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
+constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
@@ -71,6 +72,25 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
   }
 
   return matchers;
+}
+
+// Transforms the proto list of 'auth_scopes' into a vector of std::string, also
+// handling the default value logic.
+std::vector<std::string>
+authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos) {
+  std::vector<std::string> scopes;
+
+  // If 'auth_scopes' is empty it must return a list with the default value.
+  if (auth_scopes_protos.empty()) {
+    scopes.emplace_back(DEFAULT_AUTH_SCOPE);
+  } else {
+    scopes.reserve(auth_scopes_protos.size());
+
+    for (const auto& scope : auth_scopes_protos) {
+      scopes.emplace_back(scope);
+    }
+  }
+  return scopes;
 }
 
 // Sets the auth token as the Bearer token in the authorization header.
@@ -90,6 +110,8 @@ FilterConfig::FilterConfig(
       redirect_matcher_(proto_config.redirect_path_matcher()),
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      encoded_auth_scopes_(Http::Utility::PercentEncoding::encode(
+          absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)) {
@@ -276,9 +298,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    const std::string new_url =
-        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
-                    config_->clientId(), escaped_redirect_uri, escaped_state);
+    const std::string new_url = fmt::format(
+        AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
+        config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 

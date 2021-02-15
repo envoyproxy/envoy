@@ -27,6 +27,9 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
 OWS
@@ -34,7 +37,9 @@ Preconnecting
 STATNAME
 SkyWalking
 TIDs
+WASI
 ceil
+CCM
 CHACHA
 CHLO
 CHMOD
@@ -196,6 +201,7 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NLOHMANN
 NOAUTH
 NOCHECKRESP
 NODELAY
@@ -369,6 +375,7 @@ absl
 accesslog
 accessor
 accessors
+ackless
 acks
 acls
 addr
@@ -440,6 +447,7 @@ bools
 boringssl
 borks
 broadcasted
+brotli
 buf
 buflen
 bugprone
@@ -543,6 +551,7 @@ deflater
 deletable
 deleter
 delim
+denylist
 deque
 deprecations
 dereference
@@ -589,6 +598,7 @@ enqueued
 enqueues
 enum
 enums
+environ
 epoll
 errno
 etag
@@ -700,6 +710,7 @@ inlined
 inlining
 inobservability
 inotify
+inserter
 instantiation
 instantiations
 interpretable
@@ -823,6 +834,7 @@ noncopyable
 nonresponsive
 noop
 nop
+npos
 nthreads
 ntohl
 ntop
@@ -870,6 +882,7 @@ passphrase
 passthrough
 pathname
 pausable
+pausedness
 pcall
 pcap
 pclose
@@ -881,6 +894,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix
@@ -999,6 +1013,7 @@ resolvers
 responder
 restarter
 resync
+ret
 retransmitting
 retriable
 retriggers
@@ -1063,6 +1078,7 @@ src
 ssize
 stackdriver
 stacktrace
+starttls
 startup
 stateful
 statsd

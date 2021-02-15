@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <list>
 #include <string>
 #include <vector>
 
@@ -23,8 +24,9 @@ namespace Formatter {
 class SubstitutionFormatParser {
 public:
   static std::vector<FormatterProviderPtr> parse(const std::string& format);
+  static std::vector<FormatterProviderPtr>
+  parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
-private:
   /**
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
@@ -60,6 +62,19 @@ private:
                            const std::string& separator, std::string& main,
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
+  /**
+   * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method
+   * handles mapping the command name to an appropriate formatter after parsing.
+   *
+   * TODO(rgs1): this can be refactored into a dispatch table using the command name as the key and
+   * the parsing parameters as the value.
+   *
+   * @param token the token to parse
+   * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
+   */
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& token);
+
+private:
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
@@ -93,6 +108,8 @@ private:
 class FormatterImpl : public Formatter {
 public:
   FormatterImpl(const std::string& format, bool omit_empty_values = false);
+  FormatterImpl(const std::string& format, bool omit_empty_values,
+                const std::vector<CommandParserPtr>& command_parsers);
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -106,6 +123,10 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
+// Helper classes for StructFormatter::StructFormatMapVisitor.
+template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
+template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+
 /**
  * An formatter for structured log formats, which returns a Struct proto that
  * can be converted easily into multiple formats.
@@ -113,9 +134,7 @@ private:
 class StructFormatter {
 public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                  bool omit_empty_values)
-      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
-        struct_output_format_(toFormatMap(format_mapping)) {}
+                  bool omit_empty_values);
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
@@ -125,22 +144,55 @@ public:
 
 private:
   struct StructFormatMapWrapper;
-  using StructFormatMapValue =
-      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper>;
+  struct StructFormatListWrapper;
+  using StructFormatValue =
+      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper,
+                    const StructFormatListWrapper>;
   // Although not required for Struct/JSON, it is nice to have the order of
   // properties preserved between the format and the log entry, thus std::map.
-  using StructFormatMap = std::map<std::string, StructFormatMapValue>;
+  using StructFormatMap = std::map<std::string, StructFormatValue>;
   using StructFormatMapPtr = std::unique_ptr<StructFormatMap>;
   struct StructFormatMapWrapper {
     StructFormatMapPtr value_;
   };
 
-  StructFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& struct_format) const;
+  using StructFormatList = std::list<StructFormatValue>;
+  using StructFormatListPtr = std::unique_ptr<StructFormatList>;
+  struct StructFormatListWrapper {
+    StructFormatListPtr value_;
+  };
+
+  using StructFormatMapVisitor = StructFormatMapVisitorHelper<
+      const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
+      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
+      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
+
+  // Methods for building the format map.
+  std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+  StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
+  StructFormatListWrapper toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+
+  // Methods for doing the actual formatting.
+  ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
+                                       const Http::RequestHeaderMap& request_headers,
+                                       const Http::ResponseHeaderMap& response_headers,
+                                       const Http::ResponseTrailerMap& response_trailers,
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       absl::string_view local_reply_body) const;
+  ProtobufWkt::Value
+  structFormatMapCallback(const StructFormatter::StructFormatMapWrapper& format_map,
+                          const StructFormatMapVisitor& visitor) const;
+  ProtobufWkt::Value
+  structFormatListCallback(const StructFormatter::StructFormatListWrapper& format_list,
+                           const StructFormatMapVisitor& visitor) const;
 
   const bool omit_empty_values_;
   const bool preserve_types_;
+  const std::string empty_value_;
   const StructFormatMapWrapper struct_output_format_;
-};
+}; // namespace Formatter
+
+using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 
 class JsonFormatterImpl : public Formatter {
 public:
@@ -210,6 +262,33 @@ private:
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
   absl::optional<size_t> max_length_;
+};
+
+/**
+ * FormatterProvider for headers byte size.
+ */
+class HeadersByteSizeFormatter : public FormatterProvider {
+public:
+  // TODO(taoxuy): Add RequestTrailers here.
+  enum class HeaderType { RequestHeaders, ResponseHeaders, ResponseTrailers };
+
+  HeadersByteSizeFormatter(const HeaderType header_type);
+
+  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
+                                     const Http::ResponseHeaderMap& response_headers,
+                                     const Http::ResponseTrailerMap& response_trailers,
+                                     const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const override;
+
+private:
+  uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
+                                  const Http::ResponseHeaderMap& response_headers,
+                                  const Http::ResponseTrailerMap& response_trailers) const;
+  HeaderType header_type_;
 };
 
 /**
@@ -340,6 +419,23 @@ private:
 class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+};
+
+/**
+ * FormatterProvider for ClusterMetadata from StreamInfo.
+ */
+class ClusterMetadataFormatter : public FormatterProvider, MetadataFormatter {
+public:
+  ClusterMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
 
   // FormatterProvider

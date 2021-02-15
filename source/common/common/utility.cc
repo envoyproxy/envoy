@@ -262,6 +262,12 @@ uint64_t DateUtil::nowToMilliseconds(TimeSource& time_source) {
   return std::chrono::time_point_cast<UnsignedMilliseconds>(now).time_since_epoch().count();
 }
 
+uint64_t DateUtil::nowToSeconds(TimeSource& time_source) {
+  return std::chrono::duration_cast<std::chrono::seconds>(
+             time_source.systemTime().time_since_epoch())
+      .count();
+}
+
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
 const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
@@ -455,6 +461,35 @@ std::string StringUtil::escape(const std::string& source) {
   }
 
   return ret;
+}
+
+// TODO(kbaichoo): If needed, add support for escaping chars < 32 and >= 127.
+void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
+  for (const char c : view) {
+    switch (c) {
+    case '\r':
+      os << "\\r";
+      break;
+    case '\n':
+      os << "\\n";
+      break;
+    case '\t':
+      os << "\\t";
+      break;
+    case '"':
+      os << "\\\"";
+      break;
+    case '\'':
+      os << "\\\'";
+      break;
+    case '\\':
+      os << "\\\\";
+      break;
+    default:
+      os << c;
+      break;
+    }
+  }
 }
 
 const std::string& getDefaultDateFormat() {

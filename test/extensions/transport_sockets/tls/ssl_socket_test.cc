@@ -4887,13 +4887,9 @@ protected:
     for (uint32_t i = 0; i < num_writes; i++) {
       Buffer::OwnedImpl data(std::string(write_size, 'a'));
 
-      // Incredibly contrived way of making sure that the write buffer has an empty chain in it.
       if (reserve_write_space) {
-        Buffer::RawSlice iovecs[2];
-        EXPECT_EQ(2UL, data.reserve(16384, iovecs, 2));
-        iovecs[0].len_ = 0;
-        iovecs[1].len_ = 0;
-        data.commit(iovecs, 2);
+        data.appendSliceForTest(absl::string_view());
+        ASSERT_EQ(0, data.describeSlicesForTest().back().data);
       }
 
       client_connection_->write(data, false);

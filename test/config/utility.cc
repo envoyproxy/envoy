@@ -629,18 +629,30 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
 
 void ConfigHelper::setConnectConfig(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
-    bool terminate_connect) {
+    bool terminate_connect, bool allow_post) {
   auto* route_config = hcm.mutable_route_config();
   ASSERT_EQ(1, route_config->virtual_hosts_size());
   auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
   auto* match = route->mutable_match();
   match->Clear();
-  match->mutable_connect_matcher();
+
+  if (allow_post) {
+    match->set_prefix("/");
+
+    auto* header = match->add_headers();
+    header->set_name(":method");
+    header->set_exact_match("POST");
+  } else {
+    match->mutable_connect_matcher();
+  }
 
   if (terminate_connect) {
     auto* upgrade = route->mutable_route()->add_upgrade_configs();
     upgrade->set_upgrade_type("CONNECT");
-    upgrade->mutable_connect_config();
+    auto* config = upgrade->mutable_connect_config();
+    if (allow_post) {
+      config->set_allow_post(true);
+    }
   }
 
   hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
@@ -1025,7 +1037,9 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view format) {
+bool ConfigHelper::setAccessLog(
+    const std::string& filename, absl::string_view format,
+    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters) {
   if (getFilterFromListener("http") == nullptr) {
     return false;
   }
@@ -1035,8 +1049,15 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        absl::StrCat(format, "\n"));
+    auto* log_format = access_log_config.mutable_log_format();
+    log_format->mutable_text_format_source()->set_inline_string(absl::StrCat(format, "\n"));
+    if (!formatters.empty()) {
+      for (const auto& formatter : formatters) {
+        auto* added_formatter = log_format->add_formatters();
+        added_formatter->set_name(formatter.name());
+        added_formatter->mutable_typed_config()->PackFrom(formatter.typed_config());
+      }
+    }
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -1154,6 +1175,12 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   }
 }
 
+void ConfigHelper::addBootstrapExtension(const std::string& config) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* extension = bootstrap_.add_bootstrap_extensions();
+  TestUtility::loadFromYaml(config, *extension);
+}
+
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   return loadFilter<
@@ -1196,7 +1223,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 
   const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
-      "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
+      "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);
 }
 

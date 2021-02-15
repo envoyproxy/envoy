@@ -34,3 +34,15 @@ Server related statistics are rooted at *server.* with following statistics:
   static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
 
+.. _server_compilation_settings_statistics:
+
+Server Compilation Settings
+---------------------------
+
+Server Compilation Settings related statistics are rooted at *server.compilation_settings.* with following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  fips_mode, Gauge, Integer representing whether the envoy build is FIPS compliant or not

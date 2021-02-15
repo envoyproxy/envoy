@@ -71,6 +71,11 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
+    # (Optional): defaults to 'user' scope if not provided
+    auth_scopes:
+    - user
+    - openid
+    - email
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
@@ -114,6 +119,11 @@ Below is a complete code example of how we employ the filter as one of
                     name: hmac
                     sds_config:
                       path: "/etc/envoy/hmac.yaml"
+                # (Optional): defaults to 'user' scope if not provided
+                auth_scopes:
+                - user
+                - openid
+                - email
           - name: envoy.router
           tracing: {}
           codec_type: "AUTO"
@@ -143,12 +153,12 @@ Below is a complete code example of how we employ the filter as one of
               socket_address:
                 address: 127.0.0.1
                 port_value: 8080
-  - name: auth
+  - name: oauth
     connect_timeout: 5s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: auth
+      cluster_name: oauth
       endpoints:
       - lb_endpoints:
         - endpoint:
