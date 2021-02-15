@@ -23,6 +23,8 @@ EXTENSIONS = {
 
     "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
     "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+    "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
+    "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
 
     #
     # gRPC Credentials Plugins

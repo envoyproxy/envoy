@@ -824,7 +824,7 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
@@ -848,6 +848,12 @@ message HttpFilter {
 
     google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }
+
+  // If true, clients that do not support this filter may ignore the
+  // filter but otherwise accept the config.
+  // Otherwise, clients that do not support this filter must reject the config.
+  // [#not-implemented-hide:]
+  bool is_optional = 6;
 }
 
 message RequestIDExtension {
