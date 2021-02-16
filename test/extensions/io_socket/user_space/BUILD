@@ -39,15 +39,3 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
     ],
 )
-
-envoy_extension_cc_test(
-    name = "io_handle_impl_platform_test",
-    srcs = ["io_handle_impl_platform_test.cc"],
-    extension_name = "envoy.io_socket.user_space",
-    deps = [
-        "//source/common/common:utility_lib",
-        "//source/common/network:address_lib",
-        "//source/extensions/io_socket/user_space:io_handle_impl_lib",
-        "//test/mocks/event:event_mocks",
-    ],
-)
