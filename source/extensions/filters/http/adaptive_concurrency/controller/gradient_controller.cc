@@ -108,22 +108,26 @@ void GradientController::enterMinRTTSamplingWindow() {
   min_rtt_epoch_ = time_source_.monotonicTime();
 }
 
-void GradientController::updateMinRTT() {
-  ASSERT(inMinRTTSamplingWindow());
-
-  {
-    absl::MutexLock ml(&sample_mutation_mtx_);
-    min_rtt_ = processLatencySamplesAndClear();
-    stats_.min_rtt_msecs_.set(
-        std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
-    updateConcurrencyLimit(deferred_limit_value_.load());
-    deferred_limit_value_.store(0);
-    stats_.min_rtt_calculation_active_.set(0);
-  }
-
-  min_rtt_calc_timer_->enableTimer(
-      applyJitter(config_.minRTTCalcInterval(), config_.jitterPercent()));
-  sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
+void GradientController::scheduleMinRTTUpdate() {
+  uint64_t processing_version = ++this->version_num_;
+  dispatcher_.post([this, processing_version]() -> void {
+    {
+      // skip if the in-processing version is less than the latest version
+      if (processing_version < uint64_t(this->version_num_)) {
+        return;
+      }
+      absl::MutexLock ml(&sample_mutation_mtx_);
+      min_rtt_ = processLatencySamplesAndClear();
+      stats_.min_rtt_msecs_.set(
+          std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
+      updateConcurrencyLimit(deferred_limit_value_.load());
+      deferred_limit_value_.store(0);
+      stats_.min_rtt_calculation_active_.set(0);
+    }
+    min_rtt_calc_timer_->enableTimer(
+        applyJitter(config_.minRTTCalcInterval(), config_.jitterPercent()));
+    sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
+    });
 }
 
 std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseconds interval,
@@ -218,7 +222,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   if (inMinRTTSamplingWindow() && sample_count >= config_.minRTTAggregateRequestCount()) {
     // This sample has pushed the request count over the request count requirement for the minRTT
     // recalculation. It must now be finished.
-    updateMinRTT();
+    scheduleMinRTTUpdate();
   }
 }
 

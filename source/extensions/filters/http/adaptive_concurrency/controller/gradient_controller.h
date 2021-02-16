@@ -223,7 +223,7 @@ public:
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
-  void updateMinRTT();
+  void scheduleMinRTTUpdate();
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
@@ -250,6 +250,9 @@ private:
   // Stores the value of the concurrency limit prior to entering the minRTT update window. If this
   // is non-zero, then we are actively in the minRTT sampling window.
   std::atomic<uint32_t> deferred_limit_value_;
+
+  // version number of scheduled minrtt_update
+  std::atomic<uint64_t> version_num_;
 
   // Stores the expected upstream latency value under ideal conditions with the added buffer to
   // account for variable latencies. This is the numerator in the gradient value.
