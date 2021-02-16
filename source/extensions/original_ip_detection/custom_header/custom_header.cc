@@ -30,11 +30,11 @@ CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {
   if (hdr.empty()) {
     return {nullptr, false, reject_options_};
   }
+
   auto header_value = hdr[0]->value().getStringView();
-  try {
-    return {Network::Utility::parseInternetAddress(std::string(header_value)),
-            allow_trusted_address_checks_, absl::nullopt};
-  } catch (const EnvoyException&) {
+  auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(header_value));
+  if (addr) {
+    return {addr, allow_trusted_address_checks_, absl::nullopt};
   }
 
   return {nullptr, false, reject_options_};
