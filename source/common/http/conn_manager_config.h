@@ -56,6 +56,7 @@ namespace Http {
   COUNTER(downstream_rq_idle_timeout)                                                              \
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_overload_close)                                                            \
+  COUNTER(downstream_rq_rejected_via_ip_detection)                                                 \
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_timeout)                                                                   \

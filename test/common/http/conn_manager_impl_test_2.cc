@@ -2987,5 +2987,36 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+class RejectDetection : public Http::OriginalIPDetection {
+public:
+  RejectDetection() {}
+
+  Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams&) override {
+    OriginalIPRejectRequestOptions reject_options = {Http::Code::Forbidden, "ip detection failed",
+                                                     "ip detection failed"};
+    return {nullptr, false, reject_options};
+  }
+};
+
+TEST_F(HttpConnectionManagerImplTest, RequestRejectedViaIPDetection) {
+  use_remote_address_ = false;
+  ip_detection_extension_ = std::make_shared<RejectDetection>();
+
+  setup(false, "");
+
+  // 403 direct response when IP detection fails.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("403", headers.getStatusValue());
+      }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  startRequest();
+
+  EXPECT_EQ("ip detection failed", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_rejected_via_ip_detection_.value());
+}
+
 } // namespace Http
 } // namespace Envoy

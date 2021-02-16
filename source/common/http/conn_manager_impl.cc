@@ -986,7 +986,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // IP detection failed, reject the request.
     if (mutate_result.reject_request.has_value()) {
       const auto& reject_request_params = mutate_result.reject_request.value();
-      // TODO(rgs1): bump stat?
+      connection_manager_.stats_.named_.downstream_rq_rejected_via_ip_detection_.inc();
       sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*request_headers_),
                      reject_request_params.response_code, reject_request_params.body, nullptr,
                      absl::nullopt, reject_request_params.details);

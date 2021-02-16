@@ -42,6 +42,7 @@ statistics:
    downstream_rq_http1_total, Counter, Total HTTP/1.1 requests
    downstream_rq_http2_total, Counter, Total HTTP/2 requests
    downstream_rq_active, Gauge, Total active requests
+   downstream_rq_rejected_via_ip_detection, Counter, Total requests rejected because the original IP detection failed
    downstream_rq_response_before_rq_complete, Counter, Total responses sent before the request was complete
    downstream_rq_rx_reset, Counter, Total request resets received
    downstream_rq_tx_reset, Counter, Total request resets sent
