@@ -2008,7 +2008,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
-// Verify that when returning an OK response with dynamic_metadata field set, the filter emits
+// Verify that when returning a Denied response with dynamic_metadata field set, the filter emits
 // dynamic metadata.
 TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   InSequence s;
