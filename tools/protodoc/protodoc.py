@@ -251,10 +251,9 @@ def FormatExtensionCategory(extension_category):
       extension_category = f"{extension_category}.foo"
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
-    sys.stderr.write(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    exit(1)  # Raising the error buries the above message in tracebacks.
+    raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
   anchor = FormatAnchor('extension_category_' + extension_category)
-  extensions = FormatExtensionList(extensions)
+  extensions = FormatExtensionList(sorted(extensions))
   return EXTENSION_CATEGORY_TEMPLATE.substitute(anchor=anchor, extensions=extensions)
 
 
