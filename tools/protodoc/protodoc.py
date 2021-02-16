@@ -247,8 +247,6 @@ def FormatExtensionCategory(extension_category):
     RST formatted extension category description.
   """
   try:
-    if 'tracers' in extension_category:
-      extension_category = f"{extension_category}.foo"
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
     raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
