@@ -818,7 +818,7 @@ min_rtt_calc_params:
     sampleLatency(controller, std::chrono::microseconds(1337));
   }
 
-  // The next sample will trigger the minrtt value update. We'll spin off a thread and block before
+  // The next sample will trigger the minRTT value update. We'll spin off a thread and block before
   // the actual function call to update the value.
   synchronizer.waitOn("pre_minrtt_update");
   std::thread t1([this, &controller]() {
