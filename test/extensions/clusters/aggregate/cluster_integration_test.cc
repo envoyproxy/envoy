@@ -108,7 +108,7 @@ static_resources:
                     retry_priority:
                       name: envoy.retry_priorities.previous_priorities
                       typed_config:
-                        "@type": type.googleapis.com/envoy.config.retry.previous_priorities.PreviousPrioritiesConfig
+                        "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
                         update_frequency: 1
                 match:
                   prefix: "/aggregatecluster"

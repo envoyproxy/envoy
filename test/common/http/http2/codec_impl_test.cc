@@ -309,11 +309,11 @@ protected:
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
 
     // See the limit formula in the
-    // `Envoy::Http::Http2::ServerConnectionImpl::checkInboundFrameLimits()' method.
+    // `Envoy::Http::Http2::ProtocolConstraints::checkInboundFrameLimits()' method.
     constexpr uint32_t max_allowed =
-        1 + 2 * (CommonUtility::OptionsLimits::
-                     DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT +
-                 1);
+        5 + 2 * (1 + CommonUtility::OptionsLimits::
+                             DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
+                         1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
       EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
     }
@@ -1000,7 +1000,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
       EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
                "outbound_control_frames_: 0, max_outbound_control_frames_: 1000, "
                "consecutive_inbound_frames_with_empty_payload_: 0, "
-               "max_consecutive_inbound_frames_with_empty_payload_: 1, inbound_streams_: 0, "
+               "max_consecutive_inbound_frames_with_empty_payload_: 1, opened_streams_: 0, "
                "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
                "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
                "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"

@@ -1,5 +1,5 @@
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.validate.h"
+#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
+#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "server/resource_monitor_config_impl.h"
@@ -22,7 +22,7 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
           "envoy.resource_monitors.fixed_heap");
   EXPECT_NE(factory, nullptr);
 
-  envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig config;
+  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.set_max_heap_size_bytes(std::numeric_limits<uint64_t>::max());
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
