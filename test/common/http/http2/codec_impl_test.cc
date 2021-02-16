@@ -308,11 +308,11 @@ protected:
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
 
     // See the limit formula in the
-    // `Envoy::Http::Http2::ServerConnectionImpl::checkInboundFrameLimits()' method.
+    // `Envoy::Http::Http2::ProtocolConstraints::checkInboundFrameLimits()' method.
     constexpr uint32_t max_allowed =
-        1 + 2 * (CommonUtility::OptionsLimits::
-                     DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT +
-                 1);
+        5 + 2 * (1 + CommonUtility::OptionsLimits::
+                             DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
+                         1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
       EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
     }

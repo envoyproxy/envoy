@@ -201,6 +201,7 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NLOHMANN
 NOAUTH
 NOCHECKRESP
 NODELAY
@@ -1077,6 +1078,7 @@ src
 ssize
 stackdriver
 stacktrace
+starttls
 startup
 stateful
 statsd
