@@ -77,9 +77,12 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 }
 
 DispatcherImpl::~DispatcherImpl() {
+  // TODO(lambdai): call shutdown() in tests and assert shutdown_called_.
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
   FatalErrorHandler::removeFatalErrorHandler(*this);
-  // TODO(lambdai): Explore the cases that `deletables_in_dispatcher_thread_` is not empty().
+  ASSERT(deletables_in_dispatcher_thread_.empty(),
+         fmt::format("{} dispatcher contains {} dispatcher local deletables after shutdown.",
+                     run_tid_.getId(), deletables_in_dispatcher_thread_.size()));
 }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
@@ -272,14 +275,15 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) {
-  bool do_delete;
+  bool need_schedule;
   {
     Thread::LockGuard lock(thread_local_deletable_lock_);
-    do_delete = deletables_in_dispatcher_thread_.empty();
+    need_schedule = deletables_in_dispatcher_thread_.empty();
     deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
+    ASSERT(!shutdown_called_, "inserted after shutdown");
   }
 
-  if (do_delete) {
+  if (need_schedule) {
     thread_local_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
@@ -299,8 +303,50 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 }
 
 void DispatcherImpl::shutdown() {
-  ENVOY_LOG(debug, "Clearing dispatcher thread deletables in {}", __FUNCTION__);
-  runThreadLocalDelete();
+  ASSERT(isThreadSafe());
+
+  bool delete_again = true;
+  int round = 0;
+  while (delete_again) {
+    delete_again = false;
+    round++;
+    auto deferred_deletables_size = current_to_delete_->size();
+    delete_again |= deferred_deletables_size > 0;
+    clearDeferredDeleteList();
+
+    std::list<std::function<void()>> callbacks;
+    {
+      Thread::LockGuard lock(post_lock_);
+      callbacks = std::move(post_callbacks_);
+    }
+
+    auto post_callbacks_size = callbacks.size();
+    while (!callbacks.empty()) {
+      // Don't invoke callbacks when the dispatcher is shutting down.
+      callbacks.pop_front();
+    }
+    delete_again |= post_callbacks_size > 0;
+
+    std::list<DispatcherThreadDeletablePtr> local_deletables;
+    {
+      Thread::LockGuard lock(thread_local_deletable_lock_);
+      local_deletables = std::move(deletables_in_dispatcher_thread_);
+    }
+    auto thread_local_deletables_size = local_deletables.size();
+    while (!local_deletables.empty()) {
+      local_deletables.pop_front();
+    }
+
+    delete_again |= thread_local_deletables_size > 0;
+    ENVOY_LOG(debug,
+              "Round {}: destroyed {} deferred deletables, {} post callbacks and {} thread local "
+              "deletables in {}",
+              round, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size,
+              __FUNCTION__);
+  }
+
+  ASSERT(!shutdown_called_);
+  shutdown_called_ = true;
 }
 
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
@@ -317,7 +363,7 @@ void DispatcherImpl::runThreadLocalDelete() {
     ASSERT(deletables_in_dispatcher_thread_.empty());
   }
   while (!to_be_delete.empty()) {
-    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // Touch the watchdog before deleting the objects to avoid spurious watchdog miss events when
     // executing complicated destruction.
     touchWatchdog();
     // Delete in FIFO order.

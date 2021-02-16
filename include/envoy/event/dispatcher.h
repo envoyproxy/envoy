@@ -263,7 +263,7 @@ public:
 
   /**
    * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on
-   * the dispatcher's thread before dispatcher destroy. This is safe cross thread.
+   * the dispatcher's thread before the dispatcher is destroyed. This is safe cross thread.
    */
   virtual void deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) PURE;
 
@@ -296,7 +296,7 @@ public:
   virtual void updateApproximateMonotonicTime() PURE;
 
   /**
-   * Shutdown the dispatcher by clear dispatcher thread deletable.
+   * Shutdown the dispatcher by clearing the dispatcher's thread deletable objects.
    */
   virtual void shutdown() PURE;
 };

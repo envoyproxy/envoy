@@ -33,6 +33,30 @@ using testing::Return;
 namespace Envoy {
 namespace Event {
 namespace {
+class Destroyable : public DeferredDeletable, public DispatcherThreadDeletable {
+public:
+  Destroyable(Dispatcher& dispatcher, int life, ReadyWatcher& watcher)
+      : dispatcher_(dispatcher), life_(life), watcher_(watcher) {}
+  ~Destroyable() {
+
+    if (life_ != 0) {
+      if ((life_ % 3) == 0) {
+        dispatcher_.post([obj = std::make_shared<Destroyable>(
+                              dispatcher_, life_ - 1, watcher_)]() mutable { obj.reset(); });
+      } else if ((life_ % 3) == 1) {
+        dispatcher_.deleteInDispatcherThread(
+            std::make_unique<Destroyable>(dispatcher_, life_ - 1, watcher_));
+      } else {
+        dispatcher_.deferredDelete(std::make_unique<Destroyable>(dispatcher_, life_ - 1, watcher_));
+      }
+    } else {
+      watcher_.ready();
+    }
+  }
+  Dispatcher& dispatcher_;
+  uint32_t life_;
+  ReadyWatcher& watcher_;
+};
 
 class RunOnDelete {
 public:
@@ -358,7 +382,6 @@ protected:
       cv_.wait(mu_);
     }
   }
-
   NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
@@ -440,6 +463,18 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
   while (!work_finished_) {
     cv_.wait(mu_);
   }
+}
+
+TEST(DispatcherShutdownTest, ShutdownCleanupAllDestroyableObjects) {
+  auto api = Api::createApiForTest();
+  auto dispatcher = api->allocateDispatcher("test_thread");
+  ReadyWatcher shutdown_watcher;
+  dispatcher->deferredDelete(std::make_unique<Destroyable>(*dispatcher, 10, shutdown_watcher));
+
+  EXPECT_CALL(shutdown_watcher, ready());
+  dispatcher->shutdown();
+  // Need to verify before dispatcher is destroyed.
+  testing::Mock::VerifyAndClearExpectations(&shutdown_watcher);
 }
 
 // Ensure that there is no deadlock related to calling a posted callback, or

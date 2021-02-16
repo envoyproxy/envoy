@@ -109,6 +109,7 @@ void WorkerImpl::stop() {
   // is happening, so we might not yet have a thread.
   if (thread_) {
     dispatcher_->exit();
+    dispatcher_->shutdown();
     thread_->join();
   }
 }

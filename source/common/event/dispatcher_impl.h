@@ -155,6 +155,7 @@ private:
   // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.
   std::list<DispatcherThreadDeletablePtr>
       deletables_in_dispatcher_thread_ ABSL_GUARDED_BY(thread_local_deletable_lock_);
+  bool shutdown_called_{false};
 
   SchedulableCallbackPtr deferred_delete_cb_;
 
