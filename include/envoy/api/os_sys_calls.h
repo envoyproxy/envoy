@@ -32,7 +32,7 @@ public:
   virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
-   * This interface is based on Windows `WSAIoctl`. It becames equivalent with the POSIX interface
+   * This interface is based on Windows `WSAIoctl`. It becomes equivalent with the POSIX interface
    * with `in_buffer` as `argp` and the rest of the parameters ignored.
    * @see ioctl (man 2 ioctl)
    * @see WSAIoctl (MSDN)
