@@ -57,8 +57,8 @@ private:
   // contain that information. See
   // https://grpc.github.io/grpc/core/md_doc__p_r_o_t_o_c_o_l-_h_t_t_p2.html
   // for more on the trailers-only specification.
-  void doTrailers(const Http::ResponseHeaderOrTrailerMap& trailers,
-                  bool set_grpc_status_and_message);
+  void doHeadersForTrailersOnlyResponse(const Http::ResponseHeaderOrTrailerMap& headers);
+  void doTrailers(const Http::ResponseHeaderOrTrailerMap& trailers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
