@@ -20,16 +20,6 @@ getGrpcAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context
       });
 }
 
-GrpcOpenTelemetryAccessLoggerCacheSharedPtr
-getGrpcOpenTelemetryAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<GrpcCommon::GrpcOpenTelemetryAccessLoggerCacheImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_logger_cache), [&context] {
-        return std::make_shared<GrpcCommon::GrpcOpenTelemetryAccessLoggerCacheImpl>(
-            context.clusterManager().grpcAsyncClientManager(), context.scope(),
-            context.threadLocal(), context.localInfo());
-      });
-}
-
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions

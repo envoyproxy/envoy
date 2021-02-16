@@ -58,10 +58,10 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   Stats::Scope& scope_;
-  // const envoy::extensions::access_loggers::grpc::v3::OtGrpcAccessLogConfig config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::unique_ptr<Formatter::StructFormatter> body_formatter_;
+  std::unique_ptr<Formatter::StructFormatter> attributes_formatter_;
 };
 
 using AccessLogPtr = std::unique_ptr<AccessLog>;

@@ -26,7 +26,7 @@ message OpenTelemetryAccessLogConfig {
 
   opentelemetry.proto.common.v1.AnyValue body = 2;
 
-  opentelemetry.proto.common.v1.KeyValue attributes = 3;
+  opentelemetry.proto.common.v1.KeyValueList attributes = 3;
 
-  opentelemetry.proto.common.v1.KeyValue resource_attributes = 4;
+  opentelemetry.proto.common.v1.KeyValueList resource = 4;
 }

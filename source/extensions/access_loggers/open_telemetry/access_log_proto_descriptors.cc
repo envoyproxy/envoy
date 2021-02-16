@@ -7,15 +7,15 @@
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace GrpcCommon {
+namespace OpenTelemetry {
 
 void validateProtoDescriptors() {
-  const auto method = "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs";
+  const auto method = "opentelemetry.proto.collector.logs.v1.LogsService.Export";
 
   RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
                  "");
 };
-} // namespace GrpcCommon
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

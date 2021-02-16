@@ -37,7 +37,7 @@ getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
 ::Envoy::AccessLog::InstanceSharedPtr
 createAccessLogInstance(const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
                         Server::Configuration::FactoryContext& context) {
-  // GrpcCommon::validateProtoDescriptors();
+  validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(

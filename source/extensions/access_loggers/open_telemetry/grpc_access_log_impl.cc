@@ -1,6 +1,7 @@
 #include "extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 

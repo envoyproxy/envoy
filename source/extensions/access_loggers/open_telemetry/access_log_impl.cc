@@ -21,34 +21,34 @@
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
-const char BODY_CONFIG[] = R"EOF(
-kvlist_value:
-  values:
-    - key: "downstream_service_id"
-      value:
-        string_value: "%REQ(x-envoy-downstream-service-cluster)%"
-    - key: "upstream_service_id"
-      value:
-        string_value: "DYNAMIC_METADATA(com.google.trafficdirector:backend_service_name)"
-    - key: "upstream_backend_service"
-      value:
-        string_value: "DYNAMIC_METADATA(com.google.trafficdirector:backend_service_name)"
-    - key: "protocol"
-      value:
-        string_value: "%PROTOCOL%"
-    - key: "status_code"
-      value:
-        string_value: "%RESPONSE_CODE%"
-    - key: "duration"
-      value:
-        string_value: "%REQUEST_DURATION%"
-    - key: "request_bytes"
-      value:
-        string_value: "%BYTES_RECEIVED%"
-    - key: "response_bytes"
-      value:
-        string_value: "%BYTES_SENT%"
-)EOF";
+// const char BODY_CONFIG[] = R"EOF(
+// kvlist_value:
+//   values:
+//     - key: "downstream_service_id"
+//       value:
+//         string_value: "%REQ(x-envoy-downstream-service-cluster)%"
+//     - key: "upstream_service_id"
+//       value:
+//         string_value: "DYNAMIC_METADATA(com.google.trafficdirector:backend_service_name)"
+//     - key: "upstream_backend_service"
+//       value:
+//         string_value: "DYNAMIC_METADATA(com.google.trafficdirector:backend_service_name)"
+//     - key: "protocol"
+//       value:
+//         string_value: "%PROTOCOL%"
+//     - key: "status_code"
+//       value:
+//         string_value: "%RESPONSE_CODE%"
+//     - key: "duration"
+//       value:
+//         string_value: "%REQUEST_DURATION%"
+//     - key: "request_bytes"
+//       value:
+//         string_value: "%BYTES_RECEIVED%"
+//     - key: "response_bytes"
+//       value:
+//         string_value: "%BYTES_SENT%"
+// )EOF";
 
 namespace Envoy {
 namespace Extensions {
@@ -74,18 +74,14 @@ AccessLog::AccessLog(
         config.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 
-  opentelemetry::proto::common::v1::AnyValue body_format;
-  MessageUtil::loadFromYaml(BODY_CONFIG, body_format, ProtobufMessage::getNullValidationVisitor());
-  ProtobufWkt::Struct struct_format;
-  MessageUtil::jsonConvert(body_format, struct_format);
-  // Don't preserve types === everything is string (otherwise can't define placeholders).
-  body_formatter_ = std::make_unique<Formatter::StructFormatter>(struct_format, false, false);
+  ProtobufWkt::Struct body_format;
+  MessageUtil::jsonConvert(config.body(), body_format);
+  body_formatter_ = std::make_unique<Formatter::StructFormatter>(body_format, false, false);
+  ProtobufWkt::Struct attributes_format;
+  MessageUtil::jsonConvert(config.attributes(), attributes_format);
+  attributes_formatter_ =
+      std::make_unique<Formatter::StructFormatter>(attributes_format, false, false);
 }
-
-// static void jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest);
-// static void jsonConvert(const ProtobufWkt::Struct& source,
-//                         ProtobufMessage::ValidationVisitor& validation_visitor,
-//                         Protobuf::Message& dest);
 
 void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
@@ -93,10 +89,16 @@ void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                         const StreamInfo::StreamInfo& stream_info) {
 
   opentelemetry::proto::logs::v1::LogRecord log_entry;
-  const ProtobufWkt::Struct struct_entry = body_formatter_->format(
+  const auto formatted_body = body_formatter_->format(
       request_headers, response_headers, response_trailers, stream_info, absl::string_view());
-  MessageUtil::jsonConvert(struct_entry, ProtobufMessage::getNullValidationVisitor(),
+  MessageUtil::jsonConvert(formatted_body, ProtobufMessage::getNullValidationVisitor(),
                            *log_entry.mutable_body());
+  const auto formatted_attributes = attributes_formatter_->format(
+      request_headers, response_headers, response_trailers, stream_info, absl::string_view());
+  opentelemetry::proto::common::v1::KeyValueList attributes;
+  MessageUtil::jsonConvert(formatted_attributes, ProtobufMessage::getNullValidationVisitor(),
+                           attributes);
+  *log_entry.mutable_attributes() = attributes.values();
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }

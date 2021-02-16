@@ -12,9 +12,6 @@ namespace GrpcCommon {
 GrpcAccessLoggerCacheSharedPtr
 getGrpcAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context);
 
-GrpcOpenTelemetryAccessLoggerCacheSharedPtr
-getGrpcOpenTelemetryAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context);
-
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions
