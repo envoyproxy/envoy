@@ -257,12 +257,12 @@ message HttpConnectionManager {
     // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply
     // to the *:path* header destined for the upstream.
     enum NormalizationPolicy {
-      // Normalizations apply internally before any processing of requests by
+      // Normalization applies internally before any processing of requests by
       // HTTP filters, routing, and matching. Envoy will forward the normalized
       // *:path* header. Regex rewrites by the router apply to the normalized header.
       FORWARD = 0;
 
-      // Normalizations only apply internally. The original *:path* header will
+      // Normalization only applies internally. The original *:path* header will
       // be sent upstream *unless* the path has been mutated by a filter.
       INTERNAL = 1;
     }
