@@ -61,11 +61,17 @@ This extension may be referenced by the qualified name *$extension*
 
   $security_posture
 
-  This extension extends the following extension category:
+""")
+
+# Template for formating extension categories for extension.
+EXTENSION_CATEGORIES_TEMPLATE = string.Template("""
+.. tip::
+  $message:
 
 $categories
 
 """)
+
 
 EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
 
@@ -219,12 +225,17 @@ def FormatExtension(extension):
     anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+    extension = EXTENSION_TEMPLATE.substitute(anchor=anchor,
+                                              extension=extension,
+                                              status=status,
+                                              security_posture=security_posture)
+
     categories = FormatExtensionList(extension_metadata["categories"], "extension_category")
-    return EXTENSION_TEMPLATE.substitute(anchor=anchor,
-                                         extension=extension,
-                                         status=status,
-                                         security_posture=security_posture,
-                                         categories=categories)
+    cat_or_cats = "categories" if len(categories) > 1 else "category"
+    category_message = ("This extension extends and can be used with the following extension {cat_or_cats}"
+    extension_category = EXTENSION_CATEGORIES_TEMPLATE.substitute(message=category_message,
+                                                                  categories=categories)
+    return f"{extension}\n\n{extension_category}"
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
