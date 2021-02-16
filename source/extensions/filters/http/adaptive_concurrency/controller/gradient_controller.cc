@@ -109,11 +109,9 @@ void GradientController::enterMinRTTSamplingWindow() {
 }
 
 void GradientController::updateMinRTT() {
-  ASSERT(inMinRTTSamplingWindow());
-
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
-    if (hist_sample_count(latency_sample_hist_.get()) != 0) {
+    if (hist_sample_count(latency_sample_hist_.get()) > 0) {
       min_rtt_ = processLatencySamplesAndClear();
       stats_.min_rtt_msecs_.set(
             std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());

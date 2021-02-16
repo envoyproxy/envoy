@@ -843,6 +843,8 @@ min_rtt_calc_params:
   // Complete the minRTT update in t1 and verify we've exited the window.
   synchronizer.signal("pre_minrtt_update");
   t1.join();
+
+  // verify whether we get the empty histogram.
   verifyEmptyHistogram(1);
 }
 
