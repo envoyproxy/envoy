@@ -1491,7 +1491,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
   const auto time_bias = EdfLoadBalancerBasePeer::timeBias(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(1.0d, time_bias);
+  EXPECT_EQ(1.0, time_bias);
   const auto hosts_in_slow_start =
       EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_TRUE(hosts_in_slow_start->empty());

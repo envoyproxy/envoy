@@ -1,10 +1,12 @@
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "load_balancer_fuzz_base.h"
 
 namespace Envoy {
 namespace Upstream {
-class ZoneAwareLoadBalancerFuzzBase : public LoadBalancerFuzzBase {
+class ZoneAwareLoadBalancerFuzzBase : public Event::TestUsingSimulatedTime,
+                                      public LoadBalancerFuzzBase {
 public:
   ZoneAwareLoadBalancerFuzzBase(bool need_local_cluster, const std::string& random_bytestring)
       : random_bytestring_(random_bytestring) {

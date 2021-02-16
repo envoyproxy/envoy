@@ -824,7 +824,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       }
     }
   };
-
   // Populate EdfSchedulers for each valid HostsSource value for the host set at this priority.
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());
