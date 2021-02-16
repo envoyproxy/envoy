@@ -72,10 +72,10 @@ TagNameValues::TagNameValues() {
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
-  addRe2(MONGO_COLLECTION, R"(^mongo\.<NAME>\.collection\.((<NAME>)\.).*?query\.)", ".collection.");
+  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.*");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
-  addRe2(MONGO_CMD, R"(^mongo\.<NAME>\.cmd\.((<NAME>)\.))", ".cmd.");
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.*");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
   addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
