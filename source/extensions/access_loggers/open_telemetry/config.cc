@@ -35,8 +35,9 @@ getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
 }
 
 ::Envoy::AccessLog::InstanceSharedPtr
-createAccessLogInstance(const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
-                        Server::Configuration::FactoryContext& context) {
+AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                          ::Envoy::AccessLog::FilterPtr&& filter,
+                                          Server::Configuration::FactoryContext& context) {
   validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

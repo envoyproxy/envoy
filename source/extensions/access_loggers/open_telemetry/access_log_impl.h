@@ -31,7 +31,7 @@ namespace OpenTelemetry {
 // TODO(mattklein123): Stats
 
 /**
- * Access log Instance that streams HTTP logs over gRPC.
+ * Access log Instance that streams logs over gRPC.
  */
 class AccessLog : public Common::ImplBase {
 public:

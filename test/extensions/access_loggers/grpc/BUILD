@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -60,10 +61,10 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
+envoy_cc_test(
     name = "http_config_test",
     srcs = ["http_config_test.cc"],
-    extension_name = "envoy.access_loggers.http_grpc",
+    # extension_name = "envoy.access_loggers.http_grpc",
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
         "//test/mocks/server:factory_context_mocks",

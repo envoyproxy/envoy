@@ -115,7 +115,7 @@ values:
   AccessLogPtr access_log_;
 };
 
-// Test HTTP log marshaling.
+// Test log marshaling.
 TEST_F(AccessLogTest, Marshalling) {
   InSequence s;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;

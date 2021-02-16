@@ -14,8 +14,8 @@ namespace OpenTelemetry {
  */
 class AccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
 public:
-  AccessLog::InstanceSharedPtr
-  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+  ::Envoy::AccessLog::InstanceSharedPtr
+  createAccessLogInstance(const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
                           Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
