@@ -111,8 +111,7 @@ EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text
 EXTENSION_CATEGORIES = {}
 for _k, _v in EXTENSION_DB.items():
   for _cat in _v['categories']:
-    EXTENSION_CATEGORIES.setdefault(_cat, [])
-    EXTENSION_CATEGORIES[_cat].append(_k)
+    EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
 
 
 class ProtodocError(Exception):
