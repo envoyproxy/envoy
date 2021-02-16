@@ -661,7 +661,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
 
 // Requests that exceed the configured decoder buffer limit will be rejected.
 TEST_F(GrpcJsonTranscoderFilterTest, RequestBodyExceedsBufferLimit) {
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillOnce(Return(8));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(8));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
@@ -675,7 +677,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, RequestBodyExceedsBufferLimit) {
 
 // Responses that exceed the configured encoder buffer limit will be rejected.
 TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillOnce(Return(8));
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(8));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
@@ -1002,7 +1006,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
 // Unary requests with HTTP bodies require the filter to buffer the entire body.
 // This results in the filter internally buffering more data than the configured limits.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBodyExceedsBufferLimit) {
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(8));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(3))
+      .WillRepeatedly(Return(8));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"}, {":path", "/postBody?arg=hi"}, {"content-type", "text/plain"}};
