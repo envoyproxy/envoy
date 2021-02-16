@@ -1117,7 +1117,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
                                      {":path", "/shelf"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      R"({ "theme" : "Children")", {}, {}, Status(),
+      R"({"theme" : "Children"})", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "413"}},
       "Request rejected because the transcoder's internal buffer size exceeds the configured "
       "limit.",
@@ -1140,6 +1140,22 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
           {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "99"}},
       "Response not transcoded because the transcoder's internal buffer size exceeds the "
       "configured limit.");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostHttpBodyRequestExceedsBufferLimit) {
+  // Request body is more than 8 bytes.
+  config_helper_.setBufferLimits(2 << 20, 8);
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<google::api::HttpBody, google::api::HttpBody>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/echoRawBody"},
+                                     {":authority", "host"},
+                                     {"content-type", "text/plain"}},
+      R"(hello world!)", {}, {}, Status(), Http::TestResponseHeaderMapImpl{{":status", "413"}},
+      "Request rejected because the transcoder's internal buffer size exceeds the configured "
+      "limit.",
+      true, false, "", true);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) {
