@@ -232,7 +232,7 @@ def FormatExtension(extension):
 
     categories = FormatExtensionList(extension_metadata["categories"], "extension_category")
     cat_or_cats = "categories" if len(categories) > 1 else "category"
-    category_message = "This extension extends and can be used with the following extension {cat_or_cats}"
+    category_message = f"This extension extends and can be used with the following extension {cat_or_cats}"
     extension_category = EXTENSION_CATEGORIES_TEMPLATE.substitute(message=category_message,
                                                                   categories=categories)
     return f"{extension}\n\n{extension_category}"
