@@ -200,7 +200,7 @@ def getGitInfo(CI_TARGET):
     output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
     ret += "Upstream:\t{}".format(output.replace('.git', ''))
 
-  output = subprocess.check_output(['git', 'describe', '--all'], encoding='utf-8')
+  output = subprocess.check_output(['git', 'describe', '--all', '--always'], encoding='utf-8')
   ret += "Latest ref:\t{}".format(output)
 
   ret += "\n"
@@ -223,7 +223,7 @@ if __name__ == "__main__":
   if os.getenv('TEST_TMPDIR') and os.getenv('REPO_URI') and os.getenv("BUILD_URI"):
     os.environ["TMP_OUTPUT_PROCESS_XML"] = os.getenv("TEST_TMPDIR") + "/tmp_output_process_xml.txt"
   else:
-    print("Set the env variables TEST_TMPDIR and REPO_URI first.")
+    print("Set the env variables TEST_TMPDIR, REPO_URI, and BUILD_URI first.")
     sys.exit(0)
 
   find_dir = "{}/**/**/**/**/bazel-testlogs/".format(os.environ['TEST_TMPDIR']).replace('\\', '/')
