@@ -134,10 +134,11 @@ public:
 
 private:
   static uint32_t findMatchIndex(const std::vector<std::string>& tokens);
+  static bool hasDoubleWild(const std::vector<std::string>& tokens);
 
-  std::vector<std::string> tokens_;
-  const uint32_t match_index_{0};
-};
+  const std::vector<std::string> tokens_;
+  const uint32_t match_index_;
+  const bool has_double_wild_;};
 
 } // namespace Stats
 } // namespace Envoy

@@ -431,8 +431,18 @@ TEST_F(TagExtractorTokensTest, TokensMatchStartWild) {
   EXPECT_EQ("is.the.time", tag_extracted_name_);
 }
 
-TEST_F(TagExtractorTokensTest, TokensMatchStartWildLong) {
-  EXPECT_TRUE(extract("when", "$.is.the.*", "now.is.the.time.to.come.to.the.aid"));
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildLong) {
+  EXPECT_TRUE(extract("when", "$.is.the.**", "now.is.the.time.to.come.to.the.aid"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_EQ("is.the.time.to.come.to.the.aid", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchStartSingleWildLong) {
+  EXPECT_FALSE(extract("when", "$.is.the.*", "now.is.the.time.to.come.to.the.aid"));
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWild) {
+  EXPECT_TRUE(extract("when", "$.**.aid", "now.is.the.time.to.come.to.the.aid"));
   EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
   EXPECT_EQ("is.the.time.to.come.to.the.aid", tag_extracted_name_);
 }

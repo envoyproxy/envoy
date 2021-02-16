@@ -72,10 +72,11 @@ TagNameValues::TagNameValues() {
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
-  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.*");
+  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*");
+  //addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.query.*");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
-  addTokenized(MONGO_CMD, "mongo.*.cmd.$.*");
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
   addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
@@ -128,7 +129,7 @@ TagNameValues::TagNameValues() {
   addRe2(VIRTUAL_HOST, R"(^vhost\.((<NAME>)\.))");
 
   // mongo.(<stat_prefix>.)*
-  addTokenized(MONGO_PREFIX, "mongo.$.*");
+  addTokenized(MONGO_PREFIX, "mongo.$.**");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
   // Note: <route_config_name> can contain dots thus we have to maintain full

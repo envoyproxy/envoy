@@ -174,7 +174,8 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens,
                                                absl::string_view substr)
     : TagExtractorImplBase(name, tokens, substr),
-      tokens_(absl::StrSplit(tokens, '.')), match_index_{findMatchIndex(tokens_)} {}
+      tokens_(absl::StrSplit(tokens, '.')), match_index_(findMatchIndex(tokens_)),
+      has_double_wild_(hasDoubleWild(tokens_)) {}
 
 uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
   uint32_t index = tokens.size();
@@ -188,6 +189,15 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& 
   return index;
 }
 
+bool TagExtractorTokensImpl::hasDoubleWild(const std::vector<std::string>& tokens) {
+  for (uint32_t i = 0; i < tokens.size(); ++i) {
+    if (tokens[i] == "**") {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                         IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
@@ -199,33 +209,55 @@ bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, std::vector
   }
 
   std::vector<absl::string_view> tokens = absl::StrSplit(stat_name, '.');
-  bool match_all_at_end = tokens.size() > tokens_.size() && (tokens_[tokens_.size() - 1] == "*");
-  if (tokens.size() < tokens_.size() || (tokens.size() > tokens_.size() && !match_all_at_end)) {
+  uint32_t index = 0, start = 0, end = 0;
+  absl::string_view tag;
+  uint32_t input_index = 0, pattern_index = 0;
+  for (; input_index < tokens.size() && pattern_index < tokens_.size();
+       ++input_index, ++pattern_index) {
+    if (pattern_index == match_index_) {
+      ASSERT(tag.empty());
+      tag = tokens[input_index];
+      start = index;
+      end = start + tag.size();
+      if (index > 0) {
+        --start; // Remove dot leading to this token.
+      } else if (input_index < (tokens.size() - 1)) {
+        ++end; // Remove dot leading to next token
+      }
+    } else {
+      absl::string_view expected = tokens_[pattern_index];
+      if (expected == "**") {
+        if (pattern_index == tokens_.size() - 1) {
+          if (end != 0) {
+            pattern_index = tokens_.size();
+            input_index = tokens.size();
+          }
+          break;
+        }
+
+        // A "**" in the pattern anywhere except the end means that
+        // we must search for the next expected token.
+        ++pattern_index;
+        expected = tokens_[pattern_index];
+        for (; input_index < tokens.size(); ++input_index) {
+          if (tokens[input_index] == expected) {
+            break;
+          }
+        }
+      }
+      if ((expected != "*" && expected != "**") && (expected != tokens[input_index])) {
+        PERF_RECORD(perf, "tokens-miss", name_);
+        PERF_TAG_INC(missed_);
+        return false;
+      } else if (end == 0) {
+        index += tokens[input_index].size() + 1;
+      }
+    }
+  }
+  if (pattern_index < tokens_.size() || input_index < tokens.size()) {
     PERF_RECORD(perf, "tokens-miss", name_);
     PERF_TAG_INC(missed_);
     return false;
-  }
-
-  uint32_t index = 0, start = 0, end = 0;
-  absl::string_view tag;
-  for (uint32_t i = 0; i < tokens_.size(); ++i) {
-    if (i == match_index_) {
-      ASSERT(tag.empty());
-      tag = tokens[i];
-      start = index;
-      end = start + tokens[i].size();
-      if (index > 0) {
-        --start; // Remove dot leading to this token.
-      } else if (i < (tokens.size() - 1)) {
-        ++end; // Remove dot leading to next token
-      }
-    } else if (tokens_[i] != "*" && (tokens_[i] != tokens[i])) {
-      PERF_RECORD(perf, "tokens-miss", name_);
-      PERF_TAG_INC(missed_);
-      return false;
-    } else if (end == 0) {
-      index += tokens[i].size() + 1;
-    }
   }
 
   ASSERT(!tag.empty());
