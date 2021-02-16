@@ -101,7 +101,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
-        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
 
