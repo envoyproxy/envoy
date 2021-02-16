@@ -420,61 +420,61 @@ protected:
 };
 
 TEST_F(TagExtractorTokensTest, TokensMatchStart) {
-  EXPECT_TRUE(extract("when", "$.is.the.time", "now.is.the.time"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_TRUE(extract("when", "$when.is.the.time", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.when", "now"}));
   EXPECT_EQ("is.the.time", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchStartWild) {
-  EXPECT_TRUE(extract("when", "$.is.the.*", "now.is.the.time"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_TRUE(extract("when", "$when.is.the.*", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.when", "now"}));
   EXPECT_EQ("is.the.time", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildLong) {
-  EXPECT_TRUE(extract("when", "$.is.the.**", "now.is.the.time.to.come.to.the.aid"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_TRUE(extract("when", "$when.is.the.**", "now.is.the.time.to.come.to.the.aid"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.when", "now"}));
   EXPECT_EQ("is.the.time.to.come.to.the.aid", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchStartSingleWildLong) {
-  EXPECT_FALSE(extract("when", "$.is.the.*", "now.is.the.time.to.come.to.the.aid"));
+  EXPECT_FALSE(extract("when", "$when.is.the.*", "now.is.the.time.to.come.to.the.aid"));
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWild) {
-  EXPECT_TRUE(extract("when", "$.**.aid", "now.is.the.time.to.come.to.the.aid"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_TRUE(extract("when", "$when.**.aid", "now.is.the.time.to.come.to.the.aid"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.when", "now"}));
   EXPECT_EQ("is.the.time.to.come.to.the.aid", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchMiddle) {
-  EXPECT_TRUE(extract("article", "now.is.$.time", "now.is.the.time"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"article", "the"}));
+  EXPECT_TRUE(extract("article", "now.is.$article.time", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.article", "the"}));
   EXPECT_EQ("now.is.time", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchMiddleWild) {
-  EXPECT_TRUE(extract("article", "now.*.$.time", "now.is.the.time"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"article", "the"}));
+  EXPECT_TRUE(extract("article", "now.*.$article.time", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.article", "the"}));
   EXPECT_EQ("now.is.time", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMatchEnd) {
-  EXPECT_TRUE(extract("what", "now.is.the.$", "now.is.the.time"));
-  EXPECT_THAT(tags_, ElementsAre(Tag{"what", "time"}));
+  EXPECT_TRUE(extract("what", "now.is.the.$what", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"envoy.what", "time"}));
   EXPECT_EQ("now.is.the", tag_extracted_name_);
 }
 
 TEST_F(TagExtractorTokensTest, TokensMismatchString) {
-  EXPECT_FALSE(extract("article", "now.is.$.time", "now.was.the.time"));
+  EXPECT_FALSE(extract("article", "now.is.$article.time", "now.was.the.time"));
 }
 
 TEST_F(TagExtractorTokensTest, TokensMismatchNameTooLong) {
-  EXPECT_FALSE(extract("article", "now.$.the", "now.is.the.time"));
+  EXPECT_FALSE(extract("article", "now.$verb.the", "now.is.the.time"));
 }
 
 TEST_F(TagExtractorTokensTest, TokensMismatchPatternTooLong) {
-  EXPECT_FALSE(extract("article", "now.$.the.time.to", "now.is.the.time"));
+  EXPECT_FALSE(extract("article", "now.$verb.the.time.to", "now.is.the.time"));
 }
 
 } // namespace Stats

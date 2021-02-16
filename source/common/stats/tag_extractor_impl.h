@@ -94,7 +94,7 @@ protected:
   std::string& addTag(std::vector<Tag>& tags) const;
 
   const std::string name_;
-  const std::string prefix_;
+  std::string prefix_;
   const std::string substr_;
 
   PERF_TAG_COUNTERS;
@@ -133,12 +133,15 @@ public:
                   IntervalSet<size_t>& remove_characters) const override;
 
 private:
-  static uint32_t findMatchIndex(const std::vector<std::string>& tokens);
+  using TagNameIndexPair = std::pair<std::string, uint32_t>;
+  using Matches = std::vector<TagNameIndexPair>;
+
+  static Matches findMatches(const std::vector<std::string>& tokens);
   static bool hasDoubleWild(const std::vector<std::string>& tokens);
 
   const std::vector<std::string> tokens_;
-  const uint32_t match_index_;
-  const bool has_double_wild_;};
+  const Matches matches_;
+};
 
 } // namespace Stats
 } // namespace Envoy
