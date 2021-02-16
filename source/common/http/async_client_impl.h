@@ -482,7 +482,7 @@ private:
   RequestMessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<ResponseMessageImpl> response_;
-  bool cancelled_{};
+  bool canceled_{};
   Tracing::SpanPtr child_span_;
 
   friend class AsyncClientImpl;

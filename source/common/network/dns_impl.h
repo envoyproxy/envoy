@@ -47,7 +47,7 @@ private:
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
-      cancelled_ = true;
+      canceled_ = true;
     }
 
     /**
@@ -74,7 +74,7 @@ private:
     // Has the query completed? Only meaningful if !owned_;
     bool completed_ = false;
     // Was the query cancelled via cancel()?
-    bool cancelled_ = false;
+    bool canceled_ = false;
     // If dns_lookup_family is "fallback", fallback to v4 address if v6
     // resolution failed.
     bool fallback_if_failed_ = false;

@@ -98,7 +98,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
-    if (!cancelled_) {
+    if (!canceled_) {
       callback_(ResolutionStatus::Failure, {});
     }
     delete this;
@@ -167,7 +167,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   }
 
   if (completed_) {
-    if (!cancelled_) {
+    if (!canceled_) {
       try {
         callback_(resolution_status, std::move(address_list));
       } catch (const EnvoyException& e) {
