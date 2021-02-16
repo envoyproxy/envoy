@@ -20,9 +20,8 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallIntResult OsSysCallsImpl::ioctl((os_fd_t sockfd, unsigned long request, void* argp,
-                                 unsigned long, void*,
-                                 unsigned long, unsigned long*) {
+SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long request, void* argp,
+                                       unsigned long, void*, unsigned long, unsigned long*) {
   const int rc = ::ioctl(sockfd, request, argp);
   return {rc, rc != -1 ? 0 : errno};
 }
