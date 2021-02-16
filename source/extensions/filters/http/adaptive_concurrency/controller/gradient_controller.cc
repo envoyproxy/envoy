@@ -127,7 +127,7 @@ void GradientController::scheduleMinRTTUpdate() {
     min_rtt_calc_timer_->enableTimer(
         applyJitter(config_.minRTTCalcInterval(), config_.jitterPercent()));
     sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
-    });
+  });
 }
 
 std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseconds interval,
