@@ -208,6 +208,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
+  if (response->status != CheckStatus::Error) {
+    // When response dynamic metadata is not empty, emit dynamic metadata for responses with OK or
+    // Denied check status.
+    if (!response->dynamic_metadata.fields().empty()) {
+      decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
+                                                          response->dynamic_metadata);
+    }
+  }
+
   switch (response->status) {
   case CheckStatus::OK: {
     // Any changes to request headers can affect how the request is going to be
@@ -266,11 +275,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
                        *decoder_callbacks_, response->response_headers_to_add.size());
       response_headers_to_add_ = std::move(response->response_headers_to_add);
-    }
-
-    if (!response->dynamic_metadata.fields().empty()) {
-      decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
-                                                          response->dynamic_metadata);
     }
 
     if (cluster_) {

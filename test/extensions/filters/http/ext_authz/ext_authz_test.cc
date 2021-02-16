@@ -2008,6 +2008,55 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+// Verify that when returning an OK response with dynamic_metadata field set, the filter emits
+// dynamic metadata.
+TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
+  InSequence s;
+
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Unauthorized;
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+
+  auto* fields = response.dynamic_metadata.mutable_fields();
+  (*fields)["foo"] = ValueUtil::stringValue("denied");
+  (*fields)["bar"] = ValueUtil::numberValue(1);
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(std::move(response_ptr));
+          })));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&response](const std::string& ns,
+                                   const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, HttpFilterNames::get().ExtAuthorization);
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+      }));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.denied").value());
+  EXPECT_EQ("ext_authz_denied", filter_callbacks_.details());
+}
+
 // Test that when a connection awaiting a authorization response is canceled then the
 // authorization call is closed.
 TEST_P(HttpFilterTestParam, ResetDuringCall) {
