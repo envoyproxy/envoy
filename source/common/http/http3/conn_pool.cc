@@ -34,6 +34,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         auto source_address = data.host_description_->cluster().sourceAddress();
         if (!source_address.get()) {
           source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
+          // TODO(alyssawilk) debug log: fix.
+          std::cerr << "Local address resolved to " << source_address->asString();
         }
         Network::TransportSocketFactory& transport_socket_factory =
             data.host_description_->transportSocketFactory();
