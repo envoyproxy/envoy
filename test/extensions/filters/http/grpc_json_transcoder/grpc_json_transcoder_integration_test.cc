@@ -1147,7 +1147,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
   HttpIntegrationTest::initialize();
 
   // Under limit: A single response message is less than 60 bytes.
-  // Messages streamed to the client successfully.
+  // Messages transcoded successfully.
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},

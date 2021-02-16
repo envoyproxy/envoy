@@ -757,7 +757,6 @@ bool JsonTranscoderFilter::checkIfTranscoderFailed(const std::string& details) {
   return false;
 }
 
-// TODO(lizan): Incorporate watermarks to bound buffer sizes
 bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& stream,
                                         Buffer::Instance& data) {
   const void* out;
