@@ -247,7 +247,7 @@ def FormatExtensionCategory(extension_category):
     RST formatted extension category description.
   """
   try:
-    if 'xray' in extension_category:
+    if 'tracers' in extension_category:
       extension_category = f"{extension_category}.foo"
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
