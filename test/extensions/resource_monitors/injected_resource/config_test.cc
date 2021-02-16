@@ -9,6 +9,7 @@
 #include "extensions/resource_monitors/injected_resource/config.h"
 
 #include "test/test_common/environment.h"
+#include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -29,8 +30,9 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      *dispatcher, *api, ProtobufMessage::getStrictValidationVisitor());
+      *dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }

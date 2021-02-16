@@ -173,6 +173,7 @@ envoy_cc_library(
         ":configuration_interface",
         ":drain_manager_interface",
         ":lifecycle_notifier_interface",
+        ":options_interface",
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
@@ -299,7 +300,8 @@ envoy_cc_library(
     hdrs = ["resource_monitor_config.h"],
     deps = [
         ":resource_monitor_interface",
-        "//include/envoy/api:api_interface",
+        ":options_interface",
+                "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/protobuf:message_validator_interface",
     ],

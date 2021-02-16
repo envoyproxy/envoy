@@ -36,7 +36,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                          Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, const Server::Options& options)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(Grpc::VersionedMethods(
                           "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck",
@@ -47,7 +47,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
       access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
       singleton_manager_(singleton_manager), tls_(tls), specifier_hash_(0),
-      validation_visitor_(validation_visitor), api_(api) {
+      validation_visitor_(validation_visitor), api_(api), options_(options) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -214,7 +214,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
   auto new_cluster = std::make_shared<HdsCluster>(
       admin_, runtime_, std::move(cluster_config), bind_config, store_stats_, ssl_context_manager_,
       false, info_factory_, cm_, local_info_, dispatcher_, singleton_manager_, tls_,
-      validation_visitor_, api_);
+      validation_visitor_, api_, options_);
 
   // Begin HCs in the background.
   new_cluster->initialize([] {});
@@ -338,9 +338,10 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                       const Server::Options& options)
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
-      ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
+      ssl_context_manager_(ssl_context_manager), options_(options), added_via_api_(added_via_api),
       hosts_(new HostVector()), validation_visitor_(validation_visitor),
       time_source_(dispatcher.timeSource()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
@@ -351,7 +352,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 
   info_ = info_factory.createClusterInfo(
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
-       local_info, dispatcher, singleton_manager, tls, validation_visitor, api});
+       local_info, dispatcher, singleton_manager, tls, validation_visitor, api, options});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
@@ -408,7 +409,7 @@ void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluste
       update_cluster_info = true;
       info_ = info_factory.createClusterInfo(
           {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_,
-           cm, local_info, dispatcher, singleton_manager, tls, validation_visitor, api});
+           cm, local_info, dispatcher, singleton_manager, tls, validation_visitor, api, options_});
     }
 
     // Check to see if anything in the endpoints list has changed.
@@ -531,7 +532,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
       params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-      params.validation_visitor_, params.api_);
+      params.validation_visitor_, params.api_, params.options_);
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
