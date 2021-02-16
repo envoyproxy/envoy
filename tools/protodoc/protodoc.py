@@ -107,13 +107,12 @@ EXTENSION_STATUS_VALUES = {
 
 EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
 
-categories = {}
-for k, v in data.items():
-  for cat in v['categories']:
-    categories[cat] = categories.get(cat, [])
-    categories[cat].append(k)
-
-EXTENSION_CATEGORIES = categories
+# create an index of extension categories from extension db
+EXTENSION_CATEGORIES = {}
+for _k, _v in EXTENSION_DB.items():
+  for _cat in _v['categories']:
+    EXTENSION_CATEGORIES.setdefault(_cat, [])
+    EXTENSION_CATEGORIES[_cat].append(_k)
 
 
 class ProtodocError(Exception):
