@@ -539,7 +539,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
     ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.rc_);
   } else {
     // TODO(alyssawilk) REMOVE BEFORE SUBMITTING.
-    std::cerr << "Failed sending.  Peer address " << peer_address.asString();
+    std::cerr << "Failed sending. Peer address " << peer_address.asString();
     if (local_ip) {
       std::cerr << " local ip " << local_ip->addressAsString();
     }
