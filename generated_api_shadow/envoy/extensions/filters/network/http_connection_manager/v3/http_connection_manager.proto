@@ -244,50 +244,73 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  // Transformations that apply to path headers. The policy to apply these
-  // transformations can be tuned by the configuration field. Transformations
-  // can be applied internally only, so that the normalized header is used in
-  // matching, routing, and HTTP filters while the original path header is
-  // forwarded upstream, or additionally apply to the forwarded *:path* header.
+  // [#not-implemented-hide] Transformations that apply to path
+  // headers. Transformations are applied before any processing of requests by
+  // HTTP filters, routing, and matching. A policy determines whether Envoy will
+  // forward the normalized *:path* header or forward the original header
+  // *:path* header (unless a filter modifies it).
   message PathNormalizationOptions {
-    // Defines a policy to apply normalization.  Path rewrites :ref:`regex_rewrite
-    // <envoy_api_field_route.RouteAction.regex_rewrite>` or :ref:`prefix_rewrite
-    // <envoy_api_field_route.RouteAction.prefix_rewrite>` will apply to the
-    // *:path* header destined for the upstream.
+    // Defines a policy to apply normalization. Any path rewrites that the
+    // router performs (e.g. :ref:`regex_rewrite
+    // <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>` or
+    // :ref:`prefix_rewrite
+    // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply
+    // to the *:path* header destined for the upstream.
     enum NormalizationPolicy {
-      // Normalizations apply internally before any processing of requests by HTTP
-      // filters, routing, and matching, *and* will affect the upstream *:path* header
-      // as well.
+      // Normalizations apply internally before any processing of requests by
+      // HTTP filters, routing, and matching. Envoy will forward the normalized
+      // *:path* header. Regex rewrites by the router apply to the normalized header.
       FORWARD = 0;
 
       // Normalizations only apply internally. The original *:path* header will
-      // be sent upstream *unless* the path has been mutated by a filter. Any
-      // regex rewrites that the router performs will be on the upstream *:path*
-      // header.
+      // be sent upstream *unless* the path has been mutated by a filter.
       INTERNAL = 1;
     }
 
-    NormalizationPolicy policy = 1;
-
     // Should paths be normalized according to RFC 3986 before any processing of
-    // requests by HTTP filters or routing? For paths that fail this check, Envoy
-    // will respond with 400 to paths that are malformed. This defaults to
-    // true. When not specified, this value may be overridden by the runtime
-    // variable
-    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
-    // See `Normalization and Comparison
+    // requests by HTTP filters or routing? For paths that fail this check,
+    // Envoy will respond with 400 to paths that are malformed. See
+    // `Normalization and Comparison
     // <https://tools.ietf.org/html/rfc3986#section-6>`_ for details of
-    // normalization.  Note that Envoy does not perform `case normalization
+    // normalization. Note that Envoy does not perform `case normalization
     // <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
-    google.protobuf.BoolValue normalize_path = 2;
+    message NormalizePath {
+      // Policy to apply to RFC 3986 path normalization. Defaults to FORWARD.
+      NormalizationPolicy policy = 1;
+
+      // RFC 3986 path normalization. Defaults to `true`.
+      google.protobuf.BoolValue normalize_path = 2;
+    }
 
     // Determines if adjacent slashes in the path are merged into one before any
     // processing of requests by HTTP filters or routing. Without setting this
     // option, incoming requests with path `//dir///file` will not match against
-    // route with `prefix` match set to `/dir`. Defaults to `false`. Note that
-    // slash merging is not part of `HTTP spec
-    // <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-    google.protobuf.BoolValue merge_slashes = 3;
+    // route with `prefix` match set to `/dir`. Note that slash merging is not
+    // part of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is
+    // provided for convenience.
+    message MergeSlashes {
+      // Policy to apply merging slashes. Defaults to FORWARD.
+      NormalizationPolicy policy = 1;
+
+      // Option to specify merging slashes. Defaults to `false`.
+      google.protobuf.BoolValue merge_slashes = 2;
+    }
+
+    // Wholesale policy that applies to each option if they do not specify
+    // individual policies. Individual policies allow configuring different
+    // behaviors for each transformation (e.g. forward RFC 3986 path
+    // normalization, use merge_slashes for matching only).
+    // Defaults to FORWARD.
+    NormalizationPolicy all_policy = 1;
+
+    // Message to configure RFC 3986 path normalization. Be fault, this is
+    // enabled. When not specified, this value may be overridden by the runtime
+    // variable
+    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+    NormalizePath normalize_path = 2;
+
+    // Message to configure merging adjacent slashes. By default, this is not enabled.
+    MergeSlashes merge_slashes = 3;
   }
 
   reserved 27;
@@ -635,7 +658,11 @@ message HttpConnectionManager {
   // [#not-implemented-hide:] Path normalization configuration. This includes
   // configurations for transformations (e.g. RFC 3986 normalization or merge
   // adjacent slashes) and the policy to apply them. The policy determines
-  // whether transformations affect the forwarded *:path* header.
+  // whether transformations affect the forwarded *:path* header. RFC 3986 path
+  // normalization is enabled by default and the default policy is that the
+  // normalized header will be forwarded. See :ref:`PathNormalizationOptions
+  // <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.PathNormalizationOptions>`
+  // for details.
   PathNormalizationOptions path_normalization_options = 43;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
