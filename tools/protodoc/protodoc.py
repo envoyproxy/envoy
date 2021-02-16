@@ -63,7 +63,7 @@ This extension may be referenced by the qualified name *$extension*
 
 """)
 
-# Template for formating extension categories for extension.
+# Template for formating extension's category/ies.
 EXTENSION_CATEGORIES_TEMPLATE = string.Template("""
 .. tip::
   $message:
@@ -72,7 +72,7 @@ $categories
 
 """)
 
-
+# Template for formating an extension category.
 EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
 
 .. tip::
@@ -232,7 +232,7 @@ def FormatExtension(extension):
 
     categories = FormatExtensionList(extension_metadata["categories"], "extension_category")
     cat_or_cats = "categories" if len(categories) > 1 else "category"
-    category_message = ("This extension extends and can be used with the following extension {cat_or_cats}"
+    category_message = "This extension extends and can be used with the following extension {cat_or_cats}"
     extension_category = EXTENSION_CATEGORIES_TEMPLATE.substitute(message=category_message,
                                                                   categories=categories)
     return f"{extension}\n\n{extension_category}"
