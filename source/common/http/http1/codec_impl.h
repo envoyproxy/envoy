@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -172,7 +173,9 @@ private:
  * Handles the callbacks of http_parser with its own base routine and then
  * virtual dispatches to its subclasses.
  */
-class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http> {
+class ConnectionImpl : public virtual Connection,
+                       protected Logger::Loggable<Logger::Id::http>,
+                       public ScopeTrackedObject {
 public:
   /**
    * @return Network::Connection& the backing network connection.
@@ -229,6 +232,9 @@ public:
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
   Envoy::Http::Status codec_status_;
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
@@ -294,6 +300,17 @@ protected:
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
+  friend std::ostream& operator<<(std::ostream& os, HeaderParsingState parsing_state) {
+    switch (parsing_state) {
+    case ConnectionImpl::HeaderParsingState::Field:
+      return os << "Field";
+    case ConnectionImpl::HeaderParsingState::Value:
+      return os << "Value";
+    case ConnectionImpl::HeaderParsingState::Done:
+      return os << "Done";
+    }
+    return os;
+  }
 
   virtual HeaderMap& headersOrTrailers() PURE;
   virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
@@ -442,6 +459,11 @@ private:
    */
   virtual Status checkHeaderNameForUnderscores() { return okStatus(); }
 
+  /**
+   * Additional state to dump on crash.
+   */
+  virtual void dumpAdditionalState(std::ostream& os, int indent_level) const PURE;
+
   static http_parser_settings settings_;
 
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
@@ -534,6 +556,7 @@ private:
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
     }
   }
+  void dumpAdditionalState(std::ostream& os, int indent_level) const override;
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
@@ -616,6 +639,7 @@ private:
       headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
     }
   }
+  void dumpAdditionalState(std::ostream& os, int indent_level) const override;
 
   absl::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before

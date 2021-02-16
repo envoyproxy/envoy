@@ -164,11 +164,8 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
     EXPECT_EQ(test_data.second, Utility::getErrorDescription(test_data.first));
   }
 
-#if defined(NDEBUG)
-  EXPECT_EQ(Utility::getErrorDescription(19), "UNKNOWN_ERROR");
-#else
-  EXPECT_DEATH(Utility::getErrorDescription(19), "Unknown BoringSSL error had occurred");
-#endif
+  EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(19), "UNKNOWN_ERROR"),
+                   "Unknown BoringSSL error had occurred");
 }
 
 } // namespace

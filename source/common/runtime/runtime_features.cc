@@ -74,11 +74,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
-    "envoy.reloadable_features.listener_in_place_filterchain_update",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
-    "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs",
     "envoy.reloadable_features.stop_faking_paths",
@@ -109,6 +107,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
+    // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
+    "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
 };

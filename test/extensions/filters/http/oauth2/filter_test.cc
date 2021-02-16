@@ -415,10 +415,7 @@ TEST_F(OAuth2Test, CookieValidator) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
-  const auto expires_at_s =
-      std::chrono::duration_cast<std::chrono::seconds>(
-          test_time_.timeSystem().systemTime().time_since_epoch() + std::chrono::seconds(10))
-          .count();
+  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
