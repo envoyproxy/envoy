@@ -3897,7 +3897,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, win32Ioctl(_, _, _, _, _, _, _));
+  EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _));
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::TopSpan);
   EXPECT_CALL(callbacks, filterState()).WillOnce(Invoke([&]() -> StreamInfo::FilterState& {
@@ -3950,7 +3950,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
   auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
   // auto io_handle_raw_ptr = io_handle.get();
 #ifdef WIN32
-  EXPECT_CALL(os_sys_calls_, win32Ioctl(_, _, _, _, _, _, _))
+  EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
 #endif
   Network::AcceptedSocketImpl socket(

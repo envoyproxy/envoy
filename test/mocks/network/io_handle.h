@@ -61,7 +61,7 @@ public:
   MOCK_METHOD(void, resetFileEvents, ());
   MOCK_METHOD(Api::SysCallIntResult, shutdown, (int how));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
-  MOCK_METHOD(Api::SysCallIntResult, win32Ioctl,
+  MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
 };
 

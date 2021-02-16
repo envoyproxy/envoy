@@ -20,7 +20,9 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long int request, void* argp) {
+SysCallIntResult OsSysCallsImpl::ioctl((os_fd_t sockfd, unsigned long request, void* argp,
+                                 unsigned long, void*,
+                                 unsigned long, unsigned long*) {
   const int rc = ::ioctl(sockfd, request, argp);
   return {rc, rc != -1 ? 0 : errno};
 }
@@ -279,11 +281,6 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 #endif
 
   return {false, EOPNOTSUPP};
-}
-
-SysCallIntResult OsSysCallsImpl::win32Ioctl(os_fd_t, unsigned long, void*, unsigned long, void*,
-                                            unsigned long, unsigned long*) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Api

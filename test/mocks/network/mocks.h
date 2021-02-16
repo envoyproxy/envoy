@@ -248,7 +248,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, listen, (int));
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
-  MOCK_METHOD(Api::SysCallIntResult, win32Ioctl,
+  MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
@@ -308,7 +308,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, listen, (int));
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
-  MOCK_METHOD(Api::SysCallIntResult, win32Ioctl,
+  MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());

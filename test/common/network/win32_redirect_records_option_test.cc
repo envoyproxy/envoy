@@ -44,7 +44,7 @@ TEST_F(Win32RedirectRecordsOptionImplTest, IgnoresOptionOnDifferentState) {
 }
 
 TEST_F(Win32RedirectRecordsOptionImplTest, FailsOnSyscallFailure) {
-  EXPECT_CALL(socket_, win32Ioctl(_, _, _, _, _, _))
+  EXPECT_CALL(socket_, ioctl(_, _, _, _, _, _))
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
   Win32RedirectRecordsOptionImpl socket_option{*redirect_records_};
   EXPECT_FALSE(
