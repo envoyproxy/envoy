@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.original_ip_detection.xff.v3;
 
-import "envoy/extensions/original_ip_detection/common/v3/original_ip_detection.proto";
-
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.original_ip_detection.xff.v3";
@@ -27,7 +25,4 @@ message XffConfig {
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 1;
-
-  // Common configuration across detection extensions.
-  common.v3.OriginalIPDetectionCommonConfig common_config = 2;
 }

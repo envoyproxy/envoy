@@ -582,7 +582,8 @@ message HttpConnectionManager {
 
   // The configuration of the original-IP detection extension.
   //
-  // If not set, Envoy uses the default remote IP detection mechanism.
+  // If not set, Envoy uses the default remote IP detection mechanism (:ref:`XFF
+  // <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`).
   //
   // When the remote address of the downstream connection is not used as
   // the detection mechanism for the request's original address, Envoy

@@ -5,6 +5,7 @@ package envoy.extensions.original_ip_detection.custom_header.v3;
 import "envoy/extensions/original_ip_detection/common/v3/original_ip_detection.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.original_ip_detection.custom_header.v3";
 option java_outer_classname = "CustomHeaderProto";
@@ -14,15 +15,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Custom header original IP detection extension]
 
 // This extension allows for the original downstream remote IP to be detected
-// by reading the value for a configured header name. If the value is successfully parsed
+// by reading the value from a configured header name. If the value is successfully parsed
 // as an IP, it'll be treated as the effective downstream remote address and seen as such
 // by all filters. If the detection or parsing of the header value fails, Envoy will fallback
 // to its default detection extension.
 //
 // [#extension: envoy.original_ip_detection.custom_header]
 message CustomHeaderConfig {
-  // The name for the header containing the original downstream remote address, if present.
-  string header_name = 1;
+  // The header name containing the original downstream remote address, if present.
+  string header_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Common configuration across detection extensions.
   common.v3.OriginalIPDetectionCommonConfig common_config = 2;
