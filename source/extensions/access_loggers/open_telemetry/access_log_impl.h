@@ -10,7 +10,7 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "envoy/extensions/access_loggers/open_telemetry/v3/open_tepemetry.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.h"
 
 #include "common/formatter/substitution_formatter.h"
 #include "common/grpc/typed_async_client.h"

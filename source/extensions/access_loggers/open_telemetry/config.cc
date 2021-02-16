@@ -1,6 +1,6 @@
 #include "extensions/access_loggers/open_telemetry/config.h"
 
-#include "envoy/extensions/access_loggers/open_telemetry/v3/open_tepemetry.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.validate.h"
 
 #include "envoy/registry/registry.h"
