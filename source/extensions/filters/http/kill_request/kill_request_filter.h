@@ -101,8 +101,8 @@ public:
     return kill_request_filter_headers_;
   }
 
-  const envoy::type::v3::FractionalPercent getProbability() const {
-    return std::move(kill_probability_);
+  const envoy::type::v3::FractionalPercent& getProbability() const {
+    return kill_probability_;
   }
 
 private:
