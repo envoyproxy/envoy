@@ -994,17 +994,16 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "pending_deferred_reset_: 0\n"
           "  &protocol_constraints_: \n"
           "    ProtocolConstraints"));
-  EXPECT_THAT(
-      ostream.contents(),
-      EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
-               "outbound_control_frames_: 0, max_outbound_control_frames_: 1000, "
-               "consecutive_inbound_frames_with_empty_payload_: 0, "
-               "max_consecutive_inbound_frames_with_empty_payload_: 1, inbound_streams_: 0, "
-               "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
-               "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
-               "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
-               "  Number of active streams: 0 Active Streams:\n"
-               "  current_slice_: null\n"));
+  EXPECT_THAT(ostream.contents(),
+              EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
+                       "outbound_control_frames_: 0, max_outbound_control_frames_: 1000, "
+                       "consecutive_inbound_frames_with_empty_payload_: 0, "
+                       "max_consecutive_inbound_frames_with_empty_payload_: 1, opened_streams_: 0, "
+                       "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
+                       "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
+                       "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
+                       "  Number of active streams: 0 Active Streams:\n"
+                       "  current_slice_: null\n"));
 }
 
 TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {

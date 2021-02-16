@@ -210,7 +210,7 @@ TEST_F(ProtocolConstraintsTest, DumpsStateWithoutAllocatingMemory) {
       ostream.contents(),
       HasSubstr(" outbound_frames_: 0, max_outbound_frames_: 0, outbound_control_frames_: 0, "
                 "max_outbound_control_frames_: 0, consecutive_inbound_frames_with_empty_payload_: "
-                "0, max_consecutive_inbound_frames_with_empty_payload_: 0, inbound_streams_: 0, "
+                "0, max_consecutive_inbound_frames_with_empty_payload_: 0, opened_streams_: 0, "
                 "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 0, "
                 "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
                 "max_inbound_window_update_frames_per_data_frame_sent_: 0"));

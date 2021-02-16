@@ -121,7 +121,7 @@ void ProtocolConstraints::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(max_outbound_control_frames_)
      << DUMP_MEMBER(consecutive_inbound_frames_with_empty_payload_)
      << DUMP_MEMBER(max_consecutive_inbound_frames_with_empty_payload_)
-     << DUMP_MEMBER(inbound_streams_) << DUMP_MEMBER(inbound_priority_frames_)
+     << DUMP_MEMBER(opened_streams_) << DUMP_MEMBER(inbound_priority_frames_)
      << DUMP_MEMBER(max_inbound_priority_frames_per_stream_)
      << DUMP_MEMBER(inbound_window_update_frames_) << DUMP_MEMBER(outbound_data_frames_)
      << DUMP_MEMBER(max_inbound_window_update_frames_per_data_frame_sent_) << '\n';
