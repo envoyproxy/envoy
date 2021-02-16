@@ -96,9 +96,7 @@ protected:
   }
 
   void verifyEmptyHistogram(int empty_histogram_cnt) {
-    EXPECT_EQ(
-        empty_histogram_cnt,
-        stats_.counter("test_prefix.empty_histogram").value());
+    EXPECT_EQ(empty_histogram_cnt, stats_.counter("test_prefix.empty_histogram").value());
   }
 
   void verifyMinRTTActive() {

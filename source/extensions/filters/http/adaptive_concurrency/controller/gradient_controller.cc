@@ -114,7 +114,7 @@ void GradientController::updateMinRTT() {
     if (hist_sample_count(latency_sample_hist_.get()) > 0) {
       min_rtt_ = processLatencySamplesAndClear();
       stats_.min_rtt_msecs_.set(
-            std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
+          std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
     } else {
       stats_.empty_histogram_.inc();
     }
