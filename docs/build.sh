@@ -61,8 +61,7 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 rm -rf bazel-bin/external/envoy_api_canonical
 
 EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
-EXTENSION_CAT_DB_PATH="$(realpath "${BUILD_DIR}/extension_cat_db.json")"
-export EXTENSION_DB_PATH EXTENSION_CAT_DB_PATH
+export EXTENSION_DB_PATH
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
@@ -70,16 +69,11 @@ BAZEL_BUILD_OPTIONS+=(
     "--remote_download_outputs=all"
     "--strategy=protodoc=sandboxed,local"
     "--action_env=ENVOY_BLOB_SHA"
-    "--action_env=EXTENSION_DB_PATH"
-    "--action_env=EXTENSION_CAT_DB_PATH")
+    "--action_env=EXTENSION_DB_PATH")
 
 # Generate extension database. This maps from extension name to extension
 # metadata, based on the envoy_cc_extension() Bazel target attributes.
 ./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
-
-# Generate extension category database.
-./docs/generate_extension_cat_db.py "${EXTENSION_DB_PATH}" "${EXTENSION_CAT_DB_PATH}"
-
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.

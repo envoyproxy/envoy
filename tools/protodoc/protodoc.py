@@ -105,7 +105,15 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-EXTENSION_CATEGORIES = json.loads(pathlib.Path(os.getenv('EXTENSION_CAT_DB_PATH')).read_text())
+EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
+
+categories = {}
+for k, v in data.items():
+  for cat in v['categories']:
+    categories[cat] = categories.get(cat, [])
+    categories[cat].append(k)
+
+EXTENSION_CATEGORIES = categories
 
 
 class ProtodocError(Exception):
@@ -209,8 +217,7 @@ def FormatExtension(extension):
     RST formatted extension description.
   """
   try:
-    extension_metadata = json.loads(pathlib.Path(
-        os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
+    extension_metadata = EXTENSION_DB[extension]
     anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
