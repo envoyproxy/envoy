@@ -2072,7 +2072,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
 
 // Verify that when returning an Error response with dynamic_metadata field set, the filter skips
 // dynamic metadata.
-TEST_F(HttpFilterTest, DontEmitMetadataWhenError) {
+TEST_F(HttpFilterTest, SkipEmittingMetadataWhenError) {
   InSequence s;
 
   initialize(R"EOF(
