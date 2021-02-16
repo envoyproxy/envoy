@@ -12,6 +12,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/common/assert.h"
@@ -121,16 +122,21 @@ common_tls_context:
   } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
   if (upstream_config_.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   } else {
-    return Config::Utility::getAndCheckFactoryByName<Http::QuicServerTransportSocketFactory>(
-               Http::QuicCodecNames::get().Quiche)
-        .createQuicServerTransportSocketFactory(std::move(cfg));
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+    quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+
+    std::vector<std::string> server_names;
+    auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(
+        "envoy.transport_sockets.quic");
+    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
   }
 }
 

@@ -687,10 +687,10 @@ private:
           udp_listener_worker_router_(1), init_manager_(nullptr) {
       if (is_quic) {
         envoy::config::listener::v3::QuicProtocolOptions config;
-        udp_listener_factory_ =
-            Config::Utility::getAndCheckFactoryByName<Http::QuicActiveQuicListenerFactory>(
-                Http::QuicCodecNames::get().Quiche)
-                .createActiveQuicListener(config, 1);
+        auto& config_factory =
+            Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
+                "quiche_quic_listener");
+        udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(config, 1);
       } else {
         udp_listener_factory_ = std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       }

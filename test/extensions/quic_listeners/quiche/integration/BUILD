@@ -22,7 +22,9 @@ envoy_cc_test(
         "nofips",
     ],
     deps = [
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_lib",
         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//test/integration:protocol_integration_test_lib",
     ],
 )

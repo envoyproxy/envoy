@@ -48,28 +48,5 @@ public:
   std::string category() const override { return "envoy.quic_connection"; }
 };
 
-// A factory to create ActiveQuicListenerFactory instance for QUIC
-class QuicActiveQuicListenerFactory : public Config::UntypedFactory {
-public:
-  ~QuicActiveQuicListenerFactory() override = default;
-
-  virtual Network::ActiveUdpListenerFactoryPtr
-  createActiveQuicListener(envoy::config::listener::v3::QuicProtocolOptions,
-                           uint32_t concurrency) PURE;
-
-  std::string category() const override { return "envoy.quic_listener"; }
-};
-
-// A factory to create QuicServerTransportSocketFactory instance for QUIC
-class QuicServerTransportSocketFactory : public Config::UntypedFactory {
-public:
-  ~QuicServerTransportSocketFactory() override = default;
-
-  virtual Network::TransportSocketFactoryPtr
-  createQuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config) PURE;
-
-  std::string category() const override { return "envoy.quic_server_transport_factory"; }
-};
-
 } // namespace Http
 } // namespace Envoy

@@ -6,14 +6,12 @@
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 
-#include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
@@ -167,32 +165,9 @@ public:
   quic::QuicClientPushPromiseIndex push_promise_index_;
 };
 
-class QuicActiveQuicListenerFactoryImpl : public Http::QuicActiveQuicListenerFactory {
-public:
-  Network::ActiveUdpListenerFactoryPtr
-  createActiveQuicListener(envoy::config::listener::v3::QuicProtocolOptions config,
-                           uint32_t concurrency) override {
-    return std::make_unique<Quic::ActiveQuicListenerFactory>(config, concurrency);
-  }
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-};
-
-// A factory to create QuicServerTransportSocketFactory instance for QUIC
-class QuicServerTransportSocketFactoryImpl : public Http::QuicServerTransportSocketFactory {
-public:
-  Network::TransportSocketFactoryPtr
-  createQuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config) override {
-    return std::make_unique<Quic::QuicServerTransportSocketFactory>(std::move(config));
-  }
-
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-};
-
 DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);
 DECLARE_FACTORY(QuicHttpServerConnectionFactoryImpl);
 DECLARE_FACTORY(QuicClientConnectionFactoryImpl);
-DECLARE_FACTORY(QuicActiveQuicListenerFactoryImpl);
-DECLARE_FACTORY(QuicServerTransportSocketFactoryImpl);
 
 } // namespace Quic
 } // namespace Envoy
