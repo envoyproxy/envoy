@@ -12,8 +12,6 @@
 namespace Envoy {
 namespace Stats {
 
-class StatNamePool;
-
 class TagProducer {
 public:
   virtual ~TagProducer() = default;
