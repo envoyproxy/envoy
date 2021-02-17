@@ -903,7 +903,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(
-      "envoy.network.upstream_server_name", std::make_unique<UpstreamServerName>("www.example.com"),
+      "envoy.network.upstream_server_name",
+      std::make_unique<Network::UpstreamServerName>("www.example.com"),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
