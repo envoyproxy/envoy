@@ -1653,6 +1653,8 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/original_ip_detection/custom_header:config",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/original_ip_detection/custom_header/v3:pkg_cc_proto",
     ],
 )

@@ -14,6 +14,7 @@
 #include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
+#include "extensions/original_ip_detection/custom_header/custom_header.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
@@ -1759,36 +1760,16 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
                           "Original IP detection extension not found");
 }
 
-class TestIPDetection : public Http::OriginalIPDetection {
-public:
-  Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams&) override {
-    return {nullptr, false, absl::nullopt};
-  }
-};
-
-class TestIPDetectionFactory : public Http::OriginalIPDetectionFactory {
-public:
-  Http::OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message&) const override {
-    return std::make_shared<TestIPDetection>();
-  }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
-  }
-  std::string name() const override { return "TestFactory"; }
-  std::string category() const override { return "OriginalIpDetection"; }
-};
-
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
-  TestIPDetectionFactory factory;
-  Registry::InjectFactory<Http::OriginalIPDetectionFactory> ip_detection_register(factory);
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   route_config:
     name: local_route
   original_ip_detection_extensions:
-  - name: envoy.ip_detection.OriginalIPDetectionExtension
+  - name: envoy.original_ip_detection.custom_header
     typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
+      "@type": type.googleapis.com/envoy.extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1801,7 +1782,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   auto original_ip_detection_extensions = config.originalIpDetectionExtensions();
   EXPECT_EQ(1, original_ip_detection_extensions.size());
 
-  auto* extension = dynamic_cast<TestIPDetection*>(original_ip_detection_extensions[0].get());
+  auto* extension = dynamic_cast<OriginalIPDetection::CustomHeader::CustomHeaderIPDetection*>(
+      original_ip_detection_extensions[0].get());
   EXPECT_NE(nullptr, extension);
 }
 

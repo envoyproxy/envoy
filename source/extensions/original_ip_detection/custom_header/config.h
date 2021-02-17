@@ -16,8 +16,8 @@ public:
   createExtension(const Protobuf::Message& message) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr(
-        new envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig());
+    return std::make_unique<
+        envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig>();
   }
 
   std::string name() const override { return "envoy.original_ip_detection.custom_header"; }

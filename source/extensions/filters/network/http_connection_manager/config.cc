@@ -298,7 +298,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       if (!factory) {
         throw EnvoyException("Original IP detection extension not found");
       }
-      original_ip_detection_extensions_.push_back(factory->createExtension(typed_config));
+
+      ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+      Envoy::Config::Utility::translateOpaqueConfig(typed_config.typed_config(),
+                                                    ProtobufWkt::Struct::default_instance(),
+                                                    context_.messageValidationVisitor(), *message);
+      original_ip_detection_extensions_.push_back(factory->createExtension(*message));
     }
   } else {
     original_ip_detection_extensions_.push_back(

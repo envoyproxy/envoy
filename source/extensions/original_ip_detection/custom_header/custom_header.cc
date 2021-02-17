@@ -24,8 +24,10 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
   }
 }
 
-CustomHeaderIPDetection::CustomHeaderIPDetection(const std::string& header_name)
-    : header_name_(header_name) {}
+CustomHeaderIPDetection::CustomHeaderIPDetection(
+    const std::string& header_name,
+    absl::optional<Http::OriginalIPRejectRequestOptions> reject_options)
+    : header_name_(header_name), reject_options_(reject_options) {}
 
 Http::OriginalIPDetectionResult
 CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {

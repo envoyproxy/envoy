@@ -14,7 +14,9 @@ public:
   CustomHeaderIPDetection(
       const envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig&
           config);
-  CustomHeaderIPDetection(const std::string& header_name);
+  CustomHeaderIPDetection(
+      const std::string& header_name,
+      absl::optional<Http::OriginalIPRejectRequestOptions> reject_options = absl::nullopt);
 
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override;
 

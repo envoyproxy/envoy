@@ -1,3 +1,5 @@
+#include "envoy/extensions/original_ip_detection/custom_header/v3/custom_header.pb.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -15,49 +17,17 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 };
 
-class CustomHeaderDetection : public Http::OriginalIPDetection {
-public:
-  CustomHeaderDetection(const std::string& header_name) : header_name_(header_name) {}
-
-  Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override {
-    auto hdr = params.request_headers.get(Http::LowerCaseString(header_name_));
-    if (hdr.empty()) {
-      return {nullptr, false, absl::nullopt};
-    }
-    auto header_value = hdr[0]->value().getStringView();
-    return {std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value)), false,
-            absl::nullopt};
-  }
-
-private:
-  std::string header_name_;
-};
-
-class HeaderDetectionFactory : public Http::OriginalIPDetectionFactory {
-public:
-  Http::OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message&) const override {
-    return std::make_shared<CustomHeaderDetection>("x-cdn-detected-ip");
-  }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
-  }
-  std::string name() const override { return "CustomHeaderDetection"; }
-};
-
 TEST_F(OriginalIPDetectionIntegrationTest, HeaderBasedDetection) {
-  HeaderDetectionFactory factory;
-  Registry::InjectFactory<Http::OriginalIPDetectionFactory> header_detection_factory_register(
-      factory);
-
   useAccessLog("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        ProtobufWkt::StringValue config;
+        envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
+        config.set_header_name("x-cdn-detected-ip");
 
-        auto* original_ip_detection = hcm.mutable_original_ip_detection_extensions()->Add();
-        original_ip_detection->set_name("CustomHeaderDetection");
-        original_ip_detection->mutable_typed_config()->PackFrom(config);
+        auto* extension = hcm.add_original_ip_detection_extensions();
+        extension->set_name("envoy.original_ip_detection.custom_header");
+        extension->mutable_typed_config()->PackFrom(config);
 
         hcm.mutable_use_remote_address()->set_value(false);
       });
