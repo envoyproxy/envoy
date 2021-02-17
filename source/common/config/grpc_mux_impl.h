@@ -161,14 +161,13 @@ private:
 
   absl::node_hash_map<std::string, std::unique_ptr<ApiState>> api_state_;
 
+  // Envoy's dependency ordering.
+  std::list<std::string> subscriptions_;
+
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
   // This string is a type URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
-
-  // Envoy's dependency ordering.
-  std::list<std::string> subscriptions_;
-
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 
   Event::Dispatcher& dispatcher_;
