@@ -95,8 +95,8 @@ protected:
         stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
   }
 
-  void verifyRaceCondition(int empty_histogram_cnt) {
-    EXPECT_EQ(empty_histogram_cnt, stats_.counter("test_prefix.race_found").value());
+  void verifyRaceCondition(int race_found_cnt) {
+    EXPECT_EQ(race_found_cnt, stats_.counter("test_prefix.race_found").value());
   }
 
   void verifyMinRTTActive() {
