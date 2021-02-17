@@ -13,12 +13,6 @@
 namespace Envoy {
 namespace Stats {
 
-/** A Symbol represents a string-token with a small index. */
-using Symbol = uint32_t;
-
-/** Transient representations of a vector of 32-bit symbols */
-using SymbolVec = std::vector<Symbol>;
-
 /**
  * Runtime representation of an encoded stat name. This is predeclared only in
  * the interface without abstract methods, because (a) the underlying class
@@ -188,10 +182,6 @@ public:
    * @return the array of pairs indicating the bounds.
    */
   virtual DynamicSpans getDynamicSpans(StatName stat_name) const PURE;
-
-  virtual void
-  decode(StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
-         const std::function<void(absl::string_view)>& string_view_token_fn) const PURE;
 
 private:
   friend struct HeapStatData;
