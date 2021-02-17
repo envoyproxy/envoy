@@ -196,9 +196,10 @@ public:
       configureHostSet(failover_host_metadata, *priority_set_.getMockHostSet(1));
     }
 
-    lb_ = std::make_shared<SubsetLoadBalancer>(
-        lb_type_, priority_set_, nullptr, stats_, *scope_, runtime_, random_, subset_info_,
-        ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+    lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, *scope_,
+                                               runtime_, random_, subset_info_,
+                                               ring_hash_lb_config_, maglev_lb_config_,
+                                               least_request_lb_config_, common_config_, simTime());
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -248,7 +249,7 @@ public:
     lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, &local_priority_set_,
                                                stats_, *scope_, runtime_, random_, subset_info_,
                                                ring_hash_lb_config_, maglev_lb_config_,
-                                               least_request_lb_config_, common_config_);
+                                               least_request_lb_config_, common_config_, simTime());
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -1435,7 +1436,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
@@ -1854,7 +1855,7 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1877,7 +1878,7 @@ TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
@@ -1900,7 +1901,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1935,7 +1936,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
@@ -1980,7 +1981,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
@@ -2012,7 +2013,7 @@ TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
 
   lb_ = std::make_shared<SubsetLoadBalancer>(
       lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_, random_, subset_info_,
-      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_);
+      ring_hash_lb_config_, maglev_lb_config_, least_request_lb_config_, common_config_, simTime());
 }
 
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {

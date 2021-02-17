@@ -81,7 +81,7 @@ public:
 
   void initialize() {
     lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, stats_,
-                                                   runtime_, random_, common_config_);
+                                                   runtime_, random_, common_config_, simTime());
   }
 
   std::unique_ptr<RoundRobinLoadBalancer> lb_;
@@ -92,9 +92,9 @@ public:
   LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
     envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
     lr_lb_config.mutable_choice_count()->set_value(choice_count);
-    lb_ =
-        std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
-                                                   runtime_, random_, common_config_, lr_lb_config);
+    lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+                                                     runtime_, random_, common_config_,
+                                                     lr_lb_config, simTime());
   }
 
   std::unique_ptr<LeastRequestLoadBalancer> lb_;
@@ -544,7 +544,7 @@ public:
     lb_ = std::make_unique<SubsetLoadBalancer>(LoadBalancerType::Random, priority_set_,
                                                &local_priority_set_, stats_, stats_store_, runtime_,
                                                random_, *subset_info_, absl::nullopt, absl::nullopt,
-                                               absl::nullopt, common_config_);
+                                               absl::nullopt, common_config_, simTime());
 
     const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);
