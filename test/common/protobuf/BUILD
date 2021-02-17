@@ -29,6 +29,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 

@@ -1,9 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/protobuf/utility.h"
 
-#include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -76,7 +76,8 @@ static void bmProtobufMessageHashLarge(benchmark::State& state) {
       "some.really.long.resolver.name");
 
   for (int j = 0; j < 10; ++j) {
-    auto& filter_metadata = (*cluster.mutable_metadata()->mutable_filter_metadata())[absl::StrCat("KEY_NAME_", j)];
+    auto& filter_metadata =
+        (*cluster.mutable_metadata()->mutable_filter_metadata())[absl::StrCat("KEY_NAME_", j)];
     for (int k = 0; k < 5; ++k) {
       (*filter_metadata.mutable_fields())[absl::StrCat("key_number_", k)].set_string_value(
           std::string('b', 30));
