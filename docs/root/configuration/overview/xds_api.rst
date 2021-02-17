@@ -19,7 +19,7 @@ gRPC streaming endpoints
 .. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
 .. http:post:: /envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters
 
-See :repo:`cds.proto <api/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
+See :repo:`cds.proto <api/envoy/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
 as a client when
 
 .. code-block:: yaml
