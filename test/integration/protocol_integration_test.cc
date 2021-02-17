@@ -1440,6 +1440,32 @@ name: local-reply-during-encode
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LocalReplyDuringEncodingData) {
+  config_helper_.addFilter(R"EOF(
+name: local-reply-during-encode-data
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for the upstream request and begin sending a response with end_stream = false.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(size_, false);
+  Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  // Response was aborted after headers were sent to the client.
+  // The entire connection is reset. Client does not receive body or trailers.
+  response->waitForReset();
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0, response->body().length());
+  EXPECT_EQ(nullptr, response->trailers());
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
   // Send one 95 kB URL with limit 60 kB headers.
   testLargeRequestUrl(95, 60);

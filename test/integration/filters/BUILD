@@ -40,6 +40,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "local_reply_during_encoding_data_filter_lib",
+    srcs = [
+        "local_reply_during_encoding_data_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "continue_after_local_reply_filter_lib",
     srcs = [
         "continue_after_local_reply_filter.cc",
