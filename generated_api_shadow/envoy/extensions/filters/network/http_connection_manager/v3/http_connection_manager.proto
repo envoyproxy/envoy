@@ -613,6 +613,7 @@ message HttpConnectionManager {
   // Two available extensions are the :ref:`xff
   // extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` and the
   // :ref:`custom header extension <envoy_api_msg_extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig>`.
+  // [#extension-category: envoy.original_ip_detection]
   repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 43;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11

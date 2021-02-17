@@ -13,8 +13,8 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "extensions/original_ip_detection/xff/xff.h"
 #include "extensions/original_ip_detection/custom_header/custom_header.h"
+#include "extensions/original_ip_detection/xff/xff.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
