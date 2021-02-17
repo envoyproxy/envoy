@@ -8,26 +8,32 @@ namespace Matching {
 namespace InputMatchers {
 namespace ConsistentHashing {
 
-TEST(MatcherTest, EmptyValue) {
-  Matcher matcher(10, 100);
-
-  ASSERT_FALSE(matcher.match(absl::nullopt));
-}
-
+// Validates that two independent matchers agree on the
+// match result for various inputs.
 TEST(MatcherTest, BasicUsage) {
   {
-    Matcher matcher(58, 100);
+    Matcher matcher1(10, 100);
+    Matcher matcher2(10, 100);
+
+    EXPECT_FALSE(matcher1.match(absl::nullopt));
+    EXPECT_FALSE(matcher2.match(absl::nullopt));
+  }
+  {
+    Matcher matcher1(58, 100);
+    Matcher matcher2(58, 100);
 
     // The string 'hello' hashes to 2794345569481354659
     // With mod 100 this results in 59, which is greater
     // than the threshold.
-    ASSERT_TRUE(matcher.match("hello"));
+    EXPECT_TRUE(matcher1.match("hello"));
+    EXPECT_TRUE(matcher2.match("hello"));
   }
 
   Matcher matcher(59, 100);
 
   // Changing the threshold to 59 means that we no longer match.
-  ASSERT_FALSE(matcher.match("hello"));
+  EXPECT_FALSE(matcher1.match("hello"));
+  EXPECT_FALSE(matcher2.match("hello"));
 }
 } // namespace ConsistentHashing
 } // namespace InputMatchers
