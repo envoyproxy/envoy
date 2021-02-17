@@ -559,7 +559,10 @@ void PlatformBridgeFilter::ResponseFilterBase::resumeIteration() {
 // this shortcut works for now.
 Buffer::Instance* PlatformBridgeFilter::RequestFilterBase::buffer() {
   Buffer::Instance* internal_buffer = nullptr;
-  if (parent_.decoder_callbacks_->decodingBuffer()) {
+  // This only exists to provide a mutable buffer, and that buffer is only used when iteration is
+  // stopped. We check iteration state here before returning the buffer, to ensure this filter is
+  // the one that stopped iteration.
+  if (iteration_state_ == IterationState::Stopped && parent_.decoder_callbacks_->decodingBuffer()) {
     parent_.decoder_callbacks_->modifyDecodingBuffer(
         [&internal_buffer](Buffer::Instance& mutable_buffer) {
           internal_buffer = &mutable_buffer;
@@ -573,7 +576,10 @@ Buffer::Instance* PlatformBridgeFilter::RequestFilterBase::buffer() {
 // this shortcut works for now.
 Buffer::Instance* PlatformBridgeFilter::ResponseFilterBase::buffer() {
   Buffer::Instance* internal_buffer = nullptr;
-  if (parent_.encoder_callbacks_->encodingBuffer()) {
+  // This only exists to provide a mutable buffer, and that buffer is only used when iteration is
+  // stopped. We check iteration state here before returning the buffer, to ensure this filter is
+  // the one that stopped iteration.
+  if (iteration_state_ == IterationState::Stopped && parent_.encoder_callbacks_->encodingBuffer()) {
     parent_.encoder_callbacks_->modifyEncodingBuffer(
         [&internal_buffer](Buffer::Instance& mutable_buffer) {
           internal_buffer = &mutable_buffer;
