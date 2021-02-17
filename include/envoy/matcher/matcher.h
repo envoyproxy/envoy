@@ -19,7 +19,6 @@ namespace Configuration {
 class FactoryContext;
 }
 } // namespace Server
-
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
