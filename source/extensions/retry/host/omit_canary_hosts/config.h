@@ -1,4 +1,4 @@
-#include "envoy/config/retry/omit_canary_hosts/v2/omit_canary_hosts.pb.validate.h"
+#include "envoy/extensions/retry/host/omit_canary_hosts/v3/omit_canary_hosts.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/omit_canary_hosts/omit_canary_hosts.h"
@@ -20,7 +20,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::config::retry::omit_canary_hosts::v2::OmitCanaryHostsPredicate>();
+        envoy::extensions::retry::host::omit_canary_hosts::v3::OmitCanaryHostsPredicate>();
   }
 };
 

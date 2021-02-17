@@ -6,6 +6,7 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov @htuch
 # compression extensions
 /*/extensions/compression/common/compressor @rojkov @junr03
 /*/extensions/compression/gzip/compressor @rojkov @junr03
@@ -55,7 +56,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.xray extension
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # tracers.skywalking extension
-/*/extensions/tracers/skywalking @wbpcode @dio @lizan
+/*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
 # postgres_proxy extension
@@ -147,6 +148,7 @@ extensions/filters/common/original_src @snowp @klarose
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/compression/brotli @junr03 @rojkov
 /*/extensions/filters/http/decompressor @rojkov @dio
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
@@ -164,3 +166,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
+# user space socket pair and event
+/*/extensions/io_socket/user_space @lambdai @antoniovicente

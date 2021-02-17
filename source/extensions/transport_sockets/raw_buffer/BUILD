@@ -14,6 +14,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     security_posture = "requires_trusted_downstream_and_upstream",
     # This is core Envoy config.
     visibility = ["//visibility:public"],
@@ -23,6 +27,6 @@ envoy_cc_extension(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/raw_buffer/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )

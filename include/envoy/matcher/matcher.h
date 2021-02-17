@@ -78,7 +78,9 @@ using ActionFactoryCb = std::function<ActionPtr()>;
 
 class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config) PURE;
+  virtual ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config,
+                        Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -221,7 +223,7 @@ public:
    */
   virtual DataInputPtr<DataType>
   createDataInput(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                  Server::Configuration::FactoryContext& factory_context) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

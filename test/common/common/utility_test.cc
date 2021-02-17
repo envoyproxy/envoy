@@ -29,6 +29,26 @@ using testing::Not;
 
 namespace Envoy {
 
+TEST(IntUtil, roundUpToMultiple) {
+  // Round up to non-power-of-2
+  EXPECT_EQ(3, IntUtil::roundUpToMultiple(1, 3));
+  EXPECT_EQ(3, IntUtil::roundUpToMultiple(3, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(4, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(5, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(6, 3));
+  EXPECT_EQ(21, IntUtil::roundUpToMultiple(20, 3));
+  EXPECT_EQ(21, IntUtil::roundUpToMultiple(21, 3));
+
+  // Round up to power-of-2
+  EXPECT_EQ(0, IntUtil::roundUpToMultiple(0, 4));
+  EXPECT_EQ(4, IntUtil::roundUpToMultiple(3, 4));
+  EXPECT_EQ(4, IntUtil::roundUpToMultiple(4, 4));
+  EXPECT_EQ(8, IntUtil::roundUpToMultiple(5, 4));
+  EXPECT_EQ(8, IntUtil::roundUpToMultiple(8, 4));
+  EXPECT_EQ(24, IntUtil::roundUpToMultiple(21, 4));
+  EXPECT_EQ(24, IntUtil::roundUpToMultiple(24, 4));
+}
+
 TEST(StringUtil, strtoull) {
   uint64_t out;
   const char* rest;
@@ -260,6 +280,58 @@ TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");
   EXPECT_EQ(StringUtil::escape("\t\nworld\r\n"), "\\t\\nworld\\r\\n");
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
+}
+
+TEST(StringUtil, escapeToOstream) {
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "hello world");
+    EXPECT_EQ(ostream.contents(), "hello world");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "hello\nworld\n");
+    EXPECT_EQ(ostream.contents(), "hello\\nworld\\n");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "\t\nworld\r\n");
+    EXPECT_EQ(ostream.contents(), "\\t\\nworld\\r\\n");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "{'linux': \"penguin\"}");
+    EXPECT_EQ(ostream.contents(), "{\\'linux\\': \\\"penguin\\\"}");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, R"(\\)");
+    EXPECT_EQ(ostream.contents(), R"(\\\\)");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "vertical\vtab");
+    EXPECT_EQ(ostream.contents(), "vertical\\vtab");
+  }
+
+  {
+    using namespace std::string_literals;
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "null\0char"s);
+    EXPECT_EQ(ostream.contents(), "null\\0char");
+  }
 }
 
 TEST(StringUtil, toUpper) {

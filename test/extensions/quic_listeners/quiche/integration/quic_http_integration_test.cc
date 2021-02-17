@@ -189,11 +189,11 @@ public:
         resource_monitors:
           - name: "envoy.resource_monitors.injected_resource_1"
             typed_config:
-              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
+              "@type": type.googleapis.com/envoy.extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig
               filename: "{}"
           - name: "envoy.resource_monitors.injected_resource_2"
             typed_config:
-              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
+              "@type": type.googleapis.com/envoy.extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig
               filename: "{}"
         actions:
           - name: "envoy.overload_actions.stop_accepting_requests"

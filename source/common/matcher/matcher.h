@@ -61,7 +61,7 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
  */
 template <class DataType> class MatchTreeFactory {
 public:
-  MatchTreeFactory(Server::Configuration::FactoryContext& factory_context)
+  explicit MatchTreeFactory(Server::Configuration::FactoryContext& factory_context)
       : factory_context_(factory_context) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
@@ -149,7 +149,7 @@ private:
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory>(on_match.action());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           on_match.action().typed_config(), factory_context_.messageValidationVisitor(), factory);
-      return OnMatch<DataType>{factory.createActionFactoryCb(*message), {}};
+      return OnMatch<DataType>{factory.createActionFactoryCb(*message, factory_context_), {}};
     }
 
     return absl::nullopt;
@@ -160,7 +160,7 @@ private:
     auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config.typed_config(), factory_context_.messageValidationVisitor(), factory);
-    return factory.createDataInput(*message, factory_context_.messageValidationVisitor());
+    return factory.createDataInput(*message, factory_context_);
   }
 
   InputMatcherPtr createInputMatcher(
