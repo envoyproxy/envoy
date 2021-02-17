@@ -27,8 +27,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (!forwarded_proto.empty() && (forwarded_proto == Headers::get().SchemeValues.Https ||
-                                   forwarded_proto == Headers::get().SchemeValues.Http)) {
+  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;

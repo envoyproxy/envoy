@@ -100,20 +100,6 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
 
-TEST_P(Http2IntegrationTest, HttpsPlaintextRejectedForFrontline) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "https"},
-                                     {"x-forwarded-proto", "https"},
-                                     {":authority", "host"}});
-
-  response->waitForEndStream();
-  EXPECT_EQ("403", response->headers().getStatusValue());
-}
-
 // Verify downstream codec stream flush timeout.
 TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   config_helper_.setBufferLimits(1024, 1024);

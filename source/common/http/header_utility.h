@@ -111,6 +111,13 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
+   * Validates the provided scheme is valid (either http or https)
+   * @param scheme the scheme to validate
+   * @return bool true if the scheme is valid.
+   */
+  static bool schemeIsValid(const absl::string_view scheme);
+
+  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
@@ -162,18 +169,6 @@ public:
    */
   static absl::optional<std::reference_wrapper<const absl::string_view>>
   requestHeadersValid(const RequestHeaderMap& headers);
-
-  /**
-   * Determines if request headers pass HCM-specific validity checks.
-   * @param headers to validate
-   * @param xff_num_trusted_hops the configured number of prior trusted hops.
-   * @param connection_is_ssl true if the direct connection is ssl.
-   * @return details of the error and response code to send if an error is present, otherwise
-   * absl::nullopt
-   */
-  static absl::optional<std::pair<std::reference_wrapper<const absl::string_view>, Http::Code>>
-  requestHeadersValidAtHcm(const RequestHeaderMap& headers, uint32_t xff_num_trusted_hops,
-                           bool connection_is_ssl);
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol

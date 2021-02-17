@@ -946,16 +946,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Verify header sanity checks which should have been performed by the codec.
   ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
-  // Do HCM-specific validation.
-  auto details = HeaderUtility::requestHeadersValidAtHcm(
-      *request_headers_, connection_manager_.config_.xffNumTrustedHops(),
-      connection_manager_.read_callbacks_->connection().ssl() != nullptr);
-  if (details.has_value()) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), details.value().second, "",
-                   nullptr, absl::nullopt, details.value().first);
-    return;
-  }
-
   // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
   // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
   // applicable. NOTE: Currently the HTTP/1.1 codec only does this when the allow_absolute_url flag

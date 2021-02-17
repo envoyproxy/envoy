@@ -68,7 +68,7 @@ public:
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
                                                   {":path", "/"},
                                                   {":protocol", "bytestream"},
-                                                  {":scheme", "http"},
+                                                  {":scheme", "https"},
                                                   {":authority", "host:80"}};
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
@@ -193,7 +193,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
                                      {":path", "/"},
                                      {":protocol", "bytestream"},
-                                     {":scheme", "http"},
+                                     {":scheme", "https"},
                                      {":authority", "host:80"}});
   // If the connection is established (created, set to half close, and then the
   // FIN arrives), make sure the FIN arrives, and send a FIN from upstream.
@@ -248,7 +248,7 @@ public:
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
                                                   {":path", "/"},
                                                   {":protocol", "bytestream"},
-                                                  {":scheme", "http"},
+                                                  {":scheme", "https"},
                                                   {":authority", "host:80"}};
   IntegrationStreamDecoderPtr response_;
 };

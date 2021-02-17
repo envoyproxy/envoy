@@ -1011,7 +1011,24 @@ TEST_P(IntegrationTest, AbsolutePath) {
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
+TEST_P(IntegrationTest, UnknownSchemeRejected) {
+  // Sent an HTTPS request over non-TLS. It should be rejected.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET hps://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_use_remote_address()->set_value(true); });
   // Sent an HTTPS request over non-TLS. It should be rejected.
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
@@ -1028,9 +1045,6 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
   // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
   // and match the configured redirect.
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.set_xff_num_trusted_hops(1); });
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
