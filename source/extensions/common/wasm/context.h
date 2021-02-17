@@ -48,6 +48,7 @@ using GrpcService = envoy::config::core::v3::GrpcService;
 
 class Wasm;
 
+using PluginBaseSharedPtr = std::shared_ptr<PluginBase>;
 using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 

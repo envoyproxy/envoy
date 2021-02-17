@@ -154,6 +154,29 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
                             "Unable to create Wasm network filter test");
 }
 
+TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
+  if (GetParam() == "null") {
+    return;
+  }
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    GetParam(), R"EOF("
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
+  filter_config.wasmForTest()->fail(proxy_wasm::FailState::RuntimeError, "");
+  auto context = filter_config.createFilter();
+  EXPECT_EQ(context->wasm(), nullptr);
+  EXPECT_TRUE(context->isFailed());
+}
+
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
   if (GetParam() == "null") {
     return;
