@@ -563,9 +563,12 @@ void ActiveClient::onConnectTimeout() {
 }
 
 void ActiveClient::onLifetimeTimeout() {
-  ENVOY_CONN_LOG(debug, "lifetime timeout, DRAINING", *this);
-  parent_.host()->cluster().stats().upstream_cx_max_duration_.inc();
-  parent_.transitionActiveClientState(*this, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+  if (state_ != ActiveClient::State::CLOSED) {
+    ENVOY_CONN_LOG(debug, "lifetime timeout, DRAINING", *this);
+    parent_.host()->cluster().stats().upstream_cx_max_duration_.inc();
+    parent_.transitionActiveClientState(*this,
+                                        Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+  }
 }
 
 } // namespace ConnectionPool
