@@ -8,6 +8,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
+#include "common/common/dump_state_utils.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"

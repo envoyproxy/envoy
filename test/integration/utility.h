@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
 #include "common/stats/isolated_store_impl.h"
