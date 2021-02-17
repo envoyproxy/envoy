@@ -528,7 +528,8 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher().timeSource());
   connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
-  lifetime_timer_->enableTimer(std::chrono::milliseconds(3000)); // TODO(esmet): Do not hard code this
+  lifetime_timer_->enableTimer(
+      std::chrono::milliseconds(3000)); // TODO(esmet): Do not hard code this
   parent_.host()->stats().cx_total_.inc();
   parent_.host()->stats().cx_active_.inc();
   parent_.host()->cluster().stats().upstream_cx_total_.inc();
@@ -563,7 +564,7 @@ void ActiveClient::onConnectTimeout() {
 
 void ActiveClient::onLifetimeTimeout() {
   ENVOY_CONN_LOG(debug, "lifetime timeout, DRAINING", *this);
-  parent_.host()->cluster().stats().upstream_cx_max_requests_.inc();
+  parent_.host()->cluster().stats().upstream_cx_max_duration_.inc();
   parent_.transitionActiveClientState(*this, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
 }
 
