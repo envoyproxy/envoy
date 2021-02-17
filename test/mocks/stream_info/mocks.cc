@@ -126,6 +126,11 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setConnectionID(_)).WillByDefault(Invoke([this](uint64_t id) {
     connection_id_ = id;
   }));
+  ON_CALL(*this, setFilterChainName(_))
+      .WillByDefault(Invoke([this](const absl::string_view filter_chain_name) {
+        filter_chain_name_ = std::string(filter_chain_name);
+      }));
+  ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

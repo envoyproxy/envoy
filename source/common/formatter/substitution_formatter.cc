@@ -893,6 +893,14 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [hostname](const StreamInfo::StreamInfo&) { return hostname; });
+  } else if (field_name == "FILTER_CHAIN_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          if (!stream_info.filterChainName().empty()) {
+            return stream_info.filterChainName();
+          }
+          return absl::nullopt;
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }

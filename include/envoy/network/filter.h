@@ -373,6 +373,11 @@ public:
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
