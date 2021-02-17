@@ -160,6 +160,7 @@ message Cluster {
     google.protobuf.Struct match = 2;
 
     // The configuration of the transport socket.
+    // [#extension-category: envoy.transport_sockets.upstream]
     core.v4alpha.TransportSocket transport_socket = 3;
   }
 
@@ -173,6 +174,7 @@ message Cluster {
 
     // Cluster specific configuration which depends on the cluster being instantiated.
     // See the supported cluster for further documentation.
+    // [#extension-category: envoy.clusters]
     google.protobuf.Any typed_config = 2;
   }
 
@@ -945,6 +947,7 @@ message Cluster {
   // If users desire custom connection pool or upstream behavior, for example terminating
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
+  // [#extension-category: envoy.upstreams]
   core.v4alpha.TypedExtensionConfig upstream_config = 48;
 
   // Configuration to track optional cluster stats.

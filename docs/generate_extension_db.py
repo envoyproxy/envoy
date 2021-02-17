@@ -3,6 +3,7 @@
 # Generate an extension database, a JSON file mapping from qualified well known
 # extension name to metadata derived from the envoy_cc_extension target.
 
+import ast
 import json
 import os
 import pathlib
@@ -53,18 +54,25 @@ def GetExtensionMetadata(target):
   if not BUILDOZER_PATH:
     raise ExtensionDbError('Buildozer not found!')
   r = subprocess.run(
-      [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented', target],
+      [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented category', target],
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE)
-  security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')
+  rout = r.stdout.decode('utf-8').strip().split(' ')
+  security_posture, status, undocumented = rout[:3]
+  categories = ' '.join(rout[3:])
   if IsMissing(security_posture):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
+  # evaluate tuples/lists
+  # wrap strings in a list
+  categories = (ast.literal_eval(categories) if
+                ('[' in categories or '(' in categories) else [categories])
   return {
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
       'status': 'stable' if IsMissing(status) else status,
+      'categories': categories,
   }
 
 
