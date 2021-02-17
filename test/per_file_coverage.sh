@@ -13,7 +13,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filter/http:96.5"
 "source/common/http/http3:50.0"
 "source/common/json:90.6"
-"source/common/network:95.1"
+"source/common/network:95.0"
 "source/common/protobuf:94.6"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.1"
