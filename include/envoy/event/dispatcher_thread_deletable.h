@@ -15,7 +15,6 @@ public:
   virtual ~DispatcherThreadDeletable() = default;
 };
 
-using DispatcherThreadDeletablePtr = std::unique_ptr<DispatcherThreadDeletable>;
 using DispatcherThreadDeletableConstPtr = std::unique_ptr<const DispatcherThreadDeletable>;
 
 } // namespace Event

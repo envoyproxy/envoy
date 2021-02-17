@@ -509,22 +509,24 @@ TEST_F(DispatcherImplTest, DispatcherThreadDeleted) {
   }
 }
 
-TEST_F(DispatcherImplTest, DispatcherThreadDeletedAtNextCycle) {
-  dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>(
-      [this, id = api_->threadFactory().currentThreadId()]() {
-        ASSERT(id != api_->threadFactory().currentThreadId());
-        {
-          Thread::LockGuard lock(mu_);
-          ASSERT(!work_finished_);
-          work_finished_ = true;
-        }
-        cv_.notifyOne();
-      }));
-
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
+TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
+  Api::ApiPtr api_(Api::createApiForTest());
+  DispatcherPtr dispatcher(api_->allocateDispatcher("test_thread"));
+  std::vector<std::unique_ptr<ReadyWatcher>> watchers;
+  for (int i = 0; i < 3; ++i) {
+    watchers.push_back(std::make_unique<ReadyWatcher>());
   }
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[0]->ready(); }));
+  EXPECT_CALL(*watchers[0], ready());
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[1]->ready(); }));
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[2]->ready(); }));
+  EXPECT_CALL(*watchers[1], ready());
+  EXPECT_CALL(*watchers[2], ready());
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 class DispatcherShutdownTest : public testing::Test {
@@ -563,10 +565,7 @@ TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
 
     ::testing::Mock::VerifyAndClearExpectations(&watcher);
     EXPECT_CALL(deferred_watcher, ready());
-
     dispatcher_.reset();
-    ::testing::Mock::VerifyAndClearExpectations(&deferred_watcher);
-    ::testing::Mock::VerifyAndClearExpectations(&post_watcher);
   }
 }
 
@@ -582,8 +581,6 @@ TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
     EXPECT_CALL(deferred_watcher, ready());
     EXPECT_CALL(watcher, ready());
     dispatcher_.reset();
-    ::testing::Mock::VerifyAndClearExpectations(&deferred_watcher);
-    ::testing::Mock::VerifyAndClearExpectations(&watcher);
   }
 }
 

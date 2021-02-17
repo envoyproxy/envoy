@@ -278,7 +278,8 @@ void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr 
     Thread::LockGuard lock(thread_local_deletable_lock_);
     need_schedule = deletables_in_dispatcher_thread_.empty();
     deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
-    ASSERT(!shutdown_called_, "inserted after shutdown");
+    // TODO(lambdai): Enable below after https://github.com/envoyproxy/envoy/issues/15072
+    // ASSERT(!shutdown_called_, "inserted after shutdown");
   }
 
   if (need_schedule) {
@@ -301,8 +302,9 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 }
 
 void DispatcherImpl::shutdown() {
-  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete 3 lists
-  // until all lists are empty.
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete below
+  // below 3 lists until all lists are empty. The 3 lists are list of deferred delete objects, post
+  // callbacks and dispatcher thread deletable objects.
   ASSERT(isThreadSafe());
   auto deferred_deletables_size = current_to_delete_->size();
   std::list<std::function<void()>>::size_type post_callbacks_size;
@@ -320,7 +322,8 @@ void DispatcherImpl::shutdown() {
   while (!local_deletables.empty()) {
     local_deletables.pop_front();
   }
-
+  ASSERT(!shutdown_called_);
+  shutdown_called_ = true;
   ENVOY_LOG(
       debug,
       "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",

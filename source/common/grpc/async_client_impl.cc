@@ -22,9 +22,6 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
-    FANCY_LOG(info, "destroying active stream {} of async client imp {}",
-              static_cast<const void*>(active_streams_.front().get()),
-              static_cast<const void*>(this));
     active_streams_.front()->resetStream();
   }
 }
