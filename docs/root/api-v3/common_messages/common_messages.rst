@@ -24,3 +24,4 @@ Common messages
   ../extensions/common/matching/v3/extension_matcher.proto
   ../extensions/filters/common/dependency/v3/dependency.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
+  ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
