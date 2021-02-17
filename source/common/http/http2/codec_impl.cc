@@ -687,7 +687,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   return sendPendingFrames();
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
+ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) const {
   return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
 }
 
@@ -1444,15 +1444,8 @@ void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
 
   if (current_stream_id_.has_value()) {
     os << " Dumping current stream:\n";
-    // TODO(kbaichoo): It's expected we'd have ~100 active streams, if we have
-    // orders of magnitude more it'd be preferable to use getStream
-    // even though it has more dependencies.
-    for (auto& stream : active_streams_) {
-      if (stream->stream_id_ == current_stream_id_.value()) {
-        DUMP_DETAILS(stream);
-        break;
-      }
-    }
+    ConnectionImpl::StreamImpl* stream = getStream(current_stream_id_.value());
+    DUMP_DETAILS(stream);
   } else {
     const auto streams_to_dump = std::min<size_t>(active_streams_.size(), 25);
     os << " Dumping " << streams_to_dump << " Active Streams:\n";
@@ -1474,15 +1467,12 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
   os << spaces << "Dumping corresponding downstream request for upstream stream "
      << current_stream_id_.value() << ":\n";
 
-  // TODO(kbaichoo): It's expected we'd have ~100 active streams, if we have
-  // orders of magnitude more it'd be preferable to use getStream
-  // even though it has more dependencies.
-  for (auto& stream : active_streams_) {
-    if (stream->stream_id_ == current_stream_id_.value()) {
-      ClientStreamImpl* client_stream = static_cast<ClientStreamImpl*>(stream.get());
-      client_stream->response_decoder_.dumpState(os, indent_level + 1);
-      break;
-    }
+  ClientStreamImpl* client_stream =
+      static_cast<ClientStreamImpl*>(getStream(current_stream_id_.value()));
+  if (client_stream) {
+    client_stream->response_decoder_.dumpState(os, indent_level + 1);
+  } else {
+    os << spaces << " Failed to get current stream.\n";
   }
 }
 
