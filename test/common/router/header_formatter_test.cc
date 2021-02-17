@@ -732,12 +732,11 @@ TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVA
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
-                            "Error(offset 0, line 1): Invalid value.\n");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
+      "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
   EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
@@ -745,11 +744,11 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA(), because JSON supplied is not valid. "
-                            "Error(offset 0, line 1): The document is empty.\n");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA(), because JSON supplied is not valid. Error(offset "
+      "0, line 1): The document is empty.\n");
 
   // One parameter.
   EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
@@ -787,10 +786,9 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
       StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
-      "Invalid header configuration. Expected format "
-      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is not valid. "
-      "Error(offset 7, line 1): Incorrect hex digit after \\u escape in string.\n");
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is "
+      "not valid. Error(offset 7, line 1): Incorrect hex digit after \\u escape in string.\n");
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
