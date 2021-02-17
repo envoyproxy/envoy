@@ -1349,14 +1349,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                                                         bool end_stream) {
   // Base headers.
 
-  // By default, always preserve the upstream date response header if present. If we choose to
-  // overwrite the upstream date unconditionally (a previous behavior), only do so if the response
-  // is not from cache
-  const bool should_preserve_upstream_date =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_upstream_date") ||
-      filter_manager_.streamInfo().hasResponseFlag(
-          StreamInfo::ResponseFlag::ResponseFromCacheFilter);
-  if (!should_preserve_upstream_date || !headers.Date()) {
+  // We want to preserve the original date header, but we add a date header if it is absent
+  if (!headers.Date()) {
     connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
 

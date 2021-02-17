@@ -428,14 +428,12 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "protocol_integration_test",
+envoy_cc_test_library(
+    name = "protocol_integration_test_lib",
     srcs = [
         "protocol_integration_test.cc",
+        "protocol_integration_test.h",
     ],
-    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
-    # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 5,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -453,6 +451,19 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "protocol_integration_test",
+    srcs = [
+        "instantiate_protocol_integration_test.cc",
+    ],
+    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
+    shard_count = 5,
+    deps = [
+        ":protocol_integration_test_lib",
     ],
 )
 
