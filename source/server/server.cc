@@ -79,6 +79,7 @@ InstanceImpl::InstanceImpl(
                                          : absl::nullopt,
                          watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
+      dispatcher_shutdown_helper_(*dispatcher_),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
       listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
@@ -139,7 +140,7 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
-  dispatcher_->shutdown();
+  // dispatcher_->shutdown();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
