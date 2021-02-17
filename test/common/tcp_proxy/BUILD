@@ -64,11 +64,16 @@ envoy_cc_test(
     ],
     deps = [
         ":tcp_proxy_test_base",
-        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "tcp_proxy_cluster_test",
+    srcs = [
+        "tcp_proxy_cluster_test.cc",
+    ],
+    deps = [
+        ":tcp_proxy_test_base",
     ],
 )
 

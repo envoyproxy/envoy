@@ -43,18 +43,13 @@ namespace Envoy {
 namespace TcpProxy {
 
 namespace {
-using ::Envoy::Network::UpstreamServerName;
 using ::testing::_;
-using ::testing::DoAll;
 using ::testing::Invoke;
-using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
-using ::testing::Return;
 using ::testing::ReturnPointee;
-using ::testing::ReturnRef;
 using ::testing::SaveArg;
-
 } // namespace
+
 inline Config constructConfigFromYaml(const std::string& yaml,
                                       Server::Configuration::FactoryContext& context,
                                       bool avoid_boosting = true) {

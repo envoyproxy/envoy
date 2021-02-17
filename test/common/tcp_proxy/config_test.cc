@@ -963,8 +963,6 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
 class TcpProxyNonDeprecatedConfigRoutingTest : public TcpProxyRoutingTest {
 public:
-  TcpProxyNonDeprecatedConfigRoutingTest() = default;
-
   void setup() {
     const std::string yaml = R"EOF(
     stat_prefix: name
@@ -1004,8 +1002,6 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 
 class TcpProxyHashingTest : public testing::Test {
 public:
-  TcpProxyHashingTest() = default;
-
   void setup() {
     const std::string yaml = R"EOF(
     stat_prefix: name

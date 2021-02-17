@@ -45,7 +45,6 @@ namespace TcpProxy {
 
 namespace {
 
-using ::Envoy::Network::UpstreamServerName;
 using ::testing::_;
 using ::testing::DoAll;
 using ::testing::Invoke;
