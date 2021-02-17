@@ -1444,6 +1444,9 @@ void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
 
   if (current_stream_id_.has_value()) {
     os << " Dumping current stream:\n";
+    // TODO(kbaichoo): It's expected we'd have ~100 active streams, if we have
+    // orders of magnitude more it'd be preferable to use getStream
+    // even though it has more dependencies.
     for (auto& stream : active_streams_) {
       if (stream->stream_id_ == current_stream_id_.value()) {
         DUMP_DETAILS(stream);
@@ -1471,22 +1474,13 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
   os << spaces << "Dumping corresponding downstream request for upstream stream "
      << current_stream_id_.value() << ":\n";
 
+  // TODO(kbaichoo): It's expected we'd have ~100 active streams, if we have
+  // orders of magnitude more it'd be preferable to use getStream
+  // even though it has more dependencies.
   for (auto& stream : active_streams_) {
     if (stream->stream_id_ == current_stream_id_.value()) {
       ClientStreamImpl* client_stream = static_cast<ClientStreamImpl*>(stream.get());
-      Router::UpstreamToDownstream* upstream_to_downstream =
-          dynamic_cast<Router::UpstreamToDownstream*>(&client_stream->response_decoder_);
-
-      // Guard in case the dynamic cast fails.
-      if (upstream_to_downstream == nullptr) {
-        os << spaces << " upstream_to_downstream dynamic cast failed!\n";
-        return;
-      }
-
-      const auto addressProvider = upstream_to_downstream->connection().addressProviderSharedPtr();
-      const Http::RequestHeaderMap* request_headers = upstream_to_downstream->downstreamHeaders();
-      DUMP_DETAILS(addressProvider);
-      DUMP_DETAILS(request_headers);
+      client_stream->response_decoder_.dumpState(os, indent_level + 1);
       break;
     }
   }

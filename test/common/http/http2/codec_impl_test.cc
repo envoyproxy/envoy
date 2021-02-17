@@ -1109,7 +1109,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
   }
 }
 
-TEST_P(Http2CodecImplTest, DumpClientFrame) {
+TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithoutAllocatingMemory) {
   initialize();
   // Replace the request_encoder to use the UpstreamToDownstream
   // as it would if we weren't using as many mocks..
@@ -1130,8 +1130,7 @@ TEST_P(Http2CodecImplTest, DumpClientFrame) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
   // Prepare for state dump.
-  EXPECT_CALL(upstream_to_downstream, connection()).WillOnce(ReturnRef(client_connection_));
-  EXPECT_CALL(upstream_to_downstream, downstreamHeaders()).WillOnce(Return(&request_headers));
+  EXPECT_CALL(upstream_to_downstream, dumpState(_, _));
 
   EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, false)).WillOnce(InvokeWithoutArgs([&]() {
     // dumpState here while decodingHeaders in the client. This means we're
@@ -1147,17 +1146,7 @@ TEST_P(Http2CodecImplTest, DumpClientFrame) {
 
   // Check contents for the corresponding downstream request.
   EXPECT_THAT(ostream.contents(),
-              HasSubstr("Dumping corresponding downstream request for upstream stream 1:\n"
-                        "  addressProvider: \n"
-                        "    SocketAddressSetterImpl"));
-  EXPECT_THAT(ostream.contents(),
-              HasSubstr("remote_address_: 10.0.0.3:50000, direct_remote_address_: 127.0.0.1:0, "
-                        "local_address_: 127.0.0.2:0\n"
-                        "  request_headers: \n"
-                        "    ':scheme', 'http'\n"
-                        "    ':method', 'GET'\n"
-                        "    ':authority', 'host'\n"
-                        "    ':path', '/'"));
+              HasSubstr("Dumping corresponding downstream request for upstream stream 1:\n"));
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};

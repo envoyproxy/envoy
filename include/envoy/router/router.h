@@ -1212,11 +1212,6 @@ public:
    * @return return the connection for the downstream stream.
    */
   virtual const Network::Connection& connection() const PURE;
-
-  /**
-   * @return return the RequestHeaderMap for the downstream stream.
-   */
-  virtual const Http::RequestHeaderMap* downstreamHeaders() const PURE;
 };
 
 /**

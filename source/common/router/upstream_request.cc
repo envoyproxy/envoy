@@ -10,11 +10,13 @@
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
@@ -169,14 +171,20 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
+
+void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "UpstreamRequest " << this << "\n";
+  const auto addressProvider = connection().addressProviderSharedPtr();
+  const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
+  DUMP_DETAILS(addressProvider);
+  DUMP_DETAILS(request_headers);
+}
+
 const RouteEntry& UpstreamRequest::routeEntry() const { return *parent_.routeEntry(); }
 
 const Network::Connection& UpstreamRequest::connection() const {
   return *parent_.callbacks()->connection();
-}
-
-const Http::RequestHeaderMap* UpstreamRequest::downstreamHeaders() const {
-  return parent_.downstreamHeaders();
 }
 
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {

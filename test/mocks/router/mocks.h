@@ -551,13 +551,13 @@ class MockUpstreamToDownstream : public UpstreamToDownstream {
 public:
   MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
   MOCK_METHOD(const Network::Connection&, connection, (), (const));
-  MOCK_METHOD(const Http::RequestHeaderMap*, downstreamHeaders, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
   MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
   MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
