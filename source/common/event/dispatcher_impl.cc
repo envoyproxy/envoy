@@ -77,12 +77,10 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 }
 
 DispatcherImpl::~DispatcherImpl() {
-  // TODO(lambdai): call shutdown() in tests and assert shutdown_called_.
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
   FatalErrorHandler::removeFatalErrorHandler(*this);
-  ASSERT(deletables_in_dispatcher_thread_.empty(),
-         fmt::format("{} dispatcher contains {} dispatcher local deletables after shutdown.",
-                     run_tid_.getId(), deletables_in_dispatcher_thread_.size()));
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and enable
+  // ASSERT(deletable_in_dispatcher_thread_.empty())
 }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
@@ -274,7 +272,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
-void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) {
+void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) {
   bool need_schedule;
   {
     Thread::LockGuard lock(thread_local_deletable_lock_);
@@ -303,50 +301,30 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 }
 
 void DispatcherImpl::shutdown() {
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete 3 lists
+  // until all lists are empty.
   ASSERT(isThreadSafe());
-
-  bool delete_again = true;
-  int round = 0;
-  while (delete_again) {
-    delete_again = false;
-    round++;
-    auto deferred_deletables_size = current_to_delete_->size();
-    delete_again |= deferred_deletables_size > 0;
-    clearDeferredDeleteList();
-
-    std::list<std::function<void()>> callbacks;
-    {
-      Thread::LockGuard lock(post_lock_);
-      callbacks = std::move(post_callbacks_);
-    }
-
-    auto post_callbacks_size = callbacks.size();
-    while (!callbacks.empty()) {
-      // Don't invoke callbacks when the dispatcher is shutting down.
-      callbacks.pop_front();
-    }
-    delete_again |= post_callbacks_size > 0;
-
-    std::list<DispatcherThreadDeletablePtr> local_deletables;
-    {
-      Thread::LockGuard lock(thread_local_deletable_lock_);
-      local_deletables = std::move(deletables_in_dispatcher_thread_);
-    }
-    auto thread_local_deletables_size = local_deletables.size();
-    while (!local_deletables.empty()) {
-      local_deletables.pop_front();
-    }
-
-    delete_again |= thread_local_deletables_size > 0;
-    ENVOY_LOG(debug,
-              "Round {}: destroyed {} deferred deletables, {} post callbacks and {} thread local "
-              "deletables in {}",
-              round, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size,
-              __FUNCTION__);
+  auto deferred_deletables_size = current_to_delete_->size();
+  std::list<std::function<void()>>::size_type post_callbacks_size;
+  {
+    Thread::LockGuard lock(post_lock_);
+    post_callbacks_size = post_callbacks_.size();
   }
 
-  ASSERT(!shutdown_called_);
-  shutdown_called_ = true;
+  std::list<DispatcherThreadDeletableConstPtr> local_deletables;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    local_deletables = std::move(deletables_in_dispatcher_thread_);
+  }
+  auto thread_local_deletables_size = local_deletables.size();
+  while (!local_deletables.empty()) {
+    local_deletables.pop_front();
+  }
+
+  ENVOY_LOG(
+      debug,
+      "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",
+      __FUNCTION__, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size);
 }
 
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
@@ -356,7 +334,7 @@ void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
 }
 
 void DispatcherImpl::runThreadLocalDelete() {
-  std::list<DispatcherThreadDeletablePtr> to_be_delete;
+  std::list<DispatcherThreadDeletableConstPtr> to_be_delete;
   {
     Thread::LockGuard lock(thread_local_deletable_lock_);
     to_be_delete = std::move(deletables_in_dispatcher_thread_);

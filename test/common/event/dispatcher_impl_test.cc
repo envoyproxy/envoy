@@ -33,30 +33,6 @@ using testing::Return;
 namespace Envoy {
 namespace Event {
 namespace {
-class Destroyable : public DeferredDeletable, public DispatcherThreadDeletable {
-public:
-  Destroyable(Dispatcher& dispatcher, int life, ReadyWatcher& watcher)
-      : dispatcher_(dispatcher), life_(life), watcher_(watcher) {}
-  ~Destroyable() {
-
-    if (life_ != 0) {
-      if ((life_ % 3) == 0) {
-        dispatcher_.post([obj = std::make_shared<Destroyable>(
-                              dispatcher_, life_ - 1, watcher_)]() mutable { obj.reset(); });
-      } else if ((life_ % 3) == 1) {
-        dispatcher_.deleteInDispatcherThread(
-            std::make_unique<Destroyable>(dispatcher_, life_ - 1, watcher_));
-      } else {
-        dispatcher_.deferredDelete(std::make_unique<Destroyable>(dispatcher_, life_ - 1, watcher_));
-      }
-    } else {
-      watcher_.ready();
-    }
-  }
-  Dispatcher& dispatcher_;
-  uint32_t life_;
-  ReadyWatcher& watcher_;
-};
 
 class RunOnDelete {
 public:
@@ -264,6 +240,15 @@ private:
   std::function<void()> on_destroy_;
 };
 
+class TestDispatcherThreadDeletable : public DispatcherThreadDeletable {
+public:
+  TestDispatcherThreadDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
+  ~TestDispatcherThreadDeletable() override { on_destroy_(); }
+
+private:
+  std::function<void()> on_destroy_;
+};
+
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
@@ -382,6 +367,7 @@ protected:
       cv_.wait(mu_);
     }
   }
+
   NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
@@ -465,18 +451,6 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
   }
 }
 
-TEST(DispatcherShutdownTest, ShutdownCleanupAllDestroyableObjects) {
-  auto api = Api::createApiForTest();
-  auto dispatcher = api->allocateDispatcher("test_thread");
-  ReadyWatcher shutdown_watcher;
-  dispatcher->deferredDelete(std::make_unique<Destroyable>(*dispatcher, 10, shutdown_watcher));
-
-  EXPECT_CALL(shutdown_watcher, ready());
-  dispatcher->shutdown();
-  // Need to verify before dispatcher is destroyed.
-  testing::Mock::VerifyAndClearExpectations(&shutdown_watcher);
-}
-
 // Ensure that there is no deadlock related to calling a posted callback, or
 // destructing a closure when finished calling it.
 TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
@@ -514,6 +488,102 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
   Thread::LockGuard lock(mu_);
   while (!work_finished_) {
     cv_.wait(mu_);
+  }
+}
+
+TEST_F(DispatcherImplTest, DispatcherThreadDeleted) {
+  dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>(
+      [this, id = api_->threadFactory().currentThreadId()]() {
+        ASSERT(id != api_->threadFactory().currentThreadId());
+        {
+          Thread::LockGuard lock(mu_);
+          ASSERT(!work_finished_);
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      }));
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+TEST_F(DispatcherImplTest, DispatcherThreadDeletedAtNextCycle) {
+  dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>(
+      [this, id = api_->threadFactory().currentThreadId()]() {
+        ASSERT(id != api_->threadFactory().currentThreadId());
+        {
+          Thread::LockGuard lock(mu_);
+          ASSERT(!work_finished_);
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      }));
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+class DispatcherShutdownTest : public testing::Test {
+protected:
+  DispatcherShutdownTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(DispatcherShutdownTest, ShutdownClearThreadLocalDeletables) {
+  ReadyWatcher watcher;
+
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->shutdown();
+}
+
+TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
+  ReadyWatcher watcher;
+  ReadyWatcher deferred_watcher;
+  ReadyWatcher post_watcher;
+
+  {
+    InSequence s;
+
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+        [&deferred_watcher]() { deferred_watcher.ready(); }));
+    dispatcher_->post([&post_watcher]() { post_watcher.ready(); });
+    dispatcher_->deleteInDispatcherThread(
+        std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+    EXPECT_CALL(watcher, ready());
+    dispatcher_->shutdown();
+
+    ::testing::Mock::VerifyAndClearExpectations(&watcher);
+    EXPECT_CALL(deferred_watcher, ready());
+
+    dispatcher_.reset();
+    ::testing::Mock::VerifyAndClearExpectations(&deferred_watcher);
+    ::testing::Mock::VerifyAndClearExpectations(&post_watcher);
+  }
+}
+
+TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
+  ReadyWatcher watcher;
+  ReadyWatcher deferred_watcher;
+  dispatcher_->deferredDelete(
+      std::make_unique<TestDeferredDeletable>([&deferred_watcher]() { deferred_watcher.ready(); }));
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+  {
+    InSequence s;
+    EXPECT_CALL(deferred_watcher, ready());
+    EXPECT_CALL(watcher, ready());
+    dispatcher_.reset();
+    ::testing::Mock::VerifyAndClearExpectations(&deferred_watcher);
+    ::testing::Mock::VerifyAndClearExpectations(&watcher);
   }
 }
 

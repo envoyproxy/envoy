@@ -294,12 +294,6 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
-  struct DispatcherShutdownHelper {
-
-    DispatcherShutdownHelper(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-    ~DispatcherShutdownHelper() { dispatcher_.shutdown(); }
-    Event::Dispatcher& dispatcher_;
-  };
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
@@ -348,7 +342,6 @@ private:
   Random::RandomGeneratorPtr random_generator_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  DispatcherShutdownHelper dispatcher_shutdown_helper_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;

@@ -927,7 +927,7 @@ ClusterImplBase::ClusterImplBase(
       [&dispatcher](const ClusterInfoImpl* self) {
         ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
         dispatcher.deleteInDispatcherThread(
-            std::unique_ptr<Event::DispatcherThreadDeletable>(const_cast<ClusterInfoImpl*>(self)));
+            std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
       });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&

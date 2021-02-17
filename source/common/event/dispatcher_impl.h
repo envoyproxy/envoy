@@ -86,7 +86,7 @@ public:
   void exit() override;
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
-  void deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) override;
+  void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void pushTrackedObject(const ScopeTrackedObject* object) override;
@@ -153,7 +153,7 @@ private:
   SchedulableCallbackPtr thread_local_delete_cb_;
   Thread::MutexBasicLockable thread_local_deletable_lock_;
   // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.
-  std::list<DispatcherThreadDeletablePtr>
+  std::list<DispatcherThreadDeletableConstPtr>
       deletables_in_dispatcher_thread_ ABSL_GUARDED_BY(thread_local_deletable_lock_);
   bool shutdown_called_{false};
 

@@ -101,7 +101,7 @@ public:
 
   void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
 
-  void deleteInDispatcherThread(DispatcherThreadDeletablePtr deletable) override {
+  void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
     impl_.deleteInDispatcherThread(std::move(deletable));
   }
 
