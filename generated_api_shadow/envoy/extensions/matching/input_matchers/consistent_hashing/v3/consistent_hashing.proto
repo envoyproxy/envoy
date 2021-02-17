@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ConsistentHashing {
   // The threshold the resulting hash must be over in order for this matcher to evaluate to true.
   // This value must be below the configured modulo value.
-  // Setting this to 0 is equiavlent to this matcher always matching.
+  // Setting this to 0 is equivalent to this matcher always matching.
   uint32 threshold = 1;
 
   // The value to use for the modulus in the calculation. This effectively  bounds the hash output,
