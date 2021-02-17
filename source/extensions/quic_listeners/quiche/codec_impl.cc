@@ -113,7 +113,6 @@ QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
 
 REGISTER_FACTORY(QuicHttpClientConnectionFactoryImpl, Http::QuicHttpClientConnectionFactory);
 REGISTER_FACTORY(QuicHttpServerConnectionFactoryImpl, Http::QuicHttpServerConnectionFactory);
-REGISTER_FACTORY(QuicClientConnectionFactoryImpl, Http::QuicClientConnectionFactory);
 
 } // namespace Quic
 } // namespace Envoy

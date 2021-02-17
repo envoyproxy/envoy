@@ -6,16 +6,8 @@
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 
-#include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
-
-#include "quiche/quic/core/http/quic_client_push_promise_index.h"
-#include "quiche/quic/core/quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -102,72 +94,8 @@ public:
   std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
 };
 
-// TODO(#14829) we should avoid creating this per-connection.
-struct QuicUpstreamData {
-  QuicUpstreamData(Event::Dispatcher& dispatcher, Envoy::Ssl::ClientContextConfig& config,
-                   Network::Address::InstanceConstSharedPtr server_addr)
-      : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
-        config_(config), server_id_{config_.serverNameIndication(),
-                                    static_cast<uint16_t>(server_addr->ip()->port()), false} {}
-
-  EnvoyQuicConnectionHelper conn_helper_;
-  EnvoyQuicAlarmFactory alarm_factory_;
-  Envoy::Ssl::ClientContextConfig& config_;
-  quic::QuicServerId server_id_;
-  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
-  quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
-};
-
-class EnvoyQuicClientSessionWithExtras : public EnvoyQuicClientSession {
-public:
-  using EnvoyQuicClientSession::EnvoyQuicClientSession;
-
-  std::unique_ptr<QuicUpstreamData> quic_upstream_data_;
-};
-
-// A factory to create EnvoyQuicClientConnection instance for QUIC
-class QuicClientConnectionFactoryImpl : public Http::QuicClientConnectionFactory {
-public:
-  std::unique_ptr<Network::ClientConnection>
-  createQuicNetworkConnection(Network::Address::InstanceConstSharedPtr server_addr,
-                              Network::Address::InstanceConstSharedPtr local_addr,
-                              Network::TransportSocketFactory& transport_socket_factory,
-                              Stats::Scope& stats_scope, Event::Dispatcher& dispatcher,
-                              TimeSource& time_source) override {
-    // TODO(#14829): reject the config if a raw buffer socket is configured.
-    auto* ssl_socket_factory =
-        dynamic_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory*>(
-            &transport_socket_factory);
-    ASSERT(ssl_socket_factory != nullptr);
-
-    std::unique_ptr<QuicUpstreamData> upstream_data =
-        std::make_unique<QuicUpstreamData>(dispatcher, *ssl_socket_factory->config(), server_addr);
-    upstream_data->crypto_config_ = std::make_unique<quic::QuicCryptoClientConfig>(
-        std::make_unique<EnvoyQuicProofVerifier>(stats_scope, upstream_data->config_, time_source));
-
-    auto connection = std::make_unique<EnvoyQuicClientConnection>(
-        quic::QuicUtils::CreateRandomConnectionId(), server_addr, upstream_data->conn_helper_,
-        upstream_data->alarm_factory_,
-        quic::ParsedQuicVersionVector{upstream_data->supported_versions_[0]}, local_addr,
-        dispatcher, nullptr);
-    auto ret = std::make_unique<EnvoyQuicClientSessionWithExtras>(
-        quic_config_, upstream_data->supported_versions_, std::move(connection),
-        upstream_data->server_id_, upstream_data->crypto_config_.get(), &push_promise_index_,
-        dispatcher, 0);
-    ret->Initialize();
-    ret->quic_upstream_data_ = std::move(upstream_data);
-    return ret;
-  }
-
-  quic::QuicConfig quic_config_;
-  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
-
-  quic::QuicClientPushPromiseIndex push_promise_index_;
-};
-
 DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);
 DECLARE_FACTORY(QuicHttpServerConnectionFactoryImpl);
-DECLARE_FACTORY(QuicClientConnectionFactoryImpl);
 
 } // namespace Quic
 } // namespace Envoy

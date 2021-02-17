@@ -6,7 +6,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/utility.h"
-#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/quic_client_connection_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -34,8 +34,6 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         auto source_address = data.host_description_->cluster().sourceAddress();
         if (!source_address.get()) {
           source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
-          // TODO(alyssawilk) debug log: fix.
-          std::cerr << "Local address resolved to " << source_address->asString();
         }
         Network::TransportSocketFactory& transport_socket_factory =
             data.host_description_->transportSocketFactory();

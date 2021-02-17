@@ -239,6 +239,17 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
     config_helper_.configureUpstreamTls(false);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          // Docker doesn't allow writing to the v6 address returned by
+          // Network::Utility::getLocalAddress.
+          if (version_ == Network::Address::IpVersion::v6) {
+            auto* bind_config_address = bootstrap.mutable_static_resources()
+                                            ->mutable_clusters(0)
+                                            ->mutable_upstream_bind_config()
+                                            ->mutable_source_address();
+            bind_config_address->set_address("::1");
+            bind_config_address->set_port_value(0);
+          }
+
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
           ConfigHelper::HttpProtocolOptions protocol_options;
           protocol_options.mutable_explicit_http_config()->mutable_http3_protocol_options();

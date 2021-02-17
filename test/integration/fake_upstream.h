@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
