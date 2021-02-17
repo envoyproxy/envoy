@@ -111,7 +111,8 @@ void GradientController::enterMinRTTSamplingWindow() {
 void GradientController::updateMinRTT() {
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
-    if (inMinRTTSamplingWindow() && hist_sample_count(latency_sample_hist_.get()) >= config_.minRTTAggregateRequestCount()) {
+    if (inMinRTTSamplingWindow() &&
+        hist_sample_count(latency_sample_hist_.get()) >= config_.minRTTAggregateRequestCount()) {
       // By double-checked locking, only update minRTT when it is in minRTT sampling window
       // and number of samples is greater than or equal to the minRTTAggregateRequestCount.
       min_rtt_ = processLatencySamplesAndClear();
