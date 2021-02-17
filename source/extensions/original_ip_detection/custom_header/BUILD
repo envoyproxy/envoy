@@ -13,6 +13,8 @@ envoy_cc_library(
     name = "custom_header_lib",
     srcs = ["custom_header.cc"],
     hdrs = ["custom_header.h"],
+    # This extensions is core code.
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/http:original_ip_detection_interface",
         "//source/common/network:utility_lib",

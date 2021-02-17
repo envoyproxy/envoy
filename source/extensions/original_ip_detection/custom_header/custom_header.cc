@@ -24,6 +24,9 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
   }
 }
 
+CustomHeaderIPDetection::CustomHeaderIPDetection(const std::string& header_name)
+    : header_name_(header_name) {}
+
 Http::OriginalIPDetectionResult
 CustomHeaderIPDetection::detect(Http::OriginalIPDetectionParams& params) {
   auto hdr = params.request_headers.get(Http::LowerCaseString(header_name_));

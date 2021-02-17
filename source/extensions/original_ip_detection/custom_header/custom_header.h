@@ -14,12 +14,13 @@ public:
   CustomHeaderIPDetection(
       const envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig&
           config);
+  CustomHeaderIPDetection(const std::string& header_name);
 
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override;
 
 private:
   std::string header_name_;
-  bool allow_trusted_address_checks_;
+  bool allow_trusted_address_checks_{false};
   absl::optional<Http::OriginalIPRejectRequestOptions> reject_options_{absl::nullopt};
 };
 

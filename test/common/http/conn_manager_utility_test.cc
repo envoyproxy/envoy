@@ -14,6 +14,7 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "extensions/original_ip_detection/xff/xff.h"
+#include "extensions/original_ip_detection/custom_header/custom_header.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -1558,28 +1559,12 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
   }
 }
 
-class CustomHeaderBasedDetection : public Http::OriginalIPDetection {
-public:
-  CustomHeaderBasedDetection(const std::string& header_name) : header_name_(header_name) {}
-
-  Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams& params) override {
-    auto hdr = params.request_headers.get(LowerCaseString(header_name_));
-    if (hdr.empty()) {
-      return {nullptr, false, absl::nullopt};
-    }
-    auto header_value = hdr[0]->value().getStringView();
-    return {std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value)), false,
-            absl::nullopt};
-  }
-
-private:
-  std::string header_name_;
-};
-
 // Test an extension to detect the original IP for the request.
 TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
   const std::string header_name = "x-cdn-detected-ip";
-  auto detection_extension = std::make_shared<CustomHeaderBasedDetection>(header_name);
+  auto detection_extension =
+      std::make_shared<Extensions::OriginalIPDetection::CustomHeader::CustomHeaderIPDetection>(
+          header_name);
   const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
 
   ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
