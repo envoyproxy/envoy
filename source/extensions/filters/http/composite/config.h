@@ -29,52 +29,6 @@ public:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
-/**
- * A match action used by the composite filter. We snap the factory function for the filter
- * specified by the action configuration allowing us to invoke the filter factory if this match is
- * hit.
- */
-class CompositeAction
-    : public Matcher::ActionBase<envoy::extensions::filters::http::composite::v3::CompositeAction> {
-public:
-  explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
-
-  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const { cb_(callbacks); }
-
-private:
-  const Http::FilterFactoryCb cb_;
-};
-
-/**
- * Factory for the composite match factory.
- */
-class CompositeMatchActionFactory : public Matcher::ActionFactory {
-public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
-                        Server::Configuration::FactoryContext& context) override {
-    const auto& action_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::filters::http::composite::v3::CompositeAction&>(
-        config, context.messageValidationVisitor());
-
-    auto& factory = Config::Utility::getAndCheckFactoryByType<
-        Server::Configuration::NamedHttpFilterConfigFactory>(action_config.typed_config());
-
-    auto message = Config::Utility::translateAnyToFactoryConfig(
-        action_config.typed_config(), context.messageValidationVisitor(), factory);
-
-    auto factory_cb = factory.createFilterFactoryFromProto(*message, stats_prefix, context);
-
-    return [factory_cb]() { return std::make_unique<CompositeAction>(factory_cb); };
-  }
-
-  std::string name() const override { return "composite-action"; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::http::composite::v3::CompositeAction>();
-  }
-};
-
 } // namespace Composite
 } // namespace HttpFilters
 } // namespace Extensions

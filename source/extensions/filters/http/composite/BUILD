@@ -13,10 +13,21 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "action_lib",
+    hdrs = ["action.h"],
+    srcs = ["action.cc"],
+    deps = [
+        "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
-    # srcs = ["filter.cc"],
+    srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        ":action_lib",
         "//include/envoy/http:filter_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
