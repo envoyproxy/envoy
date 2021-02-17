@@ -21,6 +21,7 @@ namespace Envoy {
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
+// spaces (const char *)
 #define DUMP_DETAILS(member)                                                                       \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
@@ -35,6 +36,7 @@ namespace Envoy {
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
+// spaces (const char *)
 #define DUMP_OPT_REF_DETAILS(member)                                                               \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
