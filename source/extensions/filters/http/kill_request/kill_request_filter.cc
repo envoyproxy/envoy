@@ -46,8 +46,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
         route_entry->mostSpecificPerFilterConfigTyped<KillSettings>(name);
 
     if (per_route_kill_settings) {
-      envoy::type::v3::FractionalPercent probability =
-          per_route_kill_settings->getProbability();
+      envoy::type::v3::FractionalPercent probability = per_route_kill_settings->getProbability();
       kill_request_.set_allocated_probability(&probability);
     }
   }
