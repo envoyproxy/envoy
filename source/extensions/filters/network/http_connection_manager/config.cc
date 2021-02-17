@@ -290,7 +290,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // Check if IP detection extensions were configured.
   const auto& ip_detection_extensions = config.original_ip_detection_extensions();
-  if (ip_detection_extensions.size() > 0) {
+  if (!ip_detection_extensions.empty()) {
     original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
     for (const auto& typed_config : ip_detection_extensions) {
       auto* factory =
