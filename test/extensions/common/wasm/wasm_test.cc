@@ -699,10 +699,10 @@ TEST_P(WasmCommonTest, VmCache) {
             });
         return std::make_shared<WasmHandle>(wasm);
       },
-      [](const WasmHandleBaseSharedPtr& base_wasm,
-         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
-        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
-                                              plugin_key);
+      [](const WasmHandleBaseSharedPtr& wasm_handle,
+         const PluginBaseSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(wasm_handle),
+                                              std::static_pointer_cast<Plugin>(plugin));
       });
   wasm_handle.reset();
   wasm_handle2.reset();
@@ -805,10 +805,10 @@ TEST_P(WasmCommonTest, RemoteCode) {
             });
         return std::make_shared<WasmHandle>(wasm);
       },
-      [](const WasmHandleBaseSharedPtr& base_wasm,
-         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
-        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
-                                              plugin_key);
+      [](const WasmHandleBaseSharedPtr& wasm_handle,
+         const PluginBaseSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(wasm_handle),
+                                              std::static_pointer_cast<Plugin>(plugin));
       });
   wasm_handle.reset();
 
@@ -922,10 +922,10 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
             });
         return std::make_shared<WasmHandle>(wasm);
       },
-      [](const WasmHandleBaseSharedPtr& base_wasm,
-         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
-        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
-                                              plugin_key);
+      [](const WasmHandleBaseSharedPtr& wasm_handle,
+         const PluginBaseSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(wasm_handle),
+                                              std::static_pointer_cast<Plugin>(plugin));
       });
   wasm_handle.reset();
 
