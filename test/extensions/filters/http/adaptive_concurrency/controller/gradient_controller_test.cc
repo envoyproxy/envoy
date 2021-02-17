@@ -95,8 +95,8 @@ protected:
         stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
   }
 
-  void verifyEmptyHistogram(int empty_histogram_cnt) {
-    EXPECT_EQ(empty_histogram_cnt, stats_.counter("test_prefix.empty_histogram").value());
+  void verifyRaceCondition(int empty_histogram_cnt) {
+    EXPECT_EQ(empty_histogram_cnt, stats_.counter("test_prefix.race_found").value());
   }
 
   void verifyMinRTTActive() {
@@ -838,12 +838,14 @@ min_rtt_calc_params:
   });
   t2.join();
 
+  verifyRaceCondition(0);
+
   // Complete the minRTT update in t1 and verify we've exited the window.
   synchronizer.signal("pre_minrtt_update");
   t1.join();
 
-  // verify whether we get the empty histogram.
-  verifyEmptyHistogram(1);
+  // verify whether race is found.
+  verifyRaceCondition(1);
 }
 
 } // namespace

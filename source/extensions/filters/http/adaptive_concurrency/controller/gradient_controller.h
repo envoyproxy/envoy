@@ -36,7 +36,7 @@ namespace Controller {
   GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(min_rtt_msecs, NeverImport)                                                                \
   GAUGE(sample_rtt_msecs, NeverImport)                                                             \
-  COUNTER(empty_histogram)
+  COUNTER(race_found)
 
 /**
  * Wrapper struct for gradient controller stats. @see stats_macros.h
@@ -291,7 +291,7 @@ private:
   Event::TimerPtr sample_reset_timer_;
 
   // Used for testing only.
-  mutable Thread::ThreadSynchronizer synchronizer_;
+  Thread::ThreadSynchronizer synchronizer_;
 };
 using GradientControllerSharedPtr = std::shared_ptr<GradientController>;
 
