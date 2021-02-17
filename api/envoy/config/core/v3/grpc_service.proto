@@ -124,6 +124,7 @@ message GrpcService {
 
         string name = 1;
 
+        // [#extension-category: envoy.grpc_credentials]
         oneof config_type {
           google.protobuf.Any typed_config = 3;
         }

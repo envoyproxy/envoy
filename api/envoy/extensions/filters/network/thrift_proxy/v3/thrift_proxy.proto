@@ -80,6 +80,7 @@ message ThriftProxy {
   // Thrift proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no thrift_filters are specified, a default Thrift router filter
   // (`envoy.filters.thrift.router`) is used.
+  // [#extension-category: envoy.thrift_proxy.filters]
   repeated ThriftFilter thrift_filters = 5;
 
   // If set to true, Envoy will try to skip decode data after metadata in the Thrift message.

@@ -35,6 +35,7 @@ message Filter {
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
+  // [#extension-category: envoy.filters.network]
   oneof config_type {
     // Filter specific configuration which depends on the filter being
     // instantiated. See the supported filters for further documentation.
@@ -323,10 +324,12 @@ message ListenerFilter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
+  // [#extension-category: envoy.transport_sockets.downstream]
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.
+  // [#extension-category: envoy.filters.listener]
   oneof config_type {
     google.protobuf.Any typed_config = 3;
   }

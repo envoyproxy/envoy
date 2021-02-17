@@ -19,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: AWS X-Ray Tracer Configuration]
 // Configuration for AWS X-Ray tracer
 
+// [#extension: envoy.tracers.xray]
 message XRayConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v3.XRayConfig";
 

@@ -41,6 +41,7 @@ message ResourceMonitor {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Configuration for the resource monitor being instantiated.
+  // [#extension-category: envoy.resource_monitors]
   oneof config_type {
     google.protobuf.Any typed_config = 3;
   }
