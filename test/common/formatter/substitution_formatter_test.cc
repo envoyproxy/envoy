@@ -1848,6 +1848,32 @@ TEST(SubstitutionFormatterTest, StructFormatterSingleOperatorTest) {
       expected_json_map);
 }
 
+TEST(SubstitutionFormatterTest, EmptyStructFormatterTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  absl::node_hash_map<std::string, std::string> expected_json_map = {{"protocol", ""}};
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    protocol: ''
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  verifyStructOutput(
+      formatter.format(request_header, response_header, response_trailer, stream_info, body),
+      expected_json_map);
+}
+
 TEST(SubstitutionFormatterTest, StructFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
@@ -2716,6 +2742,20 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
   for (const std::string& test_case : test_cases) {
     EXPECT_NO_THROW(parser.parse(test_case));
   }
+}
+
+TEST(SubstitutionFormatterTest, EmptyFormatParse) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  auto providers = SubstitutionFormatParser::parse("");
+
+  EXPECT_EQ(providers.size(), 1);
+  EXPECT_EQ("", providers[0]->format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
 }
 
 TEST(SubstitutionFormatterTest, FormatterExtension) {
