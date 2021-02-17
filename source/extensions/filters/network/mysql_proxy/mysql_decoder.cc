@@ -51,24 +51,24 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     client_login_resp.decode(message, seq, len);
     callbacks_.onClientLoginResponse(client_login_resp);
 
-    switch (client_login_resp.type()) {
-    case ClientLoginResponseType::Ok: {
+    switch (client_login_resp.getRespCode()) {
+    case MYSQL_RESP_OK: {
       session_.setState(MySQLSession::State::Req);
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
-    case ClientLoginResponseType::AuthSwitch: {
+    case MYSQL_RESP_AUTH_SWITCH: {
       session_.setState(MySQLSession::State::AuthSwitchResp);
       break;
     }
-    case ClientLoginResponseType::Err: {
+    case MYSQL_RESP_ERR: {
       // client/server should close the connection:
       // https://dev.mysql.com/doc/internals/en/connection-phase.html
       session_.setState(MySQLSession::State::Error);
       break;
     }
-    case ClientLoginResponseType::AuthMoreData:
+    case MYSQL_RESP_MORE:
     default:
       session_.setState(MySQLSession::State::NotHandled);
       break;
@@ -90,22 +90,22 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     client_login_resp.decode(message, seq, len);
     callbacks_.onMoreClientLoginResponse(client_login_resp);
 
-    switch (client_login_resp.type()) {
-    case ClientLoginResponseType::Ok: {
+    switch (client_login_resp.getRespCode()) {
+    case MYSQL_RESP_OK: {
       session_.setState(MySQLSession::State::Req);
       break;
     }
-    case ClientLoginResponseType::AuthMoreData: {
+    case MYSQL_RESP_MORE: {
       session_.setState(MySQLSession::State::AuthSwitchResp);
       break;
     }
-    case ClientLoginResponseType::Err: {
+    case MYSQL_RESP_ERR: {
       // stop parsing auth req/response, attempt to resync in command state
       session_.setState(MySQLSession::State::Resync);
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
-    case ClientLoginResponseType::AuthSwitch:
+    case MYSQL_RESP_AUTH_SWITCH:
     default:
       session_.setState(MySQLSession::State::NotHandled);
       break;

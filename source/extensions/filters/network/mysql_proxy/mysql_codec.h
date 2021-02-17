@@ -27,10 +27,12 @@ constexpr uint16_t MAX_MYSQL_USER_STRING = 256;
 constexpr uint8_t MIN_RESPONSE_PAYLOAD = 5;
 constexpr uint8_t MYSQL_MAX_USER_LEN = 32;
 constexpr uint8_t MYSQL_MAX_PASSWD_LEN = 32;
+
 constexpr uint8_t MYSQL_RESP_OK = 0x00;
 constexpr uint8_t MYSQL_RESP_MORE = 0x01;
 constexpr uint8_t MYSQL_RESP_AUTH_SWITCH = 0xfe;
 constexpr uint8_t MYSQL_RESP_ERR = 0xff;
+constexpr uint8_t MYSQL_RESP_UNKNOWN = 0x56;
 
 constexpr uint8_t EOF_MARKER = 0xfe;
 constexpr uint8_t ERR_MARKER = 0xff;

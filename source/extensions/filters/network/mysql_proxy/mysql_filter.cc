@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -85,15 +86,15 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
 }
 
 void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.type() == ClientLoginResponseType::AuthSwitch) {
+  if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
     config_->stats_.auth_switch_request_.inc();
-  } else if (client_login_resp.type() == ClientLoginResponseType::Err) {
+  } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
     config_->stats_.login_failures_.inc();
   }
 }
 
 void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.type() == ClientLoginResponseType::Err) {
+  if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
     config_->stats_.login_failures_.inc();
   }
 }
