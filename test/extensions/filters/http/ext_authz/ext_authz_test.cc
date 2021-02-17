@@ -39,7 +39,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::UnorderedElementsAre;
 using testing::Values;
 
 namespace Envoy {
