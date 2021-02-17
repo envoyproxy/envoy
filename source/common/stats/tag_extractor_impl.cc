@@ -207,10 +207,10 @@ bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, std::vector
       tag_value = tokens[input_index];
       start = char_index;
       end = start + tag_value.size();
-      if (start > 0) {
-        --start; // Remove dot leading to this token.
-      } else if (input_index < (tokens.size() - 1)) {
+      if (input_index < (tokens.size() - 1)) {
         ++end; // Remove dot leading to next token
+      } else if (start > 0) {
+        --start;
       }
     } else {
       absl::string_view expected = tokens_[pattern_index];

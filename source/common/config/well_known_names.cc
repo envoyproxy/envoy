@@ -82,16 +82,17 @@ TagNameValues::TagNameValues() {
   //addTokenized(MONGO_CMD, "mongo.*.cmd.$mongo_cmd.**");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
-  addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
+  //addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
+  addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**", ".grpc.");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
-  addRe2(HTTP_USER_AGENT, R"(^http\.<NAME>\.user_agent\.((<NAME>)\.))", ".user_agent.");
+  addTokenized(HTTP_USER_AGENT, "http.*.user_agent.$.**", ".user_agent.");
 
   // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*
-  addRe2(VIRTUAL_CLUSTER, R"(^vhost\.<NAME>\.vcluster\.((<NAME>)\.))", ".vcluster.");
+  addTokenized(VIRTUAL_CLUSTER, "vhost.*.vcluster.$.**", ".vcluster.");
 
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
-  addRe2(FAULT_DOWNSTREAM_CLUSTER, R"(^http\.<NAME>\.fault\.((<NAME>)\.))", ".fault.");
+  addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**", ".fault.");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
   addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
@@ -100,22 +101,22 @@ TagNameValues::TagNameValues() {
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<NAME>\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\.<NAME>\.grpc\.((<NAME>)\.))", ".grpc.");
+  addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**", ".grpc.");
 
   // tcp.(<stat_prefix>.)*
-  addRe2(TCP_PREFIX, R"(^tcp\.((<NAME>)\.))");
+  addTokenized(TCP_PREFIX, "tcp.$.**");
 
   // udp.(<stat_prefix>.)*
-  addRe2(UDP_PREFIX, R"(^udp\.((<NAME>)\.))");
+  addTokenized(UDP_PREFIX, "udp.$.**");
 
   // auth.clientssl.(<stat_prefix>.)*
-  addRe2(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((<NAME>)\.))");
+  addTokenized(CLIENTSSL_PREFIX, "auth.clientssl.$.**");
 
   // ratelimit.(<stat_prefix>.)*
-  addRe2(RATELIMIT_PREFIX, R"(^ratelimit\.((<NAME>)\.))");
+  addTokenized(RATELIMIT_PREFIX, "ratelimit.$.**");
 
   // cluster.(<cluster_name>.)*
-  addRe2(CLUSTER_NAME, R"(^cluster\.((<NAME>)\.))");
+  addTokenized(CLUSTER_NAME, "cluster.$.**");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
   // The <address> part can be anything here (.*?) for the sake of a simpler
@@ -123,13 +124,13 @@ TagNameValues::TagNameValues() {
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<NAME>)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
-  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^http\.((<NAME>)\.))");
+  addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
   // listener.(<address>.)*
   addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
 
   // vhost.(<virtual host name>.)*
-  addRe2(VIRTUAL_HOST, R"(^vhost\.((<NAME>)\.))");
+  addTokenized(VIRTUAL_HOST, "vhost.$.**");
 
   // mongo.(<stat_prefix>.)*
   addTokenized(MONGO_PREFIX, "mongo.$.**");
