@@ -21,7 +21,6 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
 
       listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
       request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
-      default_detection_(std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0)),
       local_reply_(LocalReply::Factory::createDefault()) {
 
   ON_CALL(route_config_provider_, lastUpdated())
@@ -31,6 +30,9 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
   // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
+
+  ip_detection_extensions_.push_back(
+      std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0));
 }
 
 HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {

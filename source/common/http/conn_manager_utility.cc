@@ -135,9 +135,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // used for determining internal/external status (see below).
     OriginalIPDetectionParams params = {request_headers,
                                         connection.addressProvider().remoteAddress()};
-    auto original_ip_detection = config.originalIpDetection();
-    if (original_ip_detection) {
-      auto result = original_ip_detection->detect(params);
+    for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
+      const auto result = detection_extension->detect(params);
 
       if (result.reject_options.has_value()) {
         return {nullptr, result.reject_options};
@@ -146,15 +145,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
       if (result.detected_remote_address) {
         final_remote_address = result.detected_remote_address;
         allow_trusted_address_checks = result.allow_trusted_address_checks;
+        break;
       }
-    }
-
-    // If there's no extension or it failed to detect, try the default extension (XFF).
-    if (!final_remote_address) {
-      auto default_ip_detection = config.defaultIpDetection();
-      auto result = default_ip_detection->detect(params);
-      final_remote_address = result.detected_remote_address;
-      allow_trusted_address_checks = result.allow_trusted_address_checks;
     }
   }
 

@@ -582,32 +582,33 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 
-  // The configuration of the original-IP detection extension.
+  // The configuration for the original-IP detection extensions.
   //
-  // If not set, Envoy uses the default remote IP detection mechanism (:ref:`XFF
-  // <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`).
-  //
-  // When the remote address of the downstream connection is not used as
-  // the detection mechanism for the request's original address, Envoy
-  // will rely on the :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP
-  // header to detect the address.
+  // By default, when the :ref:`use_remote_address
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
+  // option is not used, Envoy will rely on the :ref:`config_http_conn_man_headers_x-forwarded-for` header
+  // and the :ref:`xff_num_trusted_hops
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`
+  // configuration option to detect the remote address.
   //
   // However, relying on the :ref:`config_http_conn_man_headers_x-forwarded-for`
   // header doesn't necessarily work for all network configurations. For instance,
   // if the number of trusted hops isn't consistent for requests flowing into
-  // Envoy the header cannot be used reliably. For such cases, the following
-  // option allows for a custom extension to be provided.
+  // Envoy this mechanism cannot be used reliably. For such cases, the following
+  // option allows for a list of custom extensions to be provided.
   //
-  // If configured, the custom extension will be called along with the
-  // request headers and the downstream directly connected address when the
-  // HCM needs to populate the final remote address. The extension will then rely
+  // If configured, the custom extensions will be called along with the request headers
+  // and information about the downstream connection, such as direct connected address,
+  // when the HCM needs to populate the final remote address. Each extension will then rely
   // on these parameters to decide the value of the request's final remote address.
-  // If the extension fails to detect the original IP address, the HCM will then fallback
-  // to the standard detection mechanisms.
+  // If an extension fails to detect the original IP address and isn't configured to reject
+  // the request when this happens, the HCM will then try the remaining configured extensions
+  // until one succeeds or the request is rejected.
   //
-  // An example extension could look up at a configured header name to figure out the
-  // remote address as detected by a CDN or some other preceding network.
-  config.core.v3.TypedExtensionConfig original_ip_detection = 43;
+  // Two available extensions are the :ref:`xff
+  // extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` and the
+  // :ref:`custom header extension <envoy_api_msg_extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig>`.
+  repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 43;
 }
 
 // The configuration to customize local reply returned by Envoy.

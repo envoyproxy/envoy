@@ -17,8 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This extension allows for the original downstream remote IP to be detected
 // by reading the value from a configured header name. If the value is successfully parsed
 // as an IP, it'll be treated as the effective downstream remote address and seen as such
-// by all filters. If the detection or parsing of the header value fails, Envoy will fallback
-// to its default detection extension.
+// by all filters.
 //
 // [#extension: envoy.original_ip_detection.custom_header]
 message CustomHeaderConfig {

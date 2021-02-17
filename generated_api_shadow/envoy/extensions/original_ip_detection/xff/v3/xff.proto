@@ -14,9 +14,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This extension allows for the original downstream remote IP to be detected
 // by reading the :ref:`config_http_conn_man_headers_x-forwarded-for` header.
 //
-// If no other extension is configured or detection fails for the configured
-// extension, Envoy will fallback to using this extension.
-//
 // [#extension: envoy.original_ip_detection.xff]
 message XffConfig {
   // The number of additional ingress proxy hops from the right side of the

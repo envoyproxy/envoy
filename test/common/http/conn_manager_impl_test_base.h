@@ -141,10 +141,10 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  Http::OriginalIPDetectionSharedPtr originalIpDetection() override {
-    return ip_detection_extension_;
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return ip_detection_extensions_;
   };
-  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return default_detection_; };
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -210,8 +210,7 @@ public:
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
-  Http::OriginalIPDetectionSharedPtr ip_detection_extension_{nullptr};
-  Http::OriginalIPDetectionSharedPtr default_detection_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
 
   const LocalReply::LocalReplyPtr local_reply_;
 

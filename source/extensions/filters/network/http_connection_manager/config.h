@@ -178,10 +178,10 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  Http::OriginalIPDetectionSharedPtr originalIpDetection() override {
-    return original_ip_detection_;
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return original_ip_detection_extensions_;
   }
-  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return default_ip_detection_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -260,8 +260,7 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
-  Http::OriginalIPDetectionSharedPtr original_ip_detection_{nullptr};
-  Http::OriginalIPDetectionSharedPtr default_ip_detection_{nullptr};
+  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

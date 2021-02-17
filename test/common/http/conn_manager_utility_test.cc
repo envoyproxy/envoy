@@ -87,8 +87,6 @@ class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest()
       : request_id_extension_(std::make_shared<NiceMock<MockRequestIDExtension>>(random_)),
-        default_detection_(
-            std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0)),
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
@@ -104,7 +102,11 @@ public:
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
     ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));
-    ON_CALL(config_, defaultIpDetection()).WillByDefault(Return(default_detection_));
+
+    detection_extensions_.push_back(
+        std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(0));
+    ON_CALL(config_, originalIpDetectionExtensions())
+        .WillByDefault(ReturnRef(detection_extensions_));
   }
 
   struct MutateRequestRet {
@@ -132,7 +134,7 @@ public:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Random::MockRandomGenerator> random_;
   std::shared_ptr<NiceMock<MockRequestIDExtension>> request_id_extension_;
-  std::shared_ptr<Extensions::OriginalIPDetection::Xff::XffIPDetection> default_detection_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -321,8 +323,10 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
 // Verify that xff_num_trusted_hops works when not using remote address.
 TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   // Reconfigure XFF detection.
-  default_detection_ = std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(1);
-  ON_CALL(config_, defaultIpDetection()).WillByDefault(Return(default_detection_));
+  detection_extensions_.clear();
+  detection_extensions_.push_back(
+      std::make_shared<Extensions::OriginalIPDetection::Xff::XffIPDetection>(1));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
@@ -1576,8 +1580,9 @@ private:
 TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
   const std::string header_name = "x-cdn-detected-ip";
   auto detection_extension = std::make_shared<CustomHeaderBasedDetection>(header_name);
+  const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
 
-  ON_CALL(config_, originalIpDetection()).WillByDefault(Return(detection_extension));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
 
   // Header is present.

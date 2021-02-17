@@ -42,7 +42,6 @@ public:
     return std::make_unique<ProtobufWkt::StringValue>();
   }
   std::string name() const override { return "CustomHeaderDetection"; }
-  std::string category() const override { return "OriginalIpDetection"; }
 };
 
 TEST_F(OriginalIPDetectionIntegrationTest, HeaderBasedDetection) {
@@ -56,7 +55,7 @@ TEST_F(OriginalIPDetectionIntegrationTest, HeaderBasedDetection) {
               hcm) -> void {
         ProtobufWkt::StringValue config;
 
-        auto* original_ip_detection = hcm.mutable_original_ip_detection();
+        auto* original_ip_detection = hcm.mutable_original_ip_detection_extensions()->Add();
         original_ip_detection->set_name("CustomHeaderDetection");
         original_ip_detection->mutable_typed_config()->PackFrom(config);
 

@@ -470,14 +470,10 @@ public:
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
   /**
-   * @return OriginalIPDetectionSharedPtr original IP detection extension if available.
+   * @return vector of OriginalIPDetectionSharedPtr original IP detection extensions.
    */
-  virtual OriginalIPDetectionSharedPtr originalIpDetection() PURE;
-
-  /**
-   * @return OriginalIPDetectionSharedPtr the IP detection extension (namely XFF).
-   */
-  virtual OriginalIPDetectionSharedPtr defaultIpDetection() PURE;
+  virtual const std::vector<OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

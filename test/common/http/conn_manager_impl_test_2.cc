@@ -2989,7 +2989,7 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
 
 class RejectDetection : public Http::OriginalIPDetection {
 public:
-  RejectDetection() {}
+  RejectDetection() = default;
 
   Http::OriginalIPDetectionResult detect(Http::OriginalIPDetectionParams&) override {
     OriginalIPRejectRequestOptions reject_options = {Http::Code::Forbidden, "ip detection failed",
@@ -3000,7 +3000,7 @@ public:
 
 TEST_F(HttpConnectionManagerImplTest, RequestRejectedViaIPDetection) {
   use_remote_address_ = false;
-  ip_detection_extension_ = std::make_shared<RejectDetection>();
+  ip_detection_extensions_.push_back(std::make_shared<RejectDetection>());
 
   setup(false, "");
 

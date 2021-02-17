@@ -20,13 +20,13 @@ called the *downstream remote address*, for many reasons. Some examples include:
 Envoy supports multiple methods for providing the downstream remote address to the upstream host.
 These techniques vary in complexity and applicability.
 
-Envoy also supports an
-:ref:`extension mechanism<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection>`
+Envoy also supports
+:ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
 for detecting the original IP address. This might be useful if none of the techniques below is
-applicable to your setup. Note that, if configured, an extension will be called ahead of the
-attempt to extract the downstream remote address from the
-:ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. If the extension
-fails to detect the original IP address, the standard detection mechanisms will then be exercised.
+applicable to your setup. Two available extensions are the :ref:`custom header
+<envoy_v3_api_msg_extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig>`
+extension and the :ref:`xff <envoy_v3_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`
+extension.
 
 HTTP Headers
 ------------

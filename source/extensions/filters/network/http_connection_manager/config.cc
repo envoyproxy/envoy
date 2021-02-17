@@ -288,20 +288,22 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }
 
-  // Check if we are provided with an IP detection extension.
-  if (config.has_original_ip_detection()) {
-    auto& typed_config = config.original_ip_detection();
-    auto* factory =
-        Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(typed_config);
-    if (!factory) {
-      throw EnvoyException("Original IP detection extension not found");
+  // Check if IP detection extensions were configured.
+  const auto& ip_detection_extensions = config.original_ip_detection_extensions();
+  if (ip_detection_extensions.size() > 0) {
+    original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
+    for (const auto& typed_config : ip_detection_extensions) {
+      auto* factory =
+          Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(typed_config);
+      if (!factory) {
+        throw EnvoyException("Original IP detection extension not found");
+      }
+      original_ip_detection_extensions_.push_back(factory->createExtension(typed_config));
     }
-    original_ip_detection_ = factory->createExtension(typed_config);
+  } else {
+    original_ip_detection_extensions_.push_back(
+        std::make_shared<OriginalIPDetection::Xff::XffIPDetection>(xff_num_trusted_hops_));
   }
-
-  // Create the default IP detection extension.
-  default_ip_detection_ =
-      std::make_shared<OriginalIPDetection::Xff::XffIPDetection>(xff_num_trusted_hops_);
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.

@@ -180,8 +180,10 @@ public:
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  Http::OriginalIPDetectionSharedPtr originalIpDetection() override { return nullptr; };
-  Http::OriginalIPDetectionSharedPtr defaultIpDetection() override { return nullptr; };
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return detection_extensions_;
+  };
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
@@ -444,6 +446,7 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
+  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
 };
 
 } // namespace Server

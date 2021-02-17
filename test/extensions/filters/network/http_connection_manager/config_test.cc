@@ -1747,8 +1747,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  original_ip_detection:
-    name: envoy.ip_detection.UnknownOriginalIPDetectionExtension
+  original_ip_detection_extensions:
+  - name: envoy.ip_detection.UnknownOriginalIPDetectionExtension
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   http_filters:
@@ -1785,8 +1785,8 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   stat_prefix: ingress_http
   route_config:
     name: local_route
-  original_ip_detection:
-    name: envoy.ip_detection.OriginalIPDetectionExtension
+  original_ip_detection_extensions:
+  - name: envoy.ip_detection.OriginalIPDetectionExtension
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
   http_filters:
@@ -1797,9 +1797,12 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  auto original_ip_detection =
-      dynamic_cast<Http::OriginalIPDetection*>(config.originalIpDetection().get());
-  ASSERT_NE(nullptr, original_ip_detection);
+
+  auto original_ip_detection_extensions = config.originalIpDetectionExtensions();
+  EXPECT_EQ(1, original_ip_detection_extensions.size());
+
+  auto* extension = dynamic_cast<TestIPDetection*>(original_ip_detection_extensions[0].get());
+  EXPECT_NE(nullptr, extension);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
