@@ -511,6 +511,7 @@ message Cluster {
     }
 
     // Configuration for slow start mode.
+    // <_config_slow_start>`
     message SlowStartConfig {
       google.protobuf.UInt32Value slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
 

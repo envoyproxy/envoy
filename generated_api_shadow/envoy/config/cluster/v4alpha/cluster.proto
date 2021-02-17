@@ -516,6 +516,7 @@ message Cluster {
     }
 
     // Configuration for slow start mode.
+    // <_config_slow_start>`
     message SlowStartConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
