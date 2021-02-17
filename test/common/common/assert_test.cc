@@ -81,4 +81,26 @@ TEST(EnvoyBugDeathTest, TestResetCounters) {
   }
 }
 
+TEST(SlowAssertTest, TestSlowAssert) {
+  int slow_assert_fail_count = 0;
+  auto debug_assert_action_registration =
+      Assert::setDebugAssertionFailureRecordAction([&]() { slow_assert_fail_count++; });
+#ifndef NDEBUG
+  EXPECT_DEATH({ SLOW_ASSERT(0); }, ".*assert failure: 0.*");
+  EXPECT_DEATH({ SLOW_ASSERT(0, ""); }, ".*assert failure: 0.*");
+  EXPECT_DEATH({ SLOW_ASSERT(0, "With some logs"); },
+               ".*assert failure: 0. Details: With some logs.*");
+#elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  // Non-implementation for slow debug asserts in release.
+  EXPECT_NO_LOGS(SLOW_ASSERT(0));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, ""));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, "With some logs"));
+#else
+  EXPECT_NO_LOGS(SLOW_ASSERT(0));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, ""));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, "With some logs"));
+#endif
+  EXPECT_EQ(0, slow_assert_fail_count);
+}
+
 } // namespace Envoy

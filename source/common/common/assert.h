@@ -156,9 +156,19 @@ void resetEnvoyBugCountersForTest();
 // _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
+
+// SLOW_ASSERTs should mimic ASSERTs in debug mode.
+#if !defined(NDEBUG) // debug build
+#define SLOW_ASSERT(...) ASSERT(__VA_ARGS__)
+#else // ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE is defined
+// SLOW_ASSERTs in release mode should resolve to a non-implementation.
+#define ASSERT _NULL_ASSERT_IMPL
+#endif
+
 #else
 #define ASSERT _NULL_ASSERT_IMPL
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
+#define SLOW_ASSERT _NULL_ASSERT_IMPL
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**
