@@ -64,8 +64,6 @@ TagNameValues::TagNameValues() {
          ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
-  // addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
-  //".collection.");
   addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**", "callsite");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
@@ -73,16 +71,12 @@ TagNameValues::TagNameValues() {
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
-  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
   addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*");
-  // addTokenized(MONGO_COLLECTION, "mongo.*.collection.$mongo_collection.**.query.*");
-  // addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.query.*");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
-  // addTokenized(MONGO_CMD, "mongo.*.cmd.$mongo_cmd.**");
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
-  // addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
   addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
