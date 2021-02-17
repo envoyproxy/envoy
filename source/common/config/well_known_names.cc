@@ -64,35 +64,35 @@ TagNameValues::TagNameValues() {
          ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
-  //addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
+  // addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
   //".collection.");
-  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**", ".callsite.");
+  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**", "callsite");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
-  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**", ".cmd.");
-  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*", ".collection.");
-  //addTokenized(MONGO_COLLECTION, "mongo.*.collection.$mongo_collection.**.query.*");
-  //addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.query.*");
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
+  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*");
+  // addTokenized(MONGO_COLLECTION, "mongo.*.collection.$mongo_collection.**.query.*");
+  // addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.query.*");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
-  //addTokenized(MONGO_CMD, "mongo.*.cmd.$mongo_cmd.**");
+  // addTokenized(MONGO_CMD, "mongo.*.cmd.$mongo_cmd.**");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
-  //addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
-  addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**", ".grpc.");
+  // addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
+  addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
-  addTokenized(HTTP_USER_AGENT, "http.*.user_agent.$.**", ".user_agent.");
+  addTokenized(HTTP_USER_AGENT, "http.*.user_agent.$.**");
 
   // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*
-  addTokenized(VIRTUAL_CLUSTER, "vhost.*.vcluster.$.**", ".vcluster.");
+  addTokenized(VIRTUAL_CLUSTER, "vhost.*.vcluster.$.**");
 
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
-  addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**", ".fault.");
+  addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
   addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
@@ -101,7 +101,7 @@ TagNameValues::TagNameValues() {
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<NAME>\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**", ".grpc.");
+  addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**");
 
   // tcp.(<stat_prefix>.)*
   addTokenized(TCP_PREFIX, "tcp.$.**");

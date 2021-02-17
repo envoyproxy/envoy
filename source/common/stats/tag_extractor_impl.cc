@@ -88,7 +88,8 @@ std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
   return tag.value_;
 }
 
-bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name,
+                                          std::vector<absl::string_view>&, std::vector<Tag>& tags,
                                           IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
@@ -130,7 +131,8 @@ TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_vi
                                          absl::string_view substr)
     : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
 
-bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<absl::string_view>&,
+                                     std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
@@ -173,13 +175,28 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 
 TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens,
                                                absl::string_view substr)
-    : TagExtractorImplBase(name, tokens, substr),
-      tokens_(absl::StrSplit(tokens, '.')), match_index_(findMatchIndex(tokens_)) {
+    : TagExtractorImplBase(name, tokens, substr), tokens_(absl::StrSplit(tokens, '.')),
+      match_index_(findMatchIndex(tokens_)) {
   prefix_ = tokens_[0];
+  substr_index_ = 0;
+
+  for (uint32_t i = 1; i < tokens_.size(); ++i) {
+    absl::string_view token = tokens_[i];
+    if (token == "**") {
+      // Can't infer a token index if we see a pattern that can have a variable number of dots.
+      break;
+    }
+    if (substr_.empty() && token != "*" && token != "$") {
+      substr_ = token;
+    }
+    if (substr_ == token) {
+      substr_index_ = i;
+      break;
+    }
+  }
 }
 
-uint32_t TagExtractorTokensImpl::findMatchIndex(
-    const std::vector<std::string>& tokens) {
+uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
   for (uint32_t i = 0; i < tokens.size(); ++i) {
     if (tokens[i] == "$") {
       return i;
@@ -188,17 +205,23 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(
   return 0;
 }
 
-bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name,
+                                        std::vector<absl::string_view>& tokens,
+                                        std::vector<Tag>& tags,
                                         IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
-  if (substrMismatch(stat_name)) {
+  if (tokens.empty()) {
+    tokens = absl::StrSplit(stat_name, '.');
+  }
+  if ((substr_index_ == 0 && substrMismatch(stat_name)) ||
+      (substr_index_ != 0 &&
+       (substr_index_ >= tokens.size() || tokens[substr_index_] != substr_))) {
     PERF_RECORD(perf, "tokens-skip", name_);
     PERF_TAG_INC(skipped_);
     return false;
   }
 
-  std::vector<absl::string_view> tokens = absl::StrSplit(stat_name, '.');
   uint32_t char_index = 0, start = 0, end = 0, input_index = 0, pattern_index = 0;
   absl::string_view tag_value;
   for (; input_index < tokens.size() && pattern_index < tokens_.size();

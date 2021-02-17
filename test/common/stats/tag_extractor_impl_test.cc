@@ -22,7 +22,8 @@ TEST(TagExtractorTest, TwoSubexpressions) {
   std::string name = "cluster.test_cluster.upstream_cx_total";
   TagVector tags;
   IntervalSetImpl<size_t> remove_characters;
-  ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
+  std::vector<absl::string_view> tokens;
+  ASSERT_TRUE(tag_extractor.extractTag(name, tokens, tags, remove_characters));
   std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
   EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
@@ -36,7 +37,8 @@ TEST(TagExtractorTest, RE2Variants) {
   std::string name = "cluster.test_cluster.upstream_cx_total";
   TagVector tags;
   IntervalSetImpl<size_t> remove_characters;
-  ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
+  std::vector<absl::string_view> tokens;
+  ASSERT_TRUE(tag_extractor.extractTag(name, tokens, tags, remove_characters));
   std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
   EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
@@ -49,7 +51,8 @@ TEST(TagExtractorTest, SingleSubexpression) {
   std::string name = "listener.80.downstream_cx_total";
   TagVector tags;
   IntervalSetImpl<size_t> remove_characters;
-  ASSERT_TRUE(tag_extractor.extractTag(name, tags, remove_characters));
+  std::vector<absl::string_view> tokens;
+  ASSERT_TRUE(tag_extractor.extractTag(name, tokens, tags, remove_characters));
   std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
   EXPECT_EQ("listener.downstream_cx_total", tag_extracted_name);
   ASSERT_EQ(1, tags.size());
@@ -83,8 +86,7 @@ TEST(TagExtractorTest, BadRegex) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester()
-      : tag_extractors_(envoy::config::metrics::v3::StatsConfig()) {}
+  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3::StatsConfig()) {}
 
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
                  const TagVector& expected_tags) {
@@ -141,8 +143,9 @@ public:
                                              });
 
     IntervalSetImpl<size_t> remove_characters;
+    std::vector<absl::string_view> tokens;
     for (const TagExtractor* tag_extractor : extractors) {
-      tag_extractor->extractTag(metric_name, tags, remove_characters);
+      tag_extractor->extractTag(metric_name, tokens, tags, remove_characters);
     }
     return StringUtil::removeCharacters(metric_name, remove_characters);
   }
@@ -406,7 +409,8 @@ protected:
     TagExtractorTokensImpl tokens(tag_name, pattern);
     IntervalSetImpl<size_t> remove_characters;
     tags_.clear();
-    bool ret = tokens.extractTag(stat_name, tags_, remove_characters);
+    std::vector<absl::string_view> token_vector;
+    bool ret = tokens.extractTag(stat_name, token_vector, tags_, remove_characters);
     if (ret) {
       tag_extracted_name_ = StringUtil::removeCharacters(stat_name, remove_characters);
     } else {

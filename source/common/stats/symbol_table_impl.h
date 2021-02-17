@@ -191,8 +191,7 @@ public:
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
   DynamicSpans getDynamicSpans(StatName stat_name) const override;
-  void decode(StatName stat_name,
-              const std::function<void(Symbol)>& symbol_token_fn,
+  void decode(StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
               const std::function<void(absl::string_view)>& string_view_token_fn) const override;
 
 private:

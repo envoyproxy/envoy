@@ -100,8 +100,8 @@ void BM_ExtractTags(benchmark::State& state) {
     UNREFERENCED_PARAMETER(_);
     TagVector tags;
     tag_extractors.produceTags(str, tags);
-    RELEASE_ASSERT(tags.size() == tags_size, absl::StrCat("tags.size()=", tags.size(),
-                                                          " tags_size==", tags_size));
+    RELEASE_ASSERT(tags.size() == tags_size,
+                   absl::StrCat("tags.size()=", tags.size(), " tags_size==", tags_size));
   }
 }
 BENCHMARK(BM_ExtractTags)->DenseRange(0, 26, 1);

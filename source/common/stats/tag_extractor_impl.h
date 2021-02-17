@@ -95,7 +95,7 @@ protected:
 
   const std::string name_;
   std::string prefix_;
-  const std::string substr_;
+  std::string substr_;
 
   PERF_TAG_COUNTERS;
 };
@@ -105,8 +105,8 @@ public:
   TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                            absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(absl::string_view tag_extracted_name, std::vector<absl::string_view>& tokens,
+                  std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
 
 private:
   const std::regex regex_;
@@ -117,8 +117,8 @@ public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                       absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(absl::string_view tag_extracted_name, std::vector<absl::string_view>& tokens,
+                  std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
 
 private:
   const re2::RE2 regex_;
@@ -129,14 +129,15 @@ public:
   TagExtractorTokensImpl(absl::string_view name, absl::string_view regex,
                          absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(absl::string_view tag_extracted_name, std::vector<absl::string_view>& tokens,
+                  std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
 
 private:
   static uint32_t findMatchIndex(const std::vector<std::string>& tokens);
 
   const std::vector<std::string> tokens_;
   const uint32_t match_index_;
+  uint32_t substr_index_;
 };
 
 } // namespace Stats

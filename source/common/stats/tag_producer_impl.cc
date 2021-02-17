@@ -54,8 +54,8 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   }
   for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
     if (desc.name_ == name) {
-      addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_,
-                                                            desc.substr_));
+      addExtractor(
+          std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_, desc.substr_));
       ++num_found;
     }
   }
@@ -93,10 +93,11 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
   // TODO(jmarantz): Skip the creation of string-based tags, creating a StatNameTagVector instead.
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;
-  forEachExtractorMatching(
-      metric_name, [&remove_characters, &tags, &metric_name](const TagExtractorPtr& tag_extractor) {
-        tag_extractor->extractTag(metric_name, tags, remove_characters);
-      });
+  std::vector<absl::string_view> tokens;
+  forEachExtractorMatching(metric_name, [&remove_characters, &tags, &metric_name,
+                                         &tokens](const TagExtractorPtr& tag_extractor) {
+    tag_extractor->extractTag(metric_name, tokens, tags, remove_characters);
+  });
   return StringUtil::removeCharacters(metric_name, remove_characters);
 }
 
@@ -115,8 +116,8 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsCon
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
       names.emplace(desc.name_);
-      addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_,
-                                                            desc.substr_));
+      addExtractor(
+          std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_, desc.substr_));
     }
   }
   return names;

@@ -25,7 +25,7 @@ namespace Stats {
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
-    : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>(alloc.symbolTable())),
+    : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
       heap_allocator_(alloc.symbolTable()), null_counter_(alloc.symbolTable()),
@@ -354,11 +354,6 @@ public:
                     const absl::optional<StatNameTagVector>& stat_name_tags)
       : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
     if (!stat_name_tags) {
-      if (tls.tagProducer().produceTagsFromStatName(name, stat_name_tags_, tag_extracted_name_,
-                                                    pool_)) {
-        return;
-      }
-
       TagVector tags;
       tag_extracted_name_ =
           pool_.add(tls.tagProducer().produceTags(tls.symbolTable().toString(name), tags));

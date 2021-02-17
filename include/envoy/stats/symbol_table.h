@@ -189,10 +189,9 @@ public:
    */
   virtual DynamicSpans getDynamicSpans(StatName stat_name) const PURE;
 
-  virtual void decode(StatName stat_name,
-                      const std::function<void(Symbol)>& symbol_token_fn,
-                      const std::function<void(absl::string_view)>& string_view_token_fn)
-      const PURE;
+  virtual void
+  decode(StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
+         const std::function<void(absl::string_view)>& string_view_token_fn) const PURE;
 
 private:
   friend struct HeapStatData;
