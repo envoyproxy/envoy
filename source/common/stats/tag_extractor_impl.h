@@ -133,14 +133,10 @@ public:
                   IntervalSet<size_t>& remove_characters) const override;
 
 private:
-  using TagNameIndexPair = std::pair<std::string, uint32_t>;
-  using Matches = std::vector<TagNameIndexPair>;
-
-  static Matches findMatches(const std::vector<std::string>& tokens);
-  static bool hasDoubleWild(const std::vector<std::string>& tokens);
+  static uint32_t findMatchIndex(const std::vector<std::string>& tokens);
 
   const std::vector<std::string> tokens_;
-  const Matches matches_;
+  const uint32_t match_index_;
 };
 
 } // namespace Stats

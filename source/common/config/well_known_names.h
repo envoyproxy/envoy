@@ -72,6 +72,7 @@ public:
   struct TokenizedDescriptor {
     const std::string name_;
     const std::string pattern_;
+    const std::string substr_;
   };
 
   // Cluster name tag
@@ -140,7 +141,8 @@ public:
 
 private:
   void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
-  void addTokenized(const std::string& name, const std::string& regex);
+  void addTokenized(const std::string& name, const std::string& regex,
+                    absl::string_view substr = "");
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;

@@ -64,19 +64,22 @@ TagNameValues::TagNameValues() {
          ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
-  addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
-         ".collection.");
+  //addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
+  //".collection.");
+  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**", ".callsite.");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
-  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$mongo_collection.**.query.*");
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**", ".cmd.");
+  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*", ".collection.");
+  //addTokenized(MONGO_COLLECTION, "mongo.*.collection.$mongo_collection.**.query.*");
   //addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.query.*");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
-  addTokenized(MONGO_CMD, "mongo.*.cmd.$mongo_cmd.**");
+  //addTokenized(MONGO_CMD, "mongo.*.cmd.$mongo_cmd.**");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
   addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
@@ -129,7 +132,7 @@ TagNameValues::TagNameValues() {
   addRe2(VIRTUAL_HOST, R"(^vhost\.((<NAME>)\.))");
 
   // mongo.(<stat_prefix>.)*
-  addTokenized(MONGO_PREFIX, "mongo.$mongo_prefix.**");
+  addTokenized(MONGO_PREFIX, "mongo.$.**");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
   // Note: <route_config_name> can contain dots thus we have to maintain full
@@ -145,8 +148,9 @@ void TagNameValues::addRe2(const std::string& name, const std::string& regex,
   descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
 }
 
-void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {
-  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens});
+void TagNameValues::addTokenized(const std::string& name, const std::string& tokens,
+                                 absl::string_view substr) {
+  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens, std::string(substr)});
 }
 
 } // namespace Config
