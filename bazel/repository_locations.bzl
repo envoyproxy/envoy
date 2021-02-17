@@ -504,6 +504,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
+    com_github_nlohmann_json = dict(
+        project_name = "nlohmann JSON",
+        project_desc = "Fast JSON parser/generator for C++",
+        project_url = "https://nlohmann.github.io/json",
+        version = "3.9.1",
+        sha256 = "4cf0df69731494668bdd6460ed8cb269b68de9c19ad8c27abc24cd72605b2d5b",
+        strip_prefix = "json-{version}",
+        urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
+        # This will be a replacement for rapidJSON used in extensions and may also be a fast
+        # replacement for protobuf JSON.
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2020-08-06",
+        cpe = "cpe:2.3:a:json_project:json:*",
+    ),
     com_github_twitter_common_lang = dict(
         project_name = "twitter.common.lang (Thrift)",
         project_desc = "twitter.common Python language and compatibility facilities",
@@ -907,8 +921,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "6dab125d7a668c7158848b6f48c67fd827c952e6",
-        sha256 = "b5c73ed053a7079bd8bf53b14c4811e87ae521d9fcf4769ec5b248202a27600d",
+        version = "c51fbca35e9e7968fc5319258ed7a38b1bc1ec7a",
+        sha256 = "533944a9084c2f75c36bda627152b9f31047ff3554b6361a88a542f16dee9483",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -923,7 +937,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2020-12-16",
+        release_date = "2021-02-11",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

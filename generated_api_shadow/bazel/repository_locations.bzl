@@ -96,4 +96,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-08-17",
         use_category = ["api"],
     ),
+    opentelemetry_proto = dict(
+        project_name = "OpenTelemetry Proto",
+        project_desc = "Language Independent Interface Types For OpenTelemetry",
+        project_url = "https://github.com/open-telemetry/opentelemetry-proto",
+        version = "0.7.0",
+        sha256 = "39cc1fb45039c7687354ca497aff8a55c71d0f1e484f6b81124ba9d821c36441",
+        strip_prefix = "opentelemetry-proto-{version}",
+        urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
+        release_date = "2020-12-09",
+        use_category = ["api"],
+    ),
 )

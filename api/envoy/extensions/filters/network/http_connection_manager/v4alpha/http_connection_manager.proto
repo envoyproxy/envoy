@@ -267,6 +267,7 @@ message HttpConnectionManager {
   // A list of individual HTTP filters that make up the filter chain for
   // requests made to the connection manager. :ref:`Order matters <arch_overview_http_filters_ordering>`
   // as the filters are processed sequentially as request events happen.
+  // [#extension-category: envoy.filters.http]
   repeated HttpFilter http_filters = 5;
 
   // Whether the connection manager manipulates the :ref:`config_http_conn_man_headers_user-agent`
@@ -821,7 +822,7 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter";
@@ -845,6 +846,12 @@ message HttpFilter {
     // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
     config.core.v4alpha.ExtensionConfigSource config_discovery = 5;
   }
+
+  // If true, clients that do not support this filter may ignore the
+  // filter but otherwise accept the config.
+  // Otherwise, clients that do not support this filter must reject the config.
+  // [#not-implemented-hide:]
+  bool is_optional = 6;
 }
 
 message RequestIDExtension {
