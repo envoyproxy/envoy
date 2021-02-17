@@ -24,8 +24,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/options.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 
 using testing::NiceMock;

@@ -299,9 +299,9 @@ envoy_cc_library(
     name = "resource_monitor_config_interface",
     hdrs = ["resource_monitor_config.h"],
     deps = [
-        ":resource_monitor_interface",
         ":options_interface",
-                "//include/envoy/api:api_interface",
+        ":resource_monitor_interface",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/protobuf:message_validator_interface",
     ],

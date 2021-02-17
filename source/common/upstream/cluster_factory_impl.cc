@@ -1,6 +1,7 @@
 #include "common/upstream/cluster_factory_impl.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/server/options.h"
 
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -8,7 +9,6 @@
 #include "common/network/socket_option_factory.h"
 #include "common/upstream/health_checker_impl.h"
 
-#include "envoy/server/options.h"
 #include "server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -31,7 +31,8 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
     Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
     const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
     Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
-    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, const Server::Options& options) {
+    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+    const Server::Options& options) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {

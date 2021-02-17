@@ -7,9 +7,9 @@
 
 #include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
+#include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-#include "test/mocks/server/options.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"

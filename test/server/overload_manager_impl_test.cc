@@ -16,8 +16,8 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/options.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"

@@ -36,7 +36,8 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                          Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, const Server::Options& options)
+                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                         const Server::Options& options)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(Grpc::VersionedMethods(
                           "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck",

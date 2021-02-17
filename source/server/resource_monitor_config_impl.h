@@ -11,7 +11,8 @@ public:
   ResourceMonitorFactoryContextImpl(Event::Dispatcher& dispatcher, const Server::Options& options,
                                     Api::Api& api,
                                     ProtobufMessage::ValidationVisitor& validation_visitor)
-      : dispatcher_(dispatcher), options_(options), api_(api), validation_visitor_(validation_visitor) {}
+      : dispatcher_(dispatcher), options_(options), api_(api),
+        validation_visitor_(validation_visitor) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
