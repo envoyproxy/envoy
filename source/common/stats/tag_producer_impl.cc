@@ -93,11 +93,13 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
   // TODO(jmarantz): Skip the creation of string-based tags, creating a StatNameTagVector instead.
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;
+  TagExtractionContext tag_extraction_context(metric_name);
   std::vector<absl::string_view> tokens;
-  forEachExtractorMatching(metric_name, [&remove_characters, &tags, &metric_name,
-                                         &tokens](const TagExtractorPtr& tag_extractor) {
-    tag_extractor->extractTag(metric_name, tokens, tags, remove_characters);
-  });
+  forEachExtractorMatching(
+      metric_name, [&remove_characters, &tags, &metric_name,
+                    &tag_extraction_context](const TagExtractorPtr& tag_extractor) {
+        tag_extractor->extractTag(metric_name, tag_extraction_context, tags, remove_characters);
+      });
   return StringUtil::removeCharacters(metric_name, remove_characters);
 }
 

@@ -18,6 +18,13 @@
 namespace Envoy {
 namespace Stats {
 
+const std::vector<absl::string_view>& TagExtractionContext::tokens() {
+  if (tokens_.empty()) {
+    tokens_ = absl::StrSplit(name_, '.');
+  }
+  return tokens_;
+}
+
 namespace {
 
 bool regexStartsWithDot(absl::string_view regex) {
@@ -88,8 +95,8 @@ std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
   return tag.value_;
 }
 
-bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name,
-                                          std::vector<absl::string_view>&, std::vector<Tag>& tags,
+bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, TagExtractionContext&,
+                                          std::vector<Tag>& tags,
                                           IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
@@ -131,7 +138,7 @@ TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_vi
                                          absl::string_view substr)
     : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
 
-bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<absl::string_view>&,
+bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, TagExtractionContext&,
                                      std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
@@ -205,15 +212,12 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& 
   return 0;
 }
 
-bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name,
-                                        std::vector<absl::string_view>& tokens,
+bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, TagExtractionContext& context,
                                         std::vector<Tag>& tags,
                                         IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
-  if (tokens.empty()) {
-    tokens = absl::StrSplit(stat_name, '.');
-  }
+  const std::vector<absl::string_view>& tokens = context.tokens();
   if ((substr_index_ == 0 && substrMismatch(stat_name)) ||
       (substr_index_ != 0 &&
        (substr_index_ >= tokens.size() || tokens[substr_index_] != substr_))) {

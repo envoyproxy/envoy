@@ -18,6 +18,18 @@
 namespace Envoy {
 namespace Stats {
 
+class TagExtractionContext {
+public:
+  explicit TagExtractionContext(absl::string_view name) : name_(name) {}
+
+  absl::string_view name() { return name_; }
+  const std::vector<absl::string_view>& tokens();
+
+private:
+  absl::string_view name_;
+  std::vector<absl::string_view> tokens_;
+};
+
 // To check if a tag extractor is actually used you can run
 // bazel test //test/... --test_output=streamed --define=perf_annotation=enabled
 #ifdef ENVOY_PERF_ANNOTATION
@@ -105,7 +117,7 @@ public:
   TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                            absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<absl::string_view>& tokens,
+  bool extractTag(absl::string_view tag_extracted_name, TagExtractionContext& context,
                   std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
 
 private:
@@ -117,7 +129,7 @@ public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                       absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<absl::string_view>& tokens,
+  bool extractTag(absl::string_view tag_extracted_name, TagExtractionContext& context,
                   std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
 
 private:
@@ -129,7 +141,7 @@ public:
   TagExtractorTokensImpl(absl::string_view name, absl::string_view regex,
                          absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<absl::string_view>& tokens,
+  bool extractTag(absl::string_view tag_extracted_name, TagExtractionContext& context,
                   std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
 
 private:
