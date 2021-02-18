@@ -1582,14 +1582,23 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   return cached_route_.value();
 }
 
-// Sets the cached route to the RouteConstSharedPtr argument passed in. Sets the cached cluster
-// info based on this route's routeEntry via getThreadLocalCluster.
-void ConnectionManagerImpl::ActiveStream::setRoute(const Router::RouteConstSharedPtr r) {
-  cached_route_ = r;
+// Sets the cached route to the RouteConstSharedPtr argument passed in. Also sets the cached cluster
+// info based on this route's routeEntry.
+void ConnectionManagerImpl::ActiveStream::setRoute(const Router::RouteConstSharedPtr route) {
+  filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
+  cached_route_ = std::move(route);
+  if (nullptr == filter_manager_.streamInfo().route_entry_) {
+    cached_cluster_info_ = nullptr;
+  } else {
+    Upstream::ThreadLocalCluster* local_cluster =
+        connection_manager_.cluster_manager_.getThreadLocalCluster(
+            filter_manager_.streamInfo().route_entry_->clusterName());
+    cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
+  }
 
-  Upstream::ThreadLocalCluster* local_cluster =
-      connection_manager_.cluster_manager_.getThreadLocalCluster(r->routeEntry()->clusterName());
-  cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
+  filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
+  refreshCachedTracingCustomTags();
+  refreshDurationTimeout();
 }
 
 void ConnectionManagerImpl::ActiveStream::clearRouteCache() {

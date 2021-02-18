@@ -214,9 +214,11 @@ public:
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
-   * Sets the cached route for the current request.
-   * TODO point to DelegatingRoute
-   * TODO point out wouldn't survive a clearRouteCache()
+   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
+   *
+   * NOTE: Similar to route(const Router::RouteCallback& cb), this route that is set will be
+   * overriden by clearRouteCache() in subssequent filters. Usage is intended for filters at the end
+   * of the filter chain.
    */
   virtual void setRoute(const Router::RouteConstSharedPtr route) PURE;
 

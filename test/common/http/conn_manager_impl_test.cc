@@ -719,6 +719,76 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_F(HttpConnectionManagerImplTest, FilterSetRoute) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  setupFilterChain(1, 0);
+  const std::string default_cluster_name = "default";
+  const std::string foo_cluster_name = "foo";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{default_cluster_name}))
+      .WillRepeatedly(Return(default_cluster.get()));
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{foo_cluster_name}))
+      .WillRepeatedly(Return(foo_cluster.get()));
+
+  std::shared_ptr<Router::MockRoute> default_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(default_route->route_entry_, clusterName())
+      .WillRepeatedly(ReturnRef(default_cluster_name));
+
+  std::shared_ptr<Router::MockRoute> foo_route = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(foo_route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(foo_cluster_name));
+
+  using ::testing::InSequence;
+  {
+    InSequence seq;
+    EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+        .WillOnce(Return(default_route));
+
+    // This filter calls setRoute from its StreamDecoderFilterCallbacks to manually mutate the
+    // cached route for the current request.
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+        .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+          EXPECT_EQ(default_route->routeEntry(),
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          decoder_filters_[0]->callbacks_->setRoute(foo_route);
+
+          EXPECT_EQ(foo_route, decoder_filters_[0]->callbacks_->route());
+          EXPECT_EQ(foo_route->routeEntry(),
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(foo_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          return FilterHeadersStatus::StopIteration;
+        }));
+
+    EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  }
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clean up.
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Filters observe host header w/o port's part when port's removal is configured
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   setup(false, "");
