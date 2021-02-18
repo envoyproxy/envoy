@@ -48,7 +48,6 @@ opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& 
 } // namespace
 
 // See comment about the structure of repeated fields in the header file.
-// TODO(itamarkam): allow user configurable attributes.
 void GrpcAccessLoggerImpl::initMessageRoot(const std::string& log_name,
                                            const LocalInfo::LocalInfo& local_info) {
   auto* resource_logs = message_.add_resource_logs();
