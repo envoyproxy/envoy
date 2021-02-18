@@ -52,13 +52,9 @@ public:
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
-  // When sending a gRPC trailers-only response, we do not need to set the grpc
-  // status and message because the passed `trailers` are in fact response headers that already
-  // contain that information. See
-  // https://grpc.github.io/grpc/core/md_doc__p_r_o_t_o_c_o_l-_h_t_t_p2.html
-  // for more on the trailers-only specification.
-  void doHeadersForTrailersOnlyResponse(const Http::ResponseHeaderOrTrailerMap& headers);
-  void doTrailers(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void doResponseTrailers(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void updateGrpcStatusAndMessage(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void updateHttpStatusAndContentLength(const Http::ResponseHeaderOrTrailerMap& trailers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

@@ -50,9 +50,10 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
 
   response_headers_ = &headers;
   if (end_stream) {
-    // We still need to check if would-be trailers are present as headers
-    // for a gRPC Trailers-Only response. Non-zero grpc-status will change the response code.
-    doHeadersForTrailersOnlyResponse(headers);
+    // We may still need to set an http status and content length based on gRPC trailers
+    // present in the response headers. This is known as a gRPC trailers-only response.
+    // If the grpc status is non-zero, this will change the response code.
+    updateHttpStatusAndContentLength(headers);
     return Http::FilterHeadersStatus::Continue;
   } else {
     return Http::FilterHeadersStatus::StopIteration;
@@ -78,9 +79,9 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   }
 
   if (do_bridging_) {
-    // We're bridging, so we need to process trailers and set the grpc status and message from
-    // the those input trailers.
-    doTrailers(trailers);
+    // We're bridging, so we need to process trailers and set the http status, content length,
+    // grpc status, and grpc message from those trailers.
+    doResponseTrailers(trailers);
   }
 
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
@@ -88,27 +89,8 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Http1BridgeFilter::doHeadersForTrailersOnlyResponse(
-    const Http::ResponseHeaderOrTrailerMap& headers) {
-  // Here we check for grpc-status. If it's not zero, we change the response code. We assume
-  // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
-  // of exception/error that the response was not complete.
-  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
-  if (grpc_status_header) {
-    uint64_t grpc_status_code;
-    if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
-        grpc_status_code != 0) {
-      response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
-    }
-  }
-
-  // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
-  // if this is a complete response.
-  response_headers_->setContentLength(
-      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
-}
-
-void Http1BridgeFilter::doTrailers(const Http::ResponseHeaderOrTrailerMap& trailers) {
+void Http1BridgeFilter::updateHttpStatusAndContentLength(
+    const Http::ResponseHeaderOrTrailerMap& trailers) {
   // Here we check for grpc-status. If it's not zero, we change the response code. We assume
   // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
   // of exception/error that the response was not complete.
@@ -119,6 +101,20 @@ void Http1BridgeFilter::doTrailers(const Http::ResponseHeaderOrTrailerMap& trail
         grpc_status_code != 0) {
       response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
     }
+  }
+
+  // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
+  // if this is a complete response.
+  response_headers_->setContentLength(
+      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+}
+
+// Set grpc response headers based on incoming trailers. Sometimes, the incoming
+// trailers are in fact upstream headers, in the case of a gRPC trailers-only response.
+void Http1BridgeFilter::updateGrpcStatusAndMessage(
+    const Http::ResponseHeaderOrTrailerMap& trailers) {
+  const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
+  if (grpc_status_header) {
     response_headers_->setGrpcStatus(grpc_status_header->value().getStringView());
   }
 
@@ -126,11 +122,17 @@ void Http1BridgeFilter::doTrailers(const Http::ResponseHeaderOrTrailerMap& trail
   if (grpc_message_header) {
     response_headers_->setGrpcMessage(grpc_message_header->value().getStringView());
   }
+}
 
-  // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
-  // if this is a complete response.
-  response_headers_->setContentLength(
-      encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+// Process response trailers. This involves setting an appropriate http status and content length,
+// as well as gRPC status and message headers.
+void Http1BridgeFilter::doResponseTrailers(const Http::ResponseHeaderOrTrailerMap& trailers) {
+  // First we need to set an HTTP status based on the gRPC status in `trailers`.
+  // We also set content length based on whether there exists an encoding buffer.
+  updateHttpStatusAndContentLength(trailers);
+
+  // Finally we set the grpc status and message headers based on `trailers`.
+  updateGrpcStatusAndMessage(trailers);
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
