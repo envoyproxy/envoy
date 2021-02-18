@@ -1033,7 +1033,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
 
     // Check contents for active stream, trailers to encode and header map.
     EXPECT_THAT(ostream.contents(), HasSubstr("  Number of active streams: 1 Active Streams:\n"
-                                              "  stream: \n"
+                                              "  *stream: \n"
                                               "    ConnectionImpl::StreamImpl"));
     EXPECT_THAT(ostream.contents(),
                 HasSubstr("pending_trailers_to_encode_:     null\n"
@@ -1056,7 +1056,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
 
     // Check contents for active stream, trailers to encode and header map.
     EXPECT_THAT(ostream.contents(), HasSubstr("  Number of active streams: 1 Active Streams:\n"
-                                              "  stream: \n"
+                                              "  *stream: \n"
                                               "    ConnectionImpl::StreamImpl"));
     EXPECT_THAT(ostream.contents(),
                 HasSubstr("pending_trailers_to_encode_:     null\n"
