@@ -64,6 +64,10 @@ def GetExtensionMetadata(target):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
+  if IsMissing(categories):
+    raise ExtensionDbError(
+        'Missing extension category for %s. Please make sure the target is an envoy_cc_extension and category is set'
+        % target)
   # evaluate tuples/lists
   # wrap strings in a list
   categories = (ast.literal_eval(categories) if
