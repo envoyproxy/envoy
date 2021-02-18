@@ -171,7 +171,7 @@ void resetEnvoyBugCountersForTest();
     abort();                                                                                       \
   } while (false)
 
-// We do not want to crash on failure in tests exercises ENVOY_BUGs while running coverage in debug
+// We do not want to crash on failure in tests exercising ENVOY_BUGs while running coverage in debug
 // mode. Crashing causes flakes when forking to expect a debug death and reduces lines of coverage.
 #if !defined(NDEBUG) && !defined(ENVOY_CONFIG_COVERAGE)
 #define ENVOY_BUG_ACTION abort()
