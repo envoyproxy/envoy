@@ -95,11 +95,11 @@ std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
   return tag.value_;
 }
 
-bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, TagExtractionContext&,
-                                          std::vector<Tag>& tags,
+bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                           IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
+  absl::string_view stat_name = context.name();
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re-skip", name_);
     PERF_TAG_INC(skipped_);
@@ -138,11 +138,11 @@ TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_vi
                                          absl::string_view substr)
     : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
 
-bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, TagExtractionContext&,
-                                     std::vector<Tag>& tags,
+bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
+  absl::string_view stat_name = context.name();
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re2-skip", name_);
     PERF_TAG_INC(skipped_);
@@ -212,13 +212,12 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& 
   return 0;
 }
 
-bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, TagExtractionContext& context,
-                                        std::vector<Tag>& tags,
+bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                         IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
   const std::vector<absl::string_view>& tokens = context.tokens();
-  if ((substr_index_ == 0 && substrMismatch(stat_name)) ||
+  if ((substr_index_ == 0 && substrMismatch(context.name())) ||
       (substr_index_ != 0 &&
        (substr_index_ >= tokens.size() || tokens[substr_index_] != substr_))) {
     PERF_RECORD(perf, "tokens-skip", name_);

@@ -18,6 +18,7 @@
 namespace Envoy {
 namespace Stats {
 
+// Carries state across tag extractions.
 class TagExtractionContext {
 public:
   explicit TagExtractionContext(absl::string_view name) : name_(name) {}
@@ -117,8 +118,8 @@ public:
   TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                            absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, TagExtractionContext& context,
-                  std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
 
 private:
   const std::regex regex_;
@@ -129,8 +130,8 @@ public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                       absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, TagExtractionContext& context,
-                  std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
 
 private:
   const re2::RE2 regex_;
@@ -141,8 +142,8 @@ public:
   TagExtractorTokensImpl(absl::string_view name, absl::string_view regex,
                          absl::string_view substr = "");
 
-  bool extractTag(absl::string_view tag_extracted_name, TagExtractionContext& context,
-                  std::vector<Tag>& tags, IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
 
 private:
   static uint32_t findMatchIndex(const std::vector<std::string>& tokens);

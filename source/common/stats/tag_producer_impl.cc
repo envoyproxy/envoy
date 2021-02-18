@@ -95,11 +95,10 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
   IntervalSetImpl<size_t> remove_characters;
   TagExtractionContext tag_extraction_context(metric_name);
   std::vector<absl::string_view> tokens;
-  forEachExtractorMatching(
-      metric_name, [&remove_characters, &tags, &metric_name,
-                    &tag_extraction_context](const TagExtractorPtr& tag_extractor) {
-        tag_extractor->extractTag(metric_name, tag_extraction_context, tags, remove_characters);
-      });
+  forEachExtractorMatching(metric_name, [&remove_characters, &tags, &tag_extraction_context](
+                                            const TagExtractorPtr& tag_extractor) {
+    tag_extractor->extractTag(tag_extraction_context, tags, remove_characters);
+  });
   return StringUtil::removeCharacters(metric_name, remove_characters);
 }
 
