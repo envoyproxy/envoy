@@ -108,8 +108,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
-  // Make sure old style nodelay is covered in at least one integration test.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
   upstream_tls_ = true;
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   config_helper_.configureUpstreamTls();

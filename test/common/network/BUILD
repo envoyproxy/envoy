@@ -86,7 +86,6 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
