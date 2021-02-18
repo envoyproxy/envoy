@@ -7,9 +7,9 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/http/date_provider_impl.h"
+// #include "common/buffer/buffer_impl.h"
+// #include "common/filter/http/filter_config_discovery_impl.h"
+// #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
 #include "common/network/address_impl.h"
 
@@ -22,10 +22,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/printers.h"
+// #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
-#include "test/test_common/utility.h"
+// #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -42,6 +42,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
+namespace {
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
   EXPECT_THROW(
@@ -1960,6 +1961,7 @@ TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   EXPECT_EQ(singletons_two.http_tracer_manager_, singletons_one.http_tracer_manager_);
 }
 
+} // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters
 } // namespace Extensions

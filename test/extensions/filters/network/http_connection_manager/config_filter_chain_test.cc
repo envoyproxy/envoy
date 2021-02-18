@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
+namespace {
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {
 public:
@@ -279,6 +280,7 @@ TEST_F(FilterChainTest, InvalidConfig) {
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
+} // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters
 } // namespace Extensions
