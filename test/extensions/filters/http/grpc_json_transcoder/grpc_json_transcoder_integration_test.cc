@@ -1190,6 +1190,36 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       /*expect_response_complete=*/false);
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
+  const int num_messages = 20;
+  config_helper_.setBufferLimits(2 << 20, 80);
+  HttpIntegrationTest::initialize();
+
+  // Craft multiple response messages. IF combined together, they exceed the buffer limit.
+  std::vector<std::string> grpc_response_messages;
+  for (int i = 0; i < num_messages; i++) {
+    grpc_response_messages.push_back(R"(id: 1 author: "Neal Stephenson" title: "Readme")");
+  }
+
+  // Craft expected response.
+  std::vector<std::string> expected_json_messages;
+  for (int i = 0; i < num_messages; i++) {
+    expected_json_messages.push_back(R"({"id":"1","author":"Neal Stephenson","title":"Readme"})");
+  }
+  std::string expected_json_response =
+      absl::StrCat("[", absl::StrJoin(expected_json_messages, ","), "]");
+
+  // Under limit: Even though multiple messages are sent from the upstream, they are transcoded
+  // while streaming. The buffer limit is never hit. At most two messages are ever in the internal
+  // buffers.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"}, grpc_response_messages, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      expected_json_response);
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
   overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
   HttpIntegrationTest::initialize();
