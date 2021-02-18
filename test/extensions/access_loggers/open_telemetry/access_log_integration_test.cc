@@ -124,6 +124,11 @@ public:
 
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+    // Clear start time which is not deterministic.
+    request_msg.mutable_resource_logs(0)
+        ->mutable_instrumentation_library_logs(0)
+        ->mutable_logs(0)
+        ->clear_time_unix_nano();
     fmt::print("iitamark actual:\n{}\n\n", request_msg.DebugString());
     fmt::print("iitamark expected:\n{}\n", expected_request_msg.DebugString());
 

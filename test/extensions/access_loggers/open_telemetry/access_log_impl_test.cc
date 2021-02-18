@@ -1,7 +1,10 @@
+#include <chrono>
 #include <memory>
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+
+#include "envoy/common/time.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
@@ -119,6 +122,7 @@ values:
 TEST_F(AccessLogTest, Marshalling) {
   InSequence s;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
   stream_info.last_downstream_rx_byte_received_ = 2ms;
   stream_info.protocol_ = Http::Protocol::Http10;
   stream_info.addBytesReceived(10);
@@ -130,6 +134,7 @@ TEST_F(AccessLogTest, Marshalling) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
   expectLog(R"EOF(
+      time_unix_nano: 3600000000000
       body:
         string_value: "x-request-header: test-request-header, protocol: HTTP/1.0"
       attributes:

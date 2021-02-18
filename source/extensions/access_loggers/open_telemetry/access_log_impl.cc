@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
@@ -13,42 +15,10 @@
 #include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
 
-// #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
-
-// #include "external/opentelemetry_proto/opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
-
-// const char BODY_CONFIG[] = R"EOF(
-// kvlist_value:
-//   values:
-//     - key: "downstream_service_id"
-//       value:
-//         string_value: "%REQ(x-envoy-downstream-service-cluster)%"
-//     - key: "upstream_service_id"
-//       value:
-//         string_value: "DYNAMIC_METADATA(com.google.trafficdirector:backend_service_name)"
-//     - key: "upstream_backend_service"
-//       value:
-//         string_value: "DYNAMIC_METADATA(com.google.trafficdirector:backend_service_name)"
-//     - key: "protocol"
-//       value:
-//         string_value: "%PROTOCOL%"
-//     - key: "status_code"
-//       value:
-//         string_value: "%RESPONSE_CODE%"
-//     - key: "duration"
-//       value:
-//         string_value: "%REQUEST_DURATION%"
-//     - key: "request_bytes"
-//       value:
-//         string_value: "%BYTES_RECEIVED%"
-//     - key: "response_bytes"
-//       value:
-//         string_value: "%BYTES_SENT%"
-// )EOF";
 
 namespace Envoy {
 namespace Extensions {
@@ -87,8 +57,10 @@ void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
                         const Http::ResponseTrailerMap& response_trailers,
                         const StreamInfo::StreamInfo& stream_info) {
-
   opentelemetry::proto::logs::v1::LogRecord log_entry;
+  log_entry.set_time_unix_nano(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   stream_info.startTime().time_since_epoch())
+                                   .count());
   const auto formatted_body = body_formatter_->format(
       request_headers, response_headers, response_trailers, stream_info, absl::string_view());
   MessageUtil::jsonConvert(formatted_body, ProtobufMessage::getNullValidationVisitor(),

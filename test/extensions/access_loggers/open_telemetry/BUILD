@@ -35,6 +35,7 @@ envoy_cc_test(
     srcs = ["access_log_impl_test.cc"],
     # extension_name = "envoy.access_loggers.open_telemetry",
     deps = [
+        "//include/envoy/common:time_interface",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
