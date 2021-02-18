@@ -4,13 +4,12 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
-
-#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 
 #include "common/formatter/substitution_formatter.h"
 #include "common/grpc/typed_async_client.h"

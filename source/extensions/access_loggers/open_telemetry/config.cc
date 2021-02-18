@@ -2,18 +2,17 @@
 
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.validate.h"
-
 #include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/server/access_log_config.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
+#include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {

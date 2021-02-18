@@ -1,8 +1,8 @@
+#include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
 
 namespace Envoy {
 namespace Extensions {
