@@ -1185,7 +1185,8 @@ void ConnectionImpl::sendSettings(
       {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
        {NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()},
        {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
-       {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
+       {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()},
+       {NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE, http2_options.max_header_list_size().value()}});
   if (!settings.empty()) {
     int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
     ASSERT(rc == 0);

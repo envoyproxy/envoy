@@ -339,6 +339,8 @@ TEST(HttpUtility, parseHttp2Settings) {
               http2_options.max_inbound_priority_frames_per_stream().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
               http2_options.max_inbound_window_update_frames_per_data_frame_sent().value());
+    EXPECT_EQ(OptionsLimits::DEFAULT_MAX_HEADER_LIST_SIZE,
+              http2_options.max_header_list_size().value());
   }
 
   {

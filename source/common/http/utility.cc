@@ -144,6 +144,7 @@ const uint32_t OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
 const uint32_t OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
+const uint32_t OptionsLimits::DEFAULT_MAX_HEADER_LIST_SIZE;
 
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
@@ -216,6 +217,10 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
   if (!options_clone.has_max_inbound_window_update_frames_per_data_frame_sent()) {
     options_clone.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(
         OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
+  }
+  if (!options_clone.has_max_header_list_size()) {
+    options_clone.mutable_max_header_list_size()->set_value(
+        OptionsLimits::DEFAULT_MAX_HEADER_LIST_SIZE);
   }
 
   return options_clone;
