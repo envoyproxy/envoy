@@ -1211,7 +1211,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
 
   // Under limit: Even though multiple messages are sent from the upstream, they are transcoded
   // while streaming. The buffer limit is never hit. At most two messages are ever in the internal
-  // buffers.
+  // buffers. Transcoding succeeds.
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -1219,6 +1219,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       expected_json_response);
 }
+
+// TODO(nareddyt): Refactor testTranscoding and add a test case for client streaming under/over
+// buffer limit. Will do in a separate PR to minimize diff.
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
   overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
