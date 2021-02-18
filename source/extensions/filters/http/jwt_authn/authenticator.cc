@@ -97,6 +97,7 @@ private:
   const bool is_allow_failed_;
   const bool is_allow_missing_;
   TimeSource& time_source_;
+  bool jwt_cache_hited_;
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -169,7 +170,8 @@ void AuthenticatorImpl::startVerify() {
   // isIssuerSpecified() check already make sure the issuer is in the cache.
   ASSERT(jwks_data_ != nullptr);
 
-  if (jwks_data_->getTokenCache()->lookupTokenCache(curr_token_->token())) {
+  jwks_data_->getTokenCache()->find(curr_token_->token(), jwt_cache_hited_);
+  if (jwt_cache_hited_) {
     ENVOY_LOG(debug, "{}: verified token with cache hit: tokens size {}", name(), tokens_.size());
     doneWithStatus(Status::Ok);
     return;
@@ -273,8 +275,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
-  if (status == Status::Ok &&
-      !jwks_data_->getTokenCache()->lookupTokenCache(curr_token_->token())) {
+  if (status == Status::Ok && !jwt_cache_hited_) {
     ENVOY_LOG(debug, "JWT token: {} added in cache", curr_token_->token());
     jwks_data_->getTokenCache()->insert(curr_token_->token(), jwt_.release(), 1);
   }

@@ -12,17 +12,18 @@ TokenCache::TokenCache(int cache_size)
 
 TokenCache::~TokenCache() { clear(); }
 
-bool TokenCache::lookupTokenCache(const std::string& token) {
+void TokenCache::find(const std::string& token, bool& cache_hit) {
+  ::google::jwt_verify::Jwt* jwt_cache;
+  cache_hit = false;
   TokenCache::ScopedLookup lookup(this, token);
   if (lookup.found()) {
-    ::google::jwt_verify::Jwt* jwt_cache = lookup.value();
+    jwt_cache = lookup.value();
     if (jwt_cache->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now())) == Status::JwtExpired) {
       this->remove(token);
-      return false;
+      return;
     }
-    return true;
+    cache_hit = true;
   }
-  return false;
 }
 } // namespace JwtAuthn
 } // namespace HttpFilters

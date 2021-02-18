@@ -18,15 +18,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-// The key of the cache is a JWT,
-// and the value is of type parsed JWT.
+// Cache key is the JWT string, value is parsed JWT struct.
 
-// The default number of entries in JWT cache is 100.
 class TokenCache : public SimpleLRUCache<std::string, ::google::jwt_verify::Jwt> {
 public:
   TokenCache(int cache_size);
   ~TokenCache();
-  bool lookupTokenCache(const std::string& token);
+  void find(const std::string& token, bool& cache_hit);
 };
 
 } // namespace JwtAuthn

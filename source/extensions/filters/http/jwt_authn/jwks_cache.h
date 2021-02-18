@@ -64,7 +64,7 @@ public:
     setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
 
     // Get Token Cache
-    virtual const std::unique_ptr<TokenCache>& getTokenCache() PURE;
+    virtual std::unique_ptr<TokenCache>& getTokenCache() PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.

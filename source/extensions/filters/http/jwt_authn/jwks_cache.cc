@@ -1,6 +1,7 @@
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
@@ -25,8 +26,7 @@ namespace {
 
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
-
-// Default token_cache_size is 100.
+// The default number of entries in JWT cache is 100.
 constexpr int kJwtCacheSize = 100;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
@@ -66,7 +66,7 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
-  const std::unique_ptr<TokenCache>& getTokenCache() override {
+  std::unique_ptr<TokenCache>& getTokenCache() override {
     if (token_cache_ == nullptr) {
       if (jwt_provider_.token_cache_size() > 0) {
         token_cache_ = std::make_unique<TokenCache>(jwt_provider_.token_cache_size());
