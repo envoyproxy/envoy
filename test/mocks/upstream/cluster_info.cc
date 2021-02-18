@@ -36,6 +36,13 @@ MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
 
 MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
+MockMaxConnectionDurationEnabledClusterInfo::MockMaxConnectionDurationEnabledClusterInfo() {
+  ON_CALL(*this, maxConnectionDuration()).WillByDefault(Return(std::chrono::milliseconds(1000)));
+}
+
+MockMaxConnectionDurationEnabledClusterInfo::~MockMaxConnectionDurationEnabledClusterInfo() =
+    default;
+
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),

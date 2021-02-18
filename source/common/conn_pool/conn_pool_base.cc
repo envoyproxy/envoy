@@ -521,15 +521,17 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
                            uint32_t concurrent_stream_limit)
     : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
-      connect_timer_(parent_.dispatcher().createTimer([this]() -> void { onConnectTimeout(); })),
-      lifetime_timer_(parent_.dispatcher().createTimer([this]() -> void { onLifetimeTimeout(); })) {
+      connect_timer_(parent_.dispatcher().createTimer([this]() -> void { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher().timeSource());
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher().timeSource());
   connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
-  lifetime_timer_->enableTimer(
-      std::chrono::milliseconds(3000)); // TODO(esmet): Do not hard code this
+  const auto max_connection_duration = parent_.host()->cluster().maxConnectionDuration();
+  if (max_connection_duration) {
+    lifetime_timer_ = parent_.dispatcher().createTimer([this]() -> void { onLifetimeTimeout(); });
+    lifetime_timer_->enableTimer(max_connection_duration.value());
+  }
   parent_.host()->stats().cx_total_.inc();
   parent_.host()->stats().cx_active_.inc();
   parent_.host()->cluster().stats().upstream_cx_total_.inc();
