@@ -462,6 +462,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   for (int32_t i = 0; i < filters.size(); i++) {
     processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
   }
+  std::cerr << "[AUNI] " << filter_factories_[0]->name() << "\n";
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();

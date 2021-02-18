@@ -59,3 +59,16 @@ envoy_cc_extension(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_extension(
+    name = "dependency_manager",
+    # srcs = ["dependency_manager.cc"],
+    hdrs = ["dependency_manager.h"],
+    category = "envoy.filters.network",
+    security_posture = "robust_to_untrusted_downstream",
+    # This is core Envoy config.
+    visibility = ["//visibility:public"],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
+    ],
+)

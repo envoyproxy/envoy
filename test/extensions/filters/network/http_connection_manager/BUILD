@@ -43,3 +43,24 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_filter_chain_test",
+    srcs = ["config_filter_chain_test.cc"],
+    extension_name = "envoy.filters.network.http_connection_manager",
+    deps = [
+        ":config_cc_proto",
+        ":config_test_base",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "dependency_manager_test",
+    srcs = ["dependency_manager_test.cc"],
+    extension_name = "envoy.filters.network.http_connection_manager",
+    deps = [
+        "//source/extensions/filters/network/http_connection_manager:dependency_manager",
+    ],
+)
