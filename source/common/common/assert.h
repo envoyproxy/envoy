@@ -171,7 +171,9 @@ void resetEnvoyBugCountersForTest();
     abort();                                                                                       \
   } while (false)
 
-#if !defined(NDEBUG)
+// We do not want to crash on failure in tests exercising ENVOY_BUGs while running coverage in debug
+// mode. Crashing causes flakes when forking to expect a debug death and reduces lines of coverage.
+#if !defined(NDEBUG) && !defined(ENVOY_CONFIG_COVERAGE)
 #define ENVOY_BUG_ACTION abort()
 #else
 #define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly()
@@ -209,6 +211,8 @@ void resetEnvoyBugCountersForTest();
  * mode, it is logged and a stat is incremented with exponential back-off per ENVOY_BUG. In debug
  * mode, it will crash if the condition is not met. ENVOY_BUG must be called with two arguments for
  * verbose logging.
+ * Note: ENVOY_BUGs in coverage mode will never crash. They will log and increment a stat like in
+ * release mode. This prevents flakiness and increases code coverage.
  */
 #define ENVOY_BUG(...) PASS_ON(PASS_ON(_ENVOY_BUG_VERBOSE)(__VA_ARGS__))
 

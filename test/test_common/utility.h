@@ -82,11 +82,11 @@ namespace Envoy {
                              ::testing::Not(::testing::ContainsRegex(regex_str)))
 
 // Expect that the statement hits an ENVOY_BUG containing the specified message.
-#ifdef NDEBUG
-// ENVOY_BUGs in release mode log error.
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+// ENVOY_BUGs in release mode or in a coverage test log error.
 #define EXPECT_ENVOY_BUG(statement, message) EXPECT_LOG_CONTAINS("error", message, statement)
 #else
-// ENVOY_BUGs in debug mode is fatal.
+// ENVOY_BUGs in (non-coverage) debug mode is fatal.
 #define EXPECT_ENVOY_BUG(statement, message)                                                       \
   EXPECT_DEBUG_DEATH(statement, ::testing::HasSubstr(message))
 #endif
