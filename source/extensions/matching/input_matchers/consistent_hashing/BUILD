@@ -22,7 +22,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.matching.input_matcher",
+    category = "envoy.matching.input_matchers",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":consistent_hashing_lib",
