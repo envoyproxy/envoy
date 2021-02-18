@@ -180,6 +180,7 @@ message Bootstrap {
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
+  // [#extension-category: envoy.guarddog_actions]
   Watchdogs watchdogs = 27;
 
   // Configuration for the runtime configuration provider. If not
@@ -232,6 +233,7 @@ message Bootstrap {
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
+  // [#extension-category: envoy.bootstrap]
   repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
 
   // Specifies optional extensions instantiated at startup time and
