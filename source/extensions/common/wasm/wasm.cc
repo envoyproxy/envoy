@@ -282,10 +282,12 @@ getCloneFactory(WasmExtension* wasm_extension, Event::Dispatcher& dispatcher,
 
 static proxy_wasm::PluginHandleFactory getPluginFactory(WasmExtension* wasm_extension) {
   auto wasm_plugin_factory = wasm_extension->pluginFactory();
-  return [wasm_plugin_factory](WasmHandleBaseSharedPtr base_wasm,
-                               absl::string_view plugin_key) -> std::shared_ptr<PluginHandleBase> {
-    return wasm_plugin_factory(std::static_pointer_cast<WasmHandle>(base_wasm), plugin_key);
-  };
+  return
+      [wasm_plugin_factory](WasmHandleBaseSharedPtr base_wasm,
+                            PluginBaseSharedPtr base_plugin) -> std::shared_ptr<PluginHandleBase> {
+        return wasm_plugin_factory(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                   std::static_pointer_cast<Plugin>(base_plugin));
+      };
 }
 
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
