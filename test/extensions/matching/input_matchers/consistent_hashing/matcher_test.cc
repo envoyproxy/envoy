@@ -29,7 +29,8 @@ TEST(MatcherTest, BasicUsage) {
     EXPECT_TRUE(matcher2.match("hello"));
   }
 
-  Matcher matcher(59, 100);
+  Matcher matcher1(59, 100);
+  Matcher matcher2(59, 100);
 
   // Changing the threshold to 59 means that we no longer match.
   EXPECT_FALSE(matcher1.match("hello"));
