@@ -40,7 +40,6 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 using testing::StartsWith;
 
 namespace Envoy {
