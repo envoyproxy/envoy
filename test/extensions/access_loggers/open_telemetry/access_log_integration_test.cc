@@ -129,8 +129,6 @@ public:
         ->mutable_instrumentation_library_logs(0)
         ->mutable_logs(0)
         ->clear_time_unix_nano();
-    fmt::print("iitamark actual:\n{}\n\n", request_msg.DebugString());
-    fmt::print("iitamark expected:\n{}\n", expected_request_msg.DebugString());
 
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);

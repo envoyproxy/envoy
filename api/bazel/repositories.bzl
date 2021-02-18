@@ -128,11 +128,11 @@ cc_proto_library(
     visibility = ["//visibility:public"],
 )
 
-api_cc_py_proto_library(
-    name = "common",
-    srcs = [
-        "opentelemetry/proto/common/v1/common.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
+# api_cc_py_proto_library(
+#     name = "common",
+#     srcs = [
+#         "opentelemetry/proto/common/v1/common.proto",
+#     ],
+#     visibility = ["//visibility:public"],
+# )
 """
