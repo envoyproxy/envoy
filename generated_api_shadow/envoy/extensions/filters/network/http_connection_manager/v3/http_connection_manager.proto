@@ -275,7 +275,9 @@ message HttpConnectionManager {
     // normalization. Note that Envoy does not perform `case normalization
     // <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
     message NormalizePath {
-      // Policy to apply to RFC 3986 path normalization. Defaults to FORWARD.
+      // Policy to apply to RFC 3986 path normalization. Defaults to FORWARD. If
+      // unspecified, uses the wholesale policy
+      // :ref:`all_policy<envoy_api_field_config.extensions.filters.network.http_connection_manager.PathNormalizationOptions.all_policy`.
       NormalizationPolicy policy = 1;
 
       // RFC 3986 path normalization. Defaults to `true`.
@@ -289,7 +291,9 @@ message HttpConnectionManager {
     // part of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is
     // provided for convenience.
     message MergeSlashes {
-      // Policy to apply merging slashes. Defaults to FORWARD.
+      // Policy to apply merging slashes. Defaults to FORWARD. If unspecified,
+      // uses the wholesale policy
+      // :ref:`all_policy<envoy_api_field_config.extensions.filters.network.http_connection_manager.PathNormalizationOptions.all_policy`.
       NormalizationPolicy policy = 1;
 
       // Option to specify merging slashes. Defaults to `false`.
@@ -303,7 +307,7 @@ message HttpConnectionManager {
     // Defaults to FORWARD.
     NormalizationPolicy all_policy = 1;
 
-    // Message to configure RFC 3986 path normalization. Be fault, this is
+    // Message to configure RFC 3986 path normalization. Be default, this is
     // enabled. When not specified, this value may be overridden by the runtime
     // variable
     // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
