@@ -47,6 +47,7 @@ Minor Behavior Changes
   are very frequent. This change can be disabled by setting the `envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`
   feature flag to false. If setting this flag to false is required in a deployment please open an
   issue against the project.
+* hds: support custom health check port via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 
 Bug Fixes
 ---------
