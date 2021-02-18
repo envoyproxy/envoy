@@ -80,6 +80,26 @@ protected:
 
   bool doSendClose() { return !server_closed_stream_; }
 
+  void setUpDecodingBuffering(Buffer::Instance& buf) {
+    EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
+    EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+        .WillRepeatedly(
+            Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
+    EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+        .WillOnce(
+            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+  }
+
+  void setUpEncodingBuffering(Buffer::Instance& buf) {
+    EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buf));
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+        .WillRepeatedly(
+            Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
+    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
+        .WillOnce(
+            Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
+  }
+
   // Expect a request_headers request, and send back a valid response.
   void processRequestHeaders(
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
@@ -461,9 +481,11 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
 
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
+  Buffer::OwnedImpl buffered_data;
+  setUpDecodingBuffering(buffered_data);
 
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  // Testing the case where we just have one chunk of data and it is buffered.
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data, true));
   processRequestBody(
       [&req_data](const HttpBody& req_body, ProcessingResponse&, BodyResponse& body_resp) {
         EXPECT_TRUE(req_body.end_of_stream());
@@ -473,7 +495,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
         body_mut->set_body("Replaced!");
       });
   // Expect that the original buffer is replaced.
-  EXPECT_EQ("Replaced!", req_data.toString());
+  EXPECT_EQ("Replaced!", buffered_data.toString());
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
@@ -524,8 +546,10 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
 
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  Buffer::OwnedImpl buffered_request_data;
+  setUpDecodingBuffering(buffered_request_data);
+
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data, true));
 
   processRequestBody(
       [&req_data](const HttpBody& req_body, ProcessingResponse&, BodyResponse& body_resp) {
@@ -534,7 +558,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
         auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
         body_mut->set_clear_body(true);
       });
-  EXPECT_EQ(0, req_data.length());
+  EXPECT_EQ(0, buffered_request_data.length());
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
@@ -547,8 +571,9 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
 
   Buffer::OwnedImpl resp_data;
   TestUtility::feedBufferWithRandomCharacters(resp_data, 100);
-  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillOnce(Return(nullptr));
-  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_data, true));
 
   processResponseBody(
       [&resp_data](const HttpBody& req_body, ProcessingResponse&, BodyResponse& body_resp) {
@@ -557,7 +582,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
         auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body("Hello, World!");
       });
-  EXPECT_EQ("Hello, World!", resp_data.toString());
+  EXPECT_EQ("Hello, World!", buffered_response_data.toString());
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
@@ -596,14 +621,11 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   Buffer::OwnedImpl req_data;
   TestUtility::feedBufferWithRandomCharacters(req_data, 100);
   Buffer::OwnedImpl buffered_req_data;
-  buffered_req_data.add(req_data);
   Buffer::OwnedImpl empty_data;
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buffered_req_data));
-  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .WillOnce(Invoke([&buffered_req_data](std::function<void(Buffer::Instance&)> f) {
-        f(buffered_req_data);
-      }));
+  setUpDecodingBuffering(buffered_req_data);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data, false));
+  // At this point, Envoy adds data to the buffer
+  buffered_req_data.add(req_data);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(empty_data, true));
 
   processRequestBody(
@@ -631,19 +653,15 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   Buffer::OwnedImpl resp_data_3;
   TestUtility::feedBufferWithRandomCharacters(resp_data_3, 100);
   Buffer::OwnedImpl buffered_resp_data;
-  buffered_resp_data.add(resp_data_1);
-  buffered_resp_data.add(resp_data_2);
-  buffered_resp_data.add(resp_data_3);
-
-  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buffered_resp_data));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-      .WillOnce(Invoke([&buffered_resp_data](std::function<void(Buffer::Instance&)> f) {
-        f(buffered_resp_data);
-      }));
+  setUpEncodingBuffering(buffered_resp_data);
 
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_data_1, false));
+  // Emulate what Envoy does with this data
+  buffered_resp_data.add(resp_data_1);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_data_2, false));
+  buffered_resp_data.add(resp_data_2);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_data_3, true));
+  // After this call, the callback should have been used to add the third chunk to the buffer
 
   processResponseBody([&buffered_resp_data](const HttpBody& req_body, ProcessingResponse&,
                                             BodyResponse& body_resp) {

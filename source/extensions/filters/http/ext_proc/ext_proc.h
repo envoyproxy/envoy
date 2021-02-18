@@ -86,9 +86,6 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
     // The filter is waiting for a "request_body" or "response_body" message.
     // The body to modify is the filter's buffered body.
     BufferedBody,
-    // The filter is waiting for a "request_body" or "response_body" message.
-    // The body to modify is pointed to by this filter.
-    ChunkedBody,
   };
 
 public:
@@ -152,14 +149,10 @@ private:
   // failed.
   bool processing_complete_ = false;
 
-  // The headers that we'll be expected to modify.
+  // The headers that we'll be expected to modify. They are set when
+  // received and reset to nullptr when they are no longer valid.
   Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::ResponseHeaderMap* response_headers_ = nullptr;
-
-  // If we're modifying only one chunk of the body, then
-  // save a pointer here.
-  Buffer::Instance* request_body_chunk_ = nullptr;
-  Buffer::Instance* response_body_chunk_ = nullptr;
 
   // The processing mode. May be locally overridden by any response,
   // So every instance of the filter has a copy.

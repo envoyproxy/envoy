@@ -43,8 +43,8 @@ void Filter::onDestroy() {
   }
 }
 
-FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of_stream) {
-  ENVOY_LOG(trace, "decodeHeaders: end_of_stream = {}", end_of_stream);
+FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
+  ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
 
   if (processing_mode_.request_header_mode() == ProcessingMode::SKIP) {
@@ -53,13 +53,12 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of
   }
 
   // We're at the start, so start the stream and send a headers message
-  ENVOY_BUG(!request_headers_, "Request headers should not have been set yet");
   openStream();
   request_headers_ = &headers;
   ProcessingRequest req;
   auto* headers_req = req.mutable_request_headers();
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_of_stream);
+  headers_req->set_end_of_stream(end_stream);
   request_state_ = FilterState::Headers;
   ENVOY_LOG(debug, "Sending request_headers message");
   stream_->send(std::move(req), false);
@@ -71,7 +70,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of
 }
 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(trace, "decodeData({}): end_of_stream = {}", data.length(), end_stream);
+  ENVOY_LOG(trace, "decodeData({}): end_stream = {}", data.length(), end_stream);
   if (processing_complete_) {
     ENVOY_LOG(trace, "decodeData: Continue (complete)");
     return FilterDataStatus::Continue;
@@ -81,22 +80,14 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
       ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
-      if (decoder_callbacks_->decodingBuffer() == nullptr) {
-        // The whole body will be delivered in one chunk
-        request_state_ = FilterState::ChunkedBody;
-        request_body_chunk_ = &data;
-        sendBodyChunk(true, data, true);
-        return FilterDataStatus::StopIterationNoBuffer;
-      } else {
-        // The body has been buffered and we need to send the buffer
-        request_state_ = FilterState::BufferedBody;
-        sendBodyChunk(true, *decoder_callbacks_->decodingBuffer(), true);
-        return FilterDataStatus::StopIterationAndBuffer;
-      }
+      decoder_callbacks_->addDecodedData(data, false);
+      // The body has been buffered and we need to send the buffer
+      request_state_ = FilterState::BufferedBody;
+      sendBodyChunk(true, *decoder_callbacks_->decodingBuffer(), true);
     } else {
       ENVOY_LOG(trace, "decodeData: Buffering");
-      return FilterDataStatus::StopIterationAndBuffer;
     }
+    return FilterDataStatus::StopIterationAndBuffer;
   case ProcessingMode::BUFFERED_PARTIAL:
   case ProcessingMode::STREAMED:
     ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
@@ -108,8 +99,8 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_of_stream) {
-  ENVOY_LOG(trace, "encodeHeaders end_of_stream = {}", end_of_stream);
+FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
+  ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
   ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on  response path");
 
   if (processing_complete_ || processing_mode_.response_header_mode() == ProcessingMode::SKIP) {
@@ -123,7 +114,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_o
   ProcessingRequest req;
   auto* headers_req = req.mutable_response_headers();
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
-  headers_req->set_end_of_stream(end_of_stream);
+  headers_req->set_end_of_stream(end_stream);
   response_state_ = FilterState::Headers;
   ENVOY_LOG(debug, "Sending response_headers message");
   stream_->send(std::move(req), false);
@@ -133,7 +124,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_o
 }
 
 FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(trace, "encodeData({}): end_of_stream = {}", data.length(), end_stream);
+  ENVOY_LOG(trace, "encodeData({}): end_stream = {}", data.length(), end_stream);
   if (processing_complete_) {
     ENVOY_LOG(trace, "encodeData: Continue (complete)");
     return FilterDataStatus::Continue;
@@ -143,22 +134,13 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
       ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on response path");
-      if (encoder_callbacks_->encodingBuffer() == nullptr) {
-        // Whole body in one chunk
-        response_state_ = FilterState::ChunkedBody;
-        response_body_chunk_ = &data;
-        sendBodyChunk(false, data, true);
-        return FilterDataStatus::StopIterationNoBuffer;
-      } else {
-        // Multiple chunks that were buffered
-        response_state_ = FilterState::BufferedBody;
-        sendBodyChunk(false, *encoder_callbacks_->encodingBuffer(), true);
-        return FilterDataStatus::StopIterationAndBuffer;
-      }
+      encoder_callbacks_->addEncodedData(data, false);
+      response_state_ = FilterState::BufferedBody;
+      sendBodyChunk(false, *encoder_callbacks_->encodingBuffer(), true);
     } else {
       ENVOY_LOG(trace, "encodeData: Buffering");
-      return FilterDataStatus::StopIterationAndBuffer;
     }
+    return FilterDataStatus::StopIterationAndBuffer;
   case ProcessingMode::BUFFERED_PARTIAL:
   case ProcessingMode::STREAMED:
     ENVOY_LOG(debug, "Ignoring unimplemented response body processing mode");
@@ -224,8 +206,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
   } else {
     stats_.spurious_msgs_received_.inc();
-    // Ignore messages received out of order. However, ignore the stream
-    // protect ourselves since the server is not following the protocol.
+    // When a message is received out of order, ignore it and also
+    // ignore the stream for the rest of this filter instance's lifetime
+    // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
               response->response_case());
     cleanupState();
@@ -237,6 +220,7 @@ bool Filter::handleRequestHeadersResponse(const HeadersResponse& response) {
   if (request_state_ == FilterState::Headers) {
     ENVOY_LOG(debug, "applying request_headers response");
     MutationUtils::applyCommonHeaderResponse(response, *request_headers_);
+    request_headers_ = nullptr;
     request_state_ = FilterState::Idle;
     decoder_callbacks_->continueDecoding();
     return true;
@@ -248,6 +232,7 @@ bool Filter::handleResponseHeadersResponse(const HeadersResponse& response) {
   if (response_state_ == FilterState::Headers) {
     ENVOY_LOG(debug, "applying response_headers response");
     MutationUtils::applyCommonHeaderResponse(response, *response_headers_);
+    response_headers_ = nullptr;
     response_state_ = FilterState::Idle;
     encoder_callbacks_->continueEncoding();
     return true;
@@ -256,45 +241,31 @@ bool Filter::handleResponseHeadersResponse(const HeadersResponse& response) {
 }
 
 bool Filter::handleRequestBodyResponse(const BodyResponse& response) {
-  switch (request_state_) {
-  case FilterState::BufferedBody:
+  if (request_state_ == FilterState::BufferedBody) {
     ENVOY_LOG(debug, "Applying request_body response to buffered data");
     decoder_callbacks_->modifyDecodingBuffer([&response](Buffer::Instance& data) {
       MutationUtils::applyCommonBodyResponse(response, data);
     });
-    break;
-  case FilterState::ChunkedBody:
-    ENVOY_LOG(debug, "Applying request_body response to body chunk");
-    MutationUtils::applyCommonBodyResponse(response, *request_body_chunk_);
-    break;
-  default:
-    return false;
+    request_state_ = FilterState::Idle;
+    decoder_callbacks_->continueDecoding();
+    return true;
   }
-
-  request_state_ = FilterState::Idle;
-  decoder_callbacks_->continueDecoding();
-  return true;
+  return false;
 }
 
 bool Filter::handleResponseBodyResponse(const BodyResponse& response) {
-  switch (response_state_) {
-  case FilterState::BufferedBody:
+  if (response_state_ == FilterState::BufferedBody) {
     ENVOY_LOG(debug, "Applying response_body response to buffered data");
+    ENVOY_LOG(trace, "Buffered data is now {} bytes",
+              encoder_callbacks_->encodingBuffer()->length());
     encoder_callbacks_->modifyEncodingBuffer([&response](Buffer::Instance& data) {
       MutationUtils::applyCommonBodyResponse(response, data);
     });
-    break;
-  case FilterState::ChunkedBody:
-    ENVOY_LOG(debug, "Applying response_body response to body chunk");
-    MutationUtils::applyCommonBodyResponse(response, *response_body_chunk_);
-    break;
-  default:
-    return false;
+    response_state_ = FilterState::Idle;
+    encoder_callbacks_->continueEncoding();
+    return true;
   }
-
-  response_state_ = FilterState::Idle;
-  encoder_callbacks_->continueEncoding();
-  return true;
+  return false;
 }
 
 void Filter::handleImmediateResponse(const ImmediateResponse& response) {

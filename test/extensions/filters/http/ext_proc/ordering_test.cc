@@ -100,18 +100,6 @@ protected:
               filter_->encodeHeaders(response_headers_, false));
   }
 
-  void sendRequestBody(FilterDataStatus expected_status, bool end_stream) {
-    Buffer::OwnedImpl data;
-    data.add("Dummy data");
-    EXPECT_EQ(expected_status, filter_->decodeData(data, end_stream));
-  }
-
-  void sendResponseBody(FilterDataStatus expected_status, bool end_stream) {
-    Buffer::OwnedImpl data;
-    data.add("Dummy data");
-    EXPECT_EQ(expected_status, filter_->encodeData(data, end_stream));
-  }
-
   void sendRequestTrailers() {
     EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
   }
@@ -167,12 +155,18 @@ protected:
 
   void expectBufferedRequest(Buffer::Instance& buf) {
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
+    EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+        .WillRepeatedly(
+            Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
     EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
         .WillOnce(Invoke([&buf](std::function<void(Buffer::Instance&)> f) { f(buf); }));
   }
 
   void expectBufferedResponse(Buffer::Instance& buf) {
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buf));
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+        .WillRepeatedly(
+            Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
     EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
         .WillOnce(Invoke([&buf](std::function<void(Buffer::Instance&)> f) { f(buf); }));
   }
@@ -207,13 +201,14 @@ TEST_F(OrderingTest, DefaultOrderingGet) {
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   sendResponseHeadersReply();
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl req_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(req_body, true));
   sendResponseTrailers();
 }
 
 // A normal call with all supported callbacks turned on
 TEST_F(OrderingTest, DefaultOrderingAllCallbacks) {
-  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
+  // Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_body_mode(ProcessingMode::BUFFERED);
@@ -230,26 +225,27 @@ TEST_F(OrderingTest, DefaultOrderingAllCallbacks) {
   Buffer::OwnedImpl req_body_2;
   req_body_2.add("Dummy data 2");
   Buffer::OwnedImpl req_buffer;
-  req_buffer.add(req_body_1);
-  req_buffer.add(req_body_2);
+  expectBufferedRequest(req_buffer);
 
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body_1, false));
+  req_buffer.add(req_body_1);
 
-  expectBufferedRequest(req_buffer);
   EXPECT_CALL(stream_delegate_, send(_, false));
-  sendRequestBody(FilterDataStatus::StopIterationAndBuffer, true);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body_2, true));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   sendRequestBodyReply();
-
   sendRequestTrailers();
+
+  Buffer::OwnedImpl resp_body_1("Dummy response");
+  Buffer::OwnedImpl resp_buffer;
+  expectBufferedResponse(resp_buffer);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   sendResponseHeadersReply();
   EXPECT_CALL(stream_delegate_, send(_, false));
-  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillOnce(Return(nullptr));
-  sendResponseBody(FilterDataStatus::StopIterationNoBuffer, true);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, true));
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   sendResponseBodyReply();
   sendResponseTrailers();
@@ -336,7 +332,8 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   sendImmediateResponse500();
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -358,7 +355,8 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
 
   // Expect us to go on from here normally but send no more stream messages
   sendResponseHeaders(false);
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -376,7 +374,8 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
 
   // Expect us to go on from here normally but send no more stream messages
   sendResponseHeaders(false);
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -390,20 +389,27 @@ TEST_F(OrderingTest, IncorrectRequestBodyReply) {
     pm->set_response_body_mode(ProcessingMode::BUFFERED);
   });
 
+  Buffer::OwnedImpl req_body_1("Hello!");
+  Buffer::OwnedImpl req_buffer;
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&req_buffer));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+      .WillRepeatedly(Invoke(
+          [&req_buffer](Buffer::Instance& new_chunk, Unused) { req_buffer.add(new_chunk); }));
+
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersPost(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   sendRequestHeadersReply();
   EXPECT_CALL(stream_delegate_, send(_, false));
-  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
-  sendRequestBody(FilterDataStatus::StopIterationNoBuffer, true);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body_1, true));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   sendResponseBodyReply(); // Wrong message here
   sendRequestTrailers();
 
   // Expect us to go on from here normally but send no more stream messages
   sendResponseHeaders(false);
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -423,7 +429,8 @@ TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   sendRequestHeadersReply();
   // Still should ignore the message and go on but send no more stream messages
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -443,7 +450,8 @@ TEST_F(OrderingTest, ExtraReply) {
   // After this we are ignoring the processor
   sendRequestTrailers();
   sendResponseHeaders(false);
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -486,7 +494,8 @@ TEST_F(OrderingTest, GrpcErrorInlineIgnored) {
   // After that we ignore the processor
   sendRequestTrailers();
   sendResponseHeaders(false);
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
@@ -517,7 +526,8 @@ TEST_F(OrderingTest, GrpcCloseAfter) {
   // After that we ignore the processor
   sendRequestTrailers();
   sendResponseHeaders(false);
-  sendResponseBody(FilterDataStatus::Continue, true);
+  Buffer::OwnedImpl resp_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
 }
 
