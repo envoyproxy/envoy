@@ -42,6 +42,7 @@ envoy_cc_extension(
         "redis_cluster.cc",
         "redis_cluster.h",
     ],
+    category = "envoy.clusters",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "redis_cluster_lb",
@@ -69,9 +70,9 @@ envoy_cc_extension(
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/redis/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
