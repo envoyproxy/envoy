@@ -246,9 +246,14 @@ message HttpConnectionManager {
 
   // [#not-implemented-hide] Transformations that apply to path
   // headers. Transformations are applied before any processing of requests by
-  // HTTP filters, routing, and matching. A policy determines whether Envoy will
-  // forward the normalized *:path* header or forward the original header
-  // *:path* header (unless a filter modifies it).
+  // HTTP filters, routing, and matching. Only the normalized path will be
+  // visible internally if a transformation is enabled. The policy determines
+  // whether Envoy will forward the normalized *:path* header or forward the
+  // original header *:path* header (unless a filter modifies it).  Note:
+  // observing (logging, tracing) headers after a transformation is applied will
+  // show the normalized header. Observing after headers are sent to the codec
+  // for encoding to the upstream (e.g. when closing the stream after a response
+  // is received from an upstream) will show the forwarded header.
   message PathNormalizationOptions {
     // Defines a policy to apply to a normalization. Any path rewrites that the
     // router performs (e.g. :ref:`regex_rewrite
@@ -257,7 +262,7 @@ message HttpConnectionManager {
     // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply
     // to the *:path* header destined for the upstream.
     enum NormalizationPolicy {
-      // Unspecified. Uses default.
+      // Unspecified. See individual transformations for defaults.
       UNSPECIFIED = 0;
 
       // No transformation applied to the header.
@@ -269,7 +274,8 @@ message HttpConnectionManager {
       FORWARD = 2;
 
       // Normalization only applies internally. The original *:path* header will
-      // be sent upstream *unless* the path has been mutated by a filter.
+      // be restored in the router filter and sent upstream *unless* the path
+      // has been mutated by a filter.
       INTERNAL = 3;
     }
 
