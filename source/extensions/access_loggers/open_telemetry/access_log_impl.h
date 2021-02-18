@@ -10,7 +10,7 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 
 #include "common/formatter/substitution_formatter.h"
 #include "common/grpc/typed_async_client.h"
@@ -35,11 +35,11 @@ namespace OpenTelemetry {
  */
 class AccessLog : public Common::ImplBase {
 public:
-  AccessLog(
-      ::Envoy::AccessLog::FilterPtr&& filter,
-      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
-      ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-      Stats::Scope& scope);
+  AccessLog(::Envoy::AccessLog::FilterPtr&& filter,
+            envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig
+                config,
+            ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+            Stats::Scope& scope);
 
 private:
   /**

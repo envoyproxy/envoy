@@ -5,7 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/extensions/access_loggers/open_telemetry/v3/open_telemetry.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 
 #include "common/common/assert.h"
 #include "common/formatter/substitution_formatter.h"
@@ -33,7 +33,7 @@ AccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger
 
 AccessLog::AccessLog(
     ::Envoy::AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
+    envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
     Stats::Scope& scope)
     : Common::ImplBase(std::move(filter)), scope_(scope), tls_slot_(tls.allocateSlot()),

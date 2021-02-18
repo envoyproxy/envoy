@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.access_loggers.open_telemetry.v3;
+package envoy.extensions.access_loggers.open_telemetry.v3alpha;
 
 import "envoy/extensions/access_loggers/grpc/v3/als.proto";
 
@@ -9,8 +9,8 @@ import "opentelemetry/proto/common/v1/common.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3";
-option java_outer_classname = "OpenTelemetryProto";
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3alpha";
+option java_outer_classname = "LogsServiceProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
@@ -21,12 +21,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // populate :ref:`ExportLogsServiceRequest.resource_logs
 // <opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs>`.
 // [#extension: envoy.access_loggers.open_telemetry]
+// [#comment:TODO(itamarkam): allow configuration or resource attributes.]
 message OpenTelemetryAccessLogConfig {
   grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 
   opentelemetry.proto.common.v1.AnyValue body = 2;
 
   opentelemetry.proto.common.v1.KeyValueList attributes = 3;
-
-  opentelemetry.proto.common.v1.KeyValueList resource = 4;
 }
