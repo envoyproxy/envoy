@@ -429,7 +429,7 @@ protected:
   double time_bias_{1.0};
   const std::unique_ptr<Runtime::Double> time_bias_runtime_;
   TimeSource& time_source_;
-  struct orderByCreateDateDesc {
+  struct OrderByCreateDateDesc {
     bool operator()(const HostSharedPtr l, const HostSharedPtr r) const {
       return (l->creationTime() < r->creationTime()) ||
              (l->address()->asString() < r->address()->asString());
@@ -438,10 +438,10 @@ protected:
   // Used exclusively for:
   //    - checking if at least one host is in slow start;
   //    - ordering of hosts by creation date in ascending order.
-  // Not meant to check if given host is in slow start.
-  // That check could be done inline by comparing host creation date to slow start window
-  // and by checking if hosts adheres to endpoint warming policy.
-  std::shared_ptr<absl::btree_set<HostSharedPtr, orderByCreateDateDesc>> hosts_in_slow_start_;
+  // Not meant to check if given host is in slow start as it does not rely on current time.
+  // That check could be done inline by comparing the diff of current time and host creation date
+  // against slow start window and by checking if hosts adheres to endpoint warming policy.
+  std::shared_ptr<absl::btree_set<HostSharedPtr, OrderByCreateDateDesc>> hosts_in_slow_start_;
   bool slow_start_enabled_;
 };
 

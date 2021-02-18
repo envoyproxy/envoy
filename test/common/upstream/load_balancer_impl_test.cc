@@ -44,7 +44,7 @@ public:
   }
   static double timeBias(EdfLoadBalancerBase& edf_lb) { return edf_lb.time_bias_; }
   static const std::shared_ptr<
-      absl::btree_set<HostSharedPtr, EdfLoadBalancerBase::orderByCreateDateDesc>>&
+      absl::btree_set<HostSharedPtr, EdfLoadBalancerBase::OrderByCreateDateDesc>>&
   hostsInSlowStart(EdfLoadBalancerBase& edf_lb) {
     return edf_lb.hosts_in_slow_start_;
   }
@@ -1609,7 +1609,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
   hostSet().runCallbacks({}, {});
   EXPECT_EQ(1, hosts_in_slow_start->size());
 
-  // We expect 3:1 ratio, as host1 is in slow start mode and should get half less traffic than
+  // We expect 3:1 ratio, as host2 is in slow start mode and should get half less traffic than
   // usual.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));

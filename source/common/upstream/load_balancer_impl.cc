@@ -726,7 +726,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
               : nullptr),
       time_source_(time_source),
       hosts_in_slow_start_(
-          std::make_shared<absl::btree_set<HostSharedPtr, orderByCreateDateDesc>>()),
+          std::make_shared<absl::btree_set<HostSharedPtr, OrderByCreateDateDesc>>()),
       slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
@@ -865,7 +865,7 @@ bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
 }
 
 bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
-  if (hosts_in_slow_start_->size() == 0) {
+  if (hosts_in_slow_start_->empty()) {
     return true;
   } else {
     auto current_time =
