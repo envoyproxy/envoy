@@ -247,8 +247,14 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
           break;
         }
 
-        // A "**" in the pattern anywhere except the end means that
-        // we must search for the next expected token.
+        // A "**" in the pattern anywhere except the end means that we must
+        // search for the next expected token. Note: this implementation has a
+        // bug. Consider pattern "a.**.b.c.$" and input "a.x.b.b.c.d". This
+        // algorithm will greedily match the "**" against "x" when it should
+        // match against "x.b". It needs to backtrack to get this right,
+        // e.g. via recursion.
+        //
+        // DO NOT SUBMIT TILL FIXED.
         ++pattern_index;
         expected = tokens_[pattern_index];
         for (; input_index < tokens.size(); ++input_index) {
