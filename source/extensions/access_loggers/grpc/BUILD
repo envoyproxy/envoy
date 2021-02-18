@@ -97,6 +97,7 @@ envoy_cc_extension(
     name = "http_config",
     srcs = ["http_config.cc"],
     hdrs = ["http_config.h"],
+    category = "envoy.access_loggers",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",

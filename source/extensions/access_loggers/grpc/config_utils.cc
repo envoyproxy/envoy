@@ -19,7 +19,6 @@ getGrpcAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context
             context.threadLocal(), context.localInfo());
       });
 }
-
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions
