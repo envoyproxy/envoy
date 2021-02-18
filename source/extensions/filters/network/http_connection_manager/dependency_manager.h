@@ -12,14 +12,18 @@ class DependencyManager {
 public:
   DependencyManager() {}
 
-  void RegisterFilter(std::string name, envoy::extensions::filters::common::dependency::v3::FilterDependencies dependencies) {
+  void RegisterFilter(
+      std::string name,
+      envoy::extensions::filters::common::dependency::v3::FilterDependencies dependencies) {
     dependencies_.push_back({name, dependencies});
   }
 
   bool IsValid();
 
 private:
-  std::vector<std::pair<std::string, envoy::extensions::filters::common::dependency::v3::FilterDependencies>> dependencies_;
+  std::vector<std::pair<std::string,
+                        envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
+      dependencies_;
 };
 
 } // namespace HttpConnectionManager
@@ -27,4 +31,4 @@ private:
 } // namespace Extensions
 } // namespace Envoy
 
-#endif  // LOCAL_GOOGLE_HOME_AUNI_ENVOY_SOURCE_EXTENSIONS_FILTERS_NETWORK_HTTP_CONNECTION_MANAGER_DEPENDENCY_MANAGER_H_
+#endif // LOCAL_GOOGLE_HOME_AUNI_ENVOY_SOURCE_EXTENSIONS_FILTERS_NETWORK_HTTP_CONNECTION_MANAGER_DEPENDENCY_MANAGER_H_

@@ -16,7 +16,6 @@ bool DependencyManager::IsValid() {
 
   for (auto& [name, dependencies] : dependencies_) {
     for (auto& requirement : dependencies.decode_required()) {
-      for (auto& x : satisfied) std::cerr << "[AUNI] Have " << x.name() << "\n";
       if (satisfied.count(requirement) == 0) {
         return false;
       }
