@@ -176,9 +176,10 @@ def getGitInfo(CI_TARGET):
     ret += "Stage:\t\t{} {}\n".format(os.environ['SYSTEM_STAGEDISPLAYNAME'],
                                       os.environ['SYSTEM_STAGEJOBNAME'])
 
-  if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv('SYSTEM_PULLREQUEST_PULLREQUESTID'):
+  if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv(
+      'SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'):
     ret += "Pull request:\t{}/pull/{}\n".format(os.environ['REPO_URI'],
-                                                os.environ['SYSTEM_PULLREQUEST_PULLREQUESTID'])
+                                                os.environ['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'])
   elif os.getenv('BUILD_REASON'):
     ret += "Build reason:\t{}\n".format(os.environ['BUILD_REASON'])
 
@@ -190,13 +191,17 @@ def getGitInfo(CI_TARGET):
 
   ret += "\n"
 
-  output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
-  ret += "Origin:\t\t{}".format(output.replace('.git', ''))
+  remotes = subprocess.check_output(['git', 'remote'], encoding='utf-8').splitlines()
 
-  output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
-  ret += "Upstream:\t{}".format(output.replace('.git', ''))
+  if ("origin" in remotes):
+    output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
+    ret += "Origin:\t\t{}".format(output.replace('.git', ''))
 
-  output = subprocess.check_output(['git', 'describe', '--all'], encoding='utf-8')
+  if ("upstream" in remotes):
+    output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
+    ret += "Upstream:\t{}".format(output.replace('.git', ''))
+
+  output = subprocess.check_output(['git', 'describe', '--all', '--always'], encoding='utf-8')
   ret += "Latest ref:\t{}".format(output)
 
   ret += "\n"
@@ -219,7 +224,7 @@ if __name__ == "__main__":
   if os.getenv('TEST_TMPDIR') and os.getenv('REPO_URI') and os.getenv("BUILD_URI"):
     os.environ["TMP_OUTPUT_PROCESS_XML"] = os.getenv("TEST_TMPDIR") + "/tmp_output_process_xml.txt"
   else:
-    print("Set the env variables TEST_TMPDIR and REPO_URI first.")
+    print("Set the env variables TEST_TMPDIR, REPO_URI, and BUILD_URI first.")
     sys.exit(0)
 
   find_dir = "{}/**/**/**/**/bazel-testlogs/".format(os.environ['TEST_TMPDIR']).replace('\\', '/')

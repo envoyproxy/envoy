@@ -30,6 +30,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.filters.http",
     # TODO(#9953) classify and clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",
@@ -41,6 +42,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
-        "@envoy_api//envoy/config/filter/http/on_demand/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
     ],
 )
