@@ -192,6 +192,7 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, transportSocketConnectTimeout, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
+  MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
 class MockFilterChainManager : public FilterChainManager {

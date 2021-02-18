@@ -62,6 +62,7 @@ message Tracing {
     // - :ref:`DatadogConfig <envoy_api_msg_extensions.tracers.datadog.v4alpha.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_extensions.tracers.opencensus.v4alpha.OpenCensusConfig>`
     // - :ref:`AWS X-Ray <envoy_api_msg_extensions.tracers.xray.v4alpha.XRayConfig>`
+    // [#extension-category: envoy.tracers]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
