@@ -1409,11 +1409,12 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   DUMP_DETAILS(&protocol_constraints_);
 
   os << spaces << "Number of active streams: " << active_streams_.size() << " Active Streams:\n";
-  const size_t num_iterations = std::min<size_t>(active_streams_.size(), 100);
-  auto stream = active_streams_.begin();
-  for (size_t i = 0; i < num_iterations; ++i) {
-    DUMP_DETAILS(*stream);
-    ++stream;
+  size_t count = 0;
+  for (auto& stream : active_streams_) {
+    DUMP_DETAILS(stream);
+    if (++count >= 100) {
+      break;
+    }
   }
 
   // Dump the active slice
