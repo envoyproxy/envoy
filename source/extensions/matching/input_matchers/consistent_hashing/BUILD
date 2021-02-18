@@ -13,6 +13,7 @@ envoy_cc_library(
     name = "consistent_hashing_lib",
     hdrs = ["matcher.h"],
     deps = [
+        "//include/envoy/matcher:matcher_interface",
         "//include/envoy/upstream:retry_interface",
         "//source/common/common:hash_lib",
     ],
