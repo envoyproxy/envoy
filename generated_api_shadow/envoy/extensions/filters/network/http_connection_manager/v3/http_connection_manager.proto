@@ -250,71 +250,45 @@ message HttpConnectionManager {
   // forward the normalized *:path* header or forward the original header
   // *:path* header (unless a filter modifies it).
   message PathNormalizationOptions {
-    // Defines a policy to apply normalization. Any path rewrites that the
+    // Defines a policy to apply to a normalization. Any path rewrites that the
     // router performs (e.g. :ref:`regex_rewrite
     // <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>` or
     // :ref:`prefix_rewrite
     // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply
     // to the *:path* header destined for the upstream.
     enum NormalizationPolicy {
+      // No transformation applied.
+      DISABLE = 0;
+
       // Normalization applies internally before any processing of requests by
       // HTTP filters, routing, and matching. Envoy will forward the normalized
       // *:path* header. Regex rewrites by the router apply to the normalized header.
-      FORWARD = 0;
+      FORWARD = 1;
 
       // Normalization only applies internally. The original *:path* header will
       // be sent upstream *unless* the path has been mutated by a filter.
-      INTERNAL = 1;
+      INTERNAL = 2;
     }
 
     // Should paths be normalized according to RFC 3986 before any processing of
-    // requests by HTTP filters or routing? For paths that fail this check,
-    // Envoy will respond with 400 to paths that are malformed. See
-    // `Normalization and Comparison
+    // requests by HTTP filters or routing? Defaults to FORWARD (normalization
+    // applies internally and affects upstream *:path* header). When not
+    // specified, this value may be overridden by the runtime variable
+    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`. For
+    // paths that fail this check, Envoy will respond with 400 to paths that are
+    // malformed. See `Normalization and Comparison
     // <https://tools.ietf.org/html/rfc3986#section-6>`_ for details of
     // normalization. Note that Envoy does not perform `case normalization
     // <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
-    message NormalizePath {
-      // Policy to apply to RFC 3986 path normalization. Defaults to FORWARD. If
-      // unspecified, uses the wholesale policy
-      // :ref:`all_policy<envoy_api_field_config.extensions.filters.network.http_connection_manager.PathNormalizationOptions.all_policy`.
-      NormalizationPolicy policy = 1;
-
-      // RFC 3986 path normalization. Defaults to `true`.
-      google.protobuf.BoolValue normalize_path = 2;
-    }
+    NormalizationPolicy normalize_path = 1;
 
     // Determines if adjacent slashes in the path are merged into one before any
-    // processing of requests by HTTP filters or routing. Without setting this
-    // option, incoming requests with path `//dir///file` will not match against
-    // route with `prefix` match set to `/dir`. Note that slash merging is not
-    // part of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is
-    // provided for convenience.
-    message MergeSlashes {
-      // Policy to apply merging slashes. Defaults to FORWARD. If unspecified,
-      // uses the wholesale policy
-      // :ref:`all_policy<envoy_api_field_config.extensions.filters.network.http_connection_manager.PathNormalizationOptions.all_policy`.
-      NormalizationPolicy policy = 1;
-
-      // Option to specify merging slashes. Defaults to `false`.
-      google.protobuf.BoolValue merge_slashes = 2;
-    }
-
-    // Wholesale policy that applies to each option if they do not specify
-    // individual policies. Individual policies allow configuring different
-    // behaviors for each transformation (e.g. forward RFC 3986 path
-    // normalization, use merge_slashes for matching only).
-    // Defaults to FORWARD.
-    NormalizationPolicy all_policy = 1;
-
-    // Message to configure RFC 3986 path normalization. Be default, this is
-    // enabled. When not specified, this value may be overridden by the runtime
-    // variable
-    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
-    NormalizePath normalize_path = 2;
-
-    // Message to configure merging adjacent slashes. By default, this is not enabled.
-    MergeSlashes merge_slashes = 3;
+    // processing of requests by HTTP filters or routing. Defaults to
+    // DISABLE. Without setting this option, incoming requests with path
+    // `//dir///file` will not match against route with `prefix` match set to
+    // `/dir`. Note that slash merging is not part of `HTTP spec
+    // <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+    NormalizationPolicy merge_slashes = 2;
   }
 
   reserved 27;
