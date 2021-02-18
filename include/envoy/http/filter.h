@@ -217,7 +217,7 @@ public:
    * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
    *
    * NOTE: Similar to route(const Router::RouteCallback& cb), this route that is set will be
-   * overriden by clearRouteCache() in subssequent filters. Usage is intended for filters at the end
+   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
    * of the filter chain.
    */
   virtual void setRoute(const Router::RouteConstSharedPtr route) PURE;
