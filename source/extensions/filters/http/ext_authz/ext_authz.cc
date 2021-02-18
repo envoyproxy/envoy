@@ -208,13 +208,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
-  if (response->status != CheckStatus::Error) {
-    // When response dynamic metadata is not empty, emit dynamic metadata for responses with OK or
-    // Denied check status.
-    if (!response->dynamic_metadata.fields().empty()) {
-      decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
-                                                          response->dynamic_metadata);
-    }
+  // When we receive a response with a check status error, we skip setting dynamic metadata. Since
+  // currently, the only way to get the metadata is from the external authorization server response.
+  // Having a check status error means we failed to reach the authorization server, hence no
+  // response's dynamic metadata to be set.
+  //
+  // When the response check status is not an error and the response dynamic metadata is not empty,
+  // we emit dynamic metadata.
+  if (response->status != CheckStatus::Error && !response->dynamic_metadata.fields().empty()) {
+    decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
+                                                        response->dynamic_metadata);
   }
 
   switch (response->status) {
