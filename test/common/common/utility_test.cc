@@ -282,6 +282,58 @@ TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }
 
+TEST(StringUtil, escapeToOstream) {
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "hello world");
+    EXPECT_EQ(ostream.contents(), "hello world");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "hello\nworld\n");
+    EXPECT_EQ(ostream.contents(), "hello\\nworld\\n");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "\t\nworld\r\n");
+    EXPECT_EQ(ostream.contents(), "\\t\\nworld\\r\\n");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "{'linux': \"penguin\"}");
+    EXPECT_EQ(ostream.contents(), "{\\'linux\\': \\\"penguin\\\"}");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, R"(\\)");
+    EXPECT_EQ(ostream.contents(), R"(\\\\)");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "vertical\vtab");
+    EXPECT_EQ(ostream.contents(), "vertical\\vtab");
+  }
+
+  {
+    using namespace std::string_literals;
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "null\0char"s);
+    EXPECT_EQ(ostream.contents(), "null\\0char");
+  }
+}
+
 TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper(""), "");
   EXPECT_EQ(StringUtil::toUpper("a"), "A");

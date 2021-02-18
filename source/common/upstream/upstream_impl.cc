@@ -895,8 +895,12 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
   } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
     return {Http::Protocol::Http2, Http::Protocol::Http11};
   } else {
+    if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
+      return {Http::Protocol::Http3};
+    }
     return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                  : Http::Protocol::Http11};
   }
@@ -935,6 +939,10 @@ ClusterImplBase::ClusterImplBase(
     throw EnvoyException(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
+  }
+  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
+    throw EnvoyException(
+        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
   }
 
   // Create the default (empty) priority set before registering callbacks to

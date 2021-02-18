@@ -8,6 +8,10 @@
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -1312,6 +1316,19 @@ TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersion) {
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
 }
 
+// MessageUtility::unpackTo() with API message works across version and doesn't register
+// deprecations for allowlisted v2 protos.
+TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersionV2Allowed) {
+  API_NO_BOOST(envoy::config::health_checker::redis::v2::Redis) source;
+  source.set_key("foo");
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source);
+  API_NO_BOOST(envoy::extensions::health_checkers::redis::v3::Redis) dst;
+  MessageUtil::unpackTo(source_any, dst);
+  EXPECT_EQ(runtime_deprecated_feature_use_.value(), 0);
+  EXPECT_EQ(dst.key(), "foo");
+}
+
 // Validate warning messages on v2 upgrades.
 TEST_F(ProtobufV2ApiUtilityTest, V2UpgradeWarningLogs) {
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
@@ -1601,7 +1618,7 @@ TEST_P(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
-TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsError)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
@@ -1610,6 +1627,21 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated))
                       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
   EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
+}
+
+TEST_P(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  // Non-fatal checks for a deprecated field should throw an exception if the
+  // runtime flag is enabled..
+  Runtime::LoaderSingleton::getExisting()->mergeValues({
+      {"envoy.features.fail_on_any_deprecated_feature", "true"},
+  });
+  EXPECT_THROW_WITH_REGEX(
+      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.

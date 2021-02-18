@@ -6,6 +6,7 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov @htuch
 # compression extensions
 /*/extensions/compression/common/compressor @rojkov @junr03
 /*/extensions/compression/gzip/compressor @rojkov @junr03
@@ -147,6 +148,7 @@ extensions/filters/common/original_src @snowp @klarose
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/compression/brotli @junr03 @rojkov
 /*/extensions/filters/http/decompressor @rojkov @dio
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
