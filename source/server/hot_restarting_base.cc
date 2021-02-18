@@ -5,6 +5,14 @@
 #include "common/network/address_impl.h"
 #include "common/stats/utility.h"
 
+#include "absl/container/fixed_array.h"
+
+#ifndef SOCK_NONBLOCK
+#include <fcntl.h>
+// TODO(rgs1): workaround for OS X should actually be using fctnl(..., F_SETFL, O_NONBLOCK)
+#define SOCK_NONBLOCK 0
+#endif
+
 namespace Envoy {
 namespace Server {
 
@@ -66,6 +74,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
 
 void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
                                               const HotRestartMessage& proto) {
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const uint64_t serialized_size = proto.ByteSizeLong();
   const uint64_t total_size = sizeof(uint64_t) + serialized_size;
   // Fill with uint64_t 'length' followed by the serialized HotRestartMessage.
@@ -95,11 +104,11 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
     message.msg_iovlen = 1;
 
     // Control data stuff, only relevant for the fd passing done with PassListenSocketReply.
-    uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
+    absl::FixedArray<uint8_t> control_buffer(CMSG_SPACE(sizeof(int)));
     if (replyIsExpectedType(&proto, HotRestartMessage::Reply::kPassListenSocket) &&
         proto.reply().pass_listen_socket().fd() != -1) {
-      memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
-      message.msg_control = control_buffer;
+      memset(control_buffer.data(), 0, CMSG_SPACE(sizeof(int)));
+      message.msg_control = control_buffer.data();
       message.msg_controllen = CMSG_SPACE(sizeof(int));
       cmsghdr* control_message = CMSG_FIRSTHDR(&message);
       control_message->cmsg_level = SOL_SOCKET;
@@ -110,10 +119,16 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
     }
 
     // A transient connection refused error probably means the old process is not ready.
+    int saved_errno = 0;
+    int rc = 0;
+    bool sent = false;
     for (int i = 0; i < SENDMSG_MAX_RETRIES; i++) {
-      const int rc = sendmsg(my_domain_socket_, &message, 0);
-      const int saved_errno = errno;
+      auto result = os_sys_calls.sendmsg(my_domain_socket_, &message, 0);
+      rc = result.rc_;
+      saved_errno = result.errno_;
+
       if (rc == static_cast<int>(cur_chunk_size)) {
+        sent = true;
         break;
       }
 
@@ -126,7 +141,13 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
       RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
                                         saved_errno));
     }
+
+    if (!sent) {
+      RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
+                                        saved_errno));
+    }
   }
+
   RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                  fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
 }
@@ -191,18 +212,18 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
 
   iovec iov[1];
   msghdr message;
-  uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
+  absl::FixedArray<uint8_t> control_buffer(CMSG_SPACE(sizeof(int)));
   std::unique_ptr<HotRestartMessage> ret = nullptr;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
     iov[0].iov_len = MaxSendmsgSize;
 
     // We always setup to receive an FD even though most messages do not pass one.
-    memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
+    memset(control_buffer.data(), 0, CMSG_SPACE(sizeof(int)));
     memset(&message, 0, sizeof(message));
     message.msg_iov = iov;
     message.msg_iovlen = 1;
-    message.msg_control = control_buffer;
+    message.msg_control = control_buffer.data();
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
     const int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);
