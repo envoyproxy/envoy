@@ -513,6 +513,7 @@ TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
   Api::ApiPtr api_(Api::createApiForTest());
   DispatcherPtr dispatcher(api_->allocateDispatcher("test_thread"));
   std::vector<std::unique_ptr<ReadyWatcher>> watchers;
+  watchers.reserve(3);
   for (int i = 0; i < 3; ++i) {
     watchers.push_back(std::make_unique<ReadyWatcher>());
   }
