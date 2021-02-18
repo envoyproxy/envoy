@@ -360,6 +360,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
+    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
+    // Make sure that cluster info is obtained without calling upstreamHost.
+    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
     EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
