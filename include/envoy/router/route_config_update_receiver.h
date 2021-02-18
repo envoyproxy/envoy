@@ -83,6 +83,11 @@ public:
   virtual const envoy::config::route::v3::RouteConfiguration& routeConfiguration() PURE;
 
   /**
+   * @return Router::ConfigConstSharedPtr a route configuration after the latest update.
+   */
+  virtual ConfigConstSharedPtr config() const PURE;
+
+  /**
    * @return SystemTime the time of the last update.
    */
   virtual SystemTime lastUpdated() const PURE;

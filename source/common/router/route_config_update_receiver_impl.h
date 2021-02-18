@@ -6,19 +6,22 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_update_receiver.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
+#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(TimeSource& time_source)
-      : time_source_(time_source), last_config_hash_(0ull), last_vhds_config_hash_(0ul),
-        vhds_configuration_changed_(true) {}
+  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context,
+                                TimeSource& time_source)
+      : factory_context_(factory_context), time_source_(time_source), last_config_hash_(0ull),
+        last_vhds_config_hash_(0ul), vhds_configuration_changed_(true) {}
 
   void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
@@ -50,12 +53,14 @@ public:
   const envoy::config::route::v3::RouteConfiguration& routeConfiguration() override {
     return route_config_proto_;
   }
+  ConfigConstSharedPtr config() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
     return resource_ids_in_last_update_;
   }
 
 private:
+  Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
   envoy::config::route::v3::RouteConfiguration route_config_proto_;
   uint64_t last_config_hash_;
@@ -67,6 +72,7 @@ private:
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_;
+  ConfigConstSharedPtr config_;
 };
 
 } // namespace Router

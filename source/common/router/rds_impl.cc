@@ -89,8 +89,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
           resource_decoder_, false);
   local_init_manager_.add(local_init_target_);
-  config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
+      factory_context, factory_context.timeSource());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -253,9 +253,9 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() { return tls_->config_; }
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
-  ConfigConstSharedPtr new_config(new ConfigImpl(config_update_info_->routeConfiguration(),
-                                                 factory_context_, validator_, false));
-  tls_.runOnAllThreads([new_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
+  tls_.runOnAllThreads([new_config = config_update_info_->config()](OptRef<ThreadLocalConfig> tls) {
+    tls->config_ = new_config;
+  });
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
@@ -263,7 +263,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
     return;
   }
 
-  const auto config = std::static_pointer_cast<const ConfigImpl>(new_config);
+  const auto config = std::static_pointer_cast<const ConfigImpl>(config_update_info_->config());
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response

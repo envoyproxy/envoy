@@ -26,6 +26,10 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
   last_vhds_config_hash_ = new_vhds_config_hash;
   initializeRdsVhosts(route_config_proto_);
   onUpdateCommon(route_config_proto_, version_info);
+
+  config_ = std::make_shared<ConfigImpl>(
+      route_config_proto_, factory_context_,
+      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
   return true;
 }
 
@@ -41,10 +45,30 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const VirtualHostRefVector& added_vhosts, const std::set<std::string>& added_resource_ids,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
+
+  std::map<std::string, envoy::config::route::v3::VirtualHost> vhosts_after_this_update(
+      vhds_virtual_hosts_);
+  const bool removed = removeVhosts(vhosts_after_this_update, removed_resources);
+  const bool updated = updateVhosts(vhosts_after_this_update, added_vhosts);
+
+  envoy::config::route::v3::RouteConfiguration latest_route_config = route_config_proto_;
+  // latest_route_config.CopyFrom(route_config_proto_);
+  rebuildRouteConfig(rds_virtual_hosts_, vhosts_after_this_update, latest_route_config);
+
+  // ConfigImpl ctor throws exception on validation failures
+  ConfigConstSharedPtr new_config(new ConfigImpl(
+      latest_route_config, factory_context_,
+      factory_context_.messageValidationContext().dynamicValidationVisitor(), false));
+
+  // no exception
+  config_ = new_config;
+  route_config_proto_.CopyFrom(latest_route_config);
+  vhds_virtual_hosts_ = vhosts_after_this_update;
+  last_config_version_ = version_info;
+  last_updated_ = time_source_.systemTime();
+  config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_proto_, last_config_version_});
   resource_ids_in_last_update_ = added_resource_ids;
-  const bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
-  const bool updated = updateVhosts(vhds_virtual_hosts_, added_vhosts);
-  onUpdateCommon(route_config_proto_, version_info);
+
   return removed || updated || !resource_ids_in_last_update_.empty();
 }
 
