@@ -2,6 +2,9 @@
 
 set -e
 
+echo "BAZEL_BUILD_EXTRA_OPTIONS IN CACHE SETUP:"
+echo "$BAZEL_BUILD_EXTRA_OPTIONS"
+
 if [[ -n "${GCP_SERVICE_ACCOUNT_KEY:0:1}" ]]; then
   # mktemp will create a tempfile with u+rw permission minus umask, it will not be readable by all
   # users by default.

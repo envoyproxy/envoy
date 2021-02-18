@@ -51,7 +51,7 @@ stages:
               path: $(Build.StagingDirectory)/repository_cache
             continueOnError: true
 
-          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+          - script: ci/run_envoy_docker.sh 'BAZEL_BUILD_EXTRA_OPTIONS="--option1 FOO --option2 BAR" ci/do_ci.sh docs'
             workingDirectory: $(Build.SourcesDirectory)
             env:
               AZP_BRANCH: $(Build.SourceBranch)
