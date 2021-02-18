@@ -611,3 +611,6 @@ The following command operators are supported:
 
 %LOCAL_REPLY_BODY%
   The body text for the requests rejected by the Envoy.
+
+%FILTER_CHAIN_NAME%
+  The network filter chain name of the downstream connection.

@@ -396,6 +396,8 @@ private:
       return empty_network_filter_factory_;
     }
 
+    absl::string_view name() const override { return "admin"; }
+
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
     const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
