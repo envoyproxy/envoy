@@ -1011,7 +1011,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   // The only connection oriented UDP transport protocol right now is QUIC.
   const bool is_quic = listener_.udpListenerFactory() != nullptr &&
                        !listener_.udpListenerFactory()->isTransportConnectionless();
-  if (is_quic && typeid(Quic::QuicServerTransportSocketConfigFactory) != typeid(config_factory)) {
+  if (is_quic &&
+      dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
     throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
                                      "transport socket config specified for quic transport socket: "
                                      "{}. \nUse QuicDownstreamTransport instead.",
