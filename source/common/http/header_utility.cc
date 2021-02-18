@@ -200,9 +200,6 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
 }
 
 bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
-  if (!headers.isRequest()) {
-    return false;
-  }
   return (headers.Method() &&
           (headers.Method()->value() == Http::Headers::get().MethodValues.Get ||
            headers.Method()->value() == Http::Headers::get().MethodValues.Head ||
