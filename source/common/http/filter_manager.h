@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "common/stream_info/stream_info_impl.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -717,6 +718,8 @@ public:
   }
 
   void dumpState(std::ostream& os, int indent_level) const override {
+    StreamInfoImpl::dumpState(os, indent_level);
+
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
        << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
