@@ -172,6 +172,8 @@ TEST_P(SSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTransportSoc
   // Message will be processed by Postgres filter which
   // is configured to accept SSL termination and confirm it
   // by returning single byte 'S'.
+  // The write can see disconnect upon completion so we do
+  // not verify the result.
   ASSERT_TRUE(tcp_client->write(data.toString(), false, false));
   data.drain(data.length());
 
