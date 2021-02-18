@@ -41,6 +41,24 @@ TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
   EXPECT_FALSE(manager.IsValid());
 }
 
+TEST(DependencyManagerTest, DependencySatisfied) {
+  DependencyManager manager;
+
+  FilterDependencies d1;
+  auto provided = d1.add_decode_provided();
+  provided->set_type(Dependency::FILTER_STATE_KEY);
+  provided->set_name("potato");
+  manager.RegisterFilter("ingredient", d1);
+
+  FilterDependencies d2;
+  auto required = d2.add_decode_required();
+  required->set_type(Dependency::FILTER_STATE_KEY);
+  required->set_name("potato");
+  manager.RegisterFilter("chef", d2);
+
+  EXPECT_TRUE(manager.IsValid());
+}
+
 } // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters

@@ -16,19 +16,7 @@ public:
     dependencies_.push_back({name, dependencies});
   }
 
-  bool IsValid() {
-    for (auto& [name, dependencies] : dependencies_) {
-      for (auto& requirement : dependencies.decode_required()) {
-        std::cerr << "[AUNI] " << requirement.DebugString() << "\n";
-
-        return false;
-      }
-      std::cerr << "[AUNI] " << name << "\n";
-      std::cerr << "[AUNI] " << dependencies.DebugString() << "\n";
-    }
-
-    return true;
-  }
+  bool IsValid();
 
 private:
   std::vector<std::pair<std::string, envoy::extensions::filters::common::dependency::v3::FilterDependencies>> dependencies_;
