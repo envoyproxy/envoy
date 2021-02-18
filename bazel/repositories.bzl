@@ -145,6 +145,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
+    _com_github_nlohmann_json()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -454,6 +455,16 @@ def _com_github_tencent_rapidjson():
     native.bind(
         name = "rapidjson",
         actual = "@com_github_tencent_rapidjson//:rapidjson",
+    )
+
+def _com_github_nlohmann_json():
+    external_http_archive(
+        name = "com_github_nlohmann_json",
+        build_file = "@envoy//bazel/external:json.BUILD",
+    )
+    native.bind(
+        name = "json",
+        actual = "@com_github_nlohmann_json//:json",
     )
 
 def _com_github_nodejs_http_parser():
