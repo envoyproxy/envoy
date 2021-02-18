@@ -1270,14 +1270,6 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
   testEnvoyHandling100Continue(false, "foo");
 }
 
-// Pick a random test and use the old nodelay for coverage. This test can be
-// removed when the code path is removed.
-TEST_P(IntegrationTest, ViaAppendWith100ContinueWithOldNodelay) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
-  config_helper_.addConfigModifier(setVia("foo"));
-  testEnvoyHandling100Continue(false, "foo");
-}
-
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is
 // sent by Envoy, it will wait for response acknowledgment (via FIN/RST) from the client before
 // closing the socket (with a timeout for ensuring cleanup).
