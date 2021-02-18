@@ -64,8 +64,8 @@ message DiscoveryRequest {
   google.rpc.Status error_detail = 6;
 
   // [#not-implemented-hide:]
-  // An optional API patch version of the requested resource that is supported by
-  // the client. This is useful for use-cases where the client and server support new
+  // Latest xDS API patch version supported by the client.
+  // This is useful for use-cases where the client and server support new
   // API features, before the next API minor version is rolled out.
   // If not included, the patch version defaults to 0, stating that the client
   // supports API features up to the client's minor version.
@@ -238,8 +238,8 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 
   // [#not-implemented-hide:]
-  // An optional API patch version of the requested resource that is supported by
-  // the client. This is useful for use-cases where the client and server support new
+  // Latest xDS API patch version supported by the client.
+  // This is useful for use-cases where the client and server support new
   // API features, before the next API minor version is rolled out.
   // If not included, the patch version defaults to 0, stating that the client
   // supports API features up to the client's minor version.
