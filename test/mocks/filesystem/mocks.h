@@ -6,6 +6,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/filesystem/watcher.h"
 
+
 #include "common/common/thread.h"
 
 #include "gmock/gmock.h"
@@ -57,6 +58,7 @@ public:
 };
 
 class MockWatcher : public Watcher {
+using OnChangedCb = std::function<void(uint32_t events)>;
 public:
   MockWatcher();
   ~MockWatcher() override;
