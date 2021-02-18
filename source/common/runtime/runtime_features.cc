@@ -99,7 +99,7 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // TODO(alyssawilk, #14890) flip once this has been validated in prod.
+    // TODO(#14890) flip once this has been validated in prod.
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     // TODO(alyssawilk) either sort out throughput changes or revert this as low-priority
     "envoy.reloadable_features.always_nodelay",
