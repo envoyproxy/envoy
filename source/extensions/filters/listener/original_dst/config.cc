@@ -34,7 +34,7 @@ public:
                            "specifying the traffic_direction."
                            "Configure the traffic_direction listener option");
     }
-    if (!Network::win32SupportsOriginalDestination()) {
+    if (!Platform::win32SupportsOriginalDestination()) {
       throw EnvoyException("[Windows] Envoy was compiled without support for `SO_ORIGINAL_DST`, "
                            "the original destination filter cannot be used");
     }

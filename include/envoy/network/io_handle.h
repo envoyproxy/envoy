@@ -33,14 +33,6 @@ struct Win32RedirectRecords {
   unsigned long buf_size_;
 };
 
-constexpr bool win32SupportsOriginalDestination() {
-#if defined(WIN32) && defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
-  return true;
-#else
-  return false;
-#endif
-}
-
 /**
  * IoHandle: an abstract interface for all I/O operations
  */
