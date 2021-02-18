@@ -1489,45 +1489,37 @@ TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
                                       {"cluster_0"}, {}, {}, false));
 
   // Set a Cluster DCP.
-  test_server_->setDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster", "foo",
-                                       "bar");
+  test_server_->setDynamicContextParam(Config::TypeUrl::get().Cluster, "foo", "bar");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
-  EXPECT_EQ("bar", last_node_.dynamic_parameters()
-                       .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
-                       .params()
-                       .at("foo"));
+  EXPECT_EQ("bar",
+            last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().at("foo"));
 
   // Modify Cluster DCP.
-  test_server_->setDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster", "foo",
-                                       "baz");
+  test_server_->setDynamicContextParam(Config::TypeUrl::get().Cluster, "foo", "baz");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
-  EXPECT_EQ("baz", last_node_.dynamic_parameters()
-                       .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
-                       .params()
-                       .at("foo"));
+  EXPECT_EQ("baz",
+            last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().at("foo"));
 
   // Modify CLA DCP (some other resource type URL).
-  test_server_->setDynamicContextParam(
-      "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment", "a", "b");
+  test_server_->setDynamicContextParam(Config::TypeUrl::get().ClusterLoadAssignment, "foo", "b");
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"cluster_0"}, {}, {}, true));
   EXPECT_EQ("b", last_node_.dynamic_parameters()
-                     .at("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment")
+                     .at(Config::TypeUrl::get().ClusterLoadAssignment)
                      .params()
-                     .at("a"));
+                     .at("foo"));
+  EXPECT_EQ("baz",
+            last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().at("foo"));
 
   // Clear Cluster DCP.
-  test_server_->unsetDynamicContextParam("type.googleapis.com/envoy.config.cluster.v3.Cluster",
-                                         "foo");
+  test_server_->unsetDynamicContextParam(Config::TypeUrl::get().Cluster, "foo");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
-  EXPECT_EQ(0, last_node_.dynamic_parameters()
-                   .at("type.googleapis.com/envoy.config.cluster.v3.Cluster")
-                   .params()
-                   .count("foo"));
-};
+  EXPECT_EQ(
+      0, last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().count("foo"));
+}
 
 class XdsTpAdsIntegrationTest : public AdsIntegrationTest {
 public:
