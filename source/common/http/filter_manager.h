@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "common/stream_info/stream_info_impl.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -24,6 +23,7 @@
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
