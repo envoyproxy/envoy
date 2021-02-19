@@ -136,6 +136,7 @@ void SubsetLoadBalancer::rebuildSingle() {
         if (fields_it != fields.end()) {
           auto [iterator, did_insert] =
               single_host_per_subset_map_.try_emplace(fields_it->second, host);
+          UNREFERENCED_PARAMETER(iterator);
           if (!did_insert) {
             // Two hosts with the same metadata value were found. Ignore all but one of them, and
             // set a metric for how many times this happened.

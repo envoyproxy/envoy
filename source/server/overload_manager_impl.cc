@@ -156,6 +156,7 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
                   Event::ScaledMinimum(UnitFloat(scale_timer.min_scale().value() / 100.0)));
 
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
+    UNREFERENCED_PARAMETER(_);
     if (!inserted) {
       throw EnvoyException(fmt::format("Found duplicate entry for timer type {}",
                                        Config::TimerType_Name(scale_timer.timer())));
