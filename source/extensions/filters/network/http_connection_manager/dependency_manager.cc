@@ -10,7 +10,7 @@ namespace HttpConnectionManager {
 using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
 
-bool DependencyManager::IsValid() {
+bool DependencyManager::DecodePathIsValid() {
   auto cmp = [](Dependency a, Dependency b) { return a.name() != b.name(); };
   std::set<Dependency, decltype(cmp)> satisfied(cmp);
 

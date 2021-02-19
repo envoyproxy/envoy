@@ -27,7 +27,7 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   provided->set_type(Dependency::FILTER_STATE_KEY);
   provided->set_name("potato");
   manager.RegisterFilter("ingredient", dependencies);
-  EXPECT_TRUE(manager.IsValid());
+  EXPECT_TRUE(manager.DecodePathIsValid());
 }
 
 TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
@@ -38,7 +38,7 @@ TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
   required->set_type(Dependency::FILTER_STATE_KEY);
   required->set_name("potato");
   manager.RegisterFilter("chef", dependencies);
-  EXPECT_FALSE(manager.IsValid());
+  EXPECT_FALSE(manager.DecodePathIsValid());
 }
 
 TEST(DependencyManagerTest, DependencySatisfied) {
@@ -57,7 +57,7 @@ TEST(DependencyManagerTest, DependencySatisfied) {
   manager.RegisterFilter("ingredient", d1);
   manager.RegisterFilter("chef", d2);
 
-  EXPECT_TRUE(manager.IsValid());
+  EXPECT_TRUE(manager.DecodePathIsValid());
 }
 
 TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
@@ -76,7 +76,7 @@ TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
   manager.RegisterFilter("chef", d2);
   manager.RegisterFilter("ingredient", d1);
 
-  EXPECT_FALSE(manager.IsValid());
+  EXPECT_FALSE(manager.DecodePathIsValid());
 }
 
 } // namespace
