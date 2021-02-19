@@ -40,10 +40,10 @@ RegisterWasmExtension::RegisterWasmExtension(WasmExtension* extension) {
 }
 
 PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
-  return [](const WasmHandleSharedPtr& base_wasm,
-            absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+  return [](const WasmHandleSharedPtr& wasm_handle,
+            const PluginSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
     return std::static_pointer_cast<PluginHandleBase>(
-        std::make_shared<PluginHandle>(base_wasm, plugin_key));
+        std::make_shared<PluginHandle>(wasm_handle, plugin));
   };
 }
 
