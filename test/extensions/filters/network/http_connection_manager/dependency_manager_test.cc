@@ -16,7 +16,7 @@ TEST(DependencyManagerTest, RegisterFilter) {
   DependencyManager manager;
 
   FilterDependencies dependencies;
-  manager.RegisterFilter("foobar", dependencies);
+  manager.registerFilter("foobar", dependencies);
 }
 
 TEST(DependencyManagerTest, RegisterFilterWithDependency) {
@@ -26,8 +26,8 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   auto provided = dependencies.add_decode_provided();
   provided->set_type(Dependency::FILTER_STATE_KEY);
   provided->set_name("potato");
-  manager.RegisterFilter("ingredient", dependencies);
-  EXPECT_TRUE(manager.DecodePathIsValid());
+  manager.registerFilter("ingredient", dependencies);
+  EXPECT_TRUE(manager.decodePathIsValid());
 }
 
 TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
@@ -37,8 +37,8 @@ TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
   auto required = dependencies.add_decode_required();
   required->set_type(Dependency::FILTER_STATE_KEY);
   required->set_name("potato");
-  manager.RegisterFilter("chef", dependencies);
-  EXPECT_FALSE(manager.DecodePathIsValid());
+  manager.registerFilter("chef", dependencies);
+  EXPECT_FALSE(manager.decodePathIsValid());
 }
 
 TEST(DependencyManagerTest, DependencySatisfied) {
@@ -54,10 +54,10 @@ TEST(DependencyManagerTest, DependencySatisfied) {
   required->set_type(Dependency::FILTER_STATE_KEY);
   required->set_name("potato");
 
-  manager.RegisterFilter("ingredient", d1);
-  manager.RegisterFilter("chef", d2);
+  manager.registerFilter("ingredient", d1);
+  manager.registerFilter("chef", d2);
 
-  EXPECT_TRUE(manager.DecodePathIsValid());
+  EXPECT_TRUE(manager.decodePathIsValid());
 }
 
 TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
@@ -73,10 +73,10 @@ TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
   required->set_type(Dependency::FILTER_STATE_KEY);
   required->set_name("potato");
 
-  manager.RegisterFilter("chef", d2);
-  manager.RegisterFilter("ingredient", d1);
+  manager.registerFilter("chef", d2);
+  manager.registerFilter("ingredient", d1);
 
-  EXPECT_FALSE(manager.DecodePathIsValid());
+  EXPECT_FALSE(manager.decodePathIsValid());
 }
 
 // TODO(auni53): Add unit tests validating dependency type match.

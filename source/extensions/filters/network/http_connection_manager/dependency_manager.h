@@ -12,13 +12,13 @@ namespace HttpConnectionManager {
  */
 class DependencyManager {
 public:
-  DependencyManager() {}
+  DependencyManager() = default;
 
   /**
    * Register each filter in an http filter chain, using name and dependencies
    * from the filter factory. Filters must be registered in decode path order.
    */
-  void RegisterFilter(
+  void registerFilter(
       std::string name,
       envoy::extensions::filters::common::dependency::v3::FilterDependencies dependencies) {
     filter_chain_.push_back({name, dependencies});
@@ -29,10 +29,10 @@ public:
    * chain is valid iff for each filter, every decode dependency has been
    * provided by a previous filter.
    *
-   * TODO(auni53): Change this to a general IsValid() that checks decode and
+   * TODO(auni53): Change this to a general isValid() that checks decode and
    * encode path.
    */
-  bool DecodePathIsValid();
+  bool decodePathIsValid();
 
 private:
   std::vector<std::pair<std::string,

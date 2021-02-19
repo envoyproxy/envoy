@@ -6,9 +6,8 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
-using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
 
-bool DependencyManager::DecodePathIsValid() {
+bool DependencyManager::decodePathIsValid() {
   auto cmp = [](Dependency a, Dependency b) { return a.name() != b.name(); };
   std::set<Dependency, decltype(cmp)> satisfied(cmp);
 
