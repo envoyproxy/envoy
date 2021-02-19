@@ -20,6 +20,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -33,6 +34,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
+  Server::MockOptions options;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Random::MockRandomGenerator> random;
@@ -51,7 +53,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   ValidationClusterManagerFactory factory(
       admin, runtime, stats_store, tls, dns_resolver, ssl_context_manager, dispatcher, local_info,
       secret_manager, validation_context, *api, http_context, grpc_context, router_context,
-      log_manager, singleton_manager);
+      log_manager, singleton_manager, options);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);

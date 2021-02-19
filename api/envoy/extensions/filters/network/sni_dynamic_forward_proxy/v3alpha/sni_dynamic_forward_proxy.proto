@@ -5,7 +5,6 @@ package envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha;
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha";

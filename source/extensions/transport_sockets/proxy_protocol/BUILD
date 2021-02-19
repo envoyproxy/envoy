@@ -13,6 +13,9 @@ envoy_cc_extension(
     name = "upstream_config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = (
+        "envoy.transport_sockets.upstream",
+    ),
     security_posture = "robust_to_untrusted_downstream_and_upstream",  # header generated in Envoy, so can't be faked
     deps = [
         ":upstream_proxy_protocol",

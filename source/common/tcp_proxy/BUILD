@@ -25,6 +25,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/router:header_parser_lib",
     ],
 )
 
@@ -65,8 +66,10 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/network:hash_policy_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_server_name_lib",
+        "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_info_lib",

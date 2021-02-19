@@ -10,16 +10,18 @@ namespace Envoy {
 // memory would likely lead to the crash handler itself causing a subsequent OOM.
 
 #define DUMP_MEMBER(member) ", " #member ": " << (member)
+#define DUMP_MEMBER_AS(member, value) ", " #member ": " << (value)
 
 #define DUMP_OPTIONAL_MEMBER(member)                                                               \
   ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
 
 #define DUMP_NULLABLE_MEMBER(member, value)                                                        \
-  ", " #member ": " << ((member) != nullptr ? value : "null")
+  ", " #member ": " << ((member) != nullptr ? (value) : "null")
 
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
+// spaces (const char *)
 #define DUMP_DETAILS(member)                                                                       \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
@@ -34,6 +36,7 @@ namespace Envoy {
 // Macro assumes local member variables
 // os (ostream)
 // indent_level (int)
+// spaces (const char *)
 #define DUMP_OPT_REF_DETAILS(member)                                                               \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \

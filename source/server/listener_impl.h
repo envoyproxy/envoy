@@ -77,7 +77,7 @@ private:
   Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
-  const std::string& listener_name_;
+  const std::string listener_name_;
   const bool reuse_port_;
   Network::SocketSharedPtr socket_;
   absl::once_flag steal_once_;
@@ -100,6 +100,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
@@ -166,6 +167,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;

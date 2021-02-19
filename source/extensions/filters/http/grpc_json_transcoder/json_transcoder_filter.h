@@ -13,6 +13,7 @@
 
 #include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
+#include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
 #include "grpc_transcoding/transcoder.h"
@@ -70,13 +71,15 @@ public:
       Api::Api& api);
 
   /**
-   * Create an instance of Transcoder interface based on incoming request
-   * @param headers headers received from decoder
-   * @param request_input a ZeroCopyInputStream reading from downstream request body
-   * @param response_input a TranscoderInputStream reading from upstream response body
-   * @param transcoder output parameter for the instance of Transcoder interface
-   * @param method_descriptor output parameter for the method looked up from config
-   * @return status whether the Transcoder instance are successfully created or not
+   * Create an instance of Transcoder interface based on incoming request.
+   * @param headers headers received from decoder.
+   * @param request_input a ZeroCopyInputStream reading from downstream request body.
+   * @param response_input a TranscoderInputStream reading from upstream response body.
+   * @param transcoder output parameter for the instance of Transcoder interface.
+   * @param method_descriptor output parameter for the method looked up from config.
+   * @return status whether the Transcoder instance are successfully created or not. If the method
+   *         is not found, status with Code::NOT_FOUND is returned. If the method is found, but
+   * fields cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
    */
   ProtobufUtil::Status
   createTranscoder(const Http::RequestHeaderMap& headers,
@@ -106,6 +109,9 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      RequestValidationOptions request_validation_options_{};
+
 private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
@@ -113,7 +119,6 @@ private:
   ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                            google::grpc::transcoding::RequestInfo* info) const;
 
-private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
