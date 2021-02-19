@@ -1,7 +1,5 @@
 #include "extensions/filters/network/http_connection_manager/dependency_manager.h"
 
-#include "google/protobuf/util/message_differencer.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
