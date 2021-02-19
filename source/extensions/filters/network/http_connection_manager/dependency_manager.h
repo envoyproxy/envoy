@@ -15,7 +15,6 @@ class DependencyManager {
 public:
   DependencyManager() {}
 
-
   /**
    * Register each filter in an http filterchain, using name and dependencies
    * from the filter factory. Filters must be registered in decode path order.
