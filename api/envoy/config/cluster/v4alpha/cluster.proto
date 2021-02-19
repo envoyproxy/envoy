@@ -446,6 +446,8 @@ message Cluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.Cluster.CommonLbConfig";
 
+    // Refer to :ref:`endpoint warming policy types <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>`
+    // for an explanation on each policy type.
     enum EndpointWarmingPolicy {
       NO_WAIT = 0;
       WAIT_FOR_FIRST_PASSING_HC = 1;
@@ -514,14 +516,19 @@ message Cluster {
       google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
     }
 
-    // Configuration for slow start mode.
-    // <_config_slow_start>`
+    // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
     message SlowStartConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
 
+      // Size of slow start window in seconds, default value is 0.
+      // If set to value greater than 0, the newly created host remains in slow start mode starting from it's creation time
+      // for the duration of slow start window.
       google.protobuf.UInt32Value slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
 
+      // This :ref:`endpoint warming policy type <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>` defines condition
+      // to be satisfied for host to enter slow start mode. The value defaults to
+      // :ref:`NO_WAIT<envoy_api_enum_value_config.cluster.v4alpha.Cluster.CommonLbConfig.EndpointWarmingPolicy.NO_WAIT>`.
       EndpointWarmingPolicy endpoint_warming_policy = 2
           [(validate.rules).enum = {defined_only: true}];
 
@@ -581,10 +588,8 @@ message Cluster {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
     // :ref:`max_interval <envoy_api_field_config.cluster.v4alpha.Cluster.RefreshRate.max_interval>`.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
-      required: true
-      gt {nanos: 1000000}
-    }];
+    google.protobuf.Duration base_interval = 1
+        [(validate.rules).duration = {required: true gt {nanos: 1000000}}];
 
     // Specifies the maximum interval between refreshes. This parameter is optional, but must be
     // greater than or equal to the
