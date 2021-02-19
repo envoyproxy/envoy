@@ -57,15 +57,19 @@ struct PerHandlerListenerStats {
 };
 
 class ActiveUdpListenerBase;
+class ActiveTcpListener;
 
 /**
  * Server side connection handler. This is used both by workers as well as the
  * main thread for non-threaded listeners.
  */
-class ConnectionHandlerImpl : public Network::ConnectionHandler,
+class ConnectionHandlerImpl : public Network::TcpConnectionHandler,
+                              public Network::UdpConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
+  using UdpListenerCallbacksOptRef =
+      absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
   // Network::ConnectionHandler
@@ -75,7 +79,6 @@ public:
   void addListener(absl::optional<uint64_t> overridden_listener,
                    Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
-  Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
@@ -85,6 +88,15 @@ public:
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
+
+  // Network::TcpConnectionHandler
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Network::BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) override;
+  Network::BalancedConnectionHandlerOptRef
+  getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
+
+  // Network::UdpConnectionHandler
+  Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
 
   /**
    * Wrapper for an active listener owned by this handler.
@@ -101,7 +113,6 @@ public:
     Network::ListenerConfig* config_{};
   };
 
-private:
   struct ActiveTcpConnection;
   using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
   struct ActiveTcpSocket;
@@ -114,10 +125,11 @@ private:
    */
   class ActiveTcpListener : public Network::TcpListenerCallbacks,
                             public ActiveListenerImplBase,
-                            public Network::BalancedConnectionHandler {
+                            public Network::BalancedConnectionHandler,
+                            Logger::Loggable<Logger::Id::conn_handler> {
   public:
-    ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
-    ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
+    ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
+    ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
     bool listenerConnectionLimitReached() const {
@@ -125,8 +137,7 @@ private:
       // manager.
       return !config_->openConnections().canCreate();
     }
-    void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
-                        bool hand_off_restored_destination_connections, bool rebalanced);
+
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
       --num_listener_connections_;
@@ -150,6 +161,8 @@ private:
       config_->openConnections().inc();
     }
     void post(Network::ConnectionSocketPtr&& socket) override;
+    void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
+                        bool hand_off_restored_destination_connections, bool rebalanced) override;
 
     /**
      * Remove and destroy an active connection.
@@ -181,7 +194,7 @@ private:
      */
     void updateListenerConfig(Network::ListenerConfig& config);
 
-    ConnectionHandlerImpl& parent_;
+    Network::TcpConnectionHandler& parent_;
     Network::ListenerPtr listener_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
@@ -243,14 +256,15 @@ private:
   struct ActiveTcpSocket : public Network::ListenerFilterManager,
                            public Network::ListenerFilterCallbacks,
                            LinkedObject<ActiveTcpSocket>,
-                           public Event::DeferredDeletable {
+                           public Event::DeferredDeletable,
+                           Logger::Loggable<Logger::Id::conn_handler> {
     ActiveTcpSocket(ActiveTcpListener& listener, Network::ConnectionSocketPtr&& socket,
                     bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           iter_(accept_filters_.end()),
           stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-              listener_.parent_.dispatcher_.timeSource(), socket_->addressProviderSharedPtr(),
+              listener_.parent_.dispatcher().timeSource(), socket_->addressProviderSharedPtr(),
               StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
     }
@@ -313,7 +327,7 @@ private:
 
     // Network::ListenerFilterCallbacks
     Network::ConnectionSocket& socket() override { return *socket_.get(); }
-    Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
+    Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher(); }
     void continueFilterChain(bool success) override;
     void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
     envoy::config::core::v3::Metadata& dynamicMetadata() override {
@@ -332,12 +346,20 @@ private:
     std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
     bool connected_{false};
   };
-
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
-  using UdpListenerCallbacksOptRef =
-      absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
 
-  struct ActiveListenerDetails {
+private:
+  struct ActiveTcpListenerDetail {
+  public:
+    virtual ~ActiveTcpListenerDetail() = default;
+    virtual ActiveTcpListenerOptRef tcpListener() PURE;
+  };
+  struct ActiveUdpListenerDetail {
+  public:
+    virtual ~ActiveUdpListenerDetail() = default;
+    virtual UdpListenerCallbacksOptRef udpListener() PURE;
+  };
+  struct ActiveListenerDetails : public ActiveTcpListenerDetail, public ActiveUdpListenerDetail {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
 
@@ -346,12 +368,10 @@ private:
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
-    ActiveTcpListenerOptRef tcpListener();
-    UdpListenerCallbacksOptRef udpListener();
+    ActiveTcpListenerOptRef tcpListener() override;
+    UdpListenerCallbacksOptRef udpListener() override;
   };
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
-
-  ActiveTcpListenerOptRef findActiveTcpListenerByAddress(const Network::Address::Instance& address);
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
   // This has a value on worker threads, and no value on the main thread.
@@ -364,11 +384,12 @@ private:
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
 
-class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
+using ActiveListenerImplBase = ConnectionHandlerImpl::ActiveListenerImplBase;
+class ActiveUdpListenerBase : public ActiveListenerImplBase,
                               public Network::ConnectionHandler::ActiveUdpListener {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
-                        Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                        Network::UdpConnectionHandler& parent, Network::Socket& listen_socket,
                         Network::UdpListenerPtr&& listener, Network::ListenerConfig* config);
   ~ActiveUdpListenerBase() override;
 
@@ -388,7 +409,7 @@ protected:
 
   const uint32_t worker_index_;
   const uint32_t concurrency_;
-  Network::ConnectionHandler& parent_;
+  Network::UdpConnectionHandler& parent_;
   Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
 };
@@ -401,18 +422,18 @@ class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpReadFilterCallbacks {
 public:
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                       Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                       Network::UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                       Network::ConnectionHandler& parent,
+                       Network::UdpConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                       Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::UdpConnectionHandler& parent, Network::Socket& listen_socket,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                       Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::UdpConnectionHandler& parent, Network::Socket& listen_socket,
                        Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
@@ -446,6 +467,5 @@ private:
   Network::UdpListenerReadFilterPtr read_filter_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
 };
-
 } // namespace Server
 } // namespace Envoy

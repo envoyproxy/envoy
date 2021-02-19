@@ -21,7 +21,7 @@ namespace Quic {
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::ConnectionHandler& parent, Network::ListenerConfig& listener_config,
+    Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
     bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
@@ -30,7 +30,7 @@ ActiveQuicListener::ActiveQuicListener(
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+    Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
@@ -221,7 +221,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
-    uint32_t worker_index, Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
+    uint32_t worker_index, Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
     Network::ListenerConfig& config) {
   bool kernel_worker_routing = false;
   std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();
