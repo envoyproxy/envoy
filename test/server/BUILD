@@ -190,6 +190,7 @@ envoy_cc_test(
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",

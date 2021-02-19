@@ -3,8 +3,8 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common/api:75.3"
-"source/common/api/posix:73.9"
+"source/common/api:74.5"
+"source/common/api/posix:73.0"
 "source/common/common:96.3"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
@@ -13,7 +13,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filter/http:96.5"
 "source/common/http/http3:50.0"
 "source/common/json:90.6"
-"source/common/network:95.2"
+"source/common/network:95.0"  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
 "source/common/protobuf:94.6"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.1"
