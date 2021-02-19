@@ -30,6 +30,9 @@ public:
    * Returns true if the decode path of the filterchain is valid. A filterchain
    * is valid iff for each filter, any decode dependencies required have been
    * provided by a previous filter.
+   *
+   * TODO(auni53): Change this to a general IsValid() that checks decode and
+   * encode path.
    */
   bool DecodePathIsValid();
 

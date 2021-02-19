@@ -79,6 +79,8 @@ TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
   EXPECT_FALSE(manager.DecodePathIsValid());
 }
 
+// TODO(auni53): Add unit tests validating dependency type match.
+
 } // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters
