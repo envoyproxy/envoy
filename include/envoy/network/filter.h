@@ -296,7 +296,7 @@ public:
   /**
    * @return Object on which filters can share data on a per-request basis.
    */
-  virtual StreamInfo::FilterState& filterState() const PURE;
+  virtual StreamInfo::FilterState& filterState() PURE;
 };
 
 /**

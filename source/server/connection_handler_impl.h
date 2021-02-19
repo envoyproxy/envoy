@@ -323,9 +323,7 @@ private:
       return stream_info_->dynamicMetadata();
     };
 
-    StreamInfo::FilterState& filterState() const override {
-      return *stream_info_->filterState().get();
-    }
+    StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
 
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
