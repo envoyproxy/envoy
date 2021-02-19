@@ -7,16 +7,15 @@ namespace HttpConnectionManager {
 
 /**
  * Validation for an http filter chain based on the factory-level
- * FilterDependencies specification. Currently only validates decode
- * dependencies.
- * @see NamedHttpFilterConfigFactory
+ * FilterDependencies specification. @see NamedHttpFilterConfigFactory
+ * Currently only validates decode dependencies.
  */
 class DependencyManager {
 public:
   DependencyManager() {}
 
   /**
-   * Register each filter in an http filterchain, using name and dependencies
+   * Register each filter in an http filter chain, using name and dependencies
    * from the filter factory. Filters must be registered in decode path order.
    */
   void RegisterFilter(
@@ -26,8 +25,8 @@ public:
   }
 
   /**
-   * Returns true if the decode path of the filterchain is valid. A filterchain
-   * is valid iff for each filter, any decode dependencies required have been
+   * Returns true if the decode path of the filter chain is valid. A filter
+   * chain is valid iff for each filter, every decode dependency has been
    * provided by a previous filter.
    *
    * TODO(auni53): Change this to a general IsValid() that checks decode and
