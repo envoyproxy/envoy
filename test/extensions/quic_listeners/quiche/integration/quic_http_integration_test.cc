@@ -36,6 +36,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
 namespace Envoy {
@@ -172,8 +173,31 @@ public:
       envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
           quic_transport_socket_config;
       auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+      if (!use_sds_) {
       ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
                                   *tls_context->mutable_common_tls_context());
+
+      } else {
+      auto common_tls_context = tls_context->mutable_common_tls_context();
+      common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
+          "validation_context");
+      common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("validation_context");
+      auto* validation_context = secret->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+      secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("server_cert");
+      auto* tls_certificate = secret->mutable_tls_certificate();
+      tls_certificate->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
+      tls_certificate->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    }
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
@@ -300,12 +324,19 @@ protected:
   AtomicFileUpdater file_updater_1_;
   AtomicFileUpdater file_updater_2_;
   std::list<quic::QuicConnectionId> designated_connection_ids_;
+  bool use_sds_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
                          testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
+  testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(QuicHttpIntegrationTest, ConfigCertsWithSDS) {
+  use_sds_ = true;
+  initialize();
   testRouterHeaderOnlyRequestAndResponse();
 }
 

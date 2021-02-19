@@ -18,6 +18,13 @@ namespace Quic {
 // server and client.
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory {
 public:
+ QuicTransportSocketFactoryBase(std::unique_ptr<Ssl::ContextConfig> config) 
+    : context_config_(std::move(config)) {
+       context_config_->setSecretUpdateCallback([]() {
+         // No-op. The callback is needed to set up |config_| with the updated secret.
+       });
+    }
+
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr /*options*/) const override {
@@ -25,30 +32,36 @@ public:
   }
   bool implementsSecureTransport() const override { return true; }
   bool usesProxyProtocolOptions() const override { return false; }
+
+protected:
+   const Ssl::ContextConfig& contextConfig() const {
+     return *context_config_;
+   }
+private:
+  std::unique_ptr<Ssl::ContextConfig> context_config_;
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config)
-      : config_(std::move(config)) {}
+  QuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config) : QuicTransportSocketFactoryBase(std::move(config)), config_(dynamic_cast<const Ssl::ServerContextConfig&>(contextConfig())) {}
 
-  const Ssl::ServerContextConfig& serverContextConfig() const { return *config_; }
+  const Ssl::ServerContextConfig& serverContextConfig() const { return config_; }
 
 private:
-  std::unique_ptr<const Ssl::ServerContextConfig> config_;
+  const Ssl::ServerContextConfig& config_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicClientTransportSocketFactory(Envoy::Ssl::ClientContextConfigPtr config)
-      : config_(std::move(config)) {}
+  QuicClientTransportSocketFactory(Ssl::ClientContextConfigPtr config)
+      : QuicTransportSocketFactoryBase(std::move(config)), config_(dynamic_cast<const Ssl::ClientContextConfig&>(contextConfig())) {}
 
-  const Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
+  const Ssl::ClientContextConfig& clientContextConfig() const { return config_; }
 
 private:
-  std::unique_ptr<const Ssl::ClientContextConfig> config_;
+  const Ssl::ClientContextConfig& config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client
