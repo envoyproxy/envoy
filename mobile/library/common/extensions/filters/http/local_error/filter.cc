@@ -43,15 +43,6 @@ void mapLocalHttpResponseToError(uint64_t status, Http::ResponseHeaderMap& heade
   headers.setStatus(218);
 }
 
-// Envoy Mobile surfaces non-"OK" local responses as errors via callbacks rather than an HTTP
-// response. Here that response's "real" status code is mapped to an Envoy Mobile error code
-// which is passed through the response chain as a header. The status code is updated with
-// the sentinel value, 218 ("This is fine").
-void mapLocalGrpcResponseToError(Grpc::Status::GrpcStatus status,
-                                 Http::ResponseHeaderMap& headers) {
-  return mapLocalHttpResponseToError(Grpc::Utility::grpcToHttpStatus(status), headers);
-}
-
 } // namespace
 
 LocalErrorFilter::LocalErrorFilter() {}
@@ -68,14 +59,16 @@ Http::FilterHeadersStatus LocalErrorFilter::encodeHeaders(Http::ResponseHeaderMa
   }
 
   const auto grpc_status = Grpc::Common::getGrpcStatus(headers);
-  if (grpc_status && grpc_status.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
+  // gRPC status in headers implies this is an error.
+  if (grpc_status) {
     ASSERT(end_stream,
            "Local gRPC responses must consist of a single headers frame. If Envoy changes "
            "this expectation, this code needs to be updated.");
     ENVOY_LOG(debug, "intercepted local GRPC response");
-    mapLocalGrpcResponseToError(grpc_status.value(), headers);
-    headers_->addCopy(Http::InternalHeaders::get().ErrorMessage,
-                      Grpc::Common::getGrpcMessage(headers));
+    uint64_t http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+    mapLocalHttpResponseToError(http_status, headers);
+    headers.addCopy(Http::InternalHeaders::get().ErrorMessage,
+                    Grpc::Common::getGrpcMessage(headers));
     return Http::FilterHeadersStatus::Continue;
   }
 
