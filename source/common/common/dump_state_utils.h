@@ -50,7 +50,8 @@ namespace Envoy {
 
 #define DUMP_STATE_UNIMPLEMENTED(classname)                                                        \
   const char* spaces = spacesForLevel(indent_level);                                               \
-  os << spaces << #classname << " " << this << " has not implemented dumpState\n";
+  os << spaces << __FILE__ << ": " << __LINE__ << " " << #classname << " " << this                 \
+     << " has not implemented dumpState\n";
 
 // Return the const char* equivalent of string(level*2, ' '), without dealing
 // with string creation overhead. Cap arbitrarily at 6 as we're (hopefully)

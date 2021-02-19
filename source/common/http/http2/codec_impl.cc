@@ -687,7 +687,11 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   return sendPendingFrames();
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) const {
+const ConnectionImpl::StreamImpl* ConnectionImpl::getConstStream(int32_t stream_id) const {
+  return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
+}
+
+ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
   return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
 }
 
@@ -1444,7 +1448,7 @@ void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
 
   if (current_stream_id_.has_value()) {
     os << " Dumping current stream:\n";
-    ConnectionImpl::StreamImpl* stream = getStream(current_stream_id_.value());
+    const ConnectionImpl::StreamImpl* stream = getConstStream(current_stream_id_.value());
     DUMP_DETAILS(stream);
   } else {
     const auto streams_to_dump = std::min<size_t>(active_streams_.size(), 25);
@@ -1467,8 +1471,8 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
   os << spaces << "Dumping corresponding downstream request for upstream stream "
      << current_stream_id_.value() << ":\n";
 
-  ClientStreamImpl* client_stream =
-      static_cast<ClientStreamImpl*>(getStream(current_stream_id_.value()));
+  const ClientStreamImpl* client_stream =
+      static_cast<const ClientStreamImpl*>(getConstStream(current_stream_id_.value()));
   if (client_stream) {
     client_stream->response_decoder_.dumpState(os, indent_level + 1);
   } else {
