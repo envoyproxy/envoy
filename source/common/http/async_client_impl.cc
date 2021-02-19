@@ -293,7 +293,7 @@ void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncRequestImpl::onReset() {
-  if (!canceled_) {
+  if (!cancelled_) {
     // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
     // Tracing::HttpTracerUtility::finalizeUpstreamSpan.
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
@@ -307,14 +307,14 @@ void AsyncRequestImpl::onReset() {
       *child_span_, remoteClosed() ? &response_->headers() : nullptr,
       remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
 
-  if (!canceled_) {
+  if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
     callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 
 void AsyncRequestImpl::cancel() {
-  canceled_ = true;
+  cancelled_ = true;
 
   // Add tags about the cancellation.
   child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
