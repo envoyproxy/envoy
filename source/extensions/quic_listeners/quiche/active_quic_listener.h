@@ -9,6 +9,7 @@
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"
 
+#include "server/active_udp_listener.h"
 #include "server/connection_handler_impl.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
@@ -25,13 +26,13 @@ public:
   static const size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-                     Network::ConnectionHandler& parent, Network::ListenerConfig& listener_config,
-                     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-                     bool kernel_worker_routing,
+                     Network::UdpConnectionHandler& parent,
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
+                     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
 
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-                     Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+                     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
@@ -86,7 +87,7 @@ public:
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
+  createActiveUdpListener(uint32_t worker_index, Network::UdpConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
 

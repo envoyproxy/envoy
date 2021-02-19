@@ -60,8 +60,21 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_handler_lib",
+    deps = [
+        ":active_stream_listener",
+        ":active_udp_listener",
+        ":connection_handler_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_handler_impl",
     srcs = ["connection_handler_impl.cc"],
-    hdrs = ["connection_handler_impl.h"],
+    hdrs = [
+        "active_stream_listener.h",
+        "active_udp_listener.h",
+        "connection_handler_impl.h",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
@@ -80,8 +93,28 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
-        "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/transport_sockets:well_known_names",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_udp_listener",
+    srcs = ["active_udp_listener.cc"],
+    hdrs = ["active_udp_listener.h"],
+    deps = [
+        ":connection_handler_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_stream_listener",
+    srcs = ["active_stream_listener.cc"],
+    hdrs = ["active_stream_listener.h"],
+    deps = [
+        ":connection_handler_impl",
+        "//include/envoy/event:timer_interface",
+        "//source/common/stats:timespan_lib",
         "//source/extensions/transport_sockets:well_known_names",
     ],
 )
