@@ -449,14 +449,6 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-    /*
-    std::unique_ptr<Network::Socket::Options> options =
-        std::make_unique<Network::Socket::Options>();
-    options->push_back(std::make_shared<Network::SocketOptionImpl>(
-        envoy::config::core::v3::SocketOption::STATE_PREBIND,
-        ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 2 * 1024 * 1024));
-    addListenSocketOptions(std::move(options));
-    */
     // TODO(yugant) : Add a config option for UDP_GRO
     if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
       // Needed to receive gso_size option
