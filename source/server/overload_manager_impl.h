@@ -8,6 +8,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/options.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/stats/scope.h"
@@ -108,7 +109,8 @@ public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                      const Server::Options& options);
 
   // Server::OverloadManager
   void start() override;
