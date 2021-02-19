@@ -21,6 +21,7 @@
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
+#include "envoy/server/options.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/process_context.h"
 #include "envoy/singleton/manager.h"
@@ -54,6 +55,11 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return Server::Options& the command-line options that Envoy was started with.
+   */
+  virtual const Options& options() PURE;
 
   /**
    * @return information about the local environment the server is running in.

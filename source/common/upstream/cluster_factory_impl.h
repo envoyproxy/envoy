@@ -18,6 +18,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -59,13 +60,14 @@ public:
                             const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                             Singleton::Manager& singleton_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                            const Server::Options& options)
       : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
         runtime_(runtime), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
-        validation_visitor_(validation_visitor), api_(api) {}
+        validation_visitor_(validation_visitor), api_(api), options_(options) {}
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
@@ -76,6 +78,7 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   AccessLog::AccessLogManager& logManager() override { return log_manager_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const Server::Options& options() override { return options_; }
   Server::Admin& admin() override { return admin_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   Outlier::EventLoggerSharedPtr outlierEventLogger() override { return outlier_event_logger_; }
@@ -101,6 +104,7 @@ private:
   const bool added_via_api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
+  const Server::Options& options_;
 };
 
 /**
@@ -121,7 +125,8 @@ public:
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+         const Server::Options& options);
 
   /**
    * Create a dns resolver to be used by the cluster.

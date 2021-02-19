@@ -25,6 +25,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 
 using testing::NiceMock;
@@ -72,6 +73,7 @@ protected:
   Network::DnsResolverSharedPtr dns_resolver_;
   AccessLog::MockAccessLogManager log_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
+  Server::MockOptions options_;
 };
 
 class TestStaticClusterImplTest : public testing::Test, public ClusterFactoryTestBase {};
@@ -100,7 +102,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, dispatcher_,
       log_manager_, local_info_, admin_, singleton_manager_, std::move(outlier_event_logger_),
-      false, validation_visitor_, *api_);
+      false, validation_visitor_, *api_, options_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -145,7 +147,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, dispatcher_,
       log_manager_, local_info_, admin_, singleton_manager_, std::move(outlier_event_logger_),
-      false, validation_visitor_, *api_);
+      false, validation_visitor_, *api_, options_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -188,7 +190,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, dispatcher_,
       log_manager_, local_info_, admin_, singleton_manager_, std::move(outlier_event_logger_),
-      false, validation_visitor_, *api_);
+      false, validation_visitor_, *api_, options_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -231,7 +233,7 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
         ClusterFactoryImplBase::create(
             cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
             dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-            std::move(outlier_event_logger_), false, validation_visitor_, *api_);
+            std::move(outlier_event_logger_), false, validation_visitor_, *api_, options_);
       },
       EnvoyException,
       "Didn't find a registered cluster factory implementation for name: "
@@ -264,7 +266,7 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
         ClusterFactoryImplBase::create(
             cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
             dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-            std::move(outlier_event_logger_), false, validation_visitor_, *api_);
+            std::move(outlier_event_logger_), false, validation_visitor_, *api_, options_);
       },
       EnvoyException,
       "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "

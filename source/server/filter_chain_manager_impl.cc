@@ -72,6 +72,10 @@ Event::Dispatcher& PerFilterChainFactoryContextImpl::dispatcher() {
   return parent_context_.dispatcher();
 }
 
+const Server::Options& PerFilterChainFactoryContextImpl::options() {
+  return parent_context_.options();
+}
+
 Grpc::Context& PerFilterChainFactoryContextImpl::grpcContext() {
   return parent_context_.grpcContext();
 }
@@ -679,6 +683,7 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
 }
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
 Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
+const Server::Options& FactoryContextImpl::options() { return server_.options(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
 bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }

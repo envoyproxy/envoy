@@ -18,6 +18,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_manager.h"
@@ -73,6 +74,11 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
+
+  /**
+   * @return Server::Options& the command-line options that Envoy was started with.
+   */
+  virtual const Server::Options& options() PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.

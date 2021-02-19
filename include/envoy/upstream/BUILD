@@ -30,6 +30,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
+        "//include/envoy/server:options_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/thread_local:thread_local_interface",

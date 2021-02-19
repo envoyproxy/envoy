@@ -8,6 +8,7 @@
 #include "envoy/network/udp_packet_writer_config.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
+#include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -192,6 +193,7 @@ Upstream::ClusterManager& ListenerFactoryContextBaseImpl::clusterManager() {
   return server_.clusterManager();
 }
 Event::Dispatcher& ListenerFactoryContextBaseImpl::dispatcher() { return server_.dispatcher(); }
+const Server::Options& ListenerFactoryContextBaseImpl::options() { return server_.options(); }
 Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
 bool ListenerFactoryContextBaseImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
 Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.httpContext(); }
@@ -506,7 +508,7 @@ void ListenerImpl::buildFilterChains() {
       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.stats(), parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-      validation_visitor_, parent_.server_.api());
+      validation_visitor_, parent_.server_.api(), parent_.server_.options());
   transport_factory_context.setInitManager(*dynamic_init_manager_);
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChains(
@@ -591,6 +593,9 @@ Upstream::ClusterManager& PerListenerFactoryContextImpl::clusterManager() {
 }
 Event::Dispatcher& PerListenerFactoryContextImpl::dispatcher() {
   return listener_factory_context_base_->dispatcher();
+}
+const Server::Options& PerListenerFactoryContextImpl::options() {
+  return listener_factory_context_base_->options();
 }
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
