@@ -79,6 +79,7 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/protobuf",
     ],

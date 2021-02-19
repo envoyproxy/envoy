@@ -17,7 +17,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
     return;
   }
 
-  auto filter = std::make_unique<OriginalDstFilter>();
+  auto filter =
+      std::make_unique<OriginalDstFilter>(envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   ListenerFilterFuzzer fuzzer;
   fuzzer.fuzz(*filter, input);
 }

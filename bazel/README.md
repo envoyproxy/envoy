@@ -174,6 +174,8 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
 
+    The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
+
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
     Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
     the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja

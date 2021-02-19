@@ -14,7 +14,8 @@ public:
   // Api::OsSysCalls
   SysCallIntResult bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) override;
   SysCallIntResult chmod(const std::string& path, mode_t mode) override;
-  SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp) override;
+  SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp, unsigned long,
+                         void*, unsigned long, unsigned long*) override;
   SysCallSizeResult writev(os_fd_t fd, const iovec* iov, int num_iov) override;
   SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) override;
   SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) override;
