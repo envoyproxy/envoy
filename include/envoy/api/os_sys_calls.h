@@ -32,9 +32,14 @@ public:
   virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
+   * This interface is based on Windows `WSAIoctl`. It becomes equivalent with the POSIX interface
+   * with `in_buffer` as `argp` and the rest of the parameters ignored.
    * @see ioctl (man 2 ioctl)
+   * @see WSAIoctl (MSDN)
    */
-  virtual SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp) PURE;
+  virtual SysCallIntResult ioctl(os_fd_t sockfd, unsigned long control_code, void* in_buffer,
+                                 unsigned long in_buffer_len, void* out_buffer,
+                                 unsigned long out_buffer_len, unsigned long* bytes_returned) PURE;
 
   /**
    * @see writev (man 2 writev)

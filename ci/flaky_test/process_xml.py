@@ -24,9 +24,9 @@ def didTestPass(file):
 # Returns a pretty-printed string of a test case failure.
 def printTestCaseFailure(testcase, testsuite, failure_msg, log_path):
   ret = "Test flake details:\n"
-  ret += "- Test suite:\t{}\n".format(testsuite)
-  ret += "- Test case:\t{}\n".format(testcase)
-  ret += "- Log path:\t{}\n".format(log_path)
+  ret += "- Test suite:   {}\n".format(testsuite)
+  ret += "- Test case:    {}\n".format(testcase)
+  ret += "- Log path:     {}\n".format(log_path)
   ret += "- Details:\n"
   for line in failure_msg.splitlines():
     ret += "\t" + line + "\n"
@@ -37,15 +37,15 @@ def printTestCaseFailure(testcase, testsuite, failure_msg, log_path):
 # Returns a pretty-printed string of a test suite error, such as an exception or a timeout.
 def printTestSuiteError(testsuite, testcase, log_path, duration, time, error_msg, output):
   ret = "Test flake details:\n"
-  ret += "- Test suite:\t{}\n".format(testsuite)
-  ret += "- Test case:\t{}\n".format(testcase)
-  ret += "- Log path:\t{}\n".format(log_path)
+  ret += "- Test suite:   {}\n".format(testsuite)
+  ret += "- Test case:    {}\n".format(testcase)
+  ret += "- Log path:     {}\n".format(log_path)
 
   errno_string = os.strerror(int(error_msg.split(' ')[-1]))
-  ret += "- Error:\t{} ({})\n".format(error_msg.capitalize(), errno_string)
+  ret += "- Error:        {} ({})\n".format(error_msg.capitalize(), errno_string)
 
   if duration == time and duration in well_known_timeouts:
-    ret += "- Note:\t\tThis error is likely a timeout (test duration == {}, a well known timeout value).\n".format(
+    ret += "- Note:         This error is likely a timeout (test duration == {}, a well known timeout value).\n".format(
         duration)
 
   # If there's a call stack, print it. Otherwise, attempt to print the most recent,
@@ -170,23 +170,24 @@ def getGitInfo(CI_TARGET):
   ret = ""
 
   if CI_TARGET != "":
-    ret += "Target:\t\t{}\n".format(CI_TARGET)
+    ret += "Target:         {}\n".format(CI_TARGET)
 
   if os.getenv('SYSTEM_STAGEDISPLAYNAME') and os.getenv('SYSTEM_STAGEJOBNAME'):
-    ret += "Stage:\t\t{} {}\n".format(os.environ['SYSTEM_STAGEDISPLAYNAME'],
-                                      os.environ['SYSTEM_STAGEJOBNAME'])
+    ret += "Stage:          {} {}\n".format(os.environ['SYSTEM_STAGEDISPLAYNAME'],
+                                            os.environ['SYSTEM_STAGEJOBNAME'])
 
-  if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv('SYSTEM_PULLREQUEST_PULLREQUESTID'):
-    ret += "Pull request:\t{}/pull/{}\n".format(os.environ['REPO_URI'],
-                                                os.environ['SYSTEM_PULLREQUEST_PULLREQUESTID'])
+  if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv(
+      'SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'):
+    ret += "Pull request:   {}/pull/{}\n".format(os.environ['REPO_URI'],
+                                                 os.environ['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'])
   elif os.getenv('BUILD_REASON'):
-    ret += "Build reason:\t{}\n".format(os.environ['BUILD_REASON'])
+    ret += "Build reason:   {}\n".format(os.environ['BUILD_REASON'])
 
   output = subprocess.check_output(['git', 'log', '--format=%H', '-n', '1'], encoding='utf-8')
-  ret += "Commmit:\t{}/commit/{}".format(os.environ['REPO_URI'], output)
+  ret += "Commmit:        {}/commit/{}".format(os.environ['REPO_URI'], output)
 
   build_id = os.environ['BUILD_URI'].split('/')[-1]
-  ret += "CI results:\thttps://dev.azure.com/cncf/envoy/_build/results?buildId=" + build_id + "\n"
+  ret += "CI results:     https://dev.azure.com/cncf/envoy/_build/results?buildId=" + build_id + "\n"
 
   ret += "\n"
 
@@ -194,14 +195,14 @@ def getGitInfo(CI_TARGET):
 
   if ("origin" in remotes):
     output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
-    ret += "Origin:\t\t{}".format(output.replace('.git', ''))
+    ret += "Origin:         {}".format(output.replace('.git', ''))
 
   if ("upstream" in remotes):
     output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
-    ret += "Upstream:\t{}".format(output.replace('.git', ''))
+    ret += "Upstream:       {}".format(output.replace('.git', ''))
 
-  output = subprocess.check_output(['git', 'describe', '--all'], encoding='utf-8')
-  ret += "Latest ref:\t{}".format(output)
+  output = subprocess.check_output(['git', 'describe', '--all', '--always'], encoding='utf-8')
+  ret += "Latest ref:     {}".format(output)
 
   ret += "\n"
 
@@ -223,7 +224,7 @@ if __name__ == "__main__":
   if os.getenv('TEST_TMPDIR') and os.getenv('REPO_URI') and os.getenv("BUILD_URI"):
     os.environ["TMP_OUTPUT_PROCESS_XML"] = os.getenv("TEST_TMPDIR") + "/tmp_output_process_xml.txt"
   else:
-    print("Set the env variables TEST_TMPDIR and REPO_URI first.")
+    print("Set the env variables TEST_TMPDIR, REPO_URI, and BUILD_URI first.")
     sys.exit(0)
 
   find_dir = "{}/**/**/**/**/bazel-testlogs/".format(os.environ['TEST_TMPDIR']).replace('\\', '/')
