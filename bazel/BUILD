@@ -183,10 +183,18 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "gcc_build_compiler_on_linux",
+    match_all = [
+        ":gcc_build_compiler",
+        ":linux",
+    ],
+)
+
+selects.config_setting_group(
     name = "gcc_build",
     match_any = [
         ":gcc_build_gcc",
-        ":gcc_build_compiler",
+        ":gcc_build_compiler_on_linux",
     ],
 )
 
