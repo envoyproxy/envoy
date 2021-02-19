@@ -14,7 +14,7 @@ bool DependencyManager::IsValid() {
   auto cmp = [](Dependency a, Dependency b) { return a.name() != b.name(); };
   std::set<Dependency, decltype(cmp)> satisfied(cmp);
 
-  for (auto& [name, dependencies] : dependencies_) {
+  for (auto& [name, dependencies] : filter_chain_) {
     for (auto& requirement : dependencies.decode_required()) {
       if (satisfied.count(requirement) == 0) {
         return false;
