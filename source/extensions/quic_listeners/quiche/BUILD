@@ -349,6 +349,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
+        "@com_googlesource_quiche//:quic_core_session_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -131,6 +131,12 @@ public:
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
+    // TODO(danzh) defer setting flow control window till getting http2 options. This requires
+    // QUICHE support to set the session's flow controller after instatiation.
+    quic_config_.SetInitialStreamFlowControlWindowToSend(
+        Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+    quic_config_.SetInitialSessionFlowControlWindowToSend(
+        1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, supported_versions_, std::move(connection), server_id_, crypto_config_.get(),
         &push_promise_index_, *dispatcher_, 0);

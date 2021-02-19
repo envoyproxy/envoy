@@ -202,5 +202,41 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
   return sign_alg;
 }
 
+quic::QuicByteCount GetReceivedFlowControlWindow(quic::QuicSession* session,
+                                                 quic::QuicStreamId stream_id) {
+  quic::ParsedQuicVersion version = session->connection()->version();
+  if (version.handshake_protocol != quic::PROTOCOL_TLS1_3) {
+    if (session->config()->HasReceivedInitialStreamFlowControlWindowBytes()) {
+      return session->config()->ReceivedInitialStreamFlowControlWindowBytes();
+    }
+
+    return quic::kDefaultFlowControlSendWindow;
+  }
+
+  // Unidirectional streams (v99 only).
+  if (VersionHasIetfQuicFrames(version.transport_version) &&
+      !quic::QuicUtils::IsBidirectionalStreamId(stream_id, version)) {
+    if (session->config()->HasReceivedInitialMaxStreamDataBytesUnidirectional()) {
+      return session->config()->ReceivedInitialMaxStreamDataBytesUnidirectional();
+    }
+
+    return 0;
+  }
+
+  if (quic::QuicUtils::IsOutgoingStreamId(version, stream_id, session->perspective())) {
+    if (session->config()->HasReceivedInitialMaxStreamDataBytesOutgoingBidirectional()) {
+      return session->config()->ReceivedInitialMaxStreamDataBytesOutgoingBidirectional();
+    }
+
+    return 0;
+  }
+
+  if (session->config()->HasReceivedInitialMaxStreamDataBytesIncomingBidirectional()) {
+    return session->config()->ReceivedInitialMaxStreamDataBytesIncomingBidirectional();
+  }
+
+  return 0;
+}
+
 } // namespace Quic
 } // namespace Envoy

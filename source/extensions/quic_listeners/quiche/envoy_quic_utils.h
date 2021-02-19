@@ -15,6 +15,8 @@
 #endif
 
 #include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/quic_utils.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -93,6 +95,9 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::str
 // Return the sign algorithm id works with the public key; If the public key is
 // not supported, return 0 with error_details populated correspondingly.
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
+
+quic::QuicByteCount GetReceivedFlowControlWindow(quic::QuicSession* session,
+                                                 quic::QuicStreamId stream_id);
 
 } // namespace Quic
 } // namespace Envoy
