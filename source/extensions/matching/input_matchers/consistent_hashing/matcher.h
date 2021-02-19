@@ -20,7 +20,7 @@ public:
     }
 
     // Otherwise, match if (hash(input) % modulo) > threshold.
-    return HashUtil::xxHash64(*input) % modulo_ > threshold_;
+    return HashUtil::xxHash64(*input) % modulo_ >= threshold_;
   }
 
 private:

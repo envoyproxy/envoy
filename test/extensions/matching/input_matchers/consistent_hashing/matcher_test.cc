@@ -28,13 +28,36 @@ TEST(MatcherTest, BasicUsage) {
     EXPECT_TRUE(matcher1.match("hello"));
     EXPECT_TRUE(matcher2.match("hello"));
   }
+  {
+    Matcher matcher1(59, 100);
+    Matcher matcher2(59, 100);
 
-  Matcher matcher1(59, 100);
-  Matcher matcher2(59, 100);
+    // The string 'hello' hashes to 2794345569481354659
+    // With mod 100 this results in 59, which is equal
+    // to the threshold.
+    EXPECT_TRUE(matcher1.match("hello"));
+    EXPECT_TRUE(matcher2.match("hello"));
+  }
+  {
+    Matcher matcher1(60, 100);
+    Matcher matcher2(60, 100);
 
-  // Changing the threshold to 59 means that we no longer match.
-  EXPECT_FALSE(matcher1.match("hello"));
-  EXPECT_FALSE(matcher2.match("hello"));
+    // The string 'hello' hashes to 2794345569481354659
+    // With mod 100 this results in 59, which is less
+    // than the threshold.
+    EXPECT_FALSE(matcher1.match("hello"));
+    EXPECT_FALSE(matcher2.match("hello"));
+  }
+  {
+    Matcher matcher1(0, 1);
+    Matcher matcher2(0, 1);
+
+    // The string 'hello' hashes to 2794345569481354659
+    // With mod 1 this results in 0, which is equal to
+    // the threshold.
+    EXPECT_TRUE(matcher1.match("hello"));
+    EXPECT_TRUE(matcher2.match("hello"));
+  }
 }
 } // namespace ConsistentHashing
 } // namespace InputMatchers
