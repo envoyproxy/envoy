@@ -302,6 +302,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
 
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
+    // Using 2x default timeout to cover for slow TLS implementations (no inline asm) on slow
+    // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners here.
     Event::TestTimeSystem::RealTimeBound bound(2 * TestUtility::DefaultTimeout);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
