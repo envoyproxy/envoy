@@ -152,7 +152,7 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_headers());
     if (first_message) {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      processor_stream_->startGrpcStream();
     }
     ProcessingResponse response;
     auto* headers = response.mutable_request_headers();
@@ -174,7 +174,7 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_response_headers());
     if (first_message) {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      processor_stream_->startGrpcStream();
     }
     ProcessingResponse response;
     auto* headers = response.mutable_response_headers();
@@ -195,7 +195,7 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_body());
     if (first_message) {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      processor_stream_->startGrpcStream();
     }
     ProcessingResponse response;
     auto* body = response.mutable_request_body();
@@ -216,7 +216,7 @@ protected:
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_response_body());
     if (first_message) {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      processor_stream_->startGrpcStream();
     }
     ProcessingResponse response;
     auto* body = response.mutable_response_body();
@@ -236,7 +236,7 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     if (first_message) {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+      processor_stream_->startGrpcStream();
     }
     ProcessingResponse response;
     auto* immediate = response.mutable_immediate_response();
@@ -265,8 +265,8 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
   // Just close the stream without doing anything
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
+  processor_stream_->startGrpcStream();
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -297,13 +297,13 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLine) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
   processor_stream_->sendGrpcMessage(resp1);
 
   // Fail the stream in between messages
-  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
 
   verifyDownstreamResponse(*response, 500);
 }
@@ -318,13 +318,13 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLineLater) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
   processor_stream_->sendGrpcMessage(resp1);
 
   // Fail the stream in between messages
-  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
 
   verifyDownstreamResponse(*response, 500);
 }
@@ -339,7 +339,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamOnResponse) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
   processor_stream_->sendGrpcMessage(resp1);
@@ -348,7 +348,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamOnResponse) {
 
   ProcessingRequest response_headers_msg;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
-  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -363,7 +363,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(request_headers_msg);
-  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
   processor_stream_->sendGrpcMessage(resp1);
@@ -372,7 +372,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
 
   ProcessingRequest response_headers_msg;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, response_headers_msg));
-  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+  processor_stream_->finishGrpcStream(Grpc::Status::Internal);
 
   verifyDownstreamResponse(*response, 500);
 }
