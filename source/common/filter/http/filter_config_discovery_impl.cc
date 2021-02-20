@@ -113,19 +113,10 @@ void FilterConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
                                      filter_config.name()));
   }
+  // Skip update if hash matches
   const uint64_t new_hash = MessageUtil::hash(filter_config.typed_config());
-  auto providers = filter_config_providers_;
   if (new_hash == last_config_hash_) {
-    // if hash matches, only update provider that has not been initialized
-    providers.clear();
-    for (auto* provider : filter_config_providers_) {
-      if (!provider->config().has_value()) {
-        providers.insert(provider);
-      }
-    }
-    if (providers.empty()) {
-      return;
-    }
+    return;
   }
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -133,7 +124,7 @@ void FilterConfigSubscription::onConfigUpdate(
   // Ensure that the filter config is valid in the filter chain context once the proto is processed.
   // Validation happens before updating to prevent a partial update application. It might be
   // possible that the providers have distinct type URL constraints.
-  for (auto* provider : providers) {
+  for (auto* provider : filter_config_providers_) {
     provider->validateConfig(filter_config.typed_config(), factory);
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
@@ -142,8 +133,8 @@ void FilterConfigSubscription::onConfigUpdate(
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
   const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
-      (factory_context_.admin().concurrency() + 1) * providers.size());
-  for (auto* provider : providers) {
+      (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
+  for (auto* provider : filter_config_providers_) {
     provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
       if (--(*pending_update) == 0) {
         stats_.config_reload_.inc();
