@@ -135,6 +135,11 @@ ConfigImpl::ConfigImpl(
       processFilter(filter);
     }
   }
+
+  if (config.has_max_requests_per_connection() &&
+      config.max_requests_per_connection().value() > 0) {
+    max_requests_per_connection_ = config.max_requests_per_connection().value();
+  }
 }
 
 void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) {

@@ -40,6 +40,7 @@ public:
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
+  virtual uint64_t maxRequestsPerConnection() const PURE;
 };
 
 /**
@@ -272,6 +273,11 @@ private:
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;
+
+  // The number of requests accumulated on the current connection. A connection is processed by only
+  // one thread, so there is no need to consider the thread safety of the count.
+  uint32_t accumulated_requests_{0};
+  bool requests_overflow_{false};
 };
 
 } // namespace ThriftProxy
