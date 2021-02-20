@@ -129,6 +129,42 @@ private:
 
 class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
+  class InterfaceMatcher {
+  public:
+    using MatcherImpl = std::function<bool(const absl::string_view)>;
+    InterfaceMatcher(const std::string& interface_name) {
+      if (interface_name == "*") {
+        impl_ = [](const absl::string_view) { return true; };
+        return;
+      }
+
+      if (absl::StartsWith(interface_name, "*")) {
+        const std::string suffix = interface_name.substr(1);
+        impl_ = [suffix](const absl::string_view interface) {
+          return absl::EndsWith(interface, suffix);
+        };
+        return;
+      }
+
+      if (absl::EndsWith(interface_name, "*")) {
+        const std::string prefix = interface_name.substr(0, interface_name.size() - 1);
+        impl_ = [prefix](const absl::string_view interface) {
+          return absl::StartsWith(interface, prefix);
+        };
+        return;
+      }
+
+      impl_ = [interface_name](const absl::string_view interface) {
+        return interface == interface_name;
+      };
+    }
+
+    bool match(const absl::string_view interface) const { return impl_(interface); }
+
+  private:
+    MatcherImpl impl_;
+  };
+
   using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration;
   SingleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
 
@@ -136,7 +172,7 @@ public:
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
-  const std::string service_name_;
+  const InterfaceMatcher interface_matcher_;
   const absl::optional<std::string> group_;
   const absl::optional<std::string> version_;
 };

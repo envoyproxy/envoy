@@ -38,6 +38,115 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
 
 } // namespace
 
+TEST(DubboRouteMatcherTest, RouteByServiceNameWithWildcard) {
+  {
+    const std::string yaml = R"EOF(
+name: local_route
+interface: "*"
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV2Yaml(yaml);
+
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setMethodName("add");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("unknown");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("random");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake_service");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+  }
+  {
+    const std::string yaml = R"EOF(
+name: local_route
+interface: "*.test.com"
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV2Yaml(yaml);
+
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setMethodName("add");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("code.test.com");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake.test.com");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake_service");
+
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+  }
+  {
+    const std::string yaml = R"EOF(
+name: local_route
+interface: "com.test.*"
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+        parseRouteConfigurationFromV2Yaml(yaml);
+
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setMethodName("add");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("com.test.code");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("com.test.fake");
+
+    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+
+    invo->setServiceName("fake_service");
+
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+  }
+}
+
 TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
   {
     const std::string yaml = R"EOF(
