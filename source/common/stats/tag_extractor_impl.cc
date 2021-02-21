@@ -185,22 +185,6 @@ TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::str
     : TagExtractorImplBase(name, tokens, substr), tokens_(absl::StrSplit(tokens, '.')),
       match_index_(findMatchIndex(tokens_)) {
   prefix_ = tokens_[0];
-  substr_index_ = 0;
-
-  for (uint32_t i = 1; i < tokens_.size(); ++i) {
-    absl::string_view token = tokens_[i];
-    if (token == "**") {
-      // Can't infer a token index if we see a pattern that can have a variable number of dots.
-      break;
-    }
-    if (substr_.empty() && token != "*" && token != "$") {
-      substr_ = token;
-    }
-    if (substr_ == token) {
-      substr_index_ = i;
-      break;
-    }
-  }
 }
 
 uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
@@ -209,6 +193,7 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& 
       return i;
     }
   }
+  ASSERT(false, absl::StrCat("did not find match in ", absl::StrJoin(tokens, ".")));
   return 0;
 }
 
@@ -216,34 +201,20 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
                                         IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
-  const std::vector<absl::string_view>& tokens = context.tokens();
-  if ((substr_index_ == 0 && substrMismatch(context.name())) ||
-      (substr_index_ != 0 &&
-       (substr_index_ >= tokens.size() || tokens[substr_index_] != substr_))) {
-    PERF_RECORD(perf, "tokens-skip", name_);
-    PERF_TAG_INC(skipped_);
-    return false;
-  }
-
-  uint32_t char_index = 0, start = 0, end = 0, input_index = 0, pattern_index = 0;
-  absl::string_view tag_value;
-  for (; input_index < tokens.size() && pattern_index < tokens_.size();
+  const std::vector<absl::string_view>& input_tokens = context.tokens();
+  uint32_t char_index = 0, start = 0, input_index = 0, pattern_index = 0;
+  uint32_t match_input_index = input_tokens.size();
+  for (; input_index < input_tokens.size() && pattern_index < tokens_.size();
        ++input_index, ++pattern_index) {
     if (pattern_index == match_index_) {
-      tag_value = tokens[input_index];
       start = char_index;
-      end = start + tag_value.size();
-      if (input_index < (tokens.size() - 1)) {
-        ++end; // Remove dot leading to next token
-      } else if (start > 0) {
-        --start;
-      }
+      match_input_index = input_index;
     } else {
       absl::string_view expected = tokens_[pattern_index];
       if (expected == "**") {
         if (pattern_index == tokens_.size() - 1) {
           pattern_index = tokens_.size();
-          input_index = tokens.size();
+          input_index = input_tokens.size();
           break;
         }
 
@@ -257,29 +228,38 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
         // DO NOT SUBMIT TILL FIXED.
         ++pattern_index;
         expected = tokens_[pattern_index];
-        for (; input_index < tokens.size(); ++input_index) {
-          if (tokens[input_index] == expected) {
+        for (; input_index < input_tokens.size(); ++input_index) {
+          if (input_tokens[input_index] == expected) {
             break;
           }
-          char_index += tokens[input_index].size() + 1;
+          char_index += input_tokens[input_index].size() + 1;
         }
       }
-      if ((expected != "*" && expected != "**") && (expected != tokens[input_index])) {
+      if ((expected != "*" && expected != "**") && (expected != input_tokens[input_index])) {
         PERF_RECORD(perf, "tokens-miss", name_);
         PERF_TAG_INC(missed_);
         return false;
       }
-      char_index += tokens[input_index].size() + 1;
+      char_index += input_tokens[input_index].size() + 1;
     }
   }
-  if (pattern_index < tokens_.size() || input_index < tokens.size()) {
+  if (pattern_index < tokens_.size() || input_index < input_tokens.size()) {
     PERF_RECORD(perf, "tokens-miss", name_);
     PERF_TAG_INC(missed_);
     return false;
   }
 
+  ASSERT(match_input_index < input_tokens.size());
+  const absl::string_view tag_value = input_tokens[match_input_index];
+  uint32_t end = start + tag_value.size();
+  if (match_input_index < (input_tokens.size() - 1)) {
+    ++end; // Remove dot leading to next token
+  } else if (start > 0) {
+    --start;
+  }
   remove_characters.insert(start, end);
   addTag(tags) = tag_value;
+
   PERF_RECORD(perf, "tokens-match", name_);
   PERF_TAG_INC(matched_);
   return true;

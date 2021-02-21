@@ -150,7 +150,6 @@ private:
 
   const std::vector<std::string> tokens_;
   const uint32_t match_index_;
-  uint32_t substr_index_;
 };
 
 } // namespace Stats
