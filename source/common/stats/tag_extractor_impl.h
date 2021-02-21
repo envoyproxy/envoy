@@ -147,6 +147,9 @@ public:
 
 private:
   static uint32_t findMatchIndex(const std::vector<std::string>& tokens);
+  bool extractTagHelper(const std::vector<absl::string_view>& input_tokens, uint32_t input_index,
+                        uint32_t pattern_index, uint32_t char_index, uint32_t& start,
+                        uint32_t& match_input_index) const;
 
   const std::vector<std::string> tokens_;
   const uint32_t match_index_;

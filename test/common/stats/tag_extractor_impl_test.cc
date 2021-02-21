@@ -451,6 +451,26 @@ TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWild) {
   EXPECT_EQ("is.the.time.to.come.to.the.aid", tag_extracted_name_);
 }
 
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackEarlyMatch) {
+  EXPECT_TRUE(extract("when", "$.**.aid.of.their",
+                      "now.is.the.time.to.come.to.the.aid.backtrack.now.aid.of.their"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_EQ("is.the.time.to.come.to.the.aid.backtrack.now.aid.of.their", tag_extracted_name_);
+}
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackImmediateMatch) {
+  EXPECT_TRUE(extract("match", "now.**.$.of.their",
+                      "now.is.the.time.to.come.to.the.aid.fake.aid.real.of.their"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"match", "real"}));
+  EXPECT_EQ("now.is.the.time.to.come.to.the.aid.fake.aid.of.their", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackLateMatch) {
+  EXPECT_TRUE(extract("match", "now.**.aid.$.of.their",
+                      "now.is.the.time.to.come.to.the.aid.fake.aid.real.of.their"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"match", "real"}));
+  EXPECT_EQ("now.is.the.time.to.come.to.the.aid.fake.aid.of.their", tag_extracted_name_);
+}
+
 TEST_F(TagExtractorTokensTest, TokensMatchMiddle) {
   EXPECT_TRUE(extract("article", "now.is.$.time", "now.is.the.time"));
   EXPECT_THAT(tags_, ElementsAre(Tag{"article", "the"}));

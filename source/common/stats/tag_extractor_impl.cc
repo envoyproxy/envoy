@@ -200,56 +200,13 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& 
 bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                         IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
-
   const std::vector<absl::string_view>& input_tokens = context.tokens();
-  uint32_t char_index = 0, start = 0, input_index = 0, pattern_index = 0;
-  uint32_t match_input_index = input_tokens.size();
-  for (; input_index < input_tokens.size() && pattern_index < tokens_.size();
-       ++input_index, ++pattern_index) {
-    if (pattern_index == match_index_) {
-      start = char_index;
-      match_input_index = input_index;
-    } else {
-      absl::string_view expected = tokens_[pattern_index];
-      if (expected == "**") {
-        if (pattern_index == tokens_.size() - 1) {
-          pattern_index = tokens_.size();
-          input_index = input_tokens.size();
-          break;
-        }
-
-        // A "**" in the pattern anywhere except the end means that we must
-        // search for the next expected token. Note: this implementation has a
-        // bug. Consider pattern "a.**.b.c.$" and input "a.x.b.b.c.d". This
-        // algorithm will greedily match the "**" against "x" when it should
-        // match against "x.b". It needs to backtrack to get this right,
-        // e.g. via recursion.
-        //
-        // DO NOT SUBMIT TILL FIXED.
-        ++pattern_index;
-        expected = tokens_[pattern_index];
-        for (; input_index < input_tokens.size(); ++input_index) {
-          if (input_tokens[input_index] == expected) {
-            break;
-          }
-          char_index += input_tokens[input_index].size() + 1;
-        }
-      }
-      if ((expected != "*" && expected != "**") && (expected != input_tokens[input_index])) {
-        PERF_RECORD(perf, "tokens-miss", name_);
-        PERF_TAG_INC(missed_);
-        return false;
-      }
-      char_index += input_tokens[input_index].size() + 1;
-    }
-  }
-  if (pattern_index < tokens_.size() || input_index < input_tokens.size()) {
+  uint32_t match_input_index = input_tokens.size(), start = 0;
+  if (!extractTagHelper(input_tokens, 0, 0, 0, start, match_input_index)) {
     PERF_RECORD(perf, "tokens-miss", name_);
     PERF_TAG_INC(missed_);
     return false;
   }
-
-  ASSERT(match_input_index < input_tokens.size());
   const absl::string_view tag_value = input_tokens[match_input_index];
   uint32_t end = start + tag_value.size();
   if (match_input_index < (input_tokens.size() - 1)) {
@@ -263,6 +220,48 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   PERF_RECORD(perf, "tokens-match", name_);
   PERF_TAG_INC(matched_);
   return true;
+}
+
+bool TagExtractorTokensImpl::extractTagHelper(const std::vector<absl::string_view>& input_tokens,
+                                              uint32_t input_index, uint32_t pattern_index,
+                                              uint32_t char_index, uint32_t& start,
+                                              uint32_t& match_input_index) const {
+  for (; input_index < input_tokens.size() && pattern_index < tokens_.size();
+       ++input_index, ++pattern_index) {
+    if (pattern_index == match_index_) {
+      start = char_index;
+      match_input_index = input_index;
+    } else {
+      const absl::string_view expected = tokens_[pattern_index];
+      if (expected == "**") {
+        if (pattern_index == tokens_.size() - 1) {
+          pattern_index = tokens_.size();
+          input_index = input_tokens.size();
+          break;
+        }
+
+        // A "**" in the pattern anywhere except the end means that we must find
+        // a match for the remainder of the pattern anywhere in the the
+        // input. Consider pattern "a.**.b.c.$" and input "a.x.b.b.c.d". We
+        // don't want to just greedily match the "**" against "x" when it should
+        // match against "x.b". Thus we recurse looking for a complete match.
+        ++pattern_index;
+        for (; input_index < input_tokens.size(); ++input_index) {
+          if (extractTagHelper(input_tokens, input_index, pattern_index, char_index, start,
+                               match_input_index)) {
+            return true;
+          }
+          char_index += input_tokens[input_index].size() + 1;
+        }
+        return false;
+      }
+      if (expected != "*" && expected != input_tokens[input_index]) {
+        return false;
+      }
+      char_index += input_tokens[input_index].size() + 1;
+    }
+  }
+  return pattern_index == tokens_.size() && input_index == input_tokens.size();
 }
 
 } // namespace Stats
