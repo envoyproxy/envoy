@@ -54,8 +54,7 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   }
   for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
     if (desc.name_ == name) {
-      addExtractor(
-          std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_, desc.substr_));
+      addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_));
       ++num_found;
     }
   }
@@ -117,8 +116,7 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsCon
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
       names.emplace(desc.name_);
-      addExtractor(
-          std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_, desc.substr_));
+      addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_));
     }
   }
   return names;

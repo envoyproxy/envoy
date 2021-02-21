@@ -64,7 +64,7 @@ TagNameValues::TagNameValues() {
          ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
-  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**", "callsite");
+  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
@@ -143,9 +143,8 @@ void TagNameValues::addRe2(const std::string& name, const std::string& regex,
   descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
 }
 
-void TagNameValues::addTokenized(const std::string& name, const std::string& tokens,
-                                 absl::string_view substr) {
-  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens, std::string(substr)});
+void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {
+  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens});
 }
 
 } // namespace Config
