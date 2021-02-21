@@ -229,6 +229,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
     return stream_info_->dynamicMetadata();
   };
+  StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
 
   ActiveTcpListener& listener_;
   Network::ConnectionSocketPtr socket_;
