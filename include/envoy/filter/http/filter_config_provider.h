@@ -15,7 +15,7 @@ namespace Http {
 using FilterConfigProvider =
     Envoy::Config::ExtensionConfigProvider<Server::Configuration::NamedHttpFilterConfigFactory,
                                            Envoy::Http::FilterFactoryCb>;
-using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider>;
+using FilterConfigProviderPtr = std::shared_ptr<FilterConfigProvider>;
 
 /**
  * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider

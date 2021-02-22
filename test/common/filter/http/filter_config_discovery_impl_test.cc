@@ -263,6 +263,7 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
   EXPECT_CALL(init_watcher_, ready());
   callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
+  EXPECT_EQ(provider_.get(), provider2.get());
   EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_NE(absl::nullopt, provider2->config());
   EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
@@ -293,6 +294,12 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
       "expect envoy.extensions.filters.http.router.v3.Router.");
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
+
+// TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
+//   InSequence s;
+//   setup();
+//   auto provider2 = createProvider("foo", true);
+// }
 
 } // namespace
 } // namespace Http

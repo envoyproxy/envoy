@@ -200,21 +200,37 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     bool apply_without_warming) {
-  auto subscription =
-      getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
-  // For warming, wait until the subscription receives the first response to indicate readiness.
-  // Otherwise, mark ready immediately and start the subscription on initialization. A default
-  // config is expected in the latter case.
-  if (!apply_without_warming) {
-    factory_context.initManager().add(subscription->initTarget());
+  const uint64_t config_source_hash = MessageUtil::hash(config_source);
+  const uint64_t provider_identifier =
+      HashUtil::xxHash64(absl::StrCat(filter_config_name, std::to_string(config_source_hash)));
+  auto it = dynamic_filter_config_providers_.find(provider_identifier);
+  if (it == dynamic_filter_config_providers_.end()) {
+    auto subscription =
+        getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
+    // For warming, wait until the subscription receives the first response to indicate readiness.
+    // Otherwise, mark ready immediately and start the subscription on initialization. A default
+    // config is expected in the latter case.
+    if (!apply_without_warming) {
+      factory_context.initManager().add(subscription->initTarget());
+    }
+    auto provider = std::make_shared<DynamicFilterConfigProviderImpl>(
+        std::move(subscription), require_type_urls, factory_context);
+    // Ensure the subscription starts if it has not already.
+    if (apply_without_warming) {
+      factory_context.initManager().add(provider->init_target_);
+    }
+    dynamic_filter_config_providers_.insert(
+        {provider_identifier, std::weak_ptr<DynamicFilterConfigProviderImpl>(provider)});
+    return provider;
+  } else {
+    auto existing_provider = it->second.lock();
+    ASSERT(existing_provider != nullptr,
+           absl::StrCat("Cannot find dynamic filter config provider ", filter_config_name));
+    if (!apply_without_warming) {
+      factory_context.initManager().add(existing_provider->subscription_->initTarget());
+    }
+    return existing_provider;
   }
-  auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      std::move(subscription), require_type_urls, factory_context);
-  // Ensure the subscription starts if it has not already.
-  if (apply_without_warming) {
-    factory_context.initManager().add(provider->init_target_);
-  }
-  return provider;
 }
 
 } // namespace Http

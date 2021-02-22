@@ -183,6 +183,8 @@ private:
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                   const std::string& name, Server::Configuration::FactoryContext& factory_context,
                   const std::string& stat_prefix);
+  absl::flat_hash_map<uint64_t, std::weak_ptr<DynamicFilterConfigProviderImpl>>
+      dynamic_filter_config_providers_;
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   friend class FilterConfigSubscription;
 };
