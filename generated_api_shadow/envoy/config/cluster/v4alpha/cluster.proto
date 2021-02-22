@@ -589,8 +589,10 @@ message Cluster {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
     // :ref:`max_interval <envoy_api_field_config.cluster.v4alpha.Cluster.RefreshRate.max_interval>`.
-    google.protobuf.Duration base_interval = 1
-        [(validate.rules).duration = {required: true gt {nanos: 1000000}}];
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
 
     // Specifies the maximum interval between refreshes. This parameter is optional, but must be
     // greater than or equal to the
