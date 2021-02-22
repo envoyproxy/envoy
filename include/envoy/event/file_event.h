@@ -11,11 +11,11 @@ namespace Event {
 
 struct FileReadyType {
   // File is ready for reading.
-  static const uint32_t Read = 0x1;
+  static constexpr uint32_t Read = 0x1;
   // File is ready for writing.
-  static const uint32_t Write = 0x2;
+  static constexpr uint32_t Write = 0x2;
   // File has been remote closed.
-  static const uint32_t Closed = 0x4;
+  static constexpr uint32_t Closed = 0x4;
 };
 
 enum class FileTriggerType {
