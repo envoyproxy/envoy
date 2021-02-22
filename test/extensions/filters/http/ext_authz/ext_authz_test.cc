@@ -1222,7 +1222,7 @@ TEST_F(HttpFilterTest, MetadataDisabled) {
   )EOF";
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(yaml, metadata);
-  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(metadata));
 
   // Make sure check is not called.
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -1254,7 +1254,7 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
   )EOF";
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(yaml, metadata);
-  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(metadata));
 
   prepareCheck();
 
@@ -1301,7 +1301,7 @@ TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
   )EOF";
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(yaml, metadata);
-  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(metadata));
 
   // Make sure check is not called.
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -1345,7 +1345,7 @@ TEST_F(HttpFilterTest, FilterDisabledButMetadataEnabled) {
   )EOF";
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(yaml, metadata);
-  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(metadata));
 
   // Make sure check is not called.
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -1389,7 +1389,7 @@ TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
   )EOF";
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(yaml, metadata);
-  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(metadata));
 
   prepareCheck();
 
