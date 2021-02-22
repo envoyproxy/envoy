@@ -151,7 +151,7 @@ message OutlierDetection {
   google.protobuf.UInt32Value failure_percentage_request_volume = 20;
 
   // The maximum time that a host is ejected for. See :ref:`base_ejection_time<envoy_api_field_config.cluster.v4alpha.OutlierDetection.base_ejection_time>`
-  // for more information.
-  // Defaults to 300000ms or 300s.
+  // for more information. If not specified, the default value (300000ms or 300s) or
+  // :ref:`base_ejection_time<envoy_api_field_config.cluster.v4alpha.OutlierDetection.base_ejection_time>` value is applied, whatever is larger.
   google.protobuf.Duration max_ejection_time = 21 [(validate.rules).duration = {gt {}}];
 }
