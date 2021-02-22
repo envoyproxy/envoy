@@ -1757,7 +1757,7 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
 }
 
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged with the
-// oservability name.
+// observability name.
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
   raiseEventUpstreamConnected(0);

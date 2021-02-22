@@ -686,7 +686,7 @@ message Cluster {
   // An optional alternative to the cluster name to be used for observability. This name is used
   // emitting stats for the cluster and access logging the cluster name. This will appear as
   // additional information in configuration dumps of a cluster's current status as
-  // :ref:`observability_name <envoy_api_field_config.admin.v3.ClusterStatus.observability_name>`
+  // :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>`
   // and as an additional tag "upstream_cluster.name" while tracing. Note: access logging using
   // this field is presently enabled with runtime feature
   // `envoy.reloadable_features.use_observable_cluster_name`. Any ``:`` in the name will be
