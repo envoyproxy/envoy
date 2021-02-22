@@ -134,26 +134,23 @@ public:
     using MatcherImpl = std::function<bool(const absl::string_view)>;
     InterfaceMatcher(const std::string& interface_name) {
       if (interface_name == "*") {
-        impl_ = [](const absl::string_view) { return true; };
+        impl_ = [](const absl::string_view interface) { return !interface.empty(); };
         return;
       }
-
       if (absl::StartsWith(interface_name, "*")) {
         const std::string suffix = interface_name.substr(1);
         impl_ = [suffix](const absl::string_view interface) {
-          return absl::EndsWith(interface, suffix);
+          return interface.size() > suffix.size() && absl::EndsWith(interface, suffix);
         };
         return;
       }
-
       if (absl::EndsWith(interface_name, "*")) {
         const std::string prefix = interface_name.substr(0, interface_name.size() - 1);
         impl_ = [prefix](const absl::string_view interface) {
-          return absl::StartsWith(interface, prefix);
+          return interface.size() > prefix.size() && absl::StartsWith(interface, prefix);
         };
         return;
       }
-
       impl_ = [interface_name](const absl::string_view interface) {
         return interface == interface_name;
       };

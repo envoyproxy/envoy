@@ -60,8 +60,7 @@ routes:
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
     invo->setMethodName("add");
-
-    EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceName("unknown");
 
@@ -98,6 +97,9 @@ routes:
     invo->setMethodName("add");
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
+    invo->setServiceName(".test.com");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
     invo->setServiceName("code.test.com");
 
     EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
@@ -131,6 +133,9 @@ routes:
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
     invo->setMethodName("add");
+    EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+
+    invo->setServiceName("com.test.");
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceName("com.test.code");
