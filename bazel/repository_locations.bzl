@@ -759,7 +759,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "52680dea984dbe899c27176155578b97276e1f1516b7c3a63fb16ba593061859",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.transport_sockets.quic"],
+        extensions = ["envoy.transport_sockets.quic", "envoy.listener.quic"],
         release_date = "2020-11-10",
         cpe = "N/A",
     ),
