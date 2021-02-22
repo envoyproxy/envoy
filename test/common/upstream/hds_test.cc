@@ -1096,5 +1096,89 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   EXPECT_EQ(third_match.name_, "default");
 }
 
+TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  // - Cluster "anna" with 3 lb_endpoints
+  message = std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
+  message->mutable_interval()->set_seconds(1);
+
+  auto* health_check = message->add_cluster_health_checks();
+  health_check->set_cluster_name("anna");
+  for (int i = 0; i < 3; i++) {
+    auto* endpoint = health_check->add_locality_endpoints()->add_endpoints();
+    endpoint->mutable_health_check_config()->set_port_value(4321 + i);
+    auto* address = endpoint->mutable_address();
+    address->mutable_socket_address()->set_address("127.0.0.1");
+    address->mutable_socket_address()->set_port_value(1234 + i);
+  }
+
+  // Process message
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+
+  // Check Correctness
+  for (int i = 0; i < 3; i++) {
+    auto& host =
+        hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[i];
+    EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
+    EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 4321 + i);
+  }
+}
+
+TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  // - Cluster "anna" with 1 lb_endpoints with 3 endpoints
+  message = std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
+  message->mutable_interval()->set_seconds(1);
+
+  auto* health_check = message->add_cluster_health_checks();
+  health_check->set_cluster_name("anna");
+  auto* lb_endpoint = health_check->add_locality_endpoints();
+  for (int i = 0; i < 3; i++) {
+    auto* endpoint = lb_endpoint->add_endpoints();
+    auto* address = endpoint->mutable_address();
+    address->mutable_socket_address()->set_address("127.0.0.1");
+    address->mutable_socket_address()->set_port_value(1234 + i);
+  }
+
+  // Process message
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+
+  for (int i = 0; i < 3; i++) {
+    auto& host =
+        hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[i];
+    EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
+    EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 1234 + i);
+  }
+
+  // Set custom health config port
+  for (int i = 0; i < 3; i++) {
+    auto* endpoint =
+        message->mutable_cluster_health_checks(0)->mutable_locality_endpoints(0)->mutable_endpoints(
+            i);
+    endpoint->mutable_health_check_config()->set_port_value(4321 + i);
+  }
+
+  // Process updating message
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+
+  // Check Correctness
+  for (int i = 0; i < 3; i++) {
+    auto& host =
+        hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[i];
+    EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
+    EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 4321 + i);
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy
