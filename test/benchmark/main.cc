@@ -21,6 +21,19 @@ static bool skip_expensive_benchmarks = false;
 // separated by --.
 // TODO(pgenera): convert this to abseil/flags/ when benchmark also adopts abseil.
 int main(int argc, char** argv) {
+
+  bool is_help_flag = false;
+
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "--help") == 0) {
+      is_help_flag = true;
+    }
+  }
+
+  if (!is_help_flag) {
+    ::benchmark::Initialize(&argc, argv);
+  }
+
   TestEnvironment::initializeTestMain(argv[0]);
 
   // Suppressing non-error messages in benchmark tests. This hides warning
@@ -76,8 +89,6 @@ int main(int argc, char** argv) {
     const auto feature_val = runtime_feature_split[1];
     Runtime::LoaderSingleton::getExisting()->mergeValues({{feature_name, feature_val}});
   }
-
-  ::benchmark::Initialize(&argc, argv);
 
   if (skip_expensive_benchmarks) {
     ENVOY_LOG_MISC(
