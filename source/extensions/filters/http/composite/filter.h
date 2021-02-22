@@ -20,14 +20,22 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  FilterTrailersStatus decodeTrailers(RequestTrailerMap& trailers) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
 
   // Http::StreamFilterBase
   void onDestroy() override {
@@ -38,27 +46,7 @@ public:
     }
   }
 
-  void onMatchCallback(const Matcher::Action& action) override {
-    const auto& composite_action = action.getTyped<CompositeAction>();
-
-    FactoryCallbacksWrapper wrapper(*this);
-    composite_action.createFilters(wrapper);
-
-    if (wrapper.filter_to_inject_) {
-      if (absl::holds_alternative<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_)) {
-        delegated_filter_ = std::make_shared<StreamFilterWrapper>(
-            absl::get<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_));
-      } else if (absl::holds_alternative<Http::StreamEncoderFilterSharedPtr>(*wrapper.filter_to_inject_)) {
-        delegated_filter_ = std::make_shared<StreamFilterWrapper>(
-            absl::get<Http::StreamEncoderFilterSharedPtr>(*wrapper.filter_to_inject_));
-      } else {
-        delegated_filter_ = absl::get<Http::StreamFilterSharedPtr>(*wrapper.filter_to_inject_);
-      }
-
-      delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
-      delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
-    }
-  }
+  void onMatchCallback(const Matcher::Action& action) override;
 
 private:
   // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
@@ -109,17 +97,34 @@ private:
   struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
     explicit FactoryCallbacksWrapper(Filter& filter) : filter_(filter) {}
 
-    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override;
+    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
+      ASSERT(!filter_.decoded_headers_);
+      ASSERT(!filter_to_inject_);
+
+      filter_to_inject_ = filter;
+    }
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
-                                Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override;
-    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override;
+                                Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+                                }
+    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
+      ASSERT(!filter_.encoded_headers_);
+      ASSERT(!filter_to_inject_);
+
+      filter_to_inject_ = filter;
+    }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr,
                                 Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
-    void addStreamFilter(Http::StreamFilterSharedPtr filter) override;
+    void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+      ASSERT(!filter_.decoded_headers_);
+      ASSERT(!filter_to_inject_);
+
+      filter_to_inject_ = filter;
+    }
 
     void addStreamFilter(Http::StreamFilterSharedPtr,
                          Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override  {
