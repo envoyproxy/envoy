@@ -5,8 +5,6 @@
 #include "common/network/address_impl.h"
 #include "common/stats/utility.h"
 
-#include "absl/container/fixed_array.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -50,13 +48,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
-#if !defined(__APPLE__)
   my_domain_socket_ = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-#else
-  my_domain_socket_ = socket(AF_UNIX, SOCK_DGRAM, 0);
-  int flags = fcntl(my_domain_socket_, F_GETFL);
-  ASSERT(fcntl(my_domain_socket_, F_SETFL, flags | O_NONBLOCK) != -1);
-#endif
   sockaddr_un address = createDomainSocketAddress(id, role, socket_path, socket_mode);
   unlink(address.sun_path);
   Api::SysCallIntResult result =
@@ -104,11 +96,11 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
     message.msg_iovlen = 1;
 
     // Control data stuff, only relevant for the fd passing done with PassListenSocketReply.
-    absl::FixedArray<uint8_t> control_buffer(CMSG_SPACE(sizeof(int)));
+    uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
     if (replyIsExpectedType(&proto, HotRestartMessage::Reply::kPassListenSocket) &&
         proto.reply().pass_listen_socket().fd() != -1) {
-      memset(control_buffer.data(), 0, CMSG_SPACE(sizeof(int)));
-      message.msg_control = control_buffer.data();
+      memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
+      message.msg_control = control_buffer;
       message.msg_controllen = CMSG_SPACE(sizeof(int));
       cmsghdr* control_message = CMSG_FIRSTHDR(&message);
       control_message->cmsg_level = SOL_SOCKET;
@@ -212,18 +204,18 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
 
   iovec iov[1];
   msghdr message;
-  absl::FixedArray<uint8_t> control_buffer(CMSG_SPACE(sizeof(int)));
+  uint8_t control_buffer[CMSG_SPACE(sizeof(int))];
   std::unique_ptr<HotRestartMessage> ret = nullptr;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
     iov[0].iov_len = MaxSendmsgSize;
 
     // We always setup to receive an FD even though most messages do not pass one.
-    memset(control_buffer.data(), 0, CMSG_SPACE(sizeof(int)));
+    memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
     memset(&message, 0, sizeof(message));
     message.msg_iov = iov;
     message.msg_iovlen = 1;
-    message.msg_control = control_buffer.data();
+    message.msg_control = control_buffer;
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
     const int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);

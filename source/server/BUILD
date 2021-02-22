@@ -141,8 +141,8 @@ envoy_proto_library(
 
 envoy_cc_library(
     name = "hot_restarting_base",
-    srcs = ["hot_restarting_base.cc"],
-    hdrs = ["hot_restarting_base.h"],
+    srcs = envoy_select_hot_restart(["hot_restarting_base.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_base.h"]),
     deps = [
         ":hot_restart_cc_proto",
         "//include/envoy/api:os_sys_calls_interface",
