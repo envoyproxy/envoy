@@ -639,10 +639,12 @@ public:
                      Server::Configuration::TransportSocketFactoryContext& c)
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
-        singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()) {}
+        singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
+        options_(c.options()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  const Server::Options& options() override { return options_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
@@ -666,6 +668,7 @@ private:
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;
+  const Server::Options& options_;
 };
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
@@ -897,8 +900,12 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
   } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
     return {Http::Protocol::Http2, Http::Protocol::Http11};
   } else {
+    if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
+      return {Http::Protocol::Http3};
+    }
     return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                  : Http::Protocol::Http11};
   }
@@ -931,6 +938,10 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
+  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
+    throw EnvoyException(
+        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
+  }
 
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
@@ -958,6 +969,17 @@ ClusterImplBase::ClusterImplBase(
       });
 }
 
+namespace {
+
+bool excludeBasedOnHealthFlag(const Host& host) {
+  return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
+         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+}
+
+} // namespace
+
 std::tuple<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr,
            ExcludedHostVectorConstSharedPtr>
 ClusterImplBase::partitionHostList(const HostVector& hosts) {
@@ -972,7 +994,7 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
     if (host->health() == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
-    if (host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    if (excludeBasedOnHealthFlag(*host)) {
       excluded_list->get().emplace_back(host);
     }
   }
@@ -983,10 +1005,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
 std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
            HostsPerLocalityConstSharedPtr>
 ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
-  auto filtered_clones = hosts.filter(
-      {[](const Host& host) { return host.health() == Host::Health::Healthy; },
-       [](const Host& host) { return host.health() == Host::Health::Degraded; },
-       [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
+  auto filtered_clones =
+      hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
+                    [](const Host& host) { return host.health() == Host::Health::Degraded; },
+                    [](const Host& host) { return excludeBasedOnHealthFlag(host); }});
 
   return std::make_tuple(std::move(filtered_clones[0]), std::move(filtered_clones[1]),
                          std::move(filtered_clones[2]));
@@ -1395,12 +1417,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
   // Did hosts change?
   //
-  // Has the EDS health status changed the health of any endpoint? If so, we
+  // Have host attributes changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
   // endpoint has materially changed (e.g. if previously failing active health
   // checks, we just note it's now failing EDS health status but don't rebuild).
-  //
-  // Likewise, if metadata for an endpoint changed we rebuild the hosts vectors.
   //
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to

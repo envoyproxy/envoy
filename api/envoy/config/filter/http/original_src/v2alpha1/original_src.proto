@@ -4,7 +4,6 @@ package envoy.config.filter.http.original_src.v2alpha1;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.original_src.v2alpha1";
 option java_outer_classname = "OriginalSrcProto";

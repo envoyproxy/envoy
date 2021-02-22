@@ -24,6 +24,7 @@ public:
   MOCK_METHOD(void, incNotices, (NoticeType), (override));
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
   MOCK_METHOD(void, processQuery, (const std::string&), (override));
+  MOCK_METHOD(bool, onSSLRequest, (), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -482,6 +483,9 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // Initial state is no-encryption.
   ASSERT_FALSE(decoder_->encrypted());
 
+  // Indicate that decoder should continue with processing the message.
+  ON_CALL(callbacks_, onSSLRequest).WillByDefault(testing::Return(true));
+
   // Create SSLRequest.
   EXPECT_CALL(callbacks_, incSessionsEncrypted());
   // Add length.
@@ -489,7 +493,7 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
   // Add 4 bytes long code
   data_.writeBEInt<uint32_t>(GetParam());
-  decoder_->onData(data_, false);
+  decoder_->onData(data_, true);
   ASSERT_TRUE(decoder_->encrypted());
   // Decoder should drain data.
   ASSERT_THAT(data_.length(), 0);
@@ -510,6 +514,26 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEncrDecoderTest,
                          ::testing::Values(80877103, 80877104));
 
+// Test onSSLRequest callback.
+TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
+  // Set decoder to wait for initial message.
+  decoder_->setStartup(true);
+
+  // Indicate that decoder should not continue with processing the message
+  // because filter will try to terminate SSL session.
+  EXPECT_CALL(callbacks_, onSSLRequest).WillOnce(testing::Return(false));
+
+  // Send initial message requesting SSL.
+  data_.writeBEInt<uint32_t>(8);
+  // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
+  // Add 4 bytes long code
+  data_.writeBEInt<uint32_t>(80877103);
+  decoder_->onData(data_, true);
+
+  // Decoder should interpret the session as encrypted stream.
+  ASSERT_FALSE(decoder_->encrypted());
+}
+
 class FakeBuffer : public Buffer::Instance {
 public:
   MOCK_METHOD(void, addDrainTracker, (std::function<void()>), (override));
@@ -519,7 +543,6 @@ public:
   MOCK_METHOD(void, add, (const Instance&), (override));
   MOCK_METHOD(void, prepend, (absl::string_view), (override));
   MOCK_METHOD(void, prepend, (Instance&), (override));
-  MOCK_METHOD(void, commit, (Buffer::RawSlice*, uint64_t), (override));
   MOCK_METHOD(void, copyOut, (size_t, uint64_t, void*), (const, override));
   MOCK_METHOD(void, drain, (uint64_t), (override));
   MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (absl::optional<uint64_t>), (const, override));
@@ -529,7 +552,11 @@ public:
   MOCK_METHOD(void*, linearize, (uint32_t), (override));
   MOCK_METHOD(void, move, (Instance&), (override));
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
-  MOCK_METHOD(uint64_t, reserve, (uint64_t, Buffer::RawSlice*, uint64_t), (override));
+  MOCK_METHOD(Buffer::Reservation, reserveForRead, (), (override));
+  MOCK_METHOD(Buffer::ReservationSingleSlice, reserveSingleSlice, (uint64_t, bool), (override));
+  MOCK_METHOD(void, commit,
+              (uint64_t, absl::Span<Buffer::RawSlice>, Buffer::ReservationSlicesOwnerPtr),
+              (override));
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));

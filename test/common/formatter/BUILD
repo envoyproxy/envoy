@@ -59,6 +59,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",

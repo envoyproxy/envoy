@@ -21,6 +21,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
+using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
@@ -150,7 +151,6 @@ TEST_F(HttpFilterTest, SimplestPost) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -240,7 +240,6 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -337,7 +336,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -382,7 +380,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -448,7 +445,6 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -490,7 +486,6 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -532,7 +527,6 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -578,7 +572,6 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -635,7 +628,6 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -679,7 +671,6 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -692,6 +683,172 @@ TEST_F(HttpFilterTest, PostAndClose) {
 
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a processing mode, configure the filter to only send the request_headers
+// message.
+TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(stream_close_sent_);
+  ASSERT_TRUE(last_request_.has_request_headers());
+  last_request_processed_ = true;
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  resp1->mutable_request_headers();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+
+  Buffer::OwnedImpl first_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  Http::TestRequestHeaderMapImpl final_expected_response{
+      {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+
+  Buffer::OwnedImpl second_chunk("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(second_chunk, false));
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Use the default configuration, but then override the processing mode
+// to disable processing of the response headers.
+TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(stream_close_sent_);
+  ASSERT_TRUE(last_request_.has_request_headers());
+  last_request_processed_ = true;
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  resp1->mutable_request_headers();
+  resp1->mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+
+  Buffer::OwnedImpl first_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  Http::TestRequestHeaderMapImpl final_expected_response{
+      {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+
+  Buffer::OwnedImpl second_chunk("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(second_chunk, false));
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a processing mode, configure the filter to only send the response_headers
+// message.
+TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnly) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl first_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_FALSE(last_request_.async_mode());
+  EXPECT_FALSE(stream_close_sent_);
+  ASSERT_TRUE(last_request_.has_response_headers());
+  last_request_processed_ = true;
+
+  // Send back a response
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  std::unique_ptr<ProcessingResponse> resp2 = std::make_unique<ProcessingResponse>();
+  resp2->mutable_response_headers();
+  stream_callbacks_->onReceiveMessage(std::move(resp2));
+
+  Http::TestRequestHeaderMapImpl final_expected_response{
+      {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+
+  Buffer::OwnedImpl second_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(second_chunk, false));
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
@@ -725,7 +882,6 @@ TEST_F(HttpFilterTest, OutOfOrder) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));

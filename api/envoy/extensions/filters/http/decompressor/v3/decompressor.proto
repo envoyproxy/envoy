@@ -5,12 +5,9 @@ package envoy.extensions.filters.http.decompressor.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.decompressor.v3";
@@ -46,6 +43,7 @@ message Decompressor {
   // A decompressor library to use for both request and response decompression. Currently only
   // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
   // is included in Envoy.
+  // [#extension-category: envoy.compression.decompressor]
   config.core.v3.TypedExtensionConfig decompressor_library = 1
       [(validate.rules).message = {required: true}];
 
