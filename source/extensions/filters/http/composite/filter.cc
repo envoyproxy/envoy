@@ -77,8 +77,7 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 }
 
 Http::FilterHeadersStatus
-Filter::StreamFilterWrapper::decodeHeaders(Http::RequestHeaderMap& headers,
-                                           bool end_stream) {
+Filter::StreamFilterWrapper::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   return delegateFilterAction(decoder_filter_, &StreamDecoderFilter::decodeHeaders,
                               Http::FilterHeadersStatus::Continue, headers, end_stream);
 }
@@ -115,8 +114,7 @@ Filter::StreamFilterWrapper::encode100ContinueHeaders(Http::ResponseHeaderMap& h
                               Http::FilterHeadersStatus::Continue, headers);
 }
 Http::FilterHeadersStatus
-Filter::StreamFilterWrapper::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                           bool end_stream) {
+Filter::StreamFilterWrapper::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   return delegateFilterAction(encoder_filter_, &StreamEncoderFilter::encodeHeaders,
                               Http::FilterHeadersStatus::Continue, headers, end_stream);
 }
@@ -149,12 +147,12 @@ void Filter::StreamFilterWrapper::encodeComplete() {
 
 // Http::StreamFilterBase
 void Filter::StreamFilterWrapper::onDestroy() {
-    if (decoder_filter_) {
-        decoder_filter_->onDestroy();
-    }
-    if (encoder_filter_) {
-        encoder_filter_->onDestroy();
-    }
+  if (decoder_filter_) {
+    decoder_filter_->onDestroy();
+  }
+  if (encoder_filter_) {
+    encoder_filter_->onDestroy();
+  }
 }
 
 } // namespace Composite

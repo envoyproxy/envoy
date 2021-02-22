@@ -3,10 +3,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
-#include "absl/types/variant.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/composite/action.h"
+
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,7 +61,7 @@ private:
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to
   // delegate calls.
   struct StreamFilterWrapper : public Http::StreamFilter {
-      public:
+  public:
     explicit StreamFilterWrapper(Http::StreamEncoderFilterSharedPtr encoder_filter)
         : encoder_filter_(encoder_filter) {}
     explicit StreamFilterWrapper(Http::StreamDecoderFilterSharedPtr decoder_filter)
@@ -88,11 +89,11 @@ private:
     // Http::StreamFilterBase
     void onDestroy() override;
 
-private:
+  private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
     Http::StreamDecoderFilterSharedPtr decoder_filter_;
   };
-  
+
   // A FilterChainFactoryCallbacks that delegates filter creation to the filter callbacks.
   struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
     explicit FactoryCallbacksWrapper(Filter& filter) : filter_(filter) {}
@@ -106,7 +107,7 @@ private:
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
                                 Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-                                }
+    }
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
       ASSERT(!filter_.encoded_headers_);
       ASSERT(!filter_to_inject_);
@@ -127,7 +128,7 @@ private:
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr,
-                         Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override  {
+                         Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
@@ -139,7 +140,7 @@ private:
 
     using FilterAlternative =
         absl::variant<Http::StreamDecoderFilterSharedPtr, Http::StreamEncoderFilterSharedPtr,
-                          Http::StreamFilterSharedPtr>;
+                      Http::StreamFilterSharedPtr>;
     absl::optional<FilterAlternative> filter_to_inject_;
   };
 

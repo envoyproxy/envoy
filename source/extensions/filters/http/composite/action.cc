@@ -5,4 +5,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 REGISTER_FACTORY(CompositeActionFactory, Matcher::ActionFactory);
-}}}}
+}
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

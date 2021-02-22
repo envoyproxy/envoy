@@ -14,8 +14,8 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "action_lib",
-    hdrs = ["action.h"],
     srcs = ["action.cc"],
+    hdrs = ["action.h"],
     deps = [
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
