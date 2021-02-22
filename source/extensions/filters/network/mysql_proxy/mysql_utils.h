@@ -41,7 +41,6 @@ public:
   static DecodeStatus readBytes(Buffer::Instance& buffer, size_t skip_bytes);
   static DecodeStatus readString(Buffer::Instance& buffer, std::string& str);
   static DecodeStatus readStringBySize(Buffer::Instance& buffer, size_t len, std::string& str);
-  static DecodeStatus readStringEof(Buffer::Instance& buffer, std::string& str);
   static DecodeStatus readAll(Buffer::Instance& buffer, std::string& str);
   static DecodeStatus peekUint32(Buffer::Instance& buffer, uint32_t& val);
   static void consumeHdr(Buffer::Instance& buffer);

@@ -45,7 +45,7 @@ public:
 private:
   DecodeStatus parseResponseSsl(Buffer::Instance& buffer);
   DecodeStatus parseResponse41(Buffer::Instance& buffer);
-  DecodeStatus parseResponse320(Buffer::Instance& buffer);
+  DecodeStatus parseResponse320(Buffer::Instance& buffer, uint32_t);
   void encodeResponseSsl(Buffer::Instance& out);
   void encodeResponse41(Buffer::Instance& out);
   void encodeResponse320(Buffer::Instance& out);

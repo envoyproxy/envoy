@@ -55,7 +55,7 @@ bool ClientLogin::isClientSecureConnection() const {
   return client_cap_ & CLIENT_SECURE_CONNECTION;
 }
 
-DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
+DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   /* 4.0 uses 2 bytes, 4.1+ uses 4 bytes, but the proto-flag is in the lower 2
    * bytes */
   uint16_t base_cap;
@@ -70,7 +70,7 @@ DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
   if (base_cap & CLIENT_PROTOCOL_41) {
     return parseResponse41(buffer);
   }
-  return parseResponse320(buffer);
+  return parseResponse320(buffer, len - sizeof(base_cap));
 }
 
 DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
@@ -158,7 +158,8 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
   return DecodeStatus::Success;
 }
 
-DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer) {
+DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t remain_len) {
+  int origin_len = buffer.length();
   if (BufferHelper::readUint24(buffer, max_packet_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error when parsing max packet of client login message");
     return DecodeStatus::Failure;
@@ -177,7 +178,9 @@ DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer) {
       return DecodeStatus::Failure;
     }
   } else {
-    if (BufferHelper::readStringEof(buffer, auth_resp_) != DecodeStatus::Success) {
+    int consumed_len = origin_len - buffer.length();
+    if (BufferHelper::readStringBySize(buffer, remain_len - consumed_len, auth_resp_) !=
+        DecodeStatus::Success) {
       ENVOY_LOG(info, "error when parsing auth resp of client login message");
       return DecodeStatus::Failure;
     }
@@ -249,7 +252,6 @@ void ClientLogin::encodeResponse320(Buffer::Instance& out) {
     BufferHelper::addUint8(out, enc_end_string);
   } else {
     BufferHelper::addString(out, auth_resp_);
-    BufferHelper::addUint8(out, EOF);
   }
 }
 

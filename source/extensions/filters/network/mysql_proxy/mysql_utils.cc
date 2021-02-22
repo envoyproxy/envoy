@@ -133,17 +133,6 @@ DecodeStatus BufferHelper::readLengthEncodedInteger(Buffer::Instance& buffer, ui
   return DecodeStatus::Success;
 }
 
-DecodeStatus BufferHelper::readStringEof(Buffer::Instance& buffer, std::string& str) {
-  char end = EOF;
-  ssize_t index = buffer.search(&end, sizeof(end), 0);
-  if (index == -1) {
-    return DecodeStatus::Failure;
-  }
-  str.assign(std::string(static_cast<char*>(buffer.linearize(index)), index));
-  buffer.drain(index + 1);
-  return DecodeStatus::Success;
-}
-
 DecodeStatus BufferHelper::readBytes(Buffer::Instance& buffer, size_t skip_bytes) {
   if (buffer.length() < skip_bytes) {
     return DecodeStatus::Failure;
