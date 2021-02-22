@@ -110,6 +110,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // Reject virtual host-specific configuration when filter doesn't support it.
+    "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

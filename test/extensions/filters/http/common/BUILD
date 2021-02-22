@@ -3,6 +3,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -61,5 +62,23 @@ envoy_cc_test(
         "//source/extensions/filters/http/common:utility_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "factory_base_test_proto",
+    srcs = ["factory_base_test.proto"],
+)
+
+envoy_cc_test(
+    name = "factory_base_test",
+    srcs = [
+        "factory_base_test.cc",
+    ],
+    deps = [
+        ":factory_base_test_proto_cc_proto",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )

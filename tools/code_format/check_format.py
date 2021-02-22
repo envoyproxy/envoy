@@ -114,7 +114,8 @@ EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
 # Header files that can throw exceptions. These should be limited; the only
 # valid situation identified so far is template functions used for config
 # processing.
-EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
+EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h",
+                       "./source/extensions/filters/http/common/factory_base.h")
 
 # We want all URL references to exist in repository_locations.bzl files and have
 # metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below

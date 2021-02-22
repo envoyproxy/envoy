@@ -2,6 +2,9 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "common/common/fmt.h"
+#include "common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -55,6 +58,11 @@ private:
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
                                        Server::Configuration::ServerFactoryContext&,
                                        ProtobufMessage::ValidationVisitor&) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+      throw EnvoyException(fmt::format(
+          "The filter {} doesn't support virtual host-specific configurations", name()));
+    }
     return nullptr;
   }
 
