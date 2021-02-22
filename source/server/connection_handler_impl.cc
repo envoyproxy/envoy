@@ -12,7 +12,6 @@
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
@@ -476,6 +475,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     return;
   }
 
+  stream_info->setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
@@ -590,9 +590,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
           active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-    connection_->noDelay(true);
-  }
+  connection_->noDelay(true);
   auto& listener = active_connections_.listener_;
   listener.stats_.downstream_cx_total_.inc();
   listener.stats_.downstream_cx_active_.inc();

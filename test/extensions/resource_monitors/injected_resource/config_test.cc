@@ -1,5 +1,5 @@
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.validate.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -8,6 +8,7 @@
 
 #include "extensions/resource_monitors/injected_resource/config.h"
 
+#include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -25,12 +26,13 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
           "envoy.resource_monitors.injected_resource");
   ASSERT_NE(factory, nullptr);
 
-  envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
+  envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      *dispatcher, *api, ProtobufMessage::getStrictValidationVisitor());
+      *dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }

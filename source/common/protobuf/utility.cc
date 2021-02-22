@@ -27,6 +27,19 @@ using namespace std::chrono_literals;
 namespace Envoy {
 namespace {
 
+// For historical reasons, these v2 protos are allowed in v3 and will not be removed during the v2
+// turn down.
+static const absl::flat_hash_set<absl::string_view>& v2ProtosAllowedInV3() {
+  CONSTRUCT_ON_FIRST_USE(
+      absl::flat_hash_set<absl::string_view>,
+      {"envoy.config.health_checker.redis.v2.Redis",
+       "envoy.config.filter.thrift.router.v2alpha1.Router",
+       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig",
+       "envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig",
+       "envoy.config.retry.omit_canary_hosts.v2.OmitCanaryHostsPredicate",
+       "envoy.config.retry.previous_hosts.v2.PreviousHostsPredicate"});
+}
+
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind("/");
   if (index == std::string::npos || index == full_path.size()) {
@@ -191,7 +204,10 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
 #else
   bool warn_only = true;
 #endif
-
+  if (runtime &&
+      runtime->snapshot().getBoolean("envoy.features.fail_on_any_deprecated_feature", false)) {
+    warn_only = false;
+  }
   bool warn_default = warn_only;
   // Allow runtime to be null both to not crash if this is called before server initialization,
   // and so proto validation works in context where runtime singleton is not set up (e.g.
@@ -589,10 +605,14 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
                                                   const bool block_print,
                                                   const bool always_print_primitive_fields) {
-  std::string json = getJsonStringFromMessage(message, false, always_print_primitive_fields);
+
+  auto json_or_error = getJsonStringFromMessage(message, false, always_print_primitive_fields);
+  if (!json_or_error.ok()) {
+    throw EnvoyException(json_or_error.status().ToString());
+  }
   YAML::Node node;
   try {
-    node = YAML::Load(json);
+    node = YAML::Load(json_or_error.value());
   } catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
   } catch (YAML::BadConversion& e) {
@@ -612,9 +632,9 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
   return out.c_str();
 }
 
-std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,
-                                                  const bool pretty_print,
-                                                  const bool always_print_primitive_fields) {
+ProtobufUtil::StatusOr<std::string>
+MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
+                                      const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
   // By default, proto field names are converted to camelCase when the message is converted to JSON.
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
@@ -629,10 +649,21 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
     json_options.always_print_primitive_fields = true;
   }
   std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
-  // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok(), "");
+  if (auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
+      !status.ok()) {
+    return status;
+  }
   return json;
+}
+
+std::string MessageUtil::getJsonStringFromMessageOrError(const Protobuf::Message& message,
+                                                         bool pretty_print,
+                                                         bool always_print_primitive_fields) {
+  auto json_or_error =
+      getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
+  return json_or_error.ok() ? std::move(json_or_error).value()
+                            : fmt::format("Failed to convert protobuf message to JSON string: {}",
+                                          json_or_error.status().ToString());
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
@@ -656,7 +687,10 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      // We allow some v2 protos in v3 for historical reasons.
+      if (v2ProtosAllowedInV3().count(any_full_name) == 0) {
+        MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      }
       return;
     }
   }
@@ -1004,5 +1038,4 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .time_since_epoch()
           .count()));
 }
-
 } // namespace Envoy
