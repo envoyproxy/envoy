@@ -34,8 +34,10 @@ TEST_F(HotRestartingBaseTest, SendMsgRetryFailsAfterRetries) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  uint32_t retries = 0;
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
       .WillRepeatedly(Invoke([&](os_fd_t, const msghdr*, int) {
+        ++retries;
         return Api::SysCallSizeResult{0, ECONNREFUSED};
       }));
 
@@ -48,18 +50,22 @@ TEST_F(HotRestartingBaseTest, SendMsgRetryFailsAfterRetries) {
   HotRestartMessage message;
   message.mutable_request()->mutable_pass_listen_socket()->set_address("tcp://0.0.0.0:80");
 
-  ASSERT_DEATH(base_.sendMessage(sun, message), "");
+  EXPECT_DEBUG_DEATH(base_.sendMessage(sun, message), "");
+
+#ifdef NDEBUG
+  EXPECT_EQ(10, retries);
+#endif
 }
 
 TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  bool failed = false;
+  bool retried = false;
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
       .WillRepeatedly(Invoke([&](os_fd_t, const msghdr*, int) {
-        if (!failed) {
-          failed = true;
+        if (!retried) {
+          retried = true;
           return Api::SysCallSizeResult{0, ECONNREFUSED};
         }
 
@@ -76,6 +82,8 @@ TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
   message.mutable_request()->mutable_pass_listen_socket()->set_address("tcp://0.0.0.0:80");
 
   base_.sendMessage(sun, message);
+
+  EXPECT_TRUE(retried);
 }
 
 } // namespace

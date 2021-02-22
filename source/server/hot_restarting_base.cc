@@ -7,12 +7,6 @@
 
 #include "absl/container/fixed_array.h"
 
-#ifndef SOCK_NONBLOCK
-#include <fcntl.h>
-// TODO(rgs1): workaround for OS X should actually be using fctnl(..., F_SETFL, O_NONBLOCK)
-#define SOCK_NONBLOCK 0
-#endif
-
 namespace Envoy {
 namespace Server {
 
@@ -56,7 +50,13 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
+#if !defined(__APPLE__)
   my_domain_socket_ = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+#else
+  my_domain_socket_ = socket(AF_UNIX, SOCK_DGRAM, 0);
+  int flags = fcntl(my_domain_socket_, F_GETFL);
+  ASSERT(fcntl(my_domain_socket_, F_SETFL, flags | O_NONBLOCK) != -1);
+#endif
   sockaddr_un address = createDomainSocketAddress(id, role, socket_path, socket_mode);
   unlink(address.sun_path);
   Api::SysCallIntResult result =
