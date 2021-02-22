@@ -90,9 +90,7 @@ public:
   FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                            const std::string& filter_config_name,
                            Server::Configuration::FactoryContext& factory_context,
-                           const std::string& stat_prefix,
-                           FilterConfigProviderManagerImpl& filter_config_provider_manager,
-                           const std::string& subscription_id);
+                           const std::string& stat_prefix);
 
   ~FilterConfigSubscription() override;
 
@@ -123,10 +121,7 @@ private:
   const std::string stat_prefix_;
   ExtensionConfigDiscoveryStats stats_;
 
-  // FilterConfigProviderManagerImpl maintains active subscriptions in a map.
-  FilterConfigProviderManagerImpl& filter_config_provider_manager_;
-  const std::string subscription_id_;
-  absl::flat_hash_set<DynamicFilterConfigProviderImpl*> filter_config_providers_;
+  absl::optional<DynamicFilterConfigProviderImpl*> filter_config_provider_;
   friend class DynamicFilterConfigProviderImpl;
 
   // This must be the last since its destructor may call out to stats to report
@@ -179,13 +174,8 @@ public:
   }
 
 private:
-  std::shared_ptr<FilterConfigSubscription>
-  getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
-                  const std::string& name, Server::Configuration::FactoryContext& factory_context,
-                  const std::string& stat_prefix);
-  absl::flat_hash_map<uint64_t, std::weak_ptr<DynamicFilterConfigProviderImpl>>
+  absl::flat_hash_map<std::string, std::weak_ptr<DynamicFilterConfigProviderImpl>>
       dynamic_filter_config_providers_;
-  absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   friend class FilterConfigSubscription;
 };
 

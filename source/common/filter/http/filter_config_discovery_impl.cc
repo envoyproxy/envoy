@@ -26,12 +26,15 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
         // used while waiting for a response.
         init_target_.ready();
       }) {
-  subscription_->filter_config_providers_.insert(this);
+  // It should be 1:1 mapping due to shared dynamic filter config provider.
+  ASSERT(!subscription_->filter_config_provider_.has_value());
+  subscription_->filter_config_provider_.emplace(this);
   tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
 }
 
 DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
-  subscription_->filter_config_providers_.erase(this);
+  ASSERT(subscription_->filter_config_provider_.has_value());
+  subscription_->filter_config_provider_.reset();
 }
 
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
@@ -69,8 +72,7 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
 FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix, FilterConfigProviderManagerImpl& filter_config_provider_manager,
-    const std::string& subscription_id)
+    const std::string& stat_prefix)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           envoy::config::core::v3::ApiVersion::V3,
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
@@ -81,9 +83,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "extension_config_discovery." +
                                                  filter_config_name_ + ".")),
       stat_prefix_(stat_prefix),
-      stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
-      filter_config_provider_manager_(filter_config_provider_manager),
-      subscription_id_(subscription_id) {
+      stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}) {
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
@@ -124,22 +124,17 @@ void FilterConfigSubscription::onConfigUpdate(
   // Ensure that the filter config is valid in the filter chain context once the proto is processed.
   // Validation happens before updating to prevent a partial update application. It might be
   // possible that the providers have distinct type URL constraints.
-  for (auto* provider : filter_config_providers_) {
-    provider->validateConfig(filter_config.typed_config(), factory);
+  if (filter_config_provider_.has_value()) {
+    filter_config_provider_.value()->validateConfig(filter_config.typed_config(), factory);
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
-      (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
-  for (auto* provider : filter_config_providers_) {
-    provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
-      if (--(*pending_update) == 0) {
-        stats_.config_reload_.inc();
-      }
-    });
+  if (filter_config_provider_.has_value()) {
+    filter_config_provider_.value()->onConfigUpdate(factory_callback, version_info,
+                                                    [this]() { stats_.config_reload_.inc(); });
   }
   last_config_hash_ = new_hash;
 }
@@ -169,30 +164,6 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
 FilterConfigSubscription::~FilterConfigSubscription() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
-  // Remove the subscription from the provider manager.
-  filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
-}
-
-std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSubscription(
-    const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
-  // FilterConfigSubscriptions are unique based on their config source and filter config name
-  // combination.
-  // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription
-  // aliasing.
-  const std::string subscription_id = absl::StrCat(MessageUtil::hash(config_source), ".", name);
-  auto it = subscriptions_.find(subscription_id);
-  if (it == subscriptions_.end()) {
-    auto subscription = std::make_shared<FilterConfigSubscription>(
-        config_source, name, factory_context, stat_prefix, *this, subscription_id);
-    subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
-    return subscription;
-  } else {
-    auto existing = it->second.lock();
-    ASSERT(existing != nullptr,
-           absl::StrCat("Cannot find subscribed filter config resource ", name));
-    return existing;
-  }
 }
 
 FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
@@ -200,13 +171,12 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     bool apply_without_warming) {
-  const uint64_t config_source_hash = MessageUtil::hash(config_source);
-  const uint64_t provider_identifier =
-      HashUtil::xxHash64(absl::StrCat(filter_config_name, std::to_string(config_source_hash)));
+  const std::string provider_identifier =
+      absl::StrCat(MessageUtil::hash(config_source), ".", filter_config_name);
   auto it = dynamic_filter_config_providers_.find(provider_identifier);
   if (it == dynamic_filter_config_providers_.end()) {
-    auto subscription =
-        getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
+    auto subscription = std::make_shared<FilterConfigSubscription>(
+        config_source, filter_config_name, factory_context, stat_prefix);
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
