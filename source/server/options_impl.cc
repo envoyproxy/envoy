@@ -194,10 +194,12 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
-  } else if (mode.getValue() == "validate") {
-    mode_ = Server::Mode::Validate;
   } else if (mode.getValue() == "init_only") {
     mode_ = Server::Mode::InitOnly;
+  } else if (mode.getValue() == "validate") {
+    mode_ = Server::Mode::Validate;
+  } else if (mode.getValue() == "load") {
+    mode_ = Server::Mode::Load;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
     throw MalformedArgvException(message);

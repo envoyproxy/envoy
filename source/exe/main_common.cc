@@ -84,6 +84,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
     break;
   }
   case Server::Mode::Validate:
+  case Server::Mode::Load:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
@@ -161,7 +162,8 @@ bool MainCommonBase::run() {
   case Server::Mode::Serve:
     server_->run();
     return true;
-  case Server::Mode::Validate: {
+  case Server::Mode::Validate:
+  case Server::Mode::Load: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     return Server::validateConfig(options_, local_address, component_factory_, thread_factory_,
                                   file_system_);

@@ -16,30 +16,43 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Whether to run Envoy in serving mode, or in config validation mode at one of two levels (in which
- * case we'll verify the configuration file is valid, print any errors, and exit without serving.)
+ * What mode to run Envoy in: serving, or validation with various levels of fidelity. In validation
+ * mode, Envoy will check that the configuration file is valid (with different modes verifying to
+ * different degrees), print any errors, and exit without serving.
  */
 enum class Mode {
   /**
    * Default mode: Regular Envoy serving process. Configs are validated in the normal course of
    * initialization, but if all is well we proceed to serve traffic.
    */
-  Serve,
+  Serve = 3,
 
   /**
-   * Validate as much as possible without opening network connections upstream or downstream.
+   * High fidelity validation: completely load and initialize the config, and then exit without
+   * running the listener loop.
+   *
+   * This provides the highest level of validation since it initializes Envoy completely without
+   * serving any traffic.
    */
-  Validate,
+  InitOnly = 2,
 
   /**
-   * Completely load and initialize the config, and then exit without running the listener loop.
+   * Medium fidelity validation: load and initialize with the configuration, assuming full access to
+   * the file system but without opening network connections, and then exit.
+   *
+   * This allows verifying that Envoy has all the local resources it needs to start, though not that
+   * remote resources exist.
    */
-  InitOnly,
+  Validate = 1,
 
-  // TODO(rlazarus): Add a fourth option for "light validation": Mock out access to the filesystem.
-  // Perform no validation of files referenced in the config, such as runtime configs, SSL certs,
-  // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
-  // to be validated in a non-prod environment.
+  /**
+   * Low fidelity validation: load the provided configuration and initialize as much as possible,
+   * without accessing the local file system or opening network connections, then exit.
+   *
+   * This allows verifying that all named extensions are linked in, but not that their network or
+   * file system resources are correct.
+   */
+  Load = 0,
 };
 
 /**

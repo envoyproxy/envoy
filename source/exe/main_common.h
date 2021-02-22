@@ -44,7 +44,7 @@ public:
 
   bool run();
 
-  // Will be null if options.mode() == Server::Mode::Validate
+  // Will be null if options.mode() == Validate or Load
   Server::Instance* server() { return server_.get(); }
 
   using AdminRequestFn =
