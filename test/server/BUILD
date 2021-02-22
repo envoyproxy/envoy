@@ -136,6 +136,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_base_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
+    deps = [
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_base",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
