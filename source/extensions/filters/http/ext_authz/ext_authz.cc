@@ -86,11 +86,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (route == nullptr || route->routeEntry() == nullptr) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (!config_->filterEnabled(route->routeEntry()->metadata())) {
+  if (!config_->filterEnabled(route->routeEntry())) {
     stats_.disabled_.inc();
     if (config_->denyAtDisable()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.",
