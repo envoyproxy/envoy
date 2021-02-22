@@ -141,7 +141,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
               config_update_info_->configHash());
 
     if (route_config_provider_opt_.has_value()) {
-      route_config_provider_opt_.value()->validateConfig(route_config);
+      route_config_provider_opt_.value()->onConfigUpdate();
     }
     // RDS update removed VHDS configuration
     if (!config_update_info_->routeConfiguration().has_vhds()) {
@@ -243,6 +243,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
+  ASSERT(subscription_->routeConfigProvider().has_value());
   subscription_->routeConfigProvider().reset();
 }
 
@@ -370,7 +371,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     // in the RdsRouteConfigSubscription destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
     ASSERT(subscription);
-    ASSERT(!subscription->route_config_provider_opt_.has_value());
+    ASSERT(subscription->route_config_provider_opt_.has_value());
 
     if (subscription->routeConfigUpdate()->configInfo()) {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
