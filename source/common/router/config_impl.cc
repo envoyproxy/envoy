@@ -51,6 +51,16 @@ const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
+  dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
+                                src.headers_to_append.end());
+  dest.headers_to_overwrite.insert(dest.headers_to_overwrite.end(),
+                                   src.headers_to_overwrite.begin(),
+                                   src.headers_to_overwrite.end());
+  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
+                                src.headers_to_remove.end());
+}
+
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -600,6 +610,28 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   }
 }
 
+Http::HeaderTransforms
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+  Http::HeaderTransforms transforms;
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
+    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(
+        transforms,
+        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+  } else {
+    // Most specific mutations take precedence.
+    mergeTransforms(
+        transforms,
+        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+  }
+  return transforms;
+}
+
 absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& route_match) {
   absl::optional<RuntimeData> runtime;
@@ -998,6 +1030,13 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       }
     }
   }
+}
+
+Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
+    const StreamInfo::StreamInfo& stream_info) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
+  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+  return transforms;
 }
 
 const RouteSpecificFilterConfig*

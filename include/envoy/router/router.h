@@ -57,6 +57,15 @@ public:
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Returns the response header transforms that would be applied if finalizeResponseHeaders were
+   * called now. This is useful if you want to obtain response header transforms at request time and
+   * process them later. Note: do not use unless you are sure that there will be no route
+   * modifications later in the filter chain.
+   */
+  virtual Http::HeaderTransforms
+  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**

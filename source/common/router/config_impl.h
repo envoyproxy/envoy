@@ -83,6 +83,9 @@ public:
   // Router::DirectResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                const StreamInfo::StreamInfo&) const override {}
+  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+    return {};
+  }
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
@@ -485,6 +488,8 @@ public:
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
+  Http::HeaderTransforms
+  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
   const Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
@@ -608,6 +613,10 @@ private:
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
       return parent_->finalizeResponseHeaders(headers, stream_info);
+    }
+    Http::HeaderTransforms
+    responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->responseHeaderTransforms(stream_info);
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
@@ -733,6 +742,8 @@ private:
       response_headers_parser_->evaluateHeaders(headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
+    Http::HeaderTransforms
+    responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
 
