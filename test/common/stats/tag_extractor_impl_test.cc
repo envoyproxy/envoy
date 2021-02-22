@@ -423,6 +423,18 @@ protected:
   std::string tag_extracted_name_;
 };
 
+TEST_F(TagExtractorTokensTest, Prefix) {
+  EXPECT_EQ("prefix", TagExtractorTokensImpl("name", "prefix.foo").prefixToken());
+  EXPECT_EQ("prefix", TagExtractorTokensImpl("name", "prefix").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "*.foo").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "**.foo").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "$.foo").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "*").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "**").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "$").prefixToken());
+}
+
 TEST_F(TagExtractorTokensTest, TokensMatchStart) {
   EXPECT_TRUE(extract("when", "$.is.the.time", "now.is.the.time"));
   EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
