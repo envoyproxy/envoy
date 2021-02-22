@@ -654,8 +654,10 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
-                   fmt::format("Failed to connect: {}", error));
+    Api::SysCallIntResult result =
+        socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size);
+    RELEASE_ASSERT(result.rc_ == 0,
+                   fmt::format("Failed to connect: {}", errorDetails(result.errno_)));
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
