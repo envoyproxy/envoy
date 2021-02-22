@@ -1008,7 +1008,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int 
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
   headers.setHost(absolute_url.hostAndPort());
-  // Add the scheme. This will be validated in the HCM to ensure no https://
+  // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
   if (!is_connect &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
