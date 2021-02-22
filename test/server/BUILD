@@ -137,7 +137,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "hot_restarting_base_test",
-    srcs = ["hot_restarting_base_test.cc"],
+    srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
     deps = [
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_base",
