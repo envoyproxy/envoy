@@ -2,6 +2,7 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/matcher/matcher.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
@@ -61,9 +62,9 @@ public:
 
   Matcher::DataInputPtr<HttpMatchingData>
   createDataInput(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config =
-        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
+                  Server::Configuration::FactoryContext& factory_context) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<const ProtoType&>(
+        config, factory_context.messageValidationVisitor());
 
     return std::make_unique<DataInputType>(typed_config.header_name());
   };
