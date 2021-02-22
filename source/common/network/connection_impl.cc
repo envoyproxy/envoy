@@ -656,8 +656,6 @@ void ConnectionImpl::onWriteReady() {
     socklen_t error_size = sizeof(error);
     Api::SysCallIntResult result =
         socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size);
-    RELEASE_ASSERT(result.rc_ == 0,
-                   fmt::format("Failed to connect: {}", errorDetails(result.errno_)));
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -669,7 +667,8 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, error);
+      ENVOY_BUG(result.rc_ == 0, fmt::format("failed to connect: {}", errorDetails(result.errno_)));
+      ENVOY_CONN_LOG(debug, "delayed connection error: {}", *this, errorDetails(result.errno_));
       closeSocket(ConnectionEvent::RemoteClose);
       return;
     }
