@@ -184,7 +184,12 @@ TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::str
                                                absl::string_view substr)
     : TagExtractorImplBase(name, tokens, substr), tokens_(absl::StrSplit(tokens, '.')),
       match_index_(findMatchIndex(tokens_)) {
-  prefix_ = tokens_[0];
+  if (!tokens_.empty()) {
+    const absl::string_view first = tokens_[0];
+    if (first != "$" && first != "*" && first != "**") {
+      prefix_ = first;
+    }
+  }
 }
 
 uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
