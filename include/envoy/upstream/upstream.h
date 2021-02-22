@@ -861,8 +861,9 @@ public:
 
   /**
    * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
-   * config dumps. This can be configured with :ref:`alt_stat_name
-   * <envoy_api_field_Cluster.alt_stat_name>`. The default value is the cluster name.
+   * config dumps. The observability name is configured with :ref:`alt_stat_name
+   * <envoy_api_field_config.cluster.v3.Cluster.alt_stat_name>`. If unprovided, the default value is
+   * the cluster name.
    */
   virtual const std::string& observabilityName() const PURE;
 

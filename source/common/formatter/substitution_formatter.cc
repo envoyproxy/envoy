@@ -755,22 +755,21 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-            if (stream_info.upstreamClusterInfo().has_value() &&
-                stream_info.upstreamClusterInfo().value() != nullptr) {
-              if (Runtime::runtimeFeatureEnabled(
-                      "envoy.reloadable_features.use_observable_cluster_name")) {
-                upstream_cluster_name =
-                    stream_info.upstreamClusterInfo().value()->observabilityName();
-              } else {
-                upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
-              }
+          if (stream_info.upstreamClusterInfo().has_value() &&
+              stream_info.upstreamClusterInfo().value() != nullptr) {
+            if (Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.use_observable_cluster_name")) {
+              upstream_cluster_name =
+                  stream_info.upstreamClusterInfo().value()->observabilityName();
+            } else {
+              upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
             }
+          }
 
-
-            return upstream_cluster_name.empty()
-                       ? absl::nullopt
-                       : absl::make_optional<std::string>(upstream_cluster_name);
-          });
+          return upstream_cluster_name.empty()
+                     ? absl::nullopt
+                     : absl::make_optional<std::string>(upstream_cluster_name);
+        });
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {

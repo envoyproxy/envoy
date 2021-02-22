@@ -367,7 +367,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
         {{"envoy.reloadable_features.use_observable_cluster_name", "false"}});
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string upstream_cluster_name = "cluster_name";
-        auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+    auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
     // Make sure that cluster info is obtained without calling upstreamHost.
     EXPECT_CALL(stream_info, upstreamHost()).Times(0);
