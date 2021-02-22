@@ -50,6 +50,9 @@ constexpr const char* CookieTailHttpOnlyFormatString =
 const char* AuthorizationEndpointFormat =
     "{}?client_id={}&scope={}&response_type=code&redirect_uri={}&state={}";
 
+const char* AuthorizationEndpointResourceParamFormat =
+    "&resource={}";
+
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
@@ -112,6 +115,7 @@ FilterConfig::FilterConfig(
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
       encoded_auth_scopes_(Http::Utility::PercentEncoding::encode(
           absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
+      resource_(proto_config.resource()),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
@@ -300,7 +304,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string new_url = fmt::format(
         AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
         config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
-    response_headers->setLocation(new_url);
+
+    const std::string resource_param = config_->resource() == "" ? "" : fmt::format(
+        AuthorizationEndpointResourceParamFormat, config_->resource());
+
+    response_headers->setLocation(new_url + resource_param);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
     config_->stats().oauth_unauthorized_rq_.inc();

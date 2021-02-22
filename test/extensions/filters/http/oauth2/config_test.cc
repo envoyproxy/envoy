@@ -51,6 +51,7 @@ config:
   - user
   - openid
   - email
+  resource: oauth2-resource
     )EOF";
 
   OAuth2Config factory;
@@ -95,6 +96,7 @@ config:
   - user
   - openid
   - email
+  resource: oauth2-resource
     )EOF";
 
   OAuth2Config factory;
