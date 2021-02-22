@@ -13,11 +13,14 @@ namespace Http {
 /**
  * Active client base for HTTP/2 and HTTP/3
  */
+// TODO(#14829) move to source/common/http/conn_pool_base.h
 class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Http::ConnectionCallbacks,
                                     public Envoy::Http::ActiveClient {
 public:
   MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, Stats::Counter& cx_total);
+  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, Stats::Counter& cx_total,
+                              Upstream::Host::CreateConnectionData& data);
   ~MultiplexedActiveClientBase() override = default;
 
   // ConnPoolImpl::ActiveClient

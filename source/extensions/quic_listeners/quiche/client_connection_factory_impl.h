@@ -17,16 +17,16 @@ namespace Envoy {
 namespace Quic {
 
 // TODO(#14829) we should avoid creating this per-connection.
+// Figure out what goes in per-cluster data, and what is per-connection and clean up.
 struct QuicUpstreamData {
-  QuicUpstreamData(Event::Dispatcher& dispatcher, Envoy::Ssl::ClientContextConfig& config,
+  QuicUpstreamData(Event::Dispatcher& dispatcher, const Envoy::Ssl::ClientContextConfig& config,
                    Network::Address::InstanceConstSharedPtr server_addr)
       : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
-        config_(config), server_id_{config_.serverNameIndication(),
-                                    static_cast<uint16_t>(server_addr->ip()->port()), false} {}
+        server_id_{config.serverNameIndication(), static_cast<uint16_t>(server_addr->ip()->port()),
+                   false} {}
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
-  Envoy::Ssl::ClientContextConfig& config_;
   quic::QuicServerId server_id_;
   std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};

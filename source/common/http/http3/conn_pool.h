@@ -15,9 +15,10 @@ namespace Http3 {
 // connection based on HTTP/2 config. Sort out the HTTP/3 config story.
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
-  ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent)
-      : MultiplexedActiveClientBase(parent,
-                                    parent.host()->cluster().stats().upstream_cx_http3_total_) {}
+  ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+               Upstream::Host::CreateConnectionData& data)
+      : MultiplexedActiveClientBase(
+            parent, parent.host()->cluster().stats().upstream_cx_http3_total_, data) {}
 };
 
 ConnectionPool::InstancePtr

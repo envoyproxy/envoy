@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/client_connection_factory_impl.h"
 
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -9,16 +11,17 @@ QuicClientConnectionFactoryImpl::createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr local_addr,
     Network::TransportSocketFactory& transport_socket_factory, Stats::Scope& stats_scope,
     Event::Dispatcher& dispatcher, TimeSource& time_source) {
-  // TODO(#14829): reject the config if a raw buffer socket is configured.
-  auto* ssl_socket_factory =
-      dynamic_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory*>(
-          &transport_socket_factory);
-  ASSERT(ssl_socket_factory != nullptr);
+  // TODO(#14829): reject config if anything but QuicClientTransportSocketConfigFactory configured.
+  // raw buffer socket is configured.
+  auto* quic_socket_factory =
+      dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
+  ASSERT(quic_socket_factory != nullptr);
 
+  const auto& client_context_config = quic_socket_factory->clientContextConfig();
   std::unique_ptr<QuicUpstreamData> upstream_data =
-      std::make_unique<QuicUpstreamData>(dispatcher, *ssl_socket_factory->config(), server_addr);
+      std::make_unique<QuicUpstreamData>(dispatcher, client_context_config, server_addr);
   upstream_data->crypto_config_ = std::make_unique<quic::QuicCryptoClientConfig>(
-      std::make_unique<EnvoyQuicProofVerifier>(stats_scope, upstream_data->config_, time_source));
+      std::make_unique<EnvoyQuicProofVerifier>(stats_scope, client_context_config, time_source));
 
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, upstream_data->conn_helper_,

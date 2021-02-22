@@ -236,7 +236,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
     setUdpFakeUpstream(true);
     upstream_tls_ = true;
-    config_helper_.configureUpstreamTls(false);
+    config_helper_.configureUpstreamTls(false, true);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           // Docker doesn't allow writing to the v6 address returned by

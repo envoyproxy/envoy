@@ -64,6 +64,17 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& p
   cx_total.inc();
 }
 
+MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
+                                                         Stats::Counter& cx_total,
+                                                         Upstream::Host::CreateConnectionData& data)
+    : Envoy::Http::ActiveClient(
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
+          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+  codec_client_->setCodecClientCallbacks(*this);
+  codec_client_->setCodecConnectionCallbacks(*this);
+  cx_total.inc();
+}
+
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
                                                          Upstream::Host::CreateConnectionData& data,
                                                          Stats::Counter& cx_total)

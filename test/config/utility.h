@@ -259,7 +259,7 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false);
+  void configureUpstreamTls(bool use_alpn = false, bool http3 = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.

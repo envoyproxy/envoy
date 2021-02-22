@@ -114,8 +114,6 @@ public:
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
-  Envoy::Ssl::ClientContextConfigPtr& config() { return config_; }
-
 private:
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
