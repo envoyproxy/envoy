@@ -132,7 +132,7 @@ public:
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
     // TODO(danzh) defer setting flow control window till getting http2 options. This requires
-    // QUICHE support to set the session's flow controller after instatiation.
+    // QUICHE support to set the session's flow controller after instantiation.
     quic_config_.SetInitialStreamFlowControlWindowToSend(
         Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     quic_config_.SetInitialSessionFlowControlWindowToSend(
