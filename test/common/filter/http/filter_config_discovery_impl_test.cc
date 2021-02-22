@@ -295,12 +295,6 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
-// TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
-//   InSequence s;
-//   setup();
-//   auto provider2 = createProvider("foo", true);
-// }
-
 } // namespace
 } // namespace Http
 } // namespace Filter
