@@ -22,15 +22,16 @@ static bool skip_expensive_benchmarks = false;
 // TODO(pgenera): convert this to abseil/flags/ when benchmark also adopts abseil.
 int main(int argc, char** argv) {
 
-  bool is_help_flag = false;
+  bool contains_help_flag = false;
 
   for (int i = 1; i < argc; ++i) {
     if (strcmp(argv[i], "--help") == 0) {
-      is_help_flag = true;
+      contains_help_flag = true;
+      break;
     }
   }
 
-  if (!is_help_flag) {
+  if (!contains_help_flag) {
     ::benchmark::Initialize(&argc, argv);
   }
 
