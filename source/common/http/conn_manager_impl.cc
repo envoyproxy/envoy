@@ -1255,20 +1255,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
                                            stream_id_);
     }
   }
-  filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_ = std::move(route);
-  if (nullptr == filter_manager_.streamInfo().route_entry_) {
-    cached_cluster_info_ = nullptr;
-  } else {
-    Upstream::ThreadLocalCluster* local_cluster =
-        connection_manager_.cluster_manager_.getThreadLocalCluster(
-            filter_manager_.streamInfo().route_entry_->clusterName());
-    cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
-  }
 
-  filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
-  refreshCachedTracingCustomTags();
-  refreshDurationTimeout();
+  setRoute(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -1582,9 +1570,15 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   return cached_route_.value();
 }
 
-// Sets the cached route to the RouteConstSharedPtr argument passed in. Also sets the cached cluster
-// info based on this route's routeEntry.
-void ConnectionManagerImpl::ActiveStream::setRoute(const Router::RouteConstSharedPtr route) {
+/**
+ * Sets the cached route to the RouteConstSharedPtr argument passed in. Handles setting the
+ * cached_route_/cached_cluster_info_ ActiveStream attributes, the FilterManager streamInfo, tracing
+ * tags, and timeouts.
+ *
+ * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
+ * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
+ */
+void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
   filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == filter_manager_.streamInfo().route_entry_) {
