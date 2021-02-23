@@ -1293,6 +1293,7 @@ TEST_F(HttpFilterTest, FilterEnabledButRouteEntryIsNotPresent) {
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillByDefault(Return(true));
 
+  // No route has matched 
   ON_CALL(*filter_callbacks_.route_, routeEntry()).WillByDefault(Return(nullptr));
 
   // Make sure check is not called.
