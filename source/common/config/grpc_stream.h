@@ -71,9 +71,7 @@ public:
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
-  void sendMessage(const RequestProto& request) {
-    stream_->sendMessage(request, false);
-  }
+  void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
