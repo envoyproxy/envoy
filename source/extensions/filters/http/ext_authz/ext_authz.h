@@ -99,12 +99,12 @@ public:
 
   Http::Code statusOnError() const { return status_on_error_; }
 
-  bool filterEnabled(const Router::RouteEntry* routeEntry) {
+  bool filterEnabled(const Router::RouteEntry* route_entry) {
     const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
     const bool enabled_metadata =
-        routeEntry == nullptr ? !filter_enabled_metadata_.has_value()
+        route_entry == nullptr ? !filter_enabled_metadata_.has_value()
                               : filter_enabled_metadata_.has_value()
-                                    ? filter_enabled_metadata_->match(routeEntry->metadata())
+                                    ? filter_enabled_metadata_->match(route_entry->metadata())
                                     : true;
 
     return enabled && enabled_metadata;
