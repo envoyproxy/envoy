@@ -360,9 +360,8 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   }
 
   auto it = error_state_tracker_.find(name);
-  try {
-    return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
-  } catch (const EnvoyException& e) {
+  envoy_try { return addOrUpdateListenerInternal(config, version_info, added_via_api, name); }
+  catch (const EnvoyException& e) {
     if (it == error_state_tracker_.end()) {
       it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }

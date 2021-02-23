@@ -158,18 +158,19 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                            "600", "string", cmd);
 
   cmd.setExceptionHandling(false);
-  try {
+  envoy_try {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
-  } catch (TCLAP::ArgException& e) {
-    try {
-      cmd.getOutput()->failure(cmd, e);
-    } catch (const TCLAP::ExitException&) {
+  }
+  catch (TCLAP::ArgException& e) {
+    envoy_try { cmd.getOutput()->failure(cmd, e); }
+    catch (const TCLAP::ExitException&) {
       // failure() has already written an informative message to stderr, so all that's left to do
       // is throw our own exception with the original message.
       throw MalformedArgvException(e.what());
     }
-  } catch (const TCLAP::ExitException& e) {
+  }
+  catch (const TCLAP::ExitException& e) {
     // parse() throws an ExitException with status 0 after printing the output for --help and
     // --version.
     throw NoServingException();

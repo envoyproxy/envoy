@@ -1287,9 +1287,8 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  try {
-    MessageUtil::jsonConvertValue(*proto, val);
-  } catch (EnvoyException& ex) {
+  envoy_try { MessageUtil::jsonConvertValue(*proto, val); }
+  catch (EnvoyException& ex) {
     return unspecifiedValue();
   }
   return val;
