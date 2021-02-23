@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 licenses(["notice"])  # Apache 2
 
@@ -167,10 +168,34 @@ config_setting(
 )
 
 config_setting(
-    name = "gcc_build",
+    name = "gcc_build_gcc",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
     },
+)
+
+# This is needed due to a Bazel bug (https://github.com/bazelbuild/bazel/issues/12707)
+config_setting(
+    name = "gcc_build_compiler",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "compiler",
+    },
+)
+
+selects.config_setting_group(
+    name = "gcc_build_compiler_on_linux",
+    match_all = [
+        ":gcc_build_compiler",
+        ":linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gcc_build",
+    match_any = [
+        ":gcc_build_gcc",
+        ":gcc_build_compiler_on_linux",
+    ],
 )
 
 config_setting(
