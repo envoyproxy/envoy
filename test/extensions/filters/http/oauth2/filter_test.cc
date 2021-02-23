@@ -109,7 +109,7 @@ public:
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
     p.add_auth_scopes("email");
-    p.set_resource("oauth2-resource")
+    p.set_resource("oauth2-resource");
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->set_exact_match("OPTIONS");
