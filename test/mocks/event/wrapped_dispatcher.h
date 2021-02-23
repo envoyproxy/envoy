@@ -94,6 +94,10 @@ public:
 
   void post(std::function<void()> callback) override { impl_.post(std::move(callback)); }
 
+  void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override {
+    impl_.deleteInDispatcherThread(std::move(deletable));
+  }
+
   void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
@@ -112,6 +116,8 @@ public:
   void updateApproximateMonotonicTime() override { impl_.updateApproximateMonotonicTime(); }
 
   bool isThreadSafe() const override { return impl_.isThreadSafe(); }
+
+  void shutdown() override { impl_.shutdown(); }
 
 protected:
   Dispatcher& impl_;

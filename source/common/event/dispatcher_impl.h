@@ -79,12 +79,14 @@ public:
   void exit() override;
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
+  void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void pushTrackedObject(const ScopeTrackedObject* object) override;
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
+  void shutdown() override;
 
   // FatalErrorInterface
   void onFatalError(std::ostream& os) const override;
@@ -120,6 +122,8 @@ private:
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
+  void runThreadLocalDelete();
+
   // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
   void touchWatchdog();
 
@@ -138,13 +142,24 @@ private:
   Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
+
+  SchedulableCallbackPtr thread_local_delete_cb_;
+  Thread::MutexBasicLockable thread_local_deletable_lock_;
+  // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.
+  std::list<DispatcherThreadDeletableConstPtr>
+      deletables_in_dispatcher_thread_ ABSL_GUARDED_BY(thread_local_deletable_lock_);
+  bool shutdown_called_{false};
+
   SchedulableCallbackPtr deferred_delete_cb_;
+
   SchedulableCallbackPtr post_cb_;
+  Thread::MutexBasicLockable post_lock_;
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
-  Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+
   absl::InlinedVector<const ScopeTrackedObject*, ExpectedMaxTrackedObjectStackDepth>
       tracked_object_stack_;
   bool deferred_deleting_{};
