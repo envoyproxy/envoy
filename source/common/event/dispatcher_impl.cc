@@ -63,6 +63,8 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                           ? watermark_factory
                           : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      thread_local_delete_cb_(
+          base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
@@ -74,7 +76,12 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
+DispatcherImpl::~DispatcherImpl() {
+  ENVOY_LOG(debug, "destroying dispatcher {}", name_);
+  FatalErrorHandler::removeFatalErrorHandler(*this);
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and enable
+  // ASSERT(deletable_in_dispatcher_thread_.empty())
+}
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                       std::chrono::milliseconds min_touch_interval) {
@@ -265,9 +272,23 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
+void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) {
+  bool need_schedule;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    need_schedule = deletables_in_dispatcher_thread_.empty();
+    deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
+    // TODO(lambdai): Enable below after https://github.com/envoyproxy/envoy/issues/15072
+    // ASSERT(!shutdown_called_, "inserted after shutdown");
+  }
+
+  if (need_schedule) {
+    thread_local_delete_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
 void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
-
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
@@ -280,12 +301,56 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
   return approximate_monotonic_time_;
 }
 
+void DispatcherImpl::shutdown() {
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete below
+  // below 3 lists until all lists are empty. The 3 lists are list of deferred delete objects, post
+  // callbacks and dispatcher thread deletable objects.
+  ASSERT(isThreadSafe());
+  auto deferred_deletables_size = current_to_delete_->size();
+  std::list<std::function<void()>>::size_type post_callbacks_size;
+  {
+    Thread::LockGuard lock(post_lock_);
+    post_callbacks_size = post_callbacks_.size();
+  }
+
+  std::list<DispatcherThreadDeletableConstPtr> local_deletables;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    local_deletables = std::move(deletables_in_dispatcher_thread_);
+  }
+  auto thread_local_deletables_size = local_deletables.size();
+  while (!local_deletables.empty()) {
+    local_deletables.pop_front();
+  }
+  ASSERT(!shutdown_called_);
+  shutdown_called_ = true;
+  ENVOY_LOG(
+      trace,
+      "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",
+      __FUNCTION__, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size);
+}
+
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
 
 void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
   approximate_monotonic_time_ = api_.timeSource().monotonicTime();
 }
 
+void DispatcherImpl::runThreadLocalDelete() {
+  std::list<DispatcherThreadDeletableConstPtr> to_be_delete;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    to_be_delete = std::move(deletables_in_dispatcher_thread_);
+    ASSERT(deletables_in_dispatcher_thread_.empty());
+  }
+  while (!to_be_delete.empty()) {
+    // Touch the watchdog before deleting the objects to avoid spurious watchdog miss events when
+    // executing complicated destruction.
+    touchWatchdog();
+    // Delete in FIFO order.
+    to_be_delete.pop_front();
+  }
+}
 void DispatcherImpl::runPostCallbacks() {
   // Clear the deferred delete list before running post callbacks to reduce non-determinism in
   // callback processing, and more easily detect if a scheduled post callback refers to one of the

@@ -210,6 +210,7 @@ void AsyncStreamImpl::cleanup() {
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (LinkedObject<AsyncStreamImpl>::inserted()) {
+    ASSERT(dispatcher_->isThreadSafe());
     dispatcher_->deferredDelete(
         LinkedObject<AsyncStreamImpl>::removeFromList(parent_.active_streams_));
   }

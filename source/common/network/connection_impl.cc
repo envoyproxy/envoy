@@ -211,6 +211,7 @@ Connection::State ConnectionImpl::state() const {
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
 void ConnectionImpl::setTransportSocketIsReadable() {
+  ASSERT(dispatcher_.isThreadSafe());
   // Remember that the transport requested read resumption, in case the resumption event is not
   // scheduled immediately or is "lost" because read was disabled.
   transport_wants_read_ = true;
@@ -301,6 +302,7 @@ void ConnectionImpl::noDelay(bool enable) {
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
+  ASSERT(dispatcher_.isThreadSafe());
   if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
@@ -420,6 +422,7 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
 bool ConnectionImpl::readEnabled() const {
   // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
+  ASSERT(dispatcher_.isThreadSafe());
   return read_disable_count_ == 0;
 }
 
@@ -437,6 +440,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through_filter_chain) {
   ASSERT(!end_stream || enable_half_close_);
+  ASSERT(dispatcher_.isThreadSafe());
 
   if (write_end_stream_) {
     // It is an API violation to write more data after writing end_stream, but a duplicate
