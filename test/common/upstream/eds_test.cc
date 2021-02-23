@@ -97,7 +97,7 @@ public:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -105,7 +105,7 @@ public:
   }
 
   void initialize() {
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
 
@@ -132,6 +132,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -837,7 +838,7 @@ TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
 }
 
 // Verifies that if an endpoint is moved to a new priority, the active hc status is preserved.
-TEST_F(EdsTest, EndpointMovedToNewPriority) {
+TEST_F(EdsTest, EndpointMovedToNewPriorityWithDrain) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetClusterDrainOnHostRemoval();
@@ -899,6 +900,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 
   {
@@ -911,6 +913,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 
   // Moves all the endpoints to priority 1.
@@ -932,13 +935,15 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
 
     // The endpoints were healthy, so moving them around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 }
 
 // Verifies that if an endpoint is moved between priorities, the health check value
 // of the host is preserved
-TEST_F(EdsTest, EndpointMoved) {
+TEST_F(EdsTest, EndpointMovedWithDrain) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetClusterDrainOnHostRemoval();
@@ -1008,6 +1013,7 @@ TEST_F(EdsTest, EndpointMoved) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 
   {
@@ -1021,6 +1027,296 @@ TEST_F(EdsTest, EndpointMoved) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+}
+
+// Verifies that if an endpoint is moved to a new priority, the active hc status is preserved.
+TEST_F(EdsTest, EndpointMovedToNewPriority) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port, int priority) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    endpoints->set_priority(priority);
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80, 0);
+  add_endpoint(81, 0);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // Mark the hosts as healthy
+    for (auto& host : hosts) {
+      EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    }
+  }
+
+  // Moves the endpoints between priorities
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(81, 0);
+  add_endpoint(80, 1);
+
+  // Verify that no hosts gets added or removed to/from the PrioritySet.
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    // assert that it didn't move
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:80");
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  // Moves all the endpoints to priority 1.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 1);
+  add_endpoint(81, 1);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    // Priority 0 should now be empty.
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 0);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // The endpoints were healthy, so moving them around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+}
+
+// Verifies that if an endpoint is moved between priorities, the health check value
+// of the host is preserved
+TEST_F(EdsTest, EndpointMoved) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port, int priority) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    endpoints->set_priority(priority);
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80, 0);
+  add_endpoint(81, 1);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_EQ(0, hosts[0]->priority());
+    // Mark the host as healthy and remove the pending active hc flag.
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_EQ(1, hosts[0]->priority());
+    // Mark the host as healthy and remove the pending active hc flag.
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  // Moves the endpoints between priorities
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(81, 0);
+  add_endpoint(80, 1);
+  // Verify that no hosts gets added or removed to/from the PrioritySet.
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+    EXPECT_EQ(0, hosts[0]->priority());
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:80");
+    EXPECT_EQ(1, hosts[0]->priority());
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+}
+
+// Verifies that if an endpoint is moved to a new priority and has its health check address altered
+// then nothing bad happens
+TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port, int priority, int health_port) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    endpoints->set_priority(priority);
+    auto* endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
+
+    auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+
+    endpoint->mutable_health_check_config()->set_port_value(health_port);
+  };
+
+  add_endpoint(80, 0, 80);
+  add_endpoint(81, 1, 81);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 0, 80);
+  add_endpoint(81, 0, 82);
+
+  // Changing a health check endpoint at the same time as priority is an add and immediate remove
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_EQ(added.size(), 1);
+    EXPECT_EQ(removed.size(), 1);
+  });
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    EXPECT_EQ(hosts[1]->address()->asString(), "1.2.3.4:81");
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 0, 80);
+  add_endpoint(81, 1, 83);
+
+  // Changing a health check endpoint at the same time as priority is an add and immediate remove
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_EQ(added.size(), 1);
+    EXPECT_EQ(removed.size(), 1);
+  });
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }
 

@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
@@ -490,20 +491,14 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // limits we err on the side of buffering more triggering watermark callbacks less often.
   //
   // Given the current implementation for straight up TCP proxying, the common case is reading
-  // |limit| bytes through the socket, passing |limit| bytes to the connection (triggering the high
-  // watermarks) and the immediately draining |limit| bytes to the socket (triggering the low
-  // watermarks). We avoid this by setting the high watermark to limit + 1 so a single read will
-  // not trigger watermarks if the socket is not blocked.
-  //
-  // If the connection class is changed to write to the buffer and flush to the socket in the same
-  // stack then instead of checking watermarks after the write and again after the flush it can
-  // check once after both operations complete. At that point it would be better to change the high
-  // watermark from |limit + 1| to |limit| as the common case (move |limit| bytes, flush |limit|
-  // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
-  // would result in respecting the exact buffer limit.
+  // |limit| bytes through the socket, passing |limit| bytes to the connection and the immediately
+  // draining |limit| bytes to the socket. Triggering the high watermarks and then immediately
+  // triggering the low watermarks would be expensive, but we narrowly avoid triggering high
+  // watermark when moving |limit| bytes through the connection because the high watermark
+  // computation checks if the size of the buffer exceeds the high watermark value.
   if (limit > 0) {
-    write_buffer_->setWatermarks(limit + 1);
-    read_buffer_->setWatermarks(limit + 1);
+    write_buffer_->setWatermarks(limit);
+    read_buffer_->setWatermarks(limit);
   }
 }
 
@@ -789,7 +784,8 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
   }
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
-        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+        dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
+                                      [this] { onTransportSocketConnectTimeout(); });
   }
   transport_socket_connect_timer_->enableTimer(timeout);
 }

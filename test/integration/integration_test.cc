@@ -29,6 +29,7 @@ using Envoy::Http::HttpStatusIs;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace {
@@ -518,7 +519,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
         "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
         smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
-    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
@@ -526,7 +527,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "\r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
@@ -534,7 +535,18 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+  }
+  {
+    // Verify that sending `Transfer-Encoding: chunked` as a second header is detected and triggers
+    // the "no Transfer-Encoding + Content-Length" check.
+    std::string response;
+    const std::string request =
+        "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
+        "identity\r\ncontent-length: 36\r\ntransfer-encoding: chunked \r\n\r\n" +
+        smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
 }
 
@@ -550,7 +562,7 @@ TEST_P(IntegrationTest, TestPipelinedResponses) {
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
-  ASSERT_THAT(data, HasSubstr("POST"));
+  ASSERT_THAT(data, StartsWith("POST"));
 
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
@@ -560,7 +572,7 @@ TEST_P(IntegrationTest, TestPipelinedResponses) {
   tcp_client->waitForData("0\r\n\r\n", false);
   std::string response = tcp_client->data();
 
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
   EXPECT_THAT(response, EndsWith("0\r\n\r\n"));
 
@@ -592,7 +604,7 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
 
-  ASSERT_THAT(data, HasSubstr("POST / HTTP/1.1"));
+  ASSERT_THAT(data, StartsWith("POST / HTTP/1.1"));
   ASSERT_THAT(data, HasSubstr("transfer-encoding: chunked"));
   // verify no 'content-length' header
   ASSERT_THAT(data, Not(HasSubstr("ontent-length")));
@@ -636,7 +648,7 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   tcp_client->waitForData("\r\n\r\n", false);
   std::string response = tcp_client->data();
 
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
   EXPECT_THAT(response, Not(HasSubstr("content-length")));
   EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
   EXPECT_THAT(response, EndsWith("\r\n\r\n"));
@@ -650,7 +662,7 @@ TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, MissingDelimiter) {
@@ -659,7 +671,7 @@ TEST_P(IntegrationTest, MissingDelimiter) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   std::string log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(log, HasSubstr("http1.codec_error"));
   EXPECT_THAT(log, HasSubstr("DPE"));
@@ -671,7 +683,7 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, InvalidVersion) {
@@ -679,7 +691,7 @@ TEST_P(IntegrationTest, InvalidVersion) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
                                 &response);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 // Expect that malformed trailers to break the connection
@@ -695,7 +707,7 @@ TEST_P(IntegrationTest, BadTrailer) {
                                 "badtrailer\r\n\r\n",
                                 &response);
 
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 // Expect malformed headers to break the connection
@@ -711,14 +723,14 @@ TEST_P(IntegrationTest, BadHeader) {
                                 "body\r\n0\r\n\r\n",
                                 &response);
 
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, Http10Disabled) {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 426 Upgrade Required\r\n"));
 }
 
 TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
@@ -726,7 +738,7 @@ TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\nUpgrade: h2c\r\n\r\n",
                                 &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 426 Upgrade Required\r\n"));
 }
 
 // Turn HTTP/1.0 support on and verify 09 style requests work.
@@ -737,7 +749,7 @@ TEST_P(IntegrationTest, Http09Enabled) {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\n\r\n", &response, false);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
@@ -760,7 +772,7 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
                                 &response, true);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("connection: keep-alive\r\n"));
 }
 
@@ -771,7 +783,7 @@ TEST_P(IntegrationTest, Http10Enabled) {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, false);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
@@ -781,7 +793,7 @@ TEST_P(IntegrationTest, Http10Enabled) {
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 
   sendRawHttpAndWaitForResponse(lookupPort("http"), "HEAD / HTTP/1.0\r\n\r\n", &response, false);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 }
@@ -799,7 +811,7 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
                                 "User-Agent: 123\r\n"
                                 "Eep: baz\r\n\r\n",
                                 &response, true);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
 
   std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
@@ -826,7 +838,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndLwsNoContentLength) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
                                 &response, true);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("connection: keep-alive")));
   EXPECT_THAT(response, Not(HasSubstr("content-length:")));
@@ -849,7 +861,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndContentLengthAndLws) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
                                 &response, true);
-  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, Not(HasSubstr("connection: close")));
   EXPECT_THAT(response, HasSubstr("connection: keep-alive"));
   EXPECT_THAT(response, HasSubstr("content-length:"));
@@ -870,7 +882,7 @@ TEST_P(IntegrationTest, Pipeline) {
   while (response.find("200") == std::string::npos) {
     connection->run(Event::Dispatcher::RunType::NonBlock);
   }
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
 
   // Second response should be 400 (no host)
   while (response.find("400") == std::string::npos) {
@@ -919,7 +931,7 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
   while ((pos = response.find("200")) == std::string::npos) {
     connection->run(Event::Dispatcher::RunType::NonBlock);
   }
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
   while (response.find("200", pos + 1) == std::string::npos) {
     connection->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -952,7 +964,7 @@ TEST_P(IntegrationTest, PipelineInline) {
   while (response.find("400") == std::string::npos) {
     connection->run(Event::Dispatcher::RunType::NonBlock);
   }
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 
   while (response.find("426") == std::string::npos) {
     connection->run(Event::Dispatcher::RunType::NonBlock);
@@ -981,7 +993,7 @@ TEST_P(IntegrationTest, BadPath) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n", &response,
                                 true);
-  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 404 Not Found\r\n"));
 }
 
 TEST_P(IntegrationTest, AbsolutePath) {
@@ -996,7 +1008,7 @@ TEST_P(IntegrationTest, AbsolutePath) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET http://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response, true);
-  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
@@ -1020,8 +1032,7 @@ TEST_P(IntegrationTest, TestHostWithAddress) {
   sendRawHttpAndWaitForResponse(
       lookupPort("http"), absl::StrCat("GET http://", address_string, " HTTP/1.1\r\n\r\n").c_str(),
       &response, true);
-  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
-  EXPECT_TRUE(response.find("301") != std::string::npos);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr(address_string));
 
   // Test normal IPv6 request as well.
@@ -1030,8 +1041,7 @@ TEST_P(IntegrationTest, TestHostWithAddress) {
       lookupPort("http"),
       absl::StrCat("GET / HTTP/1.1\r\nHost: ", address_string, "\r\n\r\n").c_str(), &response,
       true);
-  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
-  EXPECT_TRUE(response.find("301") != std::string::npos);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithPort) {
@@ -1045,8 +1055,7 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
   sendRawHttpAndWaitForResponse(
       lookupPort("http"), "GET http://www.namewithport.com:1234 HTTP/1.1\r\nHost: host\r\n\r\n",
       &response, true);
-  EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
-  EXPECT_TRUE(response.find("301") != std::string::npos);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
 TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
@@ -1062,7 +1071,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET http://www.namewithport.com HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0) << response;
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 404 Not Found\r\n"));
 }
 
 // Ensure that connect behaves the same with allow_absolute_url enabled and without
@@ -1161,7 +1170,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
   tcp_client->waitForData("\r\n\r\n", false);
   std::string response = tcp_client->data();
 
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
   EXPECT_THAT(response, Not(HasSubstr("content-length")));
   EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
   EXPECT_THAT(response, EndsWith("\r\n\r\n"));
@@ -1643,7 +1652,7 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
 TEST_P(IntegrationTest, ConnectWithNoBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
   initialize();
 
   // Send the payload early so we can regression test that body data does not
@@ -1681,7 +1690,7 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
 TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
@@ -1798,6 +1807,119 @@ TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverride
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(IntegrationTest, Preconnect) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_preconnect_policy()
+        ->mutable_predictive_preconnect_ratio()
+        ->set_value(1.5);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < 5; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(5);
+  initialize();
+
+  std::list<IntegrationCodecClientPtr> clients;
+  std::list<Http::RequestEncoder*> encoders;
+  std::list<IntegrationStreamDecoderPtr> responses;
+  std::vector<FakeHttpConnectionPtr> fake_connections{15};
+
+  int upstream_index = 0;
+  for (uint32_t i = 0; i < 10; ++i) {
+    // Start a new request.
+    clients.push_back(makeHttpConnection(lookupPort("http")));
+    auto encoder_decoder = clients.back()->startRequest(default_request_headers_);
+    encoders.push_back(&encoder_decoder.first);
+    responses.push_back(std::move(encoder_decoder.second));
+
+    // For each HTTP request, a new connection will be established, as none of
+    // the streams are closed so no connections can be reused.
+    waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                  TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+    ++upstream_index;
+
+    // For every other connection, an extra connection should be preconnected.
+    if (i % 2 == 0) {
+      waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                    TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+      ++upstream_index;
+    }
+  }
+
+  // Clean up.
+  while (!clients.empty()) {
+    clients.front()->close();
+    clients.pop_front();
+  }
+}
+
+TEST_P(IntegrationTest, RandomPreconnect) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_preconnect_policy()
+        ->mutable_predictive_preconnect_ratio()
+        ->set_value(1.5);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < 5; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(5);
+  TestRandomGenerator rand;
+  autonomous_upstream_ = true;
+  initialize();
+
+  std::list<IntegrationCodecClientPtr> clients;
+  std::list<Http::RequestEncoder*> encoders;
+  std::list<IntegrationStreamDecoderPtr> responses;
+  const uint32_t num_requests = 50;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    if (rand.random() % 5 <= 3) { // Bias slightly towards more connections
+      // Start a new request.
+      clients.push_back(makeHttpConnection(lookupPort("http")));
+      auto encoder_decoder = clients.back()->startRequest(default_request_headers_);
+      encoders.push_back(&encoder_decoder.first);
+      responses.push_back(std::move(encoder_decoder.second));
+    } else if (!clients.empty()) {
+      // Finish up a request.
+      clients.front()->sendData(*encoders.front(), 0, true);
+      encoders.pop_front();
+      responses.front()->waitForEndStream();
+      responses.pop_front();
+      clients.front()->close();
+      clients.pop_front();
+    }
+  }
+  // Clean up.
+  while (!clients.empty()) {
+    clients.front()->sendData(*encoders.front(), 0, true);
+    encoders.pop_front();
+    responses.front()->waitForEndStream();
+    responses.pop_front();
+    clients.front()->close();
+    clients.pop_front();
+  }
 }
 
 } // namespace Envoy

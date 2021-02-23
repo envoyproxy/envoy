@@ -23,20 +23,24 @@ namespace Http {
 #define DEFINE_INLINE_HEADER_FUNCS(name)                                                           \
 public:                                                                                            \
   const HeaderEntry* name() const override { return getInline(HeaderHandles::get().name); }        \
+  size_t remove##name() override { return removeInline(HeaderHandles::get().name); }               \
+  absl::string_view get##name##Value() const override {                                            \
+    return getInlineValue(HeaderHandles::get().name);                                              \
+  }                                                                                                \
+  void set##name(absl::string_view value) override { setInline(HeaderHandles::get().name, value); }
+
+#define DEFINE_INLINE_HEADER_STRING_FUNCS(name)                                                    \
+  DEFINE_INLINE_HEADER_FUNCS(name)                                                                 \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     appendInline(HeaderHandles::get().name, data, delimiter);                                      \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
     setReferenceInline(HeaderHandles::get().name, value);                                          \
-  }                                                                                                \
-  void set##name(absl::string_view value) override {                                               \
-    setInline(HeaderHandles::get().name, value);                                                   \
-  }                                                                                                \
-  void set##name(uint64_t value) override { setInline(HeaderHandles::get().name, value); }         \
-  size_t remove##name() override { return removeInline(HeaderHandles::get().name); }               \
-  absl::string_view get##name##Value() const override {                                            \
-    return getInlineValue(HeaderHandles::get().name);                                              \
   }
+
+#define DEFINE_INLINE_HEADER_NUMERIC_FUNCS(name)                                                   \
+  DEFINE_INLINE_HEADER_FUNCS(name)                                                                 \
+  void set##name(uint64_t value) override { setInline(HeaderHandles::get().name, value); }
 
 /**
  * Implementation of Http::HeaderMap. This is heavily optimized for performance. Roughly, when
@@ -451,8 +455,10 @@ public:
     return std::unique_ptr<RequestHeaderMapImpl>(new (inlineHeadersSize()) RequestHeaderMapImpl());
   }
 
-  INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
+  INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
+  INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the
@@ -465,8 +471,10 @@ protected:
 
 private:
   struct HeaderHandleValues {
-    INLINE_REQ_HEADERS(DEFINE_HEADER_HANDLE)
-    INLINE_REQ_RESP_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_REQ_STRING_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_REQ_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_REQ_RESP_STRING_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
   };
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
@@ -512,9 +520,12 @@ public:
                                                       ResponseHeaderMapImpl());
   }
 
-  INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
 protected:
   // See comment in RequestHeaderMapImpl.
@@ -524,9 +535,12 @@ protected:
 
 private:
   struct HeaderHandleValues {
-    INLINE_RESP_HEADERS(DEFINE_HEADER_HANDLE)
-    INLINE_REQ_RESP_HEADERS(DEFINE_HEADER_HANDLE)
-    INLINE_RESP_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
+    INLINE_RESP_STRING_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_RESP_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_REQ_RESP_STRING_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
+    INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
+    INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
   };
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
@@ -548,7 +562,8 @@ public:
                                                        ResponseTrailerMapImpl());
   }
 
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
 protected:
   // See comment in RequestHeaderMapImpl.
@@ -558,7 +573,8 @@ protected:
 
 private:
   struct HeaderHandleValues {
-    INLINE_RESP_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
+    INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
+    INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_HEADER_HANDLE)
   };
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;

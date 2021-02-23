@@ -58,6 +58,10 @@ typed_config:
         name: token
       hmac_secret:
         name: hmac
+    auth_scopes:
+    - user
+    - openid
+    - email
 )EOF");
 
     // Add the OAuth cluster.
@@ -125,12 +129,9 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
 
   envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
   oauth_response.mutable_access_token()->set_value("bar");
-  oauth_response.mutable_expires_in()->set_value(
-      std::chrono::duration_cast<std::chrono::seconds>(
-          api_->timeSource().systemTime().time_since_epoch() + std::chrono::seconds(10))
-          .count());
+  oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
 
-  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessage(oauth_response));
+  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
   upstream_request_->encodeData(buffer, true);
 
   // We should get an immediate redirect back.

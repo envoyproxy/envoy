@@ -107,6 +107,7 @@ envoy_cc_library(
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
 )
 
@@ -211,6 +212,7 @@ envoy_cc_library(
         ":quic_filter_manager_connection_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_storage_impl_lib",
@@ -349,10 +351,19 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
+    # Needed to verify that a quic specific configuration is used for quic transport socket.
+    extra_visibility = [
+        "//source/server:__subpackages__",
+    ],
+    security_posture = "unknown",
     tags = ["nofips"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
@@ -369,9 +380,12 @@ envoy_cc_library(
 # All of these are needed for this extension to function.
 envoy_cc_extension(
     name = "quic_factory_lib",
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     security_posture = "unknown",
     tags = ["nofips"],
-
     # QUICHE can't build against FIPS BoringSSL until the FIPS build
     # is on a new enough version to have QUIC support. Remove it from
     # the build until then. Re-enable as part of #7433.

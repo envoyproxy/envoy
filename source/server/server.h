@@ -50,6 +50,18 @@
 
 namespace Envoy {
 namespace Server {
+namespace CompilationSettings {
+/**
+ * All server compilation settings stats. @see stats_macros.h
+ */
+#define ALL_SERVER_COMPILATION_SETTINGS_STATS(COUNTER, GAUGE, HISTOGRAM)                           \
+  GAUGE(fips_mode, NeverImport)
+
+struct ServerCompilationSettingsStats {
+  ALL_SERVER_COMPILATION_SETTINGS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                                        GENERATE_HISTOGRAM_STRUCT)
+};
+} // namespace CompilationSettings
 
 /**
  * All server wide stats. @see stats_macros.h
@@ -162,6 +174,7 @@ public:
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
@@ -322,6 +335,8 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  std::unique_ptr<CompilationSettings::ServerCompilationSettingsStats>
+      server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;

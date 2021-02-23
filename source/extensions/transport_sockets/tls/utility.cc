@@ -1,7 +1,9 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -10,6 +12,38 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const std::string& path,
+                                                              TimeSource& time_source) {
+  Envoy::Ssl::CertificateDetailsPtr certificate_details =
+      std::make_unique<envoy::admin::v3::CertificateDetails>();
+  certificate_details->set_path(path);
+  certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
+  certificate_details->set_days_until_expiration(
+      Utility::getDaysUntilExpiration(cert, time_source));
+
+  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
+  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
+
+  for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_dns(dns_san);
+  }
+  for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_uri(uri_san);
+  }
+  for (auto& ip_san : Utility::getSubjectAltNames(*cert, GEN_IPADD)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_ip_address(ip_san);
+  }
+  return certificate_details;
+}
 
 namespace {
 
@@ -212,6 +246,50 @@ absl::optional<std::string> Utility::getLastCryptoError() {
   }
 
   return absl::nullopt;
+}
+
+absl::string_view Utility::getErrorDescription(int err) {
+  switch (err) {
+  case SSL_ERROR_NONE:
+    return SSL_ERROR_NONE_MESSAGE;
+  case SSL_ERROR_SSL:
+    return SSL_ERROR_SSL_MESSAGE;
+  case SSL_ERROR_WANT_READ:
+    return SSL_ERROR_WANT_READ_MESSAGE;
+  case SSL_ERROR_WANT_WRITE:
+    return SSL_ERROR_WANT_WRITE_MESSAGE;
+  case SSL_ERROR_WANT_X509_LOOKUP:
+    return SSL_ERROR_WANT_X509_LOOPUP_MESSAGE;
+  case SSL_ERROR_SYSCALL:
+    return SSL_ERROR_SYSCALL_MESSAGE;
+  case SSL_ERROR_ZERO_RETURN:
+    return SSL_ERROR_ZERO_RETURN_MESSAGE;
+  case SSL_ERROR_WANT_CONNECT:
+    return SSL_ERROR_WANT_CONNECT_MESSAGE;
+  case SSL_ERROR_WANT_ACCEPT:
+    return SSL_ERROR_WANT_ACCEPT_MESSAGE;
+  case SSL_ERROR_WANT_CHANNEL_ID_LOOKUP:
+    return SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE;
+  case SSL_ERROR_PENDING_SESSION:
+    return SSL_ERROR_PENDING_SESSION_MESSAGE;
+  case SSL_ERROR_PENDING_CERTIFICATE:
+    return SSL_ERROR_PENDING_CERTIFICATE_MESSAGE;
+  case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+    return SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE;
+  case SSL_ERROR_PENDING_TICKET:
+    return SSL_ERROR_PENDING_TICKET_MESSAGE;
+  case SSL_ERROR_EARLY_DATA_REJECTED:
+    return SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE;
+  case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
+    return SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE;
+  case SSL_ERROR_HANDOFF:
+    return SSL_ERROR_HANDOFF_MESSAGE;
+  case SSL_ERROR_HANDBACK:
+    return SSL_ERROR_HANDBACK_MESSAGE;
+  default:
+    ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
+    return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
+  }
 }
 
 } // namespace Tls

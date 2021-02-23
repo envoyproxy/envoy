@@ -141,7 +141,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroyed listener manager");
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -353,10 +356,17 @@ void InstanceImpl::initialize(const Options& options,
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
+  const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
+  server_compilation_settings_stats_ =
+      std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
+          CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(
+              POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
@@ -385,6 +395,9 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
+  if (VersionInfo::sslFipsCompliant()) {
+    server_compilation_settings_stats_->fips_mode_.set(1);
+  }
 
   bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");
@@ -403,8 +416,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      stats().symbolTable(), bootstrap_.node(), local_address, options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
@@ -419,7 +432,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_);
+      messageValidationContext().staticValidationVisitor(), *api_, options);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -528,7 +541,7 @@ void InstanceImpl::initialize(const Options& options,
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_);
+      access_log_manager_, *singleton_manager_, options_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -568,6 +581,11 @@ void InstanceImpl::initialize(const Options& options,
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
 
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized();
+  }
+
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
@@ -583,21 +601,33 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
+  // Initializing can throw exceptions, so catch these.
+  try {
+    clusterManager().initializeSecondaryClusters(bootstrap_);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
+    shutdown();
+  }
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        stats_store_,
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_, false)
-            ->create(),
-        Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
-        Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
-        access_log_manager_, *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_,
-        thread_local_, messageValidationContext().dynamicValidationVisitor(), *api_);
+    try {
+      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+          stats_store_,
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
+                                                         stats_store_, false)
+              ->create(),
+          Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
+          Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
+          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
+          *api_, options_);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+      shutdown();
+    }
   }
 
   // If there is no global limit to the number of active connections, warn on startup.

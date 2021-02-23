@@ -14,6 +14,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -238,8 +239,8 @@ public:
    * @return SubscriptionStats for scope.
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
-    return {
-        ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope))};
+    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope),
+                                   POOL_HISTOGRAM(scope))};
   }
 
   /**
@@ -348,8 +349,8 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
-   * provided because for statically registered implementations, a custom config is generally
+   * @param enclosing_message proto that contains a field 'typed_config'. Note: the enclosing proto
+   * is provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
    * @param validation_visitor message validation visitor instance.
    * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a

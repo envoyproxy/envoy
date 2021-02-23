@@ -20,6 +20,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/notification.h"
 
 using namespace std::chrono_literals;
 
@@ -358,12 +359,6 @@ AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milli
       [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
 }
 
-AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
-                                                    std::chrono::milliseconds timeout) {
-  return shared_connection_.executeOnDispatcher(
-      [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
-}
-
 Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
   absl::MutexLock lock(&lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
@@ -531,6 +526,9 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   absl::MutexLock lock(&lock_);
   if (read_disable_on_new_connection_) {
+    // Disable early close detection to avoid closing the network connection before full
+    // initialization is complete.
+    connection.detectEarlyCloseWhenReadDisabled(false);
     connection.readDisable(true);
   }
   auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
@@ -570,16 +568,16 @@ AssertionResult FakeUpstream::waitForHttpConnection(
             client_dispatcher, timeout)) {
       return AssertionFailure() << "Timed out waiting for new connection.";
     }
+  }
 
+  return runOnDispatcherThreadAndWait([&]() {
+    absl::MutexLock lock(&lock_);
     connection = std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(), http_type_, time_system_, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
-  }
-  VERIFY_ASSERTION(connection->initialize());
-  if (read_disable_on_new_connection_) {
-    VERIFY_ASSERTION(connection->readDisable(false));
-  }
-  return AssertionSuccess();
+    connection->initialize();
+    return AssertionSuccess();
+  });
 }
 
 AssertionResult
@@ -603,14 +601,17 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                 client_dispatcher, 5ms)) {
           continue;
         }
+      }
+
+      return upstream.runOnDispatcherThreadAndWait([&]() {
+        absl::MutexLock lock(&upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
             Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
             envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-      }
-      VERIFY_ASSERTION(connection->initialize());
-      VERIFY_ASSERTION(connection->readDisable(false));
-      return AssertionSuccess();
+        connection->initialize();
+        return AssertionSuccess();
+      });
     }
   }
   return AssertionFailure() << "Timed out waiting for HTTP connection.";
@@ -628,19 +629,35 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
-    connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
   }
-  VERIFY_ASSERTION(connection->initialize());
-  VERIFY_ASSERTION(connection->readDisable(false));
-  VERIFY_ASSERTION(connection->enableHalfClose(enable_half_close_));
-  return AssertionSuccess();
+
+  return runOnDispatcherThreadAndWait([&]() {
+    absl::MutexLock lock(&lock_);
+    connection = makeRawConnection(consumeConnection(), timeSystem());
+    connection->initialize();
+    // Skip enableHalfClose if the connection is already disconnected.
+    if (connection->connected()) {
+      connection->connection().enableHalfClose(enable_half_close_);
+    }
+    return AssertionSuccess();
+  });
 }
 
 SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   ASSERT(!new_connections_.empty());
   auto* const connection_wrapper = new_connections_.front().get();
+  // Skip the thread safety check if the network connection has already been freed since there's no
+  // alternate way to get access to the dispatcher.
+  ASSERT(!connection_wrapper->connected() ||
+         connection_wrapper->connection().dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
+  if (read_disable_on_new_connection_ && connection_wrapper->connected()) {
+    // Re-enable read and early close detection.
+    auto& connection = connection_wrapper->connection();
+    connection.detectEarlyCloseWhenReadDisabled(true);
+    connection.readDisable(false);
+  }
   return *connection_wrapper;
 }
 
@@ -663,6 +680,20 @@ testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& 
 void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
   absl::MutexLock lock(&lock_);
   received_datagrams_.emplace_back(std::move(data));
+}
+
+AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
+                                                           std::chrono::milliseconds timeout) {
+  auto result = std::make_shared<AssertionResult>(AssertionSuccess());
+  auto done = std::make_shared<absl::Notification>();
+  ASSERT(!dispatcher_->isThreadSafe());
+  dispatcher_->post([&]() {
+    *result = cb();
+    done->Notify();
+  });
+  RELEASE_ASSERT(done->WaitForNotificationWithTimeout(absl::FromChrono(timeout)),
+                 "Timed out waiting for cb to run on dispatcher");
+  return *result;
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
@@ -700,17 +731,16 @@ FakeRawConnection::~FakeRawConnection() {
   }
 }
 
-testing::AssertionResult FakeRawConnection::initialize() {
-  auto filter = Network::ReadFilterSharedPtr{new ReadFilter(*this)};
+void FakeRawConnection::initialize() {
+  FakeConnectionBase::initialize();
+  Network::ReadFilterSharedPtr filter{new ReadFilter(*this)};
   read_filter_ = filter;
-  testing::AssertionResult result = shared_connection_.executeOnDispatcher(
-      [filter = std::move(filter)](Network::Connection& connection) {
-        connection.addReadFilter(filter);
-      });
-  if (!result) {
-    return result;
+  if (!shared_connection_.connected()) {
+    ENVOY_LOG(warn, "FakeRawConnection::initialize: network connection is already disconnected");
+    return;
   }
-  return FakeConnectionBase::initialize();
+  ASSERT(shared_connection_.connection().dispatcher().isThreadSafe());
+  shared_connection_.connection().addReadFilter(filter);
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

@@ -256,14 +256,6 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
-        return dispatcher_.createTimer(callback);
-      }
-      Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum,
-                                        Event::TimerCb callback) override {
-        return dispatcher_.createTimer(callback);
-      }
-
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
@@ -280,6 +272,8 @@ private:
     ThreadLocalOverloadState& getThreadLocalOverloadState() override {
       return tls_->getTyped<NullThreadLocalOverloadState>();
     }
+
+    Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override { return nullptr; }
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
@@ -401,6 +395,8 @@ private:
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }
+
+    absl::string_view name() const override { return "admin"; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;

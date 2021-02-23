@@ -61,8 +61,8 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
  */
 template <class DataType> class MatchTreeFactory {
 public:
-  MatchTreeFactory(const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-      : stats_prefix_(stats_prefix), context_(context) {}
+  MatchTreeFactory(const std::string& stats_prefix, Server::Configuration::FactoryContext& factory_context)
+      : stats_prefix_(stats_prefix), factory_context_(factory_context) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
     switch (config.matcher_type_case()) {
@@ -148,9 +148,8 @@ private:
     } else if (on_match.has_action()) {
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory>(on_match.action());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          on_match.action().typed_config(), context_.messageValidationVisitor(), factory);
-      return OnMatch<DataType>{factory.createActionFactoryCb(*message, stats_prefix_, context_),
-                               {}};
+          on_match.action().typed_config(), factory_context_.messageValidationVisitor(), factory);
+      return OnMatch<DataType>{factory.createActionFactoryCb(*message, stats_prefix_, factory_context_), {}};
     }
 
     return absl::nullopt;
@@ -160,8 +159,8 @@ private:
   createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
     auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), context_.messageValidationVisitor(), factory);
-    return factory.createDataInput(*message, context_);
+        config.typed_config(), factory_context_.messageValidationVisitor(), factory);
+    return factory.createDataInput(*message, factory_context_);
   }
 
   InputMatcherPtr createInputMatcher(
@@ -176,8 +175,9 @@ private:
       auto& factory =
           Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          predicate.custom_match().typed_config(), context_.messageValidationVisitor(), factory);
-      return factory.createInputMatcher(*message);
+          predicate.custom_match().typed_config(), factory_context_.messageValidationVisitor(),
+          factory);
+      return factory.createInputMatcher(*message, factory_context_);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -185,7 +185,7 @@ private:
   }
 
   const std::string stats_prefix_;
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::FactoryContext& factory_context_;
 };
 } // namespace Matcher
 } // namespace Envoy

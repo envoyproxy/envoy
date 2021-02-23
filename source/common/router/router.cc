@@ -12,6 +12,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
@@ -28,8 +29,10 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/upstream_subject_alt_names.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
@@ -491,6 +494,31 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
+
+  auto has_options_from_downstream =
+      downstreamConnection() && downstreamConnection()
+                                    ->streamInfo()
+                                    .filterState()
+                                    .hasData<Network::UpstreamSocketOptionsFilterState>(
+                                        Network::UpstreamSocketOptionsFilterState::key());
+
+  if (has_options_from_downstream) {
+    auto downstream_options = downstreamConnection()
+                                  ->streamInfo()
+                                  .filterState()
+                                  .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                      Network::UpstreamSocketOptionsFilterState::key())
+                                  .value();
+    if (!upstream_options_) {
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
+    }
+    Network::Socket::appendOptions(upstream_options_, downstream_options);
+  }
+
+  if (upstream_options_ && callbacks_->getUpstreamSocketOptions()) {
+    Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
+  }
+
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {
@@ -599,15 +627,28 @@ std::unique_ptr<GenericConnPool>
 Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
-    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().value());
-  } else {
+    ENVOY_BUG(factory != nullptr,
+              fmt::format("invalid factory type '{}', failing over to default upstream",
+                          cluster_->upstreamConfig().value().DebugString()));
+  }
+  if (!factory) {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.http.generic");
   }
-  const bool should_tcp_proxy =
-      route_entry_->connectConfig().has_value() &&
-      downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
+
+  bool should_tcp_proxy = false;
+
+  if (route_entry_->connectConfig().has_value()) {
+    auto method = downstream_headers_->getMethodValue();
+    should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
+
+    // Allow POST for proxying raw TCP if it is configured.
+    if (!should_tcp_proxy && route_entry_->connectConfig().value().allow_post()) {
+      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
+    }
+  }
   return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
@@ -1193,7 +1234,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
-    upstream_request.upstreamHost()->healthChecker().setUnhealthy();
+    upstream_request.upstreamHost()->healthChecker().setUnhealthy(
+        Upstream::HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
   }
 
   bool could_not_retry = false;

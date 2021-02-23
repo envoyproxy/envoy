@@ -152,7 +152,9 @@ using InputMatcherPtr = std::unique_ptr<InputMatcher>;
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual InputMatcherPtr createInputMatcher(const Protobuf::Message& config) PURE;
+  virtual InputMatcherPtr
+  createInputMatcher(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matcher"; }
 };
@@ -221,7 +223,7 @@ public:
    */
   virtual DataInputPtr<DataType>
   createDataInput(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& context) PURE;
+                  Server::Configuration::FactoryContext& factory_context) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

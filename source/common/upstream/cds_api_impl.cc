@@ -33,7 +33,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
       cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
 }
 
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -46,9 +46,11 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& [cluster_name, _] : all_existing_clusters.active_clusters_) {
+    UNREFERENCED_PARAMETER(_);
     *to_remove_repeated.Add() = cluster_name;
   }
   for (const auto& [cluster_name, _] : all_existing_clusters.warming_clusters_) {
+    UNREFERENCED_PARAMETER(_);
     // Do not add the cluster twice when the cluster is both active and warming.
     if (all_existing_clusters.active_clusters_.count(cluster_name) == 0) {
       *to_remove_repeated.Add() = cluster_name;

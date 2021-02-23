@@ -475,6 +475,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     return;
   }
 
+  stream_info->setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);

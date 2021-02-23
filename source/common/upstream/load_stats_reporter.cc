@@ -152,36 +152,38 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
+  const ClusterManager::ClusterInfoMaps all_clusters = cm_.clusters();
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
-    auto cluster_info_map = cm_.clusters();
-    for (const auto& p : cluster_info_map.active_clusters_) {
+    for (const auto& p : all_clusters.active_clusters_) {
       const std::string& cluster_name = p.first;
-      if (clusters_.count(cluster_name) > 0) {
-        existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
+      auto it = clusters_.find(cluster_name);
+      if (it != clusters_.end()) {
+        existing_clusters.emplace(cluster_name, it->second);
       }
     }
   } else {
     for (const std::string& cluster_name : message_->clusters()) {
-      if (clusters_.count(cluster_name) > 0) {
-        existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
+      auto it = clusters_.find(cluster_name);
+      if (it != clusters_.end()) {
+        existing_clusters.emplace(cluster_name, it->second);
       }
     }
   }
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
-  auto handle_cluster_func = [this, &existing_clusters](const std::string& cluster_name) {
-    clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
-                                        ? existing_clusters[cluster_name]
+  auto handle_cluster_func = [this, &existing_clusters,
+                              &all_clusters](const std::string& cluster_name) {
+    auto existing_cluster_it = existing_clusters.find(cluster_name);
+    clusters_.emplace(cluster_name, existing_cluster_it != existing_clusters.end()
+                                        ? existing_cluster_it->second
                                         : time_source_.monotonicTime().time_since_epoch());
-    // TODO(lambdai): Move the clusters() call out of this lambda.
-    auto cluster_info_map = cm_.clusters();
-    auto it = cluster_info_map.active_clusters_.find(cluster_name);
-    if (it == cluster_info_map.active_clusters_.end()) {
+    auto it = all_clusters.active_clusters_.find(cluster_name);
+    if (it == all_clusters.active_clusters_.end()) {
       return;
     }
     // Don't reset stats for existing tracked clusters.
-    if (existing_clusters.count(cluster_name) > 0) {
+    if (existing_cluster_it != existing_clusters.end()) {
       return;
     }
     auto& cluster = it->second.get();
@@ -195,8 +197,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   };
   if (message_->send_all_clusters()) {
-    auto cluster_info_map = cm_.clusters();
-    for (const auto& p : cluster_info_map.active_clusters_) {
+    for (const auto& p : all_clusters.active_clusters_) {
       const std::string& cluster_name = p.first;
       handle_cluster_func(cluster_name);
     }

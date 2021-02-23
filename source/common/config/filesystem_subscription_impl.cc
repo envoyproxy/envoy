@@ -27,13 +27,13 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
 }
 
 // Config::Subscription
-void FilesystemSubscriptionImpl::start(const std::set<std::string>&, const bool) {
+void FilesystemSubscriptionImpl::start(const absl::flat_hash_set<std::string>&) {
   started_ = true;
   // Attempt to read in case there is a file there already.
   refresh();
 }
 
-void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::string>&) {
+void FilesystemSubscriptionImpl::updateResourceInterest(const absl::flat_hash_set<std::string>&) {
   // Bump stats for consistent behavior with other xDS.
   stats_.update_attempt_.inc();
 }

@@ -101,6 +101,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "filter_config_test",
+    srcs = ["filter_config_test.cc"],
+    deps = [
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
@@ -122,6 +132,18 @@ envoy_cc_test(
         "//source/server:hot_restarting_child",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "hot_restarting_base_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
+    deps = [
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_base",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -180,6 +202,7 @@ envoy_cc_test(
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -276,6 +299,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
