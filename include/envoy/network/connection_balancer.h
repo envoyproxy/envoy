@@ -33,6 +33,12 @@ public:
    */
   virtual void post(Network::ConnectionSocketPtr&& socket) PURE;
 
+  /**
+   * Take the ownership of the accepted socket.
+   * @param socket the accepted tcp socket.
+   * @param hand_off_restored_destination_connections true if redirection is allowed.
+   * @param rebalanced true if no more balance is allowed.
+   */
   virtual void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                               bool hand_off_restored_destination_connections, bool rebalanced) PURE;
 };

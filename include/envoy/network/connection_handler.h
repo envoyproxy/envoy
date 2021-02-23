@@ -155,14 +155,34 @@ public:
 
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
+/**
+ * The connection handler from the view of a tcp listener.
+ */
 class TcpConnectionHandler : public virtual ConnectionHandler {
 public:
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Obtain the rebalancer of the tcp listener.
+   * @param listener_tag supplies the tag of the tcp listener that was passed to addListener().
+   * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. `nullopt` if
+   * listener doesn't exist or rebalancer doesn't exist.
+   */
   virtual BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) PURE;
+
+  /**
+   * Obtain the rebalancer of the tcp listener.
+   * @param address supplies the address of the tcp listener.
+   * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. ``nullopt`` if
+   * listener doesn't exist or rebalancer doesn't exist.
+   */
   virtual BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
 };
 
+/**
+ * The connection handler from the view of a udp listener.
+ */
 class UdpConnectionHandler : public virtual ConnectionHandler {
 public:
   /**

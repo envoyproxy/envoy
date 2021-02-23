@@ -967,6 +967,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
