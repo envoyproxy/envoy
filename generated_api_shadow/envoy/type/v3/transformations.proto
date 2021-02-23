@@ -47,10 +47,13 @@ message TextTransformation {
     }
 
     oneof Kind {
+      // No transformation.
       None none = 1;
 
+      // Enable path normalization per RFC 3986.
       NormalizePathRFC3986 normalize_path_rfc_3986 = 2;
 
+      // Enable merging adjacent slashes.
       MergeSlashes merge_slashes = 3;
     }
   }
