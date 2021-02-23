@@ -22,7 +22,7 @@ public:
   FakeFilterFactory() : FactoryBase("test") {}
 
 private:
-  virtual Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::extensions::filters::http::common::FakeFilterConfig&, const std::string&,
       Server::Configuration::FactoryContext&) override {
     return nullptr;
