@@ -143,6 +143,8 @@ public:
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
+  static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
+
   /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added

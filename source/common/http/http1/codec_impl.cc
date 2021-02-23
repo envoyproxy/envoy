@@ -114,7 +114,8 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
-                                          absl::optional<uint64_t> status, bool end_stream) {
+                                          absl::optional<uint64_t> status, bool end_stream,
+                                          bool bodiless_request) {
   bool saw_content_length = false;
   headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
     absl::string_view key_to_use = header.key().getStringView();
@@ -163,8 +164,14 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
+      // Also do not add content length for requests which should not have a
+      // body, per https://tools.ietf.org/html/rfc7230#section-3.3.2
       if (!status || (*status >= 200 && *status != 204)) {
-        encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
+        if (!bodiless_request ||
+            !Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests")) {
+          encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
+        }
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
@@ -366,7 +373,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream);
+  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream, false);
 }
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
@@ -401,7 +408,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
-  encodeHeadersBase(headers, absl::nullopt, end_stream);
+  encodeHeadersBase(headers, absl::nullopt, end_stream,
+                    HeaderUtility::requestShouldHaveNoBody(headers));
   return okStatus();
 }
 
