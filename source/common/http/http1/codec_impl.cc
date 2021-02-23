@@ -164,6 +164,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
+      // Also do not add content length for requests which should not have a
+      // body, per https://tools.ietf.org/html/rfc7230#section-3.3.2
       if (!status || (*status >= 200 && *status != 204)) {
         if (!bodiless_request ||
             !Runtime::runtimeFeatureEnabled(
