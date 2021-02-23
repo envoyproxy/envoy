@@ -1265,6 +1265,43 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
             filter_->decodeHeaders(request_headers_, false));
 }
 
+// Test that the filter is disabled if the filter_enabled and filter_enabled_metadata fields are enabled
+// but the route metadata is not present.
+TEST_F(HttpFilterTest, FilterEnabledButMetadataIsNotPresent) {
+  initialize(R"EOF(
+  transport_api_version: V3
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enabled_metadata:
+    filter: "abc.xyz"
+    path:
+    - key: "k1"
+    value:
+      string_match:
+        exact: "check"
+  )EOF");
+
+  // Enable in filter_enabled.
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillByDefault(Return(true));
+
+  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(envoy::config::core::v3::Metadata::default_instance()));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+
 // Test that the filter is disabled if one of the filter_enabled and filter_enabled_metadata field
 // is disabled.
 TEST_F(HttpFilterTest, FilterEnabledButMetadataDisabled) {
