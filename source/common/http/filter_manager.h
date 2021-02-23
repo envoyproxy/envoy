@@ -111,9 +111,9 @@ public:
 
   Matcher::DataInputPtr<HttpMatchingData>
   createDataInput(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& context) override {
+                  Server::Configuration::FactoryContext& factory_context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<const ProtoType&>(
-        config, context.messageValidationVisitor());
+        config, factory_context.messageValidationVisitor());
 
     return std::make_unique<DataInputType>(typed_config.header_name());
   };
@@ -183,14 +183,12 @@ private:
 
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 
-struct ActiveStreamEncoderFilter;
-
 class SkipActionFactory : public Matcher::ActionFactory {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&, const std::string&,
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
                                                  Server::Configuration::FactoryContext&) override {
-    return []() -> Matcher::ActionPtr { return std::make_unique<SkipAction>(); };
+    return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
@@ -345,8 +343,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
-  void addStreamFilter(StreamFilterSharedPtr filter) override;
-  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override;
 
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
@@ -409,12 +405,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
-
-  // When a filter is installed as a dual filter, we end up adding it both to the decoding and
-  // encoding filter list. By storing a reference to the encoding element from the decoder filter,
-  // we are able to easily look up the position of the encoding filter when attempting to
-  // dynamically insert a filter via the filter callbacks.
-  std::list<std::unique_ptr<ActiveStreamEncoderFilter>>::iterator dual_filter_itr_;
 };
 
 using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
@@ -451,7 +441,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool hasTrailers() override;
 
   // Http::StreamEncoderFilterCallbacks
-  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override;
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
   void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
   ResponseTrailerMap& addEncodedTrailers() override;
@@ -804,12 +793,6 @@ public:
   void addStreamFilter(StreamFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, true);
     addStreamEncoderFilterWorker(filter, nullptr, true);
-
-    // Store a reference to the encoder filter on the decoder filter so we can easily infer the
-    // position of the encoding filter in the list from the decoder filter.
-    auto& decoder_filter = decoder_filters_.back();
-    auto encoder_filter_itr = --encoder_filters_.end();
-    decoder_filter->dual_filter_itr_ = encoder_filter_itr;
   }
   void addStreamFilter(StreamFilterSharedPtr filter,
                        Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
@@ -822,16 +805,11 @@ public:
           std::move(match_tree), std::make_shared<HttpMatchingDataImpl>());
       addStreamDecoderFilterWorker(filter, matching_state, true);
       addStreamEncoderFilterWorker(filter, std::move(matching_state), true);
-    } else {
-      addStreamDecoderFilterWorker(filter, nullptr, true);
-      addStreamEncoderFilterWorker(filter, nullptr, true);
+      return;
     }
 
-    // Store a reference to the encoder filter on the decoder filter so we can easily infer the
-    // position of the encoding filter in the list from the decoder filter.
-    auto& decoder_filter = decoder_filters_.back();
-    auto encoder_filter_itr = --encoder_filters_.end();
-    decoder_filter->dual_filter_itr_ = encoder_filter_itr;
+    addStreamDecoderFilterWorker(filter, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -976,38 +954,6 @@ public:
         Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders().ref());
   }
 
-  void addStreamFilterAfter(StreamFilterSharedPtr filter, ActiveStreamDecoderFilter& wrapper) {
-    auto decoder_filter_itr = decoder_filters_.insert(
-        ++wrapper.entry(),
-        std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
-
-    filter->setDecoderFilterCallbacks(*decoder_filter_itr->get());
-
-    ASSERT(wrapper.dual_filter_itr_ != encoder_filters_.end());
-    auto encoder_filter_itr = encoder_filters_.insert(
-        ++wrapper.dual_filter_itr_,
-        std::make_unique<ActiveStreamEncoderFilter>(*this, filter, nullptr, true));
-
-    decoder_filter_itr->get()->dual_filter_itr_ = encoder_filter_itr;
-
-    filter->setEncoderFilterCallbacks(*encoder_filter_itr->get());
-  }
-
-  void addStreamDecoderFilterAfter(StreamDecoderFilterSharedPtr filter,
-                                   ActiveStreamDecoderFilter& wrapper) {
-    auto itr = decoder_filters_.insert(
-        ++wrapper.entry(),
-        std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, false));
-
-    filter->setDecoderFilterCallbacks(*itr->get());
-  }
-  void addStreamEncoderFilterAfter(StreamEncoderFilterSharedPtr filter,
-                                   ActiveStreamEncoderFilter& wrapper) {
-    auto itr = encoder_filters_.insert(
-        ++wrapper.entry(),
-        std::make_unique<ActiveStreamEncoderFilter>(*this, filter, nullptr, false));
-    filter->setEncoderFilterCallbacks(*itr->get());
-  }
   /**
    * Marks local processing as complete.
    */

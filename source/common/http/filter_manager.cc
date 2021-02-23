@@ -1,6 +1,5 @@
 #include "common/http/filter_manager.h"
 
-#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
@@ -10,7 +9,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
-#include "common/matcher/matcher.h"
 #include "common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -305,12 +303,6 @@ void ActiveStreamDecoderFilter::doTrailers() {
 }
 bool ActiveStreamDecoderFilter::hasTrailers() {
   return parent_.filter_manager_callbacks_.requestTrailers().has_value();
-}
-void ActiveStreamDecoderFilter::addStreamFilter(StreamFilterSharedPtr filter) {
-  parent_.addStreamFilterAfter(filter, *this);
-}
-void ActiveStreamDecoderFilter::addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) {
-  parent_.addStreamDecoderFilterAfter(filter, *this);
 }
 
 void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
@@ -1449,9 +1441,6 @@ void ActiveStreamEncoderFilter::doTrailers() {
 }
 bool ActiveStreamEncoderFilter::hasTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers().has_value();
-}
-void ActiveStreamEncoderFilter::addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) {
-  parent_.addStreamEncoderFilterAfter(filter, *this);
 }
 void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
