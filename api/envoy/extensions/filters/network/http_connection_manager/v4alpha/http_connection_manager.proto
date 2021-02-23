@@ -254,8 +254,8 @@ message HttpConnectionManager {
 
     // [#not-implemented-hide] Normalization applies internally before any processing of requests by
     // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
-    // to :ref:`NormalizePath
-    // <envoy_api_msg_type.v3.TextTransformation.Operation.NormalizePath>`. When not specified,
+    // to :ref:`NormalizePathRFC3986
+    // <envoy_api_msg_type.v3.TextTransformation.Operation.NormalizePathRFC3986>`. When not specified,
     // this value may be overridden by the runtime variable
     // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`. For
     // paths that fail this check, Envoy will respond with 400 to paths that are malformed.

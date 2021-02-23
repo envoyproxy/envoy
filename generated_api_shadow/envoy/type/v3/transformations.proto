@@ -27,24 +27,29 @@ message TextTransformation {
     message None {
     }
 
-    // Should paths be normalized according to RFC 3986 before any processing of requests by HTTP
-    // filters or routing? See `Normalization and Comparison
-    // <https://tools.ietf.org/html/rfc3986#section-6>`_ for details of normalization. Note that Envoy
-    // does not perform `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
-    message NormalizePath {
+    // Should text be normalized according to RFC 3986? This typically is used for path headers
+    // before any processing of requests by HTTP filters or routing. This applies percent-encoded
+    // normalization and path segment normalization. Fails on characters disallowed in URLs
+    // (e.g. NULLs). See `Normalization and Comparison
+    // <https://tools.ietf.org/html/rfc3986#section-6>`_ for details of normalization. Note that
+    // this options does not perform `case normalization
+    // <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
+    message NormalizePathRFC3986 {
     }
 
-    // Determines if adjacent slashes are merged into one Without setting this option, incoming
-    // requests with path `//dir///file` will not match against route with `prefix` match set to
-    // `/dir`. Note that slash merging is not part of `HTTP spec
-    // <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+    // Determines if adjacent slashes are merged into one. A common use case is for a request path
+    // header. Using this option in `:ref: PathNormalizationOptions
+    // <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.PathNormalizationOptions>`
+    // will allow incoming requests with path `//dir///file` to match against route with `prefix`
+    // match set to `/dir`. When using for header transformations, note that slash merging is not
+    // part of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
     message MergeSlashes {
     }
 
     oneof Kind {
       None none = 1;
 
-      NormalizePath normalize_path = 2;
+      NormalizePathRFC3986 normalize_path_rfc_3986 = 2;
 
       MergeSlashes merge_slashes = 3;
     }
