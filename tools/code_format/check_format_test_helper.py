@@ -231,6 +231,7 @@ def runChecks():
   errors += checkUnfixableError("test_naming.cc",
                                 "Test names should be CamelCase, starting with a capital letter")
   errors += checkUnfixableError("mock_method_n.cc", "use MOCK_METHOD() instead")
+  errors += checkUnfixableError("for_each_n.cc", "use an alternative for loop instead")
   errors += checkUnfixableError(
       "test/register_factory.cc",
       "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
