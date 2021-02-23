@@ -274,9 +274,8 @@ private:
   bool half_closed_{false};
   TimeSource& time_source_;
 
-  // The number of requests accumulated on the current connection. A connection is processed by only
-  // one thread, so there is no need to consider the thread safety of the count.
-  uint32_t accumulated_requests_{0};
+  // The maximum number of requests remaining to be processed on the current connection.
+  uint64_t remaining_streams_{};
   bool requests_overflow_{false};
 };
 

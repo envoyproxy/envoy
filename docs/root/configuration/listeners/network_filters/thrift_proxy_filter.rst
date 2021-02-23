@@ -15,6 +15,14 @@ keyed by `envoy.filters.network.thrift_proxy`. The
 :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
 message describes the available options.
 
+Downstream Requests Limit
+-------------------------
+Thrift Proxy can set the
+:ref:`maximum number of requests<envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.max_requests_per_connection>`
+that each downstream connection can handle. When the number of requests exceeds the connection limit, Thrift Proxy will
+actively disconnect from the Thrfit client.
+
+
 Thrift Request Metadata
 -----------------------
 

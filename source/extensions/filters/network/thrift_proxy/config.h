@@ -99,7 +99,7 @@ private:
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
   const bool payload_passthrough_;
 
-  uint64_t max_requests_per_connection_ = UINT64_MAX;
+  uint64_t max_requests_per_connection_{};
 };
 
 } // namespace ThriftProxy
