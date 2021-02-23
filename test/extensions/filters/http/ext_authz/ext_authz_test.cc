@@ -1265,8 +1265,8 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
             filter_->decodeHeaders(request_headers_, false));
 }
 
-// Test that the filter is disabled if the filter_enabled and filter_enabled_metadata fields are enabled
-// but the route entry is not present.
+// Test that the filter is disabled if the filter_enabled and filter_enabled_metadata fields are
+// enabled but the route entry is not present.
 TEST_F(HttpFilterTest, FilterEnabledButRouteEntryIsNotPresent) {
   initialize(R"EOF(
   transport_api_version: V3
@@ -1293,7 +1293,7 @@ TEST_F(HttpFilterTest, FilterEnabledButRouteEntryIsNotPresent) {
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillByDefault(Return(true));
 
-  // No route has matched 
+  // No route has matched
   ON_CALL(*filter_callbacks_.route_, routeEntry()).WillByDefault(Return(nullptr));
 
   // Make sure check is not called.
@@ -1301,7 +1301,6 @@ TEST_F(HttpFilterTest, FilterEnabledButRouteEntryIsNotPresent) {
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
-
 
 // Test that the filter is disabled if one of the filter_enabled and filter_enabled_metadata field
 // is disabled.
