@@ -325,7 +325,7 @@ void DispatcherImpl::shutdown() {
   ASSERT(!shutdown_called_);
   shutdown_called_ = true;
   ENVOY_LOG(
-      debug,
+      trace,
       "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",
       __FUNCTION__, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size);
 }

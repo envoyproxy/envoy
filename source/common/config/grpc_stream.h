@@ -72,8 +72,6 @@ public:
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
   void sendMessage(const RequestProto& request) {
-    ASSERT(stream_ != nullptr, absl::StrCat("sending message to invalid grpc stream for method ",
-                                            service_method_.DebugString()));
     stream_->sendMessage(request, false);
   }
 

@@ -929,7 +929,7 @@ ClusterImplBase::ClusterImplBase(
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
-        ENVOY_LOG(debug, "Schedule destroy cluster info {}", self->name());
+        ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
         dispatcher.deleteInDispatcherThread(
             std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
       });
