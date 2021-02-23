@@ -27,7 +27,7 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   provided->set_type(Dependency::FILTER_STATE_KEY);
   provided->set_name("potato");
   manager.registerFilter("ingredient", dependencies);
-  EXPECT_TRUE(manager.decodePathIsValid());
+  EXPECT_TRUE(manager.validDecodeDependencies());
 }
 
 TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
@@ -38,7 +38,7 @@ TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
   required->set_type(Dependency::FILTER_STATE_KEY);
   required->set_name("potato");
   manager.registerFilter("chef", dependencies);
-  EXPECT_FALSE(manager.decodePathIsValid());
+  EXPECT_FALSE(manager.validDecodeDependencies());
 }
 
 TEST(DependencyManagerTest, DependencySatisfied) {
@@ -57,7 +57,7 @@ TEST(DependencyManagerTest, DependencySatisfied) {
   manager.registerFilter("ingredient", d1);
   manager.registerFilter("chef", d2);
 
-  EXPECT_TRUE(manager.decodePathIsValid());
+  EXPECT_TRUE(manager.validDecodeDependencies());
 }
 
 TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
@@ -76,7 +76,7 @@ TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
   manager.registerFilter("chef", d2);
   manager.registerFilter("ingredient", d1);
 
-  EXPECT_FALSE(manager.decodePathIsValid());
+  EXPECT_FALSE(manager.validDecodeDependencies());
 }
 
 // TODO(auni53): Add unit tests validating dependency type match.

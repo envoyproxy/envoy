@@ -7,17 +7,17 @@ namespace HttpConnectionManager {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
 
-bool DependencyManager::decodePathIsValid() {
-  auto cmp = [](Dependency a, Dependency b) { return a.name() != b.name(); };
+bool DependencyManager::validDecodeDependencies() {
+  auto cmp = [](const Dependency a, const Dependency b) { return a.name() != b.name(); };
   std::set<Dependency, decltype(cmp)> satisfied(cmp);
 
-  for (auto& [name, dependencies] : filter_chain_) {
-    for (auto& requirement : dependencies.decode_required()) {
+  for (const auto& [name, dependencies] : filter_chain_) {
+    for (const auto& requirement : dependencies.decode_required()) {
       if (satisfied.count(requirement) == 0) {
         return false;
       }
     }
-    for (auto& provided : dependencies.decode_provided()) {
+    for (const auto& provided : dependencies.decode_provided()) {
       satisfied.insert(provided);
     }
   }
