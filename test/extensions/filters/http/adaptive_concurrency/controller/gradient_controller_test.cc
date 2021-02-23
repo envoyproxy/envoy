@@ -842,8 +842,8 @@ min_rtt_calc_params:
   synchronizer.signal("pre_minrtt_update");
   t1.join();
 
-  // As it hasn't been in minRTT sampling window, t1 thread doesn't meet the condition of updating minRTT,
-  // then early exit the method. It remains not in the minRTT sampling window.
+  // As it hasn't been in minRTT sampling window, t1 thread doesn't meet the condition of updating
+  // minRTT, then early exit the method. It remains not in the minRTT sampling window.
   EXPECT_FALSE(controller->inMinRTTSamplingWindow());
 }
 
