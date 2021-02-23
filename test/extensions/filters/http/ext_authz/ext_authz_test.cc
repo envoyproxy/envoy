@@ -1266,8 +1266,8 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
 }
 
 // Test that the filter is disabled if the filter_enabled and filter_enabled_metadata fields are enabled
-// but the route metadata is not present.
-TEST_F(HttpFilterTest, FilterEnabledButMetadataIsNotPresent) {
+// but the route entry is not present.
+TEST_F(HttpFilterTest, FilterEnabledButRouteEntryIsNotPresent) {
   initialize(R"EOF(
   transport_api_version: V3
   grpc_service:
@@ -1293,7 +1293,7 @@ TEST_F(HttpFilterTest, FilterEnabledButMetadataIsNotPresent) {
                          testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillByDefault(Return(true));
 
-  ON_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillByDefault(ReturnRef(envoy::config::core::v3::Metadata::default_instance()));
+  ON_CALL(*filter_callbacks_.route_, routeEntry()).WillByDefault(Return(nullptr));
 
   // Make sure check is not called.
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
