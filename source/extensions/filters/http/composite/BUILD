@@ -41,6 +41,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
+    category = "envoy.filters.http",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
