@@ -305,7 +305,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
 
     const std::string resource_param =
-        config_->resource() == ""
+        config_->resource().empty()
             ? ""
             : fmt::format(AuthorizationEndpointResourceParamFormat, config_->resource());
 
