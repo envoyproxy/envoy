@@ -50,8 +50,7 @@ constexpr const char* CookieTailHttpOnlyFormatString =
 const char* AuthorizationEndpointFormat =
     "{}?client_id={}&scope={}&response_type=code&redirect_uri={}&state={}";
 
-const char* AuthorizationEndpointResourceParamFormat =
-    "&resource={}";
+const char* AuthorizationEndpointResourceParamFormat = "&resource={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -305,8 +304,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
         config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
 
-    const std::string resource_param = config_->resource() == "" ? "" : fmt::format(
-        AuthorizationEndpointResourceParamFormat, config_->resource());
+    const std::string resource_param =
+        config_->resource() == ""
+            ? ""
+            : fmt::format(AuthorizationEndpointResourceParamFormat, config_->resource());
 
     response_headers->setLocation(new_url + resource_param);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
