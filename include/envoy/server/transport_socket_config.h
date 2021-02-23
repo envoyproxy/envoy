@@ -65,6 +65,11 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
+   * @return Server::Options& the command-line options that Envoy was started with.
+   */
+  virtual const Options& options() PURE;
+
+  /**
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;

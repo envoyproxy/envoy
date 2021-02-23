@@ -1451,10 +1451,14 @@ void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
     const ConnectionImpl::StreamImpl* stream = getConstStream(current_stream_id_.value());
     DUMP_DETAILS(stream);
   } else {
-    const auto streams_to_dump = std::min<size_t>(active_streams_.size(), 25);
-    os << " Dumping " << streams_to_dump << " Active Streams:\n";
-    std::for_each_n(active_streams_.begin(), streams_to_dump,
-                    [&](auto& stream) { DUMP_DETAILS(stream); });
+    os << " Dumping " << std::min<size_t>(25, active_streams_.size()) << " Active Streams:\n";
+    size_t count = 0;
+    for (auto& stream : active_streams_) {
+      DUMP_DETAILS(stream);
+      if (++count >= 25) {
+        break;
+      }
+    }
   }
 }
 
