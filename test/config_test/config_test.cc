@@ -10,12 +10,14 @@
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
-#include "server/config_validation/server.h"
 #include "exe/main_common.h"
+
+#include "server/config_validation/server.h"
 #include "server/configuration_impl.h"
 #include "server/options_impl.h"
 
 #include "test/integration/server.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -59,7 +61,7 @@ uint32_t run(const std::string& directory) {
       options.setLogLevel(spdlog::level::trace);
 
       PlatformImpl platform_impl;
-      Event::RealTimeSystem real_time_system;
+      Event::SimulatedTimeSystem real_time_system;
       DefaultListenerHooks default_listener_hooks;
       ProdComponentFactory prod_component_factory;
 
