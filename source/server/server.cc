@@ -90,9 +90,9 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), server_contexts_(*this) {
-  try {
+  envoy_try {
     if (!options.logPath().empty()) {
-      try {
+      envoy_try {
         file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
             options.logPath(), access_log_manager_, Logger::Registry::getSink());
       } catch (const EnvoyException& e) {
@@ -602,7 +602,7 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
   // Initializing can throw exceptions, so catch these.
-  try {
+  envoy_try {
     clusterManager().initializeSecondaryClusters(bootstrap_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
@@ -613,7 +613,7 @@ void InstanceImpl::onRuntimeReady() {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    try {
+    envoy_try {
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,

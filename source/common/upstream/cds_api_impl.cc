@@ -77,7 +77,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;
-    try {
+    envoy_try {
       cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.

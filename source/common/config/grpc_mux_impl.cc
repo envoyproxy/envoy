@@ -186,7 +186,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // the delta state. The proper fix for this is to converge these implementations,
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
-  try {
+  envoy_try {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
     // We have to walk all watches (and need an efficient map as a result) to

@@ -190,5 +190,9 @@ private:
   std::thread::id main_thread_id_{std::this_thread::get_id()};
 };
 
+#define envoy_try                                                                                  \
+  assert(Thread::MainThread::isMainThread());                                                      \
+  try
+
 } // namespace Thread
 } // namespace Envoy

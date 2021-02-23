@@ -66,7 +66,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   std::string message;
   for (const auto& resource : added_resources) {
     envoy::config::listener::v3::Listener listener;
-    try {
+    envoy_try {
       listener =
           dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
       if (!listener_names.insert(listener.name()).second) {

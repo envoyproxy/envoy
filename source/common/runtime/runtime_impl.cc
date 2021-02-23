@@ -238,7 +238,7 @@ bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
 
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy::type::v3::FractionalPercent converted_fractional_percent;
-  try {
+  envoy_try {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
   } catch (const ProtoValidationException& ex) {
@@ -569,7 +569,7 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
         path += "/" + service_cluster_;
       }
       if (api_.fileSystem().directoryExists(path)) {
-        try {
+        envoy_try {
           layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
           ++disk_layers;
         } catch (EnvoyException& e) {
