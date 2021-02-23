@@ -12,7 +12,7 @@ namespace Composite {
 class CompositeAction
     : public Matcher::ActionBase<envoy::extensions::filters::http::composite::v3::CompositeAction> {
 public:
-  explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(cb) {}
+  explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const { cb_(callbacks); }
 

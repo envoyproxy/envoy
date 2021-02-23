@@ -12,6 +12,18 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "filter_test",
+    srcs = ["filter_test.cc"],
+    extension_name = "envoy.filters.http.composite",
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/composite:config",
+        "//source/extensions/filters/http/composite:filter_lib",
+        "//test/mocks/http:http_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "composite_integration_test",
     srcs = ["composite_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.composite",
