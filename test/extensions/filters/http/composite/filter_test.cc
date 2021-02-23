@@ -19,7 +19,8 @@ public:
   }
 
   template <class T> void expectDelegatedEncoding(T& filter_mock) {
-    EXPECT_CALL(filter_mock, encode100ContinueHeaders(HeaderMapEqualRef(&default_response_headers_)));
+    EXPECT_CALL(filter_mock,
+                encode100ContinueHeaders(HeaderMapEqualRef(&default_response_headers_)));
     EXPECT_CALL(filter_mock, encodeHeaders(HeaderMapEqualRef(&default_response_headers_), false));
     EXPECT_CALL(filter_mock, encodeData(_, false));
     EXPECT_CALL(filter_mock, encodeTrailers(HeaderMapEqualRef(&default_response_trailers_)));
