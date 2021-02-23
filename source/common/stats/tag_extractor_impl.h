@@ -107,7 +107,7 @@ protected:
   std::string& addTag(std::vector<Tag>& tags) const;
 
   const std::string name_;
-  std::string prefix_; // non-mutable so TagExtractorTokensImpl can override in its constructor.
+  std::string prefix_; // non-const so TagExtractorTokensImpl can override in its constructor.
   const std::string substr_;
 
   PERF_TAG_COUNTERS;

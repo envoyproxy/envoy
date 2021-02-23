@@ -424,14 +424,13 @@ protected:
 };
 
 TEST_F(TagExtractorTokensTest, Prefix) {
-  EXPECT_EQ("prefix", TagExtractorTokensImpl("name", "prefix.foo").prefixToken());
-  EXPECT_EQ("prefix", TagExtractorTokensImpl("name", "prefix").prefixToken());
-  EXPECT_EQ("", TagExtractorTokensImpl("name", "").prefixToken());
-  EXPECT_EQ("", TagExtractorTokensImpl("name", "*.foo").prefixToken());
-  EXPECT_EQ("", TagExtractorTokensImpl("name", "**.foo").prefixToken());
-  EXPECT_EQ("", TagExtractorTokensImpl("name", "$.foo").prefixToken());
-  EXPECT_EQ("", TagExtractorTokensImpl("name", "*").prefixToken());
-  EXPECT_EQ("", TagExtractorTokensImpl("name", "**").prefixToken());
+  EXPECT_EQ("prefix", TagExtractorTokensImpl("name", "prefix.foo.$").prefixToken());
+  EXPECT_EQ("prefix", TagExtractorTokensImpl("name", "prefix.$.*").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "*.foo.$").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "**.foo.$").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "$.foo.$").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "*.$").prefixToken());
+  EXPECT_EQ("", TagExtractorTokensImpl("name", "**.$").prefixToken());
   EXPECT_EQ("", TagExtractorTokensImpl("name", "$").prefixToken());
 }
 
