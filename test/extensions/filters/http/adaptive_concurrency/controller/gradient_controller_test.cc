@@ -95,10 +95,6 @@ protected:
         stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
   }
 
-  void verifyRaceCondition(int race_found_cnt) {
-    EXPECT_EQ(race_found_cnt, stats_.counter("test_prefix.race_found").value());
-  }
-
   void verifyMinRTTActive() {
     EXPECT_EQ(
         1,
@@ -820,6 +816,7 @@ min_rtt_calc_params:
 
   // The next sample will trigger the minRTT value update. We'll spin off a thread and block before
   // the actual function call to update the value.
+  EXPECT_TRUE(controller->inMinRTTSamplingWindow());
   synchronizer.waitOn("pre_minrtt_update");
   std::thread t1([this, &controller]() {
     tryForward(controller, true);
@@ -837,15 +834,17 @@ min_rtt_calc_params:
     sampleLatency(controller, std::chrono::microseconds(1337));
   });
   t2.join();
-
-  verifyRaceCondition(0);
+ 
+  // When t2 thread completes, it becomes not in the minRTT sampling window. 
+  EXPECT_FALSE(controller->inMinRTTSamplingWindow());
 
   // Complete the minRTT update in t1 and verify we've exited the window.
   synchronizer.signal("pre_minrtt_update");
   t1.join();
 
-  // verify whether race is found.
-  verifyRaceCondition(1);
+  // As it hasn't been in minRTT sampling window, t1 thread doesn't sastify the updatMinRTT condition,
+  // then early exit the method. It remains not in the minRTT sampling window. 
+  EXPECT_FALSE(controller->inMinRTTSamplingWindow());
 }
 
 } // namespace

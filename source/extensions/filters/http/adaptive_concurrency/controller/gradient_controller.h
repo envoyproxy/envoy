@@ -35,8 +35,7 @@ namespace Controller {
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(min_rtt_msecs, NeverImport)                                                                \
-  GAUGE(sample_rtt_msecs, NeverImport)                                                             \
-  COUNTER(race_found)
+  GAUGE(sample_rtt_msecs, NeverImport)
 
 /**
  * Wrapper struct for gradient controller stats. @see stats_macros.h
@@ -220,6 +219,9 @@ public:
   // Used in unit tests to validate worker thread interactions.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
 
+  // True if there is a minRTT sampling window active.
+  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
+
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(MonotonicTime rq_send_time) override;
@@ -234,7 +236,6 @@ private:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void enterMinRTTSamplingWindow();
-  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);

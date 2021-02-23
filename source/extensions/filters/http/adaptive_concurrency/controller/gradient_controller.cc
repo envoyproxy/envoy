@@ -119,7 +119,6 @@ void GradientController::updateMinRTT() {
       stats_.min_rtt_msecs_.set(
           std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
     } else {
-      stats_.race_found_.inc();
       return;
     }
     updateConcurrencyLimit(deferred_limit_value_.load());
