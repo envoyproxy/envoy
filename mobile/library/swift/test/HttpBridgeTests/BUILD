@@ -36,6 +36,17 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "grpc_receive_error_test",
+    srcs = [
+        "DemoFilter.swift",
+        "GRPCReceiveErrorTest.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "send_data_test",
     srcs = [
         "DemoFilter.swift",
