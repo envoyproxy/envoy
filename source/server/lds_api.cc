@@ -80,7 +80,8 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       } else {
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
-    } catch (const EnvoyException& e) {
+    }
+    catch (const EnvoyException& e) {
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();
       state->set_details(e.what());

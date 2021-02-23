@@ -31,7 +31,8 @@ bool validateConfig(const Options& options,
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     return false;
   }
 }
@@ -53,9 +54,8 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this) {
-  envoy_try {
-    initialize(options, local_address, component_factory);
-  } catch (const EnvoyException& e) {
+  envoy_try { initialize(options, local_address, component_factory); }
+  catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();

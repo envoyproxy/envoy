@@ -72,7 +72,8 @@ void SdsApi::onWatchUpdate() {
       update_callback_manager_.runCallbacks();
       files_hash_ = new_hash;
     }
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(warn, fmt::format("Failed to reload certificates: {}", e.what()));
     sds_api_stats_.key_rotation_failed_.inc();
   }

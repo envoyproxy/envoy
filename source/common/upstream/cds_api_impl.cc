@@ -89,7 +89,8 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       } else {
         ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
       }
-    } catch (const EnvoyException& e) {
+    }
+    catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
     }
   }

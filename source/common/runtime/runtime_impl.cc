@@ -241,10 +241,12 @@ void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   envoy_try {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
-  } catch (const ProtoValidationException& ex) {
+  }
+  catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
     return;
-  } catch (const EnvoyException& ex) {
+  }
+  catch (const EnvoyException& ex) {
     // An EnvoyException is thrown when we try to parse a bogus string as a protobuf. This is fine,
     // since there was no expectation that the raw string was a valid proto.
     return;
@@ -572,7 +574,8 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
         envoy_try {
           layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
           ++disk_layers;
-        } catch (EnvoyException& e) {
+        }
+        catch (EnvoyException& e) {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;

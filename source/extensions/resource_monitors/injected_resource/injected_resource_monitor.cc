@@ -38,7 +38,8 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callb
       } else {
         throw EnvoyException("failed to parse injected resource pressure");
       }
-    } catch (const EnvoyException& error) {
+    }
+    catch (const EnvoyException& error) {
       error_ = error;
       pressure_.reset();
     }

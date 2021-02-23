@@ -72,7 +72,8 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
   envoy_try {
     std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true, api_);
     metadata->insert(std::make_pair(header_key, header_prefix + header_value));
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     return grpc::Status(grpc::StatusCode::NOT_FOUND, e.what());
   }
   return grpc::Status::OK;

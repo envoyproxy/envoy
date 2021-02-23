@@ -82,9 +82,8 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {
   disableInitFetchTimeoutTimer();
   envoy::service::discovery::v3::DiscoveryResponse message;
-  envoy_try {
-    MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
-  } catch (const EnvoyException& e) {
+  envoy_try { MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_); }
+  catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     return;
   }
@@ -97,7 +96,8 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.version_text_.set(request_.version_info());
     stats_.update_success_.inc();
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 }

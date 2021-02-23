@@ -99,9 +99,8 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   }
   absl::node_hash_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
-  envoy_try {
-    server_.runtime().mergeValues(overrides);
-  } catch (const EnvoyException& e) {
+  envoy_try { server_.runtime().mergeValues(overrides); }
+  catch (const EnvoyException& e) {
     response.add(e.what());
     return Http::Code::ServiceUnavailable;
   }

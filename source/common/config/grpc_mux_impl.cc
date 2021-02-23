@@ -251,7 +251,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // would do that tracking here.
     apiStateFor(type_url).request_.set_version_info(message->version_info());
     Memory::Utils::tryShrinkHeap();
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     for (auto watch : apiStateFor(type_url).watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
