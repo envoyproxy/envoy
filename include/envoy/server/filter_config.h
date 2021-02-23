@@ -3,12 +3,12 @@
 #include <functional>
 
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/factory_context.h"
-#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"
