@@ -103,9 +103,9 @@ public:
     const bool enabled = filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
     const bool enabled_metadata =
         route_entry == nullptr ? !filter_enabled_metadata_.has_value()
-                              : filter_enabled_metadata_.has_value()
-                                    ? filter_enabled_metadata_->match(route_entry->metadata())
-                                    : true;
+                               : filter_enabled_metadata_.has_value()
+                                     ? filter_enabled_metadata_->match(route_entry->metadata())
+                                     : true;
 
     return enabled && enabled_metadata;
   }
