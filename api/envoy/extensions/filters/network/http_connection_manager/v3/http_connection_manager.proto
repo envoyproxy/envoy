@@ -13,6 +13,7 @@ import "envoy/config/route/v3/scoped_route.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
+import "envoy/type/v3/transformations.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -238,60 +239,31 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  // [#not-implemented-hide] Transformations that apply to path
-  // headers. Transformations are applied before any processing of requests by
-  // HTTP filters, routing, and matching. Only the normalized path will be
-  // visible internally if a transformation is enabled. The policy determines
-  // whether Envoy will forward the normalized *:path* header or forward the
-  // original header *:path* header (unless a filter modifies it). Note:
-  // observing (logging, tracing) headers after a transformation is applied will
-  // show the normalized header. Observing after headers are sent to the codec
-  // for encoding to the upstream (e.g. when closing the stream after a response
-  // is received from an upstream) will show the forwarded header.
+  // [#not-implemented-hide] Transformations that apply to path headers. Transformations are applied
+  // before any processing of requests by HTTP filters, routing, and matching. Only the normalized
+  // path will be visible internally if a transformation is enabled. Any path rewrites that the
+  // router performs (e.g. :ref:`regex_rewrite
+  // <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>` or :ref:`prefix_rewrite
+  // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply to the *:path* header
+  // destined for the upstream.
+  //
+  // Note: access logging and tracing will show the original *:path* header.
   message PathNormalizationOptions {
-    // Defines a policy to apply to a normalization. Any path rewrites that the
-    // router performs (e.g. :ref:`regex_rewrite
-    // <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>` or
-    // :ref:`prefix_rewrite
-    // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply
-    // to the *:path* header destined for the upstream.
-    enum NormalizationPolicy {
-      // Unspecified. See individual transformations for defaults.
-      UNSPECIFIED = 0;
-
-      // No transformation applied to the header.
-      DISABLE = 1;
-
-      // Normalization applies internally before any processing of requests by
-      // HTTP filters, routing, and matching. Envoy will forward the normalized
-      // *:path* header. Regex rewrites by the router apply to the normalized header.
-      FORWARD = 2;
-
-      // Normalization only applies internally. The original *:path* header will
-      // be restored in the router filter and sent upstream *unless* the path
-      // has been mutated by a filter.
-      INTERNAL = 3;
-    }
-
-    // Should paths be normalized according to RFC 3986 before any processing of
-    // requests by HTTP filters or routing? Defaults to FORWARD (normalization
-    // applies internally and affects upstream *:path* header). When not
+    // Normalization applies internally before any processing of requests by HTTP filters, routing,
+    // and matching *and* will affect the forwarded *:path* header. Defaults to :ref:`normalize_path
+    // <envoy_api_field_type.v3.Transformations.Operations.Kind.normalize_path>`. When not
     // specified, this value may be overridden by the runtime variable
     // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`. For
-    // paths that fail this check, Envoy will respond with 400 to paths that are
-    // malformed. See `Normalization and Comparison
-    // <https://tools.ietf.org/html/rfc3986#section-6>`_ for details of
-    // normalization. Note that Envoy does not perform `case normalization
-    // <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
-    NormalizationPolicy normalize_path = 1;
+    // paths that fail this check, Envoy will respond with 400 to paths that are malformed.
+    type.v3.TextTransformation full_transformation = 2;
 
-    // Determines if adjacent slashes in the path are merged into one before any
-    // processing of requests by HTTP filters or routing. Defaults to
-    // DISABLE. Without setting this option, incoming requests with path
-    // `//dir///file` will not match against route with `prefix` match set to
-    // `/dir`. Note that slash merging is not part of `HTTP spec
-    // <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-    NormalizationPolicy merge_slashes = 2;
+    // Normalization only applies internally before any processing of requests by HTTP filters,
+    // routing, and matching. These will be applied after :ref:`full_transformation
+    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.PathNormalizationOptions.full_transformation`
+    // is applied. The *:path* header before this transformation will be restored in the router
+    // filter and sent upstream unless it was mutated by a filter. Defaults to :ref:`none
+    // <envoy_api_field_type.v3.Transformations.Operations.Kind.none>`.
+    type.v3.TextTransformation internal_transformation = 1;
   }
 
   reserved 27, 11;

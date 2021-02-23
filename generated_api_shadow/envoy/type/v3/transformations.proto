@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.v3";
+option java_outer_classname = "TransformationsProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Text Transformations API]
+
+// TextTransformations define an API to apply a sequence of operations that can
+// be used to alter text before it is used for matching or routing. Multiple
+// actions can be applied in the same Transformation, forming a sequential
+// pipeline. The transformations will be performed in the order that they
+// appear.
+//
+// This API is a work in progress.
+
+message TextTransformation {
+  // A type of operation to alter text.
+  message Operation {
+    // No operation.
+    message None {
+    }
+
+    // Should paths be normalized according to RFC 3986 before any processing of requests by HTTP
+    // filters or routing? See `Normalization and Comparison
+    // <https://tools.ietf.org/html/rfc3986#section-6>`_ for details of normalization. Note that Envoy
+    // does not perform `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
+    message NormalizePath {
+    }
+
+    // Determines if adjacent slashes are merged into one Without setting this option, incoming
+    // requests with path `//dir///file` will not match against route with `prefix` match set to
+    // `/dir`. Note that slash merging is not part of `HTTP spec
+    // <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+    message MergeSlashes {
+    }
+
+    oneof Kind {
+      None none = 1;
+
+      NormalizePath normalize_path = 2;
+
+      MergeSlashes merge_slashes = 3;
+    }
+  }
+
+  // A list of operations to apply. Transformations will be performed in the order that they appear.
+  repeated Operation operations = 1;
+}
