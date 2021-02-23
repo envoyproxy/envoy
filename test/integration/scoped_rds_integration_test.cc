@@ -244,7 +244,10 @@ fragments:
         response);
   }
 
-  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
+  bool isDelta() {
+    return sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+           sotwOrDelta() == Grpc::SotwOrDelta::LegacyDelta;
+  }
 
   const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;

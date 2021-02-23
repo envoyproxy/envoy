@@ -117,6 +117,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // TODO (dmitri-d) flip to true to enable unified mux by default
+    "envoy.reloadable_features.unified_mux",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

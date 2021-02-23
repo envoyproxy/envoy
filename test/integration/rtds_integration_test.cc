@@ -80,7 +80,10 @@ public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecClient::Type::HTTP2, ipVersion(),
-            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::LegacySotw
+                                   ? "GRPC"
+                                   : "DELTA_GRPC")) {
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();

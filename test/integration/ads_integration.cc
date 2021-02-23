@@ -22,10 +22,16 @@ namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
                                        envoy::config::core::v3::ApiVersion transport_api_version)
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                          ConfigHelper::adsBootstrap(
-                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
-                              resource_api_version, transport_api_version)) {
+    : HttpIntegrationTest(
+          Http::CodecClient::Type::HTTP2, ipVersion(),
+          ConfigHelper::adsBootstrap(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                             sotwOrDelta() == Grpc::SotwOrDelta::LegacySotw
+                                         ? "GRPC"
+                                         : "DELTA_GRPC",
+                                     resource_api_version, transport_api_version)) {
+  if (sotwOrDelta() == Grpc::SotwOrDelta::Sotw || sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+  }
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;

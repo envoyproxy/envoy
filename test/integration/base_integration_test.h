@@ -154,7 +154,8 @@ public:
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              const bool api_downgrade = false) {
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::LegacySotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
@@ -165,10 +166,11 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
+      const bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "") {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
-                                        expected_resource_unsubscriptions, xds_stream_,
+                                        expected_resource_unsubscriptions, xds_stream_, expect_node,
                                         expected_error_code, expected_error_message);
   }
 
@@ -176,6 +178,7 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
+      const bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 

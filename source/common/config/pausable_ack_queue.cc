@@ -20,6 +20,8 @@ bool PausableAckQueue::empty() {
   return true;
 }
 
+void PausableAckQueue::clear() { storage_.clear(); }
+
 const UpdateAck& PausableAckQueue::front() {
   for (const auto& entry : storage_) {
     if (pauses_[entry.type_url_] == 0) {

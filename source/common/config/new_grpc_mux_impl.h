@@ -87,6 +87,17 @@ public:
     return subscriptions_;
   }
 
+  // unified GrpcMux interface, not implemented by legacy muxes
+  Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                  SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
+                  const bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  bool paused(const std::string&) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  void disableInitFetchTimeoutTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
 private:
   class WatchImpl : public GrpcMuxWatch {
   public:
@@ -112,14 +123,14 @@ private:
     NewGrpcMuxImpl& parent_;
   };
 
-  void removeWatch(const std::string& type_url, Watch* watch);
+  void removeWatch(const std::string& type_url, Watch* watch) override;
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
-                   bool creating_namespace_watch = false);
+                   bool creating_namespace_watch = false) override;
 
   void addSubscription(const std::string& type_url, const bool use_namespace_matching);
 

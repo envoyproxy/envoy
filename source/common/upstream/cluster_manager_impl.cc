@@ -21,6 +21,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/new_grpc_mux_impl.h"
+#include "common/config/unified_mux/grpc_mux_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -317,40 +318,87 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->create(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "DeltaAggregatedResources"),
-          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::UnifiedMux::GrpcMuxDelta>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->create(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
+                        envoy::config::core::v3::ApiVersion::V3
+                    // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the
+                    // future direction of that module re:
+                    // https://github.com/envoyproxy/envoy/issues/10650.
+                    ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                      "DeltaAggregatedResources"
+                    : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                      "DeltaAggregatedResources"),
+            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_,
+            stats_, Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            local_info, dyn_resources.ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->create(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
+                        envoy::config::core::v3::ApiVersion::V3
+                    // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the
+                    // future direction of that module re:
+                    // https://github.com/envoyproxy/envoy/issues/10650.
+                    ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                      "DeltaAggregatedResources"
+                    : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                      "DeltaAggregatedResources"),
+            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_,
+            stats_, Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            local_info);
+      }
     } else {
-      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
-          local_info,
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->create(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"),
-          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::UnifiedMux::GrpcMuxSotw>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->create(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                dyn_resources.ads_config().transport_api_version() ==
+                        envoy::config::core::v3::ApiVersion::V3
+                    // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the
+                    // future direction of that module re:
+                    // https://github.com/envoyproxy/envoy/issues/10650.
+                    ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"
+                    : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"),
+            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_,
+            stats_, Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
+            local_info,
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->create(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
+                        envoy::config::core::v3::ApiVersion::V3
+                    // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the
+                    // future direction of that module re:
+                    // https://github.com/envoyproxy/envoy/issues/10650.
+                    ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"
+                    : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"),
+            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_,
+            stats_, Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      }
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();

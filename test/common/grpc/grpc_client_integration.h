@@ -14,7 +14,7 @@ namespace Grpc {
 // Support parameterizing over gRPC client type.
 enum class ClientType { EnvoyGrpc, GoogleGrpc };
 // Support parameterizing over state-of-the-world xDS vs delta xDS.
-enum class SotwOrDelta { Sotw, Delta };
+enum class SotwOrDelta { Sotw, Delta, LegacySotw, LegacyDelta };
 
 class BaseGrpcClientIntegrationParamTest {
 public:
@@ -131,7 +131,8 @@ public:
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
-                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta,              \
+                                   Grpc::SotwOrDelta::LegacySotw, Grpc::SotwOrDelta::LegacyDelta))
 #else
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
@@ -145,7 +146,8 @@ public:
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
-                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta,              \
+                                   Grpc::SotwOrDelta::LegacySotw, Grpc::SotwOrDelta::LegacyDelta))
 #endif // ENVOY_GOOGLE_GRPC
 
 } // namespace Grpc

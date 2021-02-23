@@ -143,6 +143,7 @@ New Features
   field as well as explicit configuration for the built-in :ref:`UuidRequestIdConfig <envoy_v3_api_msg_extensions.request_id.uuid.v3.UuidRequestIdConfig>`
   request ID implementation. See the trace context propagation :ref:`architecture overview
   <arch_overview_tracing_context_propagation>` for more information.
+* xds: re-introduced unification of delta and sotw xDS multiplexers, based on work in https://github.com/envoyproxy/envoy/pull/8974. Added a new runtime config "envoy.reloadable_features.unified_mux" that switches xDS to use the unified mux when set to true.
 
 Deprecated
 ----------

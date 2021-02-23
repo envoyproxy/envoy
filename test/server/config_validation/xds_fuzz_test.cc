@@ -14,6 +14,8 @@ DEFINE_PROTO_FUZZER(const test::server::config_validation::XdsTestCase& input) {
   }
   XdsFuzzTest test(input, envoy::config::core::v3::ApiVersion::V3);
   test.replay();
+  XdsFuzzTest test_with_unified_mux(input, envoy::config::core::v3::ApiVersion::V3, true);
+  test_with_unified_mux.replay();
 }
 
 } // namespace Envoy

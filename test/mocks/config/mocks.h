@@ -122,6 +122,21 @@ public:
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const std::string& type_url,
                const absl::flat_hash_set<std::string>& add_these_names));
+
+  // unified mux interface
+  MOCK_METHOD(Watch*, addWatch,
+              (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
+               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+               std::chrono::milliseconds init_fetch_timeout, const bool use_namespace_matching),
+              (override));
+  MOCK_METHOD(void, updateWatch,
+              (const std::string& type_url, Watch* watch,
+               const absl::flat_hash_set<std::string>& resources,
+               const bool creating_namespace_watch),
+              (override));
+  MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch), (override));
+  MOCK_METHOD(bool, paused, (const std::string& type_url), (const override));
+  MOCK_METHOD(void, disableInitFetchTimeoutTimer, (), (override));
 };
 
 class MockGrpcStreamCallbacks

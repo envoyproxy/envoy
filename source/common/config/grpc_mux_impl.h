@@ -74,6 +74,24 @@ public:
     return grpc_stream_;
   }
 
+  // unified GrpcMux interface, not implemented by legacy muxes
+  Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                  SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
+                  const bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
+                   const bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  bool paused(const std::string&) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  void disableInitFetchTimeoutTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
 private:
   void drainRequests();
   void setRetryTimer();
@@ -206,6 +224,24 @@ public:
   void onEstablishmentFailure() override {}
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
+
+  // unified GrpcMux interface, not implemented by legacy muxes
+  Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                  SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
+                  const bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
+                   const bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  bool paused(const std::string&) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  void disableInitFetchTimeoutTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 };
 
 } // namespace Config

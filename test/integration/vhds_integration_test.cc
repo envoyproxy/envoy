@@ -809,7 +809,7 @@ TEST_P(VhdsIntegrationTest, AttemptAddingDuplicateDomainNames) {
            virtualHostYaml("my_route/vhost_2", "vhost.duplicate"))},
       {}, "2", vhds_stream_);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_,
-                                           13, "Only unique values for domains are permitted"));
+                                           false, 13, "Only unique values for domains are permitted"));
 
   // Another update, this time valid, should result in no errors
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(

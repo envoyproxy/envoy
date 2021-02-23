@@ -8,6 +8,8 @@
 #include "common/config/http_subscription_impl.h"
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/type_to_endpoint.h"
+#include "common/config/unified_mux/grpc_mux_impl.h"
+#include "common/config/unified_mux/grpc_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/config/xds_resource.h"
 #include "common/http/utility.h"
@@ -57,6 +59,19 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
           validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        return std::make_unique<UnifiedMux::GrpcSubscriptionImpl>(
+            std::make_shared<UnifiedMux::GrpcMuxSotw>(
+                Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                       api_config_source, scope, true)
+                    ->create(),
+                dispatcher_, sotwGrpcMethod(type_url, transport_api_version), transport_api_version,
+                api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
+                local_info_, api_config_source.set_node_on_first_message_only()),
+            type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
+            Utility::configSourceInitialFetchTimeout(config),
+            /*is_aggregated*/ false, use_namespace_matching);
+      }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::GrpcMuxImpl>(
               local_info_,
@@ -70,6 +85,20 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false, use_namespace_matching);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        return std::make_unique<UnifiedMux::GrpcSubscriptionImpl>(
+            std::make_shared<UnifiedMux::GrpcMuxDelta>(
+                Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                               api_config_source, scope, true)
+                    ->create(),
+                dispatcher_, deltaGrpcMethod(type_url, transport_api_version),
+                transport_api_version, api_.randomGenerator(), scope,
+                Utility::parseRateLimitSettings(api_config_source), local_info_,
+                api_config_source.set_node_on_first_message_only()),
+            type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
+            Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false,
+            use_namespace_matching);
+      }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -87,6 +116,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
+    if (cm_.adsMux()->isUnified()) {
+      return std::make_unique<UnifiedMux::GrpcSubscriptionImpl>(
+          cm_.adsMux(), type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
+          Utility::configSourceInitialFetchTimeout(config), true, use_namespace_matching);
+    }
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
         Utility::configSourceInitialFetchTimeout(config), true, use_namespace_matching);
@@ -125,6 +159,11 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
 
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        return std::make_unique<UnifiedMux::GrpcCollectionSubscriptionImpl>(
+            collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats,
+            dispatcher_.timeSource(), Utility::configSourceInitialFetchTimeout(config), false);
+      }
       return std::make_unique<GrpcCollectionSubscriptionImpl>(
           collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), false);
