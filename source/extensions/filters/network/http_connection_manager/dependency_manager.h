@@ -20,7 +20,9 @@ public:
    * Register each filter in an http filter chain, using name and dependencies
    * from the filter factory. Filters must be registered in decode path order.
    */
-  void registerFilter(absl::string_view name, const envoy::extensions::filters::common::dependency::v3::FilterDependencies& dependencies) {
+  void registerFilter(
+      absl::string_view name,
+      const envoy::extensions::filters::common::dependency::v3::FilterDependencies& dependencies) {
     filter_chain_.push_back({name, dependencies});
   }
 
@@ -35,7 +37,9 @@ public:
   bool validDecodeDependencies();
 
 private:
-  std::vector<std::pair<absl::string_view, envoy::extensions::filters::common::dependency::v3::FilterDependencies>> filter_chain_;
+  std::vector<std::pair<absl::string_view,
+                        envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
+      filter_chain_;
 };
 
 } // namespace HttpConnectionManager
