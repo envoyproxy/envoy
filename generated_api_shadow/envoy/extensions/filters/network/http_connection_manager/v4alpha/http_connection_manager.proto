@@ -252,21 +252,21 @@ message HttpConnectionManager {
         "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager."
         "PathNormalizationOptions";
 
-    // Normalization applies internally before any processing of requests by HTTP filters, routing,
-    // and matching *and* will affect the forwarded *:path* header. Defaults to :ref:`normalize_path
-    // <envoy_api_field_type.v3.Transformations.Operations.Kind.normalize_path>`. When not
-    // specified, this value may be overridden by the runtime variable
+    // [#not-implemented-hide] Normalization applies internally before any processing of requests by
+    // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
+    // to :ref:`NormalizePath
+    // <envoy_api_msg_type.v3.TextTransformation.Operation.NormalizePath>`. When not specified,
+    // this value may be overridden by the runtime variable
     // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`. For
     // paths that fail this check, Envoy will respond with 400 to paths that are malformed.
-    type.v3.TextTransformation full_transformation = 2;
+    type.v3.TextTransformation full_transformation = 1;
 
-    // Normalization only applies internally before any processing of requests by HTTP filters,
-    // routing, and matching. These will be applied after :ref:`full_transformation
-    // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.PathNormalizationOptions.full_transformation`
-    // is applied. The *:path* header before this transformation will be restored in the router
-    // filter and sent upstream unless it was mutated by a filter. Defaults to :ref:`none
-    // <envoy_api_field_type.v3.Transformations.Operations.Kind.none>`.
-    type.v3.TextTransformation internal_transformation = 1;
+    // [#not-implemented-hide] Normalization only applies internally before any processing of
+    // requests by HTTP filters, routing, and matching. These will be applied after full
+    // transformation is applied. The *:path* header before this transformation will be restored in
+    // the router filter and sent upstream unless it was mutated by a filter. Defaults to :ref:`None
+    // <envoy_api_msg_type.v3.TextTransformation.Operation.None>`.
+    type.v3.TextTransformation internal_transformation = 2;
   }
 
   reserved 27, 11;

@@ -13,6 +13,7 @@ Types
   ../type/v3/ratelimit_unit.proto
   ../type/v3/semantic_version.proto
   ../type/v3/token_bucket.proto
+  ../type/v3/transformations.proto
   ../type/matcher/v3/metadata.proto
   ../type/matcher/v3/node.proto
   ../type/matcher/v3/number.proto
