@@ -24,6 +24,10 @@ envoy_cc_library(
     name = "hessian_utils_lib",
     srcs = ["hessian_utils.cc"],
     hdrs = ["hessian_utils.h"],
+    external_deps = [
+        "hessian2_codec_codec_impl",
+        "hessian2_codec_object_codec_lib",
+    ],
     deps = [
         ":buffer_helper_lib",
         "//source/common/singleton:const_singleton",
@@ -58,13 +62,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "serializer_interface",
-    srcs = ["serializer_impl.cc"],
     hdrs = [
         "protocol_constants.h",
         "serializer.h",
-        "serializer_impl.h",
     ],
     deps = [
+        ":hessian_utils_lib",
         ":message_lib",
         ":metadata_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -140,12 +143,17 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "message_lib",
+    srcs = [
+        "message_impl.cc",
+    ],
     hdrs = [
         "message.h",
         "message_impl.h",
     ],
     deps = [
+        ":hessian_utils_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
     ],
 )
 

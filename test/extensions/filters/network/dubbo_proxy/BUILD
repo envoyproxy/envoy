@@ -56,6 +56,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "message_impl_test",
+    srcs = ["message_impl_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        "//source/extensions/filters/network/dubbo_proxy:message_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "dubbo_protocol_impl_test",
     srcs = ["dubbo_protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.dubbo_proxy",

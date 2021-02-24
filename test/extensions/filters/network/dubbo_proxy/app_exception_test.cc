@@ -3,8 +3,8 @@
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 #include "extensions/filters/network/dubbo_proxy/filters/filter.h"
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 
@@ -34,9 +34,14 @@ TEST_F(AppExceptionTest, Encode) {
   AppException app_exception(ResponseStatus::ServiceNotFound, mock_message);
 
   Buffer::OwnedImpl buffer;
-  size_t expect_body_size =
-      HessianUtils::writeString(buffer, mock_message) +
-      HessianUtils::writeInt(buffer, static_cast<uint8_t>(app_exception.response_type_));
+
+  Hessian2::Encoder encoder(std::make_unique<BufferWriter>(buffer));
+
+  encoder.encode(mock_message);
+  encoder.encode(static_cast<uint8_t>(app_exception.response_type_));
+
+  size_t expect_body_size = buffer.length();
+
   buffer.drain(buffer.length());
 
   metadata_->setSerializationType(SerializationType::Hessian2);
@@ -54,15 +59,15 @@ TEST_F(AppExceptionTest, Encode) {
   buffer.drain(context->headerSize());
 
   // Verify the response type and content.
-  size_t hessian_int_size;
-  int type_value = HessianUtils::peekInt(buffer, &hessian_int_size);
+  Hessian2::Decoder decoder(std::make_unique<BufferReader>(buffer));
+
+  int type_value = *decoder.decode<int32_t>();
   EXPECT_EQ(static_cast<uint8_t>(app_exception.response_type_), static_cast<uint8_t>(type_value));
 
-  size_t hessian_string_size;
-  std::string message = HessianUtils::peekString(buffer, &hessian_string_size, sizeof(uint8_t));
+  std::string message = *decoder.decode<std::string>();
   EXPECT_EQ(mock_message, message);
 
-  EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
+  EXPECT_EQ(buffer.length(), decoder.offset());
 
   auto rpc_result = protocol_.serializer()->deserializeRpcResult(buffer, result.first);
   EXPECT_TRUE(rpc_result.second);

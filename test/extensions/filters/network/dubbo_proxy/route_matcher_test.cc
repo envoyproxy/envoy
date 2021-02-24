@@ -5,8 +5,8 @@
 
 #include "common/protobuf/protobuf.h"
 
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -34,6 +34,17 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
   TestUtility::loadFromYaml(yaml, config);
   TestUtility::validate(config);
   return config;
+}
+
+void setDefaultInvocationCallback(RpcInvocationImpl& invo) {
+  invo.setParametersLazyCallback([](RpcInvocationImpl::ParametersPtr& params) {
+    params = std::make_unique<RpcInvocationImpl::Parameters>();
+  });
+
+  invo.setAttachmentLazyCallback([](RpcInvocationImpl::AttachmentPtr& attach) {
+    auto map = std::make_unique<RpcInvocationImpl::Attachment::MapObject>();
+    attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
+  });
 }
 
 } // namespace
@@ -227,12 +238,16 @@ routes:
     metadata.setInvocationInfo(invo);
     invo->setMethodName("test");
     invo->setServiceName("org.apache.dubbo.demo.DemoService");
+
+    setDefaultInvocationCallback(*invo);
+
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceGroup("test");
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceVersion("1.0.0");
+
     EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
   }
 
@@ -304,6 +319,9 @@ routes:
     metadata.setInvocationInfo(invo);
     invo->setMethodName("test");
     invo->setServiceName("org.apache.dubbo.demo.DemoService");
+
+    setDefaultInvocationCallback(*invo);
+
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
     invo->setServiceGroup("test");
@@ -474,7 +492,9 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addParameterValue(0, "150");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
@@ -504,7 +524,10 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addParameterValue(1, "user_id:94562");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->resize(2);
+  invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id:94562");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
@@ -537,21 +560,21 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addHeader("custom", "123");
-  std::string test_value("123");
 
-  Envoy::Http::LowerCaseString test_key("custom1");
-  invo->addHeaderReference(test_key, test_value);
+  setDefaultInvocationCallback(*invo);
+
+  invo->mutableAttachment()->insert("custom", "123");
+  invo->mutableAttachment()->insert("custom1", "123");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
-  test_value = "456";
+  invo->mutableAttachment()->insert("custom1", "456");
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
   EXPECT_EQ(nullptr, matcher.route(metadata, 0)->routeEntry()->metadataMatchCriteria());
 
-  test_value = "123";
+  invo->mutableAttachment()->insert("custom1", "123");
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
 
@@ -591,7 +614,10 @@ route_config:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
-  invo->addParameterValue(1, "user_id");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->resize(2);
+  invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MultiRouteMatcher matcher(config.route_config(), context);
@@ -628,22 +654,32 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
   invo->setMethodName("add");
 
+  setDefaultInvocationCallback(*invo);
+
   // There is no parameter information in metadata.
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   // The parameter is empty.
-  invo->addParameterValue(1, "");
+  invo->mutableParameters()->resize(2);
+  invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("");
+
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   {
     auto invo = std::make_shared<RpcInvocationImpl>();
+
+    setDefaultInvocationCallback(*invo);
+
+    // Error parameter.
+    invo->mutableParameters()->resize(2);
+    invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id:562");
+
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
     invo->setServiceName("org.apache.dubbo.demo.DemoService");
     invo->setMethodName("add");
-    invo->addParameterValue(1, "user_id:562");
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
 }

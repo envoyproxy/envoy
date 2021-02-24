@@ -5,7 +5,7 @@
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -391,7 +391,7 @@ TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   buffer.add("test");                                  // Body
 
   auto ctx = static_cast<ContextImpl*>(message_context_.get());
-  ctx->messageOriginData().move(buffer, buffer.length());
+  ctx->originMessage().move(buffer, buffer.length());
   startRequest(MessageType::Request);
   connectUpstream();
   destroyRouter();
