@@ -1218,8 +1218,18 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   if (disable_timer) {
     if (max_stream_duration_timer_) {
       max_stream_duration_timer_->disableTimer();
+      if (route->usingNewTimeouts() && Grpc::Common::isGrpcRequestHeaders(*request_headers_)) {
+        request_headers_->removeGrpcTimeout();
+      }
     }
     return;
+  }
+
+  // Set the header timeout before doing used-time adjustements.
+  // This may result in the upstream not getting the latest results, but also
+  // avoids every request getting a custom timeout based on envoy think time.
+  if (route->usingNewTimeouts() && Grpc::Common::isGrpcRequestHeaders(*request_headers_)) {
+    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(timeout), *request_headers_);
   }
 
   // See how long this stream has been alive, and adjust the timeout

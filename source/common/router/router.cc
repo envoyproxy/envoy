@@ -116,28 +116,30 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   // the configured maximum gRPC timeout (which may also be infinity, represented by a 0 value),
   // or the default from the route config otherwise.
   TimeoutData timeout;
-  if (grpc_request && route.maxGrpcTimeout()) {
-    const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
-    auto header_timeout = Grpc::Common::getGrpcTimeout(request_headers);
-    std::chrono::milliseconds grpc_timeout =
-        header_timeout ? header_timeout.value() : std::chrono::milliseconds(0);
-    if (route.grpcTimeoutOffset()) {
-      // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
-      // setting it to 0 means infinity and a negative timeout makes no sense.
-      const auto offset = *route.grpcTimeoutOffset();
-      if (offset < grpc_timeout) {
-        grpc_timeout -= offset;
+  if (!route.usingNewTimeouts()) {
+    if (grpc_request && route.maxGrpcTimeout()) {
+      const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
+      auto header_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+      std::chrono::milliseconds grpc_timeout =
+          header_timeout ? header_timeout.value() : std::chrono::milliseconds(0);
+      if (route.grpcTimeoutOffset()) {
+        // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
+        // setting it to 0 means infinity and a negative timeout makes no sense.
+        const auto offset = *route.grpcTimeoutOffset();
+        if (offset < grpc_timeout) {
+          grpc_timeout -= offset;
+        }
       }
-    }
 
-    // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
-    if (max_grpc_timeout != std::chrono::milliseconds(0) &&
-        (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
-      grpc_timeout = max_grpc_timeout;
+      // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
+      if (max_grpc_timeout != std::chrono::milliseconds(0) &&
+          (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
+        grpc_timeout = max_grpc_timeout;
+      }
+      timeout.global_timeout_ = grpc_timeout;
+    } else {
+      timeout.global_timeout_ = route.timeout();
     }
-    timeout.global_timeout_ = grpc_timeout;
-  } else {
-    timeout.global_timeout_ = route.timeout();
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
@@ -198,7 +200,8 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   // the expected timeout. This ensures that the optional per try timeout is reflected
   // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
   // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
-  if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
+  if (grpc_request && !route.usingNewTimeouts() && route.maxGrpcTimeout() &&
+      expected_timeout != 0) {
     Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout), request_headers);
   }
 
