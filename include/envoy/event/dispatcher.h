@@ -8,6 +8,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"
@@ -261,6 +262,12 @@ public:
   virtual void post(PostCb callback) PURE;
 
   /**
+   * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on
+   * the dispatcher's thread before dispatcher destroy. This is safe cross thread.
+   */
+  virtual void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) PURE;
+
+  /**
    * Runs the event loop. This will not return until exit() is called either from within a callback
    * or from a different thread.
    * @param type specifies whether to run in blocking mode (run() will not return until exit() is
@@ -287,6 +294,11 @@ public:
    * Updates approximate monotonic time to current value.
    */
   virtual void updateApproximateMonotonicTime() PURE;
+
+  /**
+   * Shutdown the dispatcher by clear dispatcher thread deletable.
+   */
+  virtual void shutdown() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

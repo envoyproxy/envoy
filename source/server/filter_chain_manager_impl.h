@@ -8,6 +8,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -52,6 +53,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
@@ -136,6 +138,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
   bool healthCheckFailed() override;
@@ -250,8 +253,7 @@ private:
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
@@ -259,8 +261,7 @@ private:
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
@@ -268,8 +269,7 @@ private:
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForServerNames(
       ServerNamesMapSharedPtr& server_names_map_ptr,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,

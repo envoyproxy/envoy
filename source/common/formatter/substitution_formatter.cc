@@ -504,7 +504,9 @@ SubstitutionFormatParser::parse(const std::string& format,
     pos = command_end_position;
   }
 
-  if (!current_token.empty()) {
+  if (!current_token.empty() || format.empty()) {
+    // Create a PlainStringFormatter with the final string literal. If the format string was empty,
+    // this creates a PlainStringFormatter with an empty string.
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
   }
 
@@ -752,7 +754,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-          if (stream_info.upstreamClusterInfo().has_value()) {
+          if (stream_info.upstreamClusterInfo().has_value() &&
+              stream_info.upstreamClusterInfo().value() != nullptr) {
             upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
           }
 

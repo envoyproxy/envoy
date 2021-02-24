@@ -96,7 +96,7 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
-    external_http_archive("io_bazel_rules_rust")
+    external_http_archive("rules_rust")
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
