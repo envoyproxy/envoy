@@ -1,9 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
-#include <iostream>
-#include <memory>
-#include <string>
-
 #include "envoy/buffer/buffer.h"
 
 #include "common/common/assert.h"
@@ -16,60 +12,15 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
-void ClientLoginResponse::initMessage(uint8_t resp_code) {
-  resp_code_ = resp_code;
-  switch (resp_code) {
-  case MYSQL_RESP_OK:
-    message_ = std::make_unique<OkMessage>();
-    break;
-  case MYSQL_RESP_ERR:
-    message_ = std::make_unique<ErrMessage>();
-    break;
-  case MYSQL_RESP_AUTH_SWITCH:
-    message_ = std::make_unique<AuthSwitchMessage>();
-    break;
-  case MYSQL_RESP_MORE:
-    message_ = std::make_unique<AuthMoreMessage>();
-    break;
-  default:
-    break;
-  }
-}
-
-AuthMoreMessage& ClientLoginResponse::asAuthMoreMessage() {
-  ASSERT(resp_code_ == MYSQL_RESP_MORE);
-  return *(dynamic_cast<AuthMoreMessage*>(message_.get()));
-}
-AuthSwitchMessage& ClientLoginResponse::asAuthSwitchMessage() {
-  ASSERT(resp_code_ == MYSQL_RESP_AUTH_SWITCH);
-  return *(dynamic_cast<AuthSwitchMessage*>(message_.get()));
-}
-
-OkMessage& ClientLoginResponse::asOkMessage() {
-  ASSERT(resp_code_ == MYSQL_RESP_OK);
-  return *(dynamic_cast<OkMessage*>(message_.get()));
-}
-ErrMessage& ClientLoginResponse::asErrMessage() {
-  ASSERT(resp_code_ == MYSQL_RESP_ERR);
-  return *(dynamic_cast<ErrMessage*>(message_.get()));
-}
-
-DecodeStatus ClientLoginResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {
-  if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing response code in mysql Login response msg");
-    return DecodeStatus::Failure;
-  }
-  initMessage(resp_code_);
-  if (message_ == nullptr) {
-    ENVOY_LOG(info, "unknown mysql Login resp code");
-    return DecodeStatus::Failure;
-  }
-  return message_->parseMessage(buffer, len - sizeof(uint8_t));
-}
 
 // https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::AuthSwitchRequest
 DecodeStatus AuthSwitchMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
   int origin_len = buffer.length();
+  if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    return DecodeStatus::Failure;
+  }
+  ASSERT(resp_code_ == MYSQL_RESP_AUTH_SWITCH);
   // OldAuthSwitchRequest
   if (BufferHelper::endOfBuffer(buffer)) {
     setIsOldAuthSwitch(true);
@@ -92,7 +43,11 @@ DecodeStatus AuthSwitchMessage::parseMessage(Buffer::Instance& buffer, uint32_t 
 // https://dev.mysql.com/doc/internals/en/packet-OK_Packet.html
 DecodeStatus OkMessage::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   uint32_t init_len = buffer.length();
-  ASSERT(init_len >= len);
+  if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    return DecodeStatus::Failure;
+  }
+  ASSERT(resp_code_ == MYSQL_RESP_OK);
   if (BufferHelper::readLengthEncodedInteger(buffer, affected_rows_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error parsing affected_rows in mysql Login Ok msg");
     return DecodeStatus::Failure;
@@ -125,6 +80,11 @@ DecodeStatus OkMessage::parseMessage(Buffer::Instance& buffer, uint32_t len) {
 // https://dev.mysql.com/doc/internals/en/packet-ERR_Packet.html
 DecodeStatus ErrMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
   int origin_len = buffer.length();
+  if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    return DecodeStatus::Failure;
+  }
+  ASSERT(resp_code_ == MYSQL_RESP_ERR);
   if (BufferHelper::readUint16(buffer, error_code_) != DecodeStatus::Success) {
     ENVOY_LOG(info, "error parsing error code in mysql Login error msg");
     return DecodeStatus::Failure;
@@ -149,7 +109,12 @@ DecodeStatus ErrMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_
 
 // https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::AuthMoreData
 DecodeStatus AuthMoreMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
-  if (BufferHelper::readStringBySize(buffer, remain_len, more_plugin_data_) !=
+  if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
+    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    return DecodeStatus::Failure;
+  }
+  ASSERT(resp_code_ == MYSQL_RESP_MORE);
+  if (BufferHelper::readStringBySize(buffer, remain_len - sizeof(uint8_t), more_plugin_data_) !=
       DecodeStatus::Success) {
     ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
     return DecodeStatus::Failure;
@@ -157,15 +122,8 @@ DecodeStatus AuthMoreMessage::parseMessage(Buffer::Instance& buffer, uint32_t re
   return DecodeStatus::Success;
 }
 
-void ClientLoginResponse::encode(Buffer::Instance& out) {
-  if (message_ == nullptr) {
-    return;
-  }
-  message_->encode(out);
-}
-
 void AuthSwitchMessage::encode(Buffer::Instance& out) {
-  BufferHelper::addUint8(out, MYSQL_RESP_AUTH_SWITCH);
+  BufferHelper::addUint8(out, resp_code_);
   if (isOldAuthSwitch()) {
     return;
   }
@@ -175,7 +133,7 @@ void AuthSwitchMessage::encode(Buffer::Instance& out) {
 }
 
 void OkMessage::encode(Buffer::Instance& out) {
-  BufferHelper::addUint8(out, MYSQL_RESP_OK);
+  BufferHelper::addUint8(out, resp_code_);
   BufferHelper::addLengthEncodedInteger(out, affected_rows_);
   BufferHelper::addLengthEncodedInteger(out, last_insert_id_);
   BufferHelper::addUint16(out, status_);
@@ -184,7 +142,7 @@ void OkMessage::encode(Buffer::Instance& out) {
 }
 
 void ErrMessage::encode(Buffer::Instance& out) {
-  BufferHelper::addUint8(out, MYSQL_RESP_ERR);
+  BufferHelper::addUint8(out, resp_code_);
   BufferHelper::addUint16(out, error_code_);
   BufferHelper::addUint8(out, marker_);
   BufferHelper::addString(out, sql_state_);
@@ -192,7 +150,7 @@ void ErrMessage::encode(Buffer::Instance& out) {
 }
 
 void AuthMoreMessage::encode(Buffer::Instance& out) {
-  BufferHelper::addUint8(out, MYSQL_RESP_MORE);
+  BufferHelper::addUint8(out, resp_code_);
   BufferHelper::addString(out, more_plugin_data_);
 }
 

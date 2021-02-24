@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
+#include <sys/types.h>
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
@@ -47,28 +49,45 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
 
   case MySQLSession::State::ChallengeResp41:
   case MySQLSession::State::ChallengeResp320: {
-    ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, seq, len);
-    callbacks_.onClientLoginResponse(client_login_resp);
-
-    switch (client_login_resp.getRespCode()) {
+    uint8_t resp_code;
+    if (BufferHelper::peekUint8(message, resp_code) != DecodeStatus::Success) {
+      session_.setState(MySQLSession::State::NotHandled);
+      break;
+    }
+    switch (resp_code) {
     case MYSQL_RESP_OK: {
+      OkMessage ok{};
+      ok.decode(message, seq, len);
+      callbacks_.onClientLoginResponse(ok);
       session_.setState(MySQLSession::State::Req);
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
     case MYSQL_RESP_AUTH_SWITCH: {
+      AuthSwitchMessage auth_switch{};
+      auth_switch.decode(message, seq, len);
+      callbacks_.onClientLoginResponse(auth_switch);
+      session_.setState(MySQLSession::State::Req);
       session_.setState(MySQLSession::State::AuthSwitchResp);
       break;
     }
     case MYSQL_RESP_ERR: {
+      ErrMessage err{};
+      err.decode(message, seq, len);
+      callbacks_.onClientLoginResponse(err);
       // client/server should close the connection:
       // https://dev.mysql.com/doc/internals/en/connection-phase.html
       session_.setState(MySQLSession::State::Error);
       break;
     }
-    case MYSQL_RESP_MORE:
+    case MYSQL_RESP_MORE: {
+      AuthMoreMessage more{};
+      more.decode(message, seq, len);
+      callbacks_.onClientLoginResponse(more);
+      session_.setState(MySQLSession::State::NotHandled);
+      break;
+    }
     default:
       session_.setState(MySQLSession::State::NotHandled);
       break;
@@ -86,26 +105,42 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   }
 
   case MySQLSession::State::AuthSwitchMore: {
-    ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, seq, len);
-    callbacks_.onMoreClientLoginResponse(client_login_resp);
-
-    switch (client_login_resp.getRespCode()) {
+    uint8_t resp_code;
+    if (BufferHelper::peekUint8(message, resp_code) != DecodeStatus::Success) {
+      session_.setState(MySQLSession::State::NotHandled);
+      break;
+    }
+    switch (resp_code) {
     case MYSQL_RESP_OK: {
+      OkMessage ok{};
+      ok.decode(message, seq, len);
+      callbacks_.onMoreClientLoginResponse(ok);
       session_.setState(MySQLSession::State::Req);
       break;
     }
     case MYSQL_RESP_MORE: {
+      AuthMoreMessage more{};
+      more.decode(message, seq, len);
+      callbacks_.onMoreClientLoginResponse(more);
       session_.setState(MySQLSession::State::AuthSwitchResp);
       break;
     }
     case MYSQL_RESP_ERR: {
+      ErrMessage err{};
+      err.decode(message, seq, len);
+      callbacks_.onMoreClientLoginResponse(err);
       // stop parsing auth req/response, attempt to resync in command state
       session_.setState(MySQLSession::State::Resync);
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
-    case MYSQL_RESP_AUTH_SWITCH:
+    case MYSQL_RESP_AUTH_SWITCH: {
+      AuthSwitchMessage auth_switch{};
+      auth_switch.decode(message, seq, len);
+      callbacks_.onMoreClientLoginResponse(auth_switch);
+      session_.setState(MySQLSession::State::NotHandled);
+      break;
+    }
     default:
       session_.setState(MySQLSession::State::NotHandled);
       break;

@@ -32,7 +32,6 @@ constexpr uint8_t MYSQL_RESP_OK = 0x00;
 constexpr uint8_t MYSQL_RESP_MORE = 0x01;
 constexpr uint8_t MYSQL_RESP_AUTH_SWITCH = 0xfe;
 constexpr uint8_t MYSQL_RESP_ERR = 0xff;
-constexpr uint8_t MYSQL_RESP_UNKNOWN = 0x56;
 
 constexpr uint8_t EOF_MARKER = 0xfe;
 constexpr uint8_t ERR_MARKER = 0xff;

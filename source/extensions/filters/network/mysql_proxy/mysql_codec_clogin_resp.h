@@ -24,29 +24,19 @@ using ClientLoginResponsePtr = std::unique_ptr<ClientLoginResponse>;
 // method or OK_Packet, ERR_Packet when server auth ok or error
 class ClientLoginResponse : public MySQLCodec {
 public:
-  ClientLoginResponse() = default;
-  ClientLoginResponse(const ClientLoginResponse& other);
+  ClientLoginResponse(uint8_t resp_code) : resp_code_(resp_code) {}
   // MySQLCodec
-  DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  void encode(Buffer::Instance&) override;
-
   uint8_t getRespCode() const { return resp_code_; }
   void setRespCode(uint8_t resp_code) { resp_code_ = resp_code; }
-  void initMessage(uint8_t resp_code);
 
-  AuthMoreMessage& asAuthMoreMessage();
-  AuthSwitchMessage& asAuthSwitchMessage();
-  OkMessage& asOkMessage();
-  ErrMessage& asErrMessage();
-
-private:
-  uint8_t resp_code_{MYSQL_RESP_UNKNOWN};
-  ClientLoginResponsePtr message_;
+protected:
+  uint8_t resp_code_;
 };
 
 class AuthMoreMessage : public ClientLoginResponse {
 public:
   // ClientLoginResponse
+  AuthMoreMessage() : ClientLoginResponse(MYSQL_RESP_MORE) {}
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
   void encode(Buffer::Instance&) override;
 
@@ -59,6 +49,7 @@ private:
 
 class AuthSwitchMessage : public ClientLoginResponse {
 public:
+  AuthSwitchMessage() : ClientLoginResponse(MYSQL_RESP_AUTH_SWITCH) {}
   // ClientLoginResponse
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
   void encode(Buffer::Instance&) override;
@@ -78,6 +69,7 @@ private:
 
 class OkMessage : public ClientLoginResponse {
 public:
+  OkMessage() : ClientLoginResponse(MYSQL_RESP_OK) {}
   // ClientLoginResponse
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
   void encode(Buffer::Instance&) override;
@@ -104,6 +96,7 @@ private:
 
 class ErrMessage : public ClientLoginResponse {
 public:
+  ErrMessage() : ClientLoginResponse(MYSQL_RESP_ERR) {}
   // ClientLoginResponse
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
   void encode(Buffer::Instance&) override;

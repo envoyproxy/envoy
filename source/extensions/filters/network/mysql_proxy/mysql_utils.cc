@@ -171,6 +171,15 @@ DecodeStatus BufferHelper::peekUint32(Buffer::Instance& buffer, uint32_t& val) {
   }
 }
 
+DecodeStatus BufferHelper::peekUint8(Buffer::Instance& buffer, uint8_t& val) {
+  try {
+    val = buffer.peekLEInt<uint8_t>(0);
+    return DecodeStatus::Success;
+  } catch (EnvoyException& e) {
+    return DecodeStatus::Failure;
+  }
+}
+
 void BufferHelper::consumeHdr(Buffer::Instance& buffer) { buffer.drain(sizeof(uint32_t)); }
 
 DecodeStatus BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq) {
