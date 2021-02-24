@@ -89,8 +89,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
           resource_decoder_, false);
   local_init_manager_.add(local_init_target_);
-  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
-      factory_context, factory_context.timeSource());
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {

@@ -25,20 +25,16 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
   initializeRdsVhosts(route_config_proto_);
-  onUpdateCommon(route_config_proto_, version_info);
+
+  last_config_version_ = version_info;
+  last_updated_ = time_source_.systemTime();
+  rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);
+  config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_proto_, last_config_version_});
 
   config_ = std::make_shared<ConfigImpl>(
       route_config_proto_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
   return true;
-}
-
-void RouteConfigUpdateReceiverImpl::onUpdateCommon(
-    const envoy::config::route::v3::RouteConfiguration& rc, const std::string& version_info) {
-  last_config_version_ = version_info;
-  last_updated_ = time_source_.systemTime();
-  rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);
-  config_info_.emplace(RouteConfigProvider::ConfigInfo{rc, last_config_version_});
 }
 
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
@@ -51,8 +47,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   const bool removed = removeVhosts(vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(vhosts_after_this_update, added_vhosts);
 
-  envoy::config::route::v3::RouteConfiguration latest_route_config = route_config_proto_;
-  // latest_route_config.CopyFrom(route_config_proto_);
+  envoy::config::route::v3::RouteConfiguration latest_route_config;
+  latest_route_config.CopyFrom(route_config_proto_);
   rebuildRouteConfig(rds_virtual_hosts_, vhosts_after_this_update, latest_route_config);
 
   // ConfigImpl ctor throws exception on validation failures

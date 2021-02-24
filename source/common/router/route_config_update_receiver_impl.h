@@ -18,10 +18,9 @@ namespace Router {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context,
-                                TimeSource& time_source)
-      : factory_context_(factory_context), time_source_(time_source), last_config_hash_(0ull),
-        last_vhds_config_hash_(0ul), vhds_configuration_changed_(true) {}
+  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context)
+      : factory_context_(factory_context), time_source_(factory_context.timeSource()),
+        last_config_hash_(0ull), last_vhds_config_hash_(0ul), vhds_configuration_changed_(true) {}
 
   void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
