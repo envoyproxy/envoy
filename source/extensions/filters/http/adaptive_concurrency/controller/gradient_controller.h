@@ -231,7 +231,7 @@ public:
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
-  void updateMinRTT();
+  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);

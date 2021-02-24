@@ -109,22 +109,19 @@ void GradientController::enterMinRTTSamplingWindow() {
 }
 
 void GradientController::updateMinRTT() {
-  {
-    absl::MutexLock ml(&sample_mutation_mtx_);
-    if (inMinRTTSamplingWindow() &&
-        hist_sample_count(latency_sample_hist_.get()) >= config_.minRTTAggregateRequestCount()) {
-      // By double-checked locking, only update minRTT when it is in minRTT sampling window
-      // and number of samples is greater than or equal to the minRTTAggregateRequestCount.
-      min_rtt_ = processLatencySamplesAndClear();
-      stats_.min_rtt_msecs_.set(
-          std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
-    } else {
-      return;
-    }
-    updateConcurrencyLimit(deferred_limit_value_.load());
-    deferred_limit_value_.store(0);
-    stats_.min_rtt_calculation_active_.set(0);
+  // Only update minRTT when it is in minRTT sampling window and 
+  // number of samples is greater than or equal to the minRTTAggregateRequestCount.
+  if (!inMinRTTSamplingWindow() ||
+      hist_sample_count(latency_sample_hist_.get()) < config_.minRTTAggregateRequestCount()) {
+    return;
   }
+  
+  min_rtt_ = processLatencySamplesAndClear();
+  stats_.min_rtt_msecs_.set(
+      std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
+  updateConcurrencyLimit(deferred_limit_value_.load());
+  deferred_limit_value_.store(0);
+  stats_.min_rtt_calculation_active_.set(0);
 
   min_rtt_calc_timer_->enableTimer(
       applyJitter(config_.minRTTCalcInterval(), config_.jitterPercent()));
@@ -213,18 +210,15 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   const std::chrono::microseconds rq_latency =
       std::chrono::duration_cast<std::chrono::microseconds>(time_source_.monotonicTime() -
                                                             rq_send_time);
-  uint32_t sample_count;
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
     hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
-    sample_count = hist_sample_count(latency_sample_hist_.get());
   }
 
-  if (inMinRTTSamplingWindow() && sample_count >= config_.minRTTAggregateRequestCount()) {
-    // This sample has pushed the request count over the request count requirement for the minRTT
-    // recalculation. It must now be finished.
-    synchronizer_.syncPoint("pre_minrtt_update");
+  synchronizer_.syncPoint("pre_minrtt_update");
+  if (sample_mutation_mtx_.TryLock()) {  
     updateMinRTT();
+    sample_mutation_mtx_.Unlock();
   }
 }
 
