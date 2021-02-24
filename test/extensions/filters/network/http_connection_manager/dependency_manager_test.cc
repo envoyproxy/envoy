@@ -30,18 +30,7 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   EXPECT_TRUE(manager.validDecodeDependencies());
 }
 
-TEST(DependencyManagerTest, RegisterFilterWithUnmetRequirement) {
-  DependencyManager manager;
-
-  FilterDependencies dependencies;
-  auto required = dependencies.add_decode_required();
-  required->set_type(Dependency::FILTER_STATE_KEY);
-  required->set_name("potato");
-  manager.registerFilter("chef", dependencies);
-  EXPECT_FALSE(manager.validDecodeDependencies());
-}
-
-TEST(DependencyManagerTest, DependencySatisfied) {
+TEST(DependencyManagerTest, Valid) {
   DependencyManager manager;
 
   FilterDependencies d1;
@@ -60,7 +49,56 @@ TEST(DependencyManagerTest, DependencySatisfied) {
   EXPECT_TRUE(manager.validDecodeDependencies());
 }
 
-TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
+TEST(DependencyManagerTest, MissingProvidencyInvalid) {
+  DependencyManager manager;
+
+  FilterDependencies dependencies;
+  auto required = dependencies.add_decode_required();
+  required->set_type(Dependency::FILTER_STATE_KEY);
+  required->set_name("potato");
+  manager.registerFilter("chef", dependencies);
+  EXPECT_FALSE(manager.validDecodeDependencies());
+}
+
+TEST(DependencyManagerTest, WrongProvidencyTypeInvalid) {
+  DependencyManager manager;
+
+  FilterDependencies d1;
+  auto provided = d1.add_decode_provided();
+  provided->set_type(Dependency::HEADER);
+  provided->set_name("potato");
+
+  FilterDependencies d2;
+  auto required = d2.add_decode_required();
+  required->set_type(Dependency::FILTER_STATE_KEY);
+  required->set_name("potato");
+
+  manager.registerFilter("ingredient", d1);
+  manager.registerFilter("chef", d2);
+
+  EXPECT_FALSE(manager.validDecodeDependencies());
+}
+
+TEST(DependencyManagerTest, WrongProvidencyNameInvalid) {
+  DependencyManager manager;
+
+  FilterDependencies d1;
+  auto provided = d1.add_decode_provided();
+  provided->set_type(Dependency::FILTER_STATE_KEY);
+  provided->set_name("tomato");
+
+  FilterDependencies d2;
+  auto required = d2.add_decode_required();
+  required->set_type(Dependency::FILTER_STATE_KEY);
+  required->set_name("potato");
+
+  manager.registerFilter("ingredient", d1);
+  manager.registerFilter("chef", d2);
+
+  EXPECT_FALSE(manager.validDecodeDependencies());
+}
+
+TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
   DependencyManager manager;
 
   FilterDependencies d1;
@@ -78,8 +116,6 @@ TEST(DependencyManagerTest, MisorderedDependencyNotSatisfied) {
 
   EXPECT_FALSE(manager.validDecodeDependencies());
 }
-
-// TODO(auni53): Add unit tests validating dependency type match.
 
 } // namespace
 } // namespace HttpConnectionManager
