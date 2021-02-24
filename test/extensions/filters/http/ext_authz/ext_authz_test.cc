@@ -2069,9 +2069,10 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   EXPECT_EQ("ext_authz_denied", filter_callbacks_.details());
 }
 
-// Verify that when returning an Error response with dynamic_metadata field set, the filter skips
-// dynamic metadata.
-TEST_F(HttpFilterTest, SkipEmittingMetadataWhenError) {
+// Verify that when returning an Error response with dynamic_metadata field set, the filter emits
+// dynamic metadata. In the current implementation, we don't emit metadata. This is here as a
+// reference so if it is needed, emitting dynamic metadata when CheckStatus::Error is possible.
+TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
   InSequence s;
 
   initialize(R"EOF(
@@ -2089,7 +2090,7 @@ TEST_F(HttpFilterTest, SkipEmittingMetadataWhenError) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   // When the response check status is error, we skip emitting dynamic metadata.
-  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(1);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
