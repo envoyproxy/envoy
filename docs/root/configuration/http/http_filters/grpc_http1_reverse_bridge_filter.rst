@@ -42,5 +42,6 @@ with the gRPC frame header and respond with gRPC formatted responses.
 How to disable HTTP/1.1 reverse bridge filter per route
 -------------------------------------------------------
 
-.. literalinclude:: _include/grpc-reverse-bridge-filter.yaml
+.. validatingliteralinclude:: _include/grpc-reverse-bridge-filter.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap

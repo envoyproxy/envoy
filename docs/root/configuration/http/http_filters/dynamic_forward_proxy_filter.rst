@@ -33,8 +33,9 @@ host when forwarding. See the example below within the configured routes.
   Dynamic forward proxy uses circuit breakers built in to the DNS cache with the configuration
   of :ref:`DNS cache circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`.
 
-.. literalinclude:: _include/dns-cache-circuit-breaker.yaml
+.. validatingliteralinclude:: _include/dns-cache-circuit-breaker.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 Statistics
 ----------

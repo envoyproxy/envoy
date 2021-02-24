@@ -49,8 +49,9 @@ Example configuration
 The following example configuration will cause Envoy to listen on UDP port 1234 and proxy to a UDP
 server listening on port 1235.
 
-.. literalinclude:: _include/udp-proxy.yaml
+.. validatingliteralinclude:: _include/udp-proxy.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 
 Statistics

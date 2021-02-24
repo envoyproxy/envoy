@@ -102,5 +102,6 @@ Here's a sample Envoy configuration that proxies to a gRPC server running on loc
 gRPC requests and uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping. I.e., you can make either
 gRPC or RESTful JSON requests to localhost:51051.
 
-.. literalinclude:: _include/grpc-transcoder-filter.yaml
+.. validatingliteralinclude:: _include/grpc-transcoder-filter.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap

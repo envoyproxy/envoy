@@ -70,8 +70,8 @@ static_resources:
                   port_value: 4630
   - name: grpc
     connect_timeout: 5.00s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN 
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions

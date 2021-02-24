@@ -70,11 +70,12 @@ In the :download:`envoy-demo.yaml <_include/envoy-demo.yaml>` the listener is co
 :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 of ``ingress_http``.
 
-.. literalinclude:: _include/envoy-demo.yaml
+.. validatingliteralinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-29
     :emphasize-lines: 13-14
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 .. _start_quick_start_admin_config_dump:
 

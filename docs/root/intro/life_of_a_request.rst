@@ -118,8 +118,9 @@ It's helpful to focus on one at a time, so this example covers the following:
 
 We assume a static bootstrap configuration file for simplicity:
 
-.. literalinclude:: _include/life-of-a-request.yaml
+.. validatingliteralinclude:: _include/life-of-a-request.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 High level architecture
 -----------------------

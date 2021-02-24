@@ -32,11 +32,12 @@ The following sections walk through the dynamic configuration provided in the
 
 The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should specify ``cluster`` and ``id``.
 
-.. literalinclude:: _include/envoy-dynamic-control-plane-demo.yaml
+.. validatingliteralinclude:: _include/envoy-dynamic-control-plane-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-5
     :emphasize-lines: 1-3
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 .. _start_quick_start_dynamic_dynamic_resources:
 

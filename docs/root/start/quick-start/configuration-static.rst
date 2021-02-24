@@ -21,11 +21,12 @@ The following sections walk through the static configuration provided in the
 The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contain
 everything that is configured statically when Envoy starts, as opposed to dynamically at runtime.
 
-.. literalinclude:: _include/envoy-demo.yaml
+.. validatingliteralinclude:: _include/envoy-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-3
     :emphasize-lines: 1
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 .. _start_quick_start_static_listeners:
 

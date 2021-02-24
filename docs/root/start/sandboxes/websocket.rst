@@ -81,11 +81,12 @@ In order for Envoy to terminate the WebSocket connection, the
 in :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
 must be set, as can be seen in the provided :download:`ws -> ws configuration <_include/websocket/envoy-ws.yaml>`:
 
-.. literalinclude:: _include/websocket/envoy-ws.yaml
+.. validatingliteralinclude:: _include/websocket/envoy-ws.yaml
    :language: yaml
    :lines: 1-29
    :linenos:
    :emphasize-lines: 13-14
+   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 You can start an interactive session with the socket as follows:
 

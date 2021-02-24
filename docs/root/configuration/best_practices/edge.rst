@@ -30,5 +30,6 @@ HTTP proxies should additionally configure:
 The following is a YAML example of the above recommendation (taken from the :ref:`Google VRP
 <arch_overview_google_vrp>` edge server configuration):
 
-.. literalinclude:: _include/edge.yaml
+.. validatingliteralinclude:: _include/edge.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap

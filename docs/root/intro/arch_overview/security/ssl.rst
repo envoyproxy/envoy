@@ -71,8 +71,9 @@ validation context specifies one or more trusted authority certificates.
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. literalinclude:: _include/ssl.yaml
+.. validatingliteralinclude:: _include/ssl.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
 :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` along with

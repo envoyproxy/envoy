@@ -25,5 +25,6 @@ SNI dynamic forward proxy.
   The following config doesn't terminate TLS in listener, so there is no need to configure TLS context
   in cluster. The TLS handshake is passed through by Envoy.
 
-.. literalinclude:: _include/sni-dynamic-forward-proxy-filter.yaml
+.. validatingliteralinclude:: _include/sni-dynamic-forward-proxy-filter.yaml
     :language: yaml
+    :type-name: envoy.config.bootstrap.v3.Bootstrap

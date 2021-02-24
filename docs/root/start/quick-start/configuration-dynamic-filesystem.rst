@@ -32,11 +32,12 @@ The following sections walk through the dynamic configuration provided in the
 
 The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should specify ``cluster`` and ``id``.
 
-.. literalinclude:: _include/envoy-dynamic-filesystem-demo.yaml
+.. validatingliteralinclude:: _include/envoy-dynamic-filesystem-demo.yaml
     :language: yaml
     :linenos:
     :lines: 1-5
     :emphasize-lines: 1-3
+    :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 .. _start_quick_start_dynamic_fs_dynamic_resources:
 
@@ -70,10 +71,11 @@ All domains and paths are matched and routed to the ``service_envoyproxy_io`` cl
 
 The ``host`` headers are rewritten to ``www.envoyproxy.io``
 
-.. literalinclude:: _include/envoy-dynamic-lds-demo.yaml
+.. validatingliteralinclude:: _include/envoy-dynamic-lds-demo.yaml
     :language: yaml
     :linenos:
     :emphasize-lines: 6-7, 20-21, 24, 26-27
+    :type-name: envoy.service.discovery.v3.DiscoveryResponse
 
 .. _start_quick_start_dynamic_fs_dynamic_cds:
 
@@ -86,7 +88,8 @@ In the following example of a :download:`dynamic CDS file <_include/envoy-dynami
 the ``example_proxy_cluster`` :ref:`cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
 proxies over ``TLS`` to https://www.envoyproxy.io.
 
-.. literalinclude:: _include/envoy-dynamic-cds-demo.yaml
+.. validatingliteralinclude:: _include/envoy-dynamic-cds-demo.yaml
     :language: yaml
     :linenos:
     :emphasize-lines: 8, 14-15, 19-20
+    :type-name: envoy.service.discovery.v3.DiscoveryResponse

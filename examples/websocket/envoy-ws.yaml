@@ -29,8 +29,8 @@ static_resources:
   clusters:
   - name: service_ws
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS 
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service_ws
       endpoints:

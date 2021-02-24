@@ -31,7 +31,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              certificate_chain:
+            - certificate_chain:
                 filename: certs/servercert.pem
               private_key:
                 filename: certs/serverkey.pem

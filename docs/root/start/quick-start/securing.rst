@@ -43,12 +43,13 @@ in the :ref:`transport_socket <extension_envoy.transport_sockets.tls>` of a
 
 You will also need to provide valid certificates.
 
-.. literalinclude:: _include/envoy-demo-tls.yaml
+.. validatingliteralinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
    :lines: 1-37
    :emphasize-lines: 28-37
    :caption: :download:`envoy-demo-tls.yaml <_include/envoy-demo-tls.yaml>`
+   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 Connecting to an "upstream" ``TLS`` service is conversely done by adding an
 :ref:`UpstreamTLSContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`
@@ -76,13 +77,14 @@ to specify how Envoy should validate these certificates.
 
 Firstly, you can ensure that the certificates are from a mutually trusted certificate authority:
 
-.. literalinclude:: _include/envoy-demo-tls-validation.yaml
+.. validatingliteralinclude:: _include/envoy-demo-tls-validation.yaml
    :language: yaml
    :linenos:
    :lineno-start: 43
    :lines: 43-53
    :emphasize-lines: 6-9
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
+   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 You can also ensure that the "Subject Alternative Names" for the cerficate match.
 
@@ -118,13 +120,14 @@ At a minimum you will need to set
 :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
 and specify a mutually trusted certificate authority:
 
-.. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
+.. validatingliteralinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
    :lineno-start: 27
    :lines: 27-39
    :emphasize-lines: 6, 8-10
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
+   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 You can further restrict the authentication of connecting clients by specifying the allowed
 "Subject Alternative Names" in
@@ -171,13 +174,14 @@ To secure specific domains on a listening connection with ``SNI``, you should se
 :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` of the
 :ref:`listener <envoy_v3_api_msg_config.listener.v3.Listener>`:
 
-.. literalinclude:: _include/envoy-demo-tls-sni.yaml
+.. validatingliteralinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
    :lineno-start: 27
    :lines: 27-35
    :emphasize-lines: 2-4
    :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
+   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
 See here for :ref:`more info about creating multiple endpoints with SNI <faq_how_to_setup_sni>`
 

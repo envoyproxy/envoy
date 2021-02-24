@@ -87,12 +87,13 @@ The example setup provides Envoy with two dynamic configuration files:
 Edit ``cds.yaml`` inside the container and change the cluster address
 from ``service1`` to ``service2``:
 
-.. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
+.. validatingliteralinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
    :lines: 7-15
    :lineno-start: 7
    :emphasize-lines: 8
+   :type-name: envoy.service.discovery.v3.DiscoveryResponse
 
 You can do this using ``sed`` inside the container:
 
