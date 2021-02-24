@@ -137,6 +137,11 @@ public:
     return Ssl::HandshakerCapabilities{};
   }
 
+  Ssl::SslCtxCb sslctx_cb(Ssl::HandshakerFactoryContext&) const override {
+    // The default handshaker impl doesn't additionally modify SSL_CTX.
+    return [](SSL_CTX*) {};
+  }
+
   static HandshakerFactory* getDefaultHandshakerFactory() {
     static HandshakerFactoryImpl default_handshaker_factory;
     return &default_handshaker_factory;

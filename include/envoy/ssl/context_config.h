@@ -84,6 +84,11 @@ public:
    * @return the set of capabilities for handshaker instances created by this context.
    */
   virtual HandshakerCapabilities capabilities() const PURE;
+
+  /**
+   * @return a callback for configuring an SSL_CTX before use.
+   */
+  virtual SslCtxCb sslctx_cb() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
