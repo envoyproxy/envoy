@@ -598,7 +598,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
             "termination",
             response->body());

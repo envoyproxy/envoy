@@ -205,7 +205,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "502"}, {"content-length", "139"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "139"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -240,7 +240,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "502"}, {"content-length", "134"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "134"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -278,7 +278,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeoutLegacy) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "502"}, {"content-length", "127"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "127"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::LocalReset));
@@ -871,7 +871,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
         return nullptr;
       }));
 
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "502"},
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"},
                                                    {"content-length", "91"},
                                                    {"content-type", "text/plain"},
                                                    {"x-envoy-attempt-count", "1"}};
@@ -2930,11 +2930,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  // Now trigger a 502 in response to the first request.
+  // Now trigger a 503 in response to the first request.
   Http::ResponseHeaderMapPtr bad_response_headers2(
-      new Http::TestResponseHeaderMapImpl{{":status", "502"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(502));
+              putHttpResponseCode(503));
 
   // We should not call shouldRetryHeaders() because you never retry the same
   // request twice.
@@ -2942,7 +2942,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value(), "502");
+        EXPECT_EQ(headers.Status()->value(), "503");
       }));
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 

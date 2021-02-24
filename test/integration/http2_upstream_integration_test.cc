@@ -250,7 +250,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
       EXPECT_EQ(response_bytes[i], responses[i]->body().length());
     } else {
       // Upstream stream reset.
-      EXPECT_EQ("502", responses[i]->headers().getStatusValue());
+      EXPECT_EQ("503", responses[i]->headers().getStatusValue());
     }
   }
 
@@ -410,7 +410,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
   upstream_request_->encodeHeaders(many_headers, true);
   response->waitForEndStream();
   // Upstream stream reset triggered.
-  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Tests bootstrap configuration of max response headers.
@@ -454,7 +454,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   upstream_request_->encodeHeaders(large_headers, true);
   response->waitForEndStream();
   // Upstream stream reset.
-  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.

@@ -81,7 +81,7 @@ enum ResponseFlag {
   NoFilterConfigFound = 0x200000,
   // Request or connection exceeded the downstream connection duration.
   DurationTimeout = 0x400000,
-  // Upstream request had an HTTP protocol error
+  // Upstream response had an HTTP protocol error
   UpstreamProtocolError = 0x800000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = UpstreamProtocolError

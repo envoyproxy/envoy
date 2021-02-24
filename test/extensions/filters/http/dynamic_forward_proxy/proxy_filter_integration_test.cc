@@ -293,7 +293,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   response->waitForEndStream();
-  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ssl.fail_verify_san")->value());
 }

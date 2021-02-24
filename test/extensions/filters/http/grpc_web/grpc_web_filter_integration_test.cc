@@ -86,7 +86,7 @@ public:
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
 
-    EXPECT_EQ("502", response->headers().getStatusValue());
+    EXPECT_EQ("503", response->headers().getStatusValue());
     EXPECT_EQ(absl::StrCat(accept_, "+proto"), response->headers().getContentTypeValue());
     EXPECT_EQ(expected_grpc_message_value, response->headers().getGrpcMessageValue());
     EXPECT_EQ(0U, response->body().length());

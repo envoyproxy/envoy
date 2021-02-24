@@ -1221,7 +1221,7 @@ TEST_P(IntegrationTest, TestFailedBind) {
                                      {"x-envoy-upstream-rq-timeout-ms", "1000"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), HttpStatusIs("502"));
+  EXPECT_THAT(response->headers(), HttpStatusIs("503"));
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 

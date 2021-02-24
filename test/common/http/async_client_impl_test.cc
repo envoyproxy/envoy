@@ -727,12 +727,12 @@ TEST_F(AsyncClientImplTest, ImmediateReset) {
   auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  expectSuccess(request, 502);
+  expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 
   EXPECT_EQ(
       1UL,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_502").value());
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
@@ -1126,14 +1126,14 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
         // The callback gets called before AsyncClient::send() completes, which means that we don't
         // have a request handle to compare to.
         EXPECT_NE(nullptr, &request);
-        EXPECT_EQ(502, Utility::getResponseStatus(response->headers()));
+        EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
       }));
 
   EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions()));
 
   EXPECT_EQ(
       1UL,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_502").value());
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
@@ -1151,14 +1151,14 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
         // The callback gets called before AsyncClient::send() completes, which means that we don't
         // have a request handle to compare to.
         EXPECT_NE(nullptr, &request);
-        EXPECT_EQ(502, Utility::getResponseStatus(response->headers()));
+        EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
       }));
   message_->body().add("hello");
   EXPECT_EQ(nullptr, client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions()));
 
   EXPECT_EQ(
       1UL,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_502").value());
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 }
 
 TEST_F(AsyncClientImplTest, StreamTimeout) {

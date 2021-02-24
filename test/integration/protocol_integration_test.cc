@@ -2169,7 +2169,7 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
   // Make sure that a disconnect results in valid 5xx response headers even when preceded by a 100.
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {

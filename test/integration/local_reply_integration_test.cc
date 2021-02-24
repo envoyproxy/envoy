@@ -98,7 +98,7 @@ body_format:
   initialize();
 
   const std::string expected_grpc_message = R"({
-      "code": 502,
+      "code": 503,
       "message":"upstream connect error or disconnect/reset before headers. reset reason: connection termination"
 })";
 
@@ -285,7 +285,7 @@ body_format:
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ("154", response->headers().ContentLength()->value().getStringView());
-  EXPECT_EQ("502", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   // Check if returned json is same as expected
   EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
 }
@@ -362,7 +362,7 @@ mappers:
       comparison:
         op: EQ
         value:
-          default_value: 502
+          default_value: 503
           runtime_key: key_b
   status_code: 513
   body:
@@ -420,7 +420,7 @@ mappers:
       comparison:
         op: EQ
         value:
-          default_value: 502
+          default_value: 503
           runtime_key: key_b
   status_code: 513
   body:

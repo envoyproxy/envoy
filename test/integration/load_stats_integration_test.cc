@@ -644,7 +644,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   initiateClientConnection();
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
-  EXPECT_EQ("502", response_->headers().getStatusValue());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 
   ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
