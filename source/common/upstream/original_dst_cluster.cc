@@ -89,16 +89,17 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
     override_header = downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost);
   }
   if (!override_header.empty()) {
-    try {
       // This is an implicitly untrusted header, so per the API documentation only the first
       // value is used.
       const std::string request_override_host(override_header[0]->value().getStringView());
-      request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
-      ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
-    } catch (const Envoy::EnvoyException& e) {
-      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", e.what());
-      parent_->info()->stats().original_dst_host_invalid_.inc();
-    }
+      request_host = Network::Utility::parseInternetAddressAndPortNoThrow(request_override_host, false);
+      if (request_host) {
+        ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
+      }
+      else {
+        ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", request_override_host);
+        parent_->info()->stats().original_dst_host_invalid_.inc();
+      }
   }
   return request_host;
 }
