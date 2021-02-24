@@ -155,6 +155,8 @@ VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
 OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
+# C++17 feature, lacks sufficient support across various libraries / compilers.
+FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -779,6 +781,8 @@ class FormatChecker:
       reportError("Test names should be CamelCase, starting with a capital letter")
     if OLD_MOCK_METHOD_REGEX.search(line):
       reportError("The MOCK_METHODn() macros should not be used, use MOCK_METHOD() instead")
+    if FOR_EACH_N_REGEX.search(line):
+      reportError("std::for_each_n should not be used, use an alternative for loop instead")
 
     if not self.allowlistedForSerializeAsString(file_path) and "SerializeAsString" in line:
       # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
