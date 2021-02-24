@@ -6,7 +6,7 @@ load(
     "envoy_proto_library",
 )
 load(
-    "@rules_fuzzing//fuzzing:cc_deps.bzl",
+    "@rules_fuzzing//fuzzing:cc_defs.bzl",
     "cc_fuzzing_engine",
 )
 
