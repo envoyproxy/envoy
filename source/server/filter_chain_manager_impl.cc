@@ -72,6 +72,10 @@ Event::Dispatcher& PerFilterChainFactoryContextImpl::dispatcher() {
   return parent_context_.dispatcher();
 }
 
+const Server::Options& PerFilterChainFactoryContextImpl::options() {
+  return parent_context_.options();
+}
+
 Grpc::Context& PerFilterChainFactoryContextImpl::grpcContext() {
   return parent_context_.grpcContext();
 }
@@ -186,6 +190,7 @@ void FilterChainManagerImpl::addFilterChains(
       source_ips.push_back(cidr_range.asString());
     }
 
+    std::vector<std::string> server_names;
     // Reject partial wildcards, we don't match on them.
     for (const auto& server_name : filter_chain_match.server_names()) {
       if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
@@ -194,6 +199,7 @@ void FilterChainManagerImpl::addFilterChains(
                         "\"server_names\"",
                         address_->asString()));
       }
+      server_names.push_back(absl::AsciiStrToLower(server_name));
     }
 
     // Reuse created filter chain if possible.
@@ -209,7 +215,7 @@ void FilterChainManagerImpl::addFilterChains(
     addFilterChainForDestinationPorts(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
+        server_names, filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(), filter_chain_impl);
 
@@ -258,7 +264,7 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     DestinationPortsMap& destination_ports_map, uint16_t destination_port,
     const std::vector<std::string>& destination_ips,
-    const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
+    const absl::Span<const std::string> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
@@ -275,7 +281,7 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
 
 void FilterChainManagerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-    const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
+    const absl::Span<const std::string> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
@@ -295,8 +301,8 @@ void FilterChainManagerImpl::addFilterChainForDestinationIPs(
 }
 
 void FilterChainManagerImpl::addFilterChainForServerNames(
-    ServerNamesMapSharedPtr& server_names_map_ptr,
-    const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
+    ServerNamesMapSharedPtr& server_names_map_ptr, const absl::Span<const std::string> server_names,
+    const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
@@ -312,16 +318,16 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
                                           application_protocols, source_type, source_ips,
                                           source_ports, filter_chain);
   } else {
-    for (const auto& server_name_ptr : server_names) {
-      if (isWildcardServerName(*server_name_ptr)) {
+    for (const auto& server_name : server_names) {
+      if (isWildcardServerName(server_name)) {
         // Add mapping for the wildcard domain, i.e. ".example.com" for "*.example.com".
         addFilterChainForApplicationProtocols(
-            server_names_map[server_name_ptr->substr(1)][transport_protocol], application_protocols,
+            server_names_map[server_name.substr(1)][transport_protocol], application_protocols,
             source_type, source_ips, source_ports, filter_chain);
       } else {
-        addFilterChainForApplicationProtocols(
-            server_names_map[*server_name_ptr][transport_protocol], application_protocols,
-            source_type, source_ips, source_ports, filter_chain);
+        addFilterChainForApplicationProtocols(server_names_map[server_name][transport_protocol],
+                                              application_protocols, source_type, source_ips,
+                                              source_ports, filter_chain);
       }
     }
   }
@@ -466,6 +472,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinatio
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForServerName(
     const ServerNamesMap& server_names_map, const Network::ConnectionSocket& socket) const {
+  ASSERT(absl::AsciiStrToLower(socket.requestedServerName()) == socket.requestedServerName());
   const std::string server_name(socket.requestedServerName());
 
   // Match on exact server name, i.e. "www.example.com" for "www.example.com".
@@ -679,6 +686,7 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
 }
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
 Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
+const Server::Options& FactoryContextImpl::options() { return server_.options(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
 bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
