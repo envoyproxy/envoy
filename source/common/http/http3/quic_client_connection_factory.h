@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Http {
 
-// A factory to create EnvoyQuicClientConnection instance for QUIC
+// A factory to create EnvoyQuicClientSession and EnvoyQuicClientConnection for QUIC
 class QuicClientConnectionFactory : public Config::UntypedFactory {
 public:
   ~QuicClientConnectionFactory() override = default;
