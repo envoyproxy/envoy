@@ -43,12 +43,12 @@ message SPIFFECertValidatorConfig {
   message TrustDomain {
     // Name of the trust domain, `example.com`, `foo.bar.gov` for example.
     // Note that this must *not* have "spiffe://" prefix.
-    string name = 1;
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // Specify a data source holding x.509 trust bundle used for validating incoming SVID(s) in this trust domain.
     config.core.v3.DataSource trust_bundle = 2;
   }
 
   // This field specifies trust domains used for validating incoming X.509-SVID(s).
-  repeated TrustDomain trust_domains = 1;
+  repeated TrustDomain trust_domains = 1 [(validate.rules).repeated = {min_items: 1}];
 }

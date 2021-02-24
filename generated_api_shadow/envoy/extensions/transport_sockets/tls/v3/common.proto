@@ -372,8 +372,9 @@ message CertificateValidationContext {
       [(validate.rules).enum = {defined_only: true}];
 
   // The configuration of an extension specific certificate validator.
-  // If specified, the usage of all the values above depends on the custom validator. Otherwise, the default validator is used.
-  // If you do not want custom validation algorithm, then there is no need to set this field.
+  // If specified, all validation is done by the specified validator,
+  // and the behavior of all other validation settings is defined by the specified validator (and may be entirely ignored, unused, and unvalidated).
+  // Refer to the documentation for the specified validator. If you do not want a custom validation algorithm, do not set this field.
   // The following names are available here:
   //
   // .. _extension_envoy.tls.cert_validator.spiffe:

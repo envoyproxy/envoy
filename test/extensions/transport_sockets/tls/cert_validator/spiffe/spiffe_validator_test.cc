@@ -67,11 +67,6 @@ private:
   Event::TestRealTimeSystem time_system_;
 };
 
-TEST_F(TestSPIFFEValidator, NullConfigException) {
-  EXPECT_THROW_WITH_MESSAGE(initializeWithNullptr(), EnvoyException,
-                            "SPIFFE cert validator connot be initialized from null configuration");
-}
-
 TEST_F(TestSPIFFEValidator, InvalidCA) {
   EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -90,10 +85,16 @@ TEST_F(TestSPIFFEValidator, Constructor) {
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_domains: []
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert_with_crl.pem"
   )EOF")),
                             EnvoyException,
-                            "SPIFFE cert validator requires at least one trust domain");
+                            "Multiple trust bundles are given for one trust domain for hello.com");
 
   initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -126,6 +127,7 @@ typed_config:
 }
 
 TEST(SPIFFEValidator, TestExtractTrustDomain) {
+  EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("foo"));
   EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("abc.com/"));
   EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("abc.com/workload/"));
   EXPECT_EQ("", SPIFFEValidator::extractTrustDomain("spiffe://"));
@@ -156,7 +158,7 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 
   cert = readCertFromFile(TestEnvironment::substitute(
       // basicConstraints CA:False, keyUsage does not have keyCertSign and cRLSign
-      // should be considered valid (i.e. return 1)
+      // should be considered valid (i.e. return 1).
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
   EXPECT_TRUE(SPIFFEValidator::certificatePrecheck(cert.get()));
 }
@@ -170,24 +172,24 @@ TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
   initialize();
 
-  // no san
+  // No SAN
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
-  // non spiffe san
+  // Non-SPIFFE SAN
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/non_spiffe_san_cert.pem"));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
-  // spiffe san
+  // SPIFFE SAN
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
 
-  // trust bundle not provided
+  // Trust bundle not provided.
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
-  // trust bundle provided
+  // Trust bundle provided.
   validator().trustBundleStores().emplace("example.com", X509StorePtr(X509_STORE_new()));
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
@@ -196,7 +198,7 @@ TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
   initialize();
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      // basicConstraints: CA:True,
+      // basicConstraints: CA:True
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
 
   TestSslExtendedSocketInfo info;
@@ -218,14 +220,14 @@ typed_config:
 
   X509StorePtr ssl_ctx = X509_STORE_new();
 
-  // trust domain match so should be accepted
+  // Trust domain match so should be accepted.
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
-  // different trust domain so should be rejected
+  // Different trust domain so should be rejected.
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
 
@@ -233,7 +235,7 @@ typed_config:
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   EXPECT_FALSE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
-  // does not have san
+  // Does not have san.
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"));
 

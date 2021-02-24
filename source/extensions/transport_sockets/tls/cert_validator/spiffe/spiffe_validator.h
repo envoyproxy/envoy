@@ -54,7 +54,7 @@ public:
   std::string getCaFileName() const override { return ca_file_name_; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
-  // utility functions
+  // Utility functions
   X509_STORE* getTrustBundleStore(X509* leaf_cert);
   static std::string extractTrustDomain(const std::string& san);
   static bool certificatePrecheck(X509* leaf_cert);

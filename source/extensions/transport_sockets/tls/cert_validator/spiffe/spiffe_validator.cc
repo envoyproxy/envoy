@@ -25,6 +25,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -41,9 +42,7 @@ using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertVa
 SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats, TimeSource& time_source)
     : stats_(stats), time_source_(time_source) {
-  if (config == nullptr) {
-    throw EnvoyException("SPIFFE cert validator connot be initialized from null configuration");
-  }
+  ASSERT(config != nullptr);
 
   SPIFFEConfig message;
   Config::Utility::translateOpaqueConfig(config->customValidatorConfig().value().typed_config(),
@@ -51,12 +50,13 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
                                          ProtobufMessage::getStrictValidationVisitor(), message);
 
   auto size = message.trust_domains().size();
-  if (size == 0) {
-    throw EnvoyException("SPIFFE cert validator requires at least one trust domain");
-  }
-
   trust_bundle_stores_.reserve(size);
   for (auto& domain : message.trust_domains()) {
+    if (trust_bundle_stores_.find(domain.name()) != trust_bundle_stores_.end()) {
+      throw EnvoyException(absl::StrCat(
+          "Multiple trust bundles are given for one trust domain for ", domain.name()));
+    }
+
     auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
@@ -76,7 +76,7 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
         X509_up_ref(item->x509);
         ca_certs_.push_back(bssl::UniquePtr<X509>(item->x509));
         if (!ca_loaded) {
-          // TODO: with the current interface, we cannot return the multiple
+          // TODO: With the current interface, we cannot return the multiple
           // cert information on getCaCertInformation method.
           // So temporarily we return the first CA's info here.
           ca_loaded = true;
@@ -157,7 +157,7 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     return 0;
   }
 
-  // set the trust bundle's certificate store on the context, and do the verification
+  // Set the trust bundle's certificate store on the context, and do the verification.
   store_ctx->ctx = trust_bundle;
   auto ret = X509_verify_cert(store_ctx);
   if (ssl_extended_info) {
@@ -182,7 +182,7 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = Utility::generalNameAsString(general_name);
     trust_domain = SPIFFEValidator::extractTrustDomain(san);
-    // we can assume that valid SVID has only one san
+    // We can assume that valid SVID has only one san.
     break;
   }
 
@@ -195,7 +195,7 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
 }
 
 bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
-  // Check basic constrains and key usage
+  // Check basic constrains and key usage.
   // https://github.com/spiffe/spiffe/blob/master/standards/X509-SVID.md#52-leaf-validation
   auto ext = X509_get_extension_flags(leaf_cert);
   if (ext & EXFLAG_CA) {
@@ -208,22 +208,13 @@ bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
 
 std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   static const std::string prefix = "spiffe://";
-  size_t begin = 0;
-  for (; begin < san.size() && begin < prefix.size(); begin++) {
-    if (prefix[begin] != san[begin]) {
-      break;
-    }
-  }
-
-  if (begin != prefix.size()) {
+  if (!absl::StartsWith(san, prefix)) {
     return "";
   }
 
-  size_t end = begin;
-  for (; end < san.size(); end++) {
-    if (san[end] == '/') {
-      return san.substr(begin, end - begin);
-    }
+  auto pos = san.find('/', prefix.size());
+  if (pos != std::string::npos) {
+    return san.substr(prefix.size(), pos - prefix.size());
   }
   return "";
 }
@@ -241,7 +232,7 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
   if (ca_certs_.empty()) {
     return nullptr;
   }
-  // TODO(mathetake): with the current interface, we cannot pass the multiple cert information.
+  // TODO(mathetake): With the current interface, we cannot pass the multiple cert information.
   // So temporarily we return the first CA's info here.
   return Utility::certificateDetails(ca_certs_[0].get(), getCaFileName(), time_source_);
 };
@@ -253,7 +244,7 @@ public:
     return std::make_unique<SPIFFEValidator>(config, stats, time_source);
   }
 
-  absl::string_view name() override { return "envoy.tls.cert_validator.spiffe"; }
+  absl::string_view name() override { return CertValidatorNames::get().SPIFFE; }
 };
 
 REGISTER_FACTORY(SPIFFEValidatorFactory, CertValidatorFactory);
