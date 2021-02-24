@@ -260,6 +260,12 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
 
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("https", headers.getForwardedProtoValue());
+  // Given :scheme was not set, it will be set to X-Forwarded-Proto
+  EXPECT_EQ("https", headers.getSchemeValue());
+
+  // Make sure if x-forwarded-proto changes it doesn't cause problems.
+  headers.setForwardedProto("ftp");
+  EXPECT_EQ("https", headers.getSchemeValue());
 }
 
 TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
@@ -273,6 +279,41 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
 
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("http", headers.getForwardedProtoValue());
+  // Given :scheme was not set, it will be set to X-Forwarded-Proto
+  EXPECT_EQ("http", headers.getSchemeValue());
+}
+
+TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetScheme) {
+  TestScopedRuntime scoped_runtime;
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "foo"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("foo", headers.getForwardedProtoValue());
+  // Given :scheme was not set, but X-Forwarded-Proto is not a valid scheme,
+  // scheme will be set based on encryption level.
+  EXPECT_EQ("http", headers.getSchemeValue());
+}
+
+TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "https"}, {":scheme", "https"}};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
+  // Given :scheme was set, it will not be changed.
+  EXPECT_EQ("https", headers.getSchemeValue());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is

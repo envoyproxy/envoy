@@ -16,6 +16,7 @@ envoy_cc_mock(
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
+        "//source/common/common:callback_impl_lib",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:resources_lib",
