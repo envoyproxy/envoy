@@ -157,6 +157,10 @@ TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  // Adding a new foo resource to the watch shouldn't send Node.
+  expectSendMessage("foo", {"z", "x", "y"}, "");
+  auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_);
+  expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("foo", {}, "");
 }
 

@@ -163,8 +163,11 @@ message Node {
   // directly to the management server.
   google.protobuf.Struct metadata = 3;
 
-  // Map from xDS resource type URL to dynamic context parameters. These may
-  // vary at runtime (unlike other fields in this message).
+  // Map from xDS resource type URL to dynamic context parameters. These may vary at runtime (unlike
+  // other fields in this message). For example, the xDS client may have a shard identifier that
+  // changes during the lifetime of the xDS client. In Envoy, this would be achieved by updating the
+  // dynamic context on the Server::Instance's LocalInfo context provider. The shard ID dynamic
+  // parameter then appears in this field during future discovery requests.
   map<string, xds.core.v3.ContextParams> dynamic_parameters = 12;
 
   // Locality specifying where the Envoy instance is running.

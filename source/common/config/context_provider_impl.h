@@ -3,6 +3,7 @@
 #include "envoy/config/context_provider.h"
 
 #include "common/common/callback_impl.h"
+#include "common/common/thread.h"
 #include "common/config/xds_context_params.h"
 
 namespace Envoy {
@@ -18,6 +19,7 @@ public:
   const xds::core::v3::ContextParams& nodeContext() const override { return node_context_; }
   const xds::core::v3::ContextParams&
   dynamicContext(absl::string_view resource_type_url) const override {
+    ASSERT(Thread::MainThread::isMainThread());
     auto it = dynamic_context_.find(resource_type_url);
     if (it != dynamic_context_.end()) {
       return it->second;
@@ -26,16 +28,19 @@ public:
   };
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value) override {
+    ASSERT(Thread::MainThread::isMainThread());
     (*dynamic_context_[resource_type_url].mutable_params())[key] = value;
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   void unsetDynamicContextParam(absl::string_view resource_type_url,
                                 absl::string_view key) override {
+    ASSERT(Thread::MainThread::isMainThread());
     dynamic_context_[resource_type_url].mutable_params()->erase(key);
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   Common::CallbackHandle*
   addDynamicContextUpdateCallback(UpdateNotificationCb callback) const override {
+    ASSERT(Thread::MainThread::isMainThread());
     return update_cb_helper_.add(callback);
   };
 
