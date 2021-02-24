@@ -116,7 +116,8 @@ public:
   }
 
   void setRequestedServerName(absl::string_view server_name) override {
-    server_name_ = std::string(server_name);
+    // Always keep the server_name_ as lower case.
+    server_name_ = absl::AsciiStrToLower(server_name);
   }
   absl::string_view requestedServerName() const override { return server_name_; }
 

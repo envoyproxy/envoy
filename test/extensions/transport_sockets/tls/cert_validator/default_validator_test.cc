@@ -19,6 +19,7 @@ namespace Tls {
 TEST(DefaultCertValidatorTest, TestDnsNameMatching) {
   EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("lyft.com", "lyft.com"));
   EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("a.lyft.com", "*.lyft.com"));
+  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
   EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
   EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("foo.test.com", "*.lyft.com"));
   EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", "*.lyft.com"));
