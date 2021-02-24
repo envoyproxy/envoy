@@ -1225,7 +1225,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
     return;
   }
 
-  // Set the header timeout before doing used-time adjustements.
+  // Set the header timeout before doing used-time adjustments.
   // This may result in the upstream not getting the latest results, but also
   // avoids every request getting a custom timeout based on envoy think time.
   if (route->usingNewTimeouts() && Grpc::Common::isGrpcRequestHeaders(*request_headers_)) {
