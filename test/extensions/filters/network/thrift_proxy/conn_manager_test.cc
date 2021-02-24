@@ -1218,6 +1218,8 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
       .Times(5);
 
   auto mock_new_connection = [this]() {
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
     filter_ = nullptr;
 
     filter_callbacks_.connection_.read_enabled_ = true;
