@@ -7,6 +7,7 @@
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
+#include "source/common/router/_virtual_includes/delegating_route_lib/common/router/delegating_route_impl.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -212,6 +213,33 @@ public:
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
+
+  // For testing Router::DelegatingRoute
+  class ExampleDelegatingRouteEntryDerived : public Router::DelegatingRouteEntry {
+  public:
+    ExampleDelegatingRouteEntryDerived(const Router::RouteEntry* base_route_entry, std::string& cluster_name_override)
+      : DelegatingRouteEntry(base_route_entry),
+        custom_cluster_name_(cluster_name_override)
+    {}
+
+    const std::string& clusterName() const override {
+      return custom_cluster_name_;
+    }
+
+  private:
+    std::string& custom_cluster_name_;
+  };
+
+  class ExampleDelegatingRouteDerived : public Router::DelegatingRoute {
+  public:
+    ExampleDelegatingRouteDerived(Router::RouteConstSharedPtr base_route, std::string& cluster_name_override)
+      : DelegatingRoute(base_route),
+        custom_route_entry_(new ExampleDelegatingRouteEntryDerived(base_route->routeEntry(), cluster_name_override))
+    {}
+
+  private:
+    ExampleDelegatingRouteEntryDerived* custom_route_entry_;
+  };
 };
 
 } // namespace Http

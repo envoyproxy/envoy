@@ -19,6 +19,11 @@ const RouteSpecificFilterConfig* DelegatingRoute::perFilterConfig(const std::str
 }
 
 // Router:DelegatingRouteEntry
+void DelegatingRouteEntry::finalizeResponseHeaders(
+    Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_entry_->finalizeResponseHeaders(headers, stream_info);
+}
+
 const std::string& DelegatingRouteEntry::clusterName() const {
   return base_route_entry_->clusterName();
 }

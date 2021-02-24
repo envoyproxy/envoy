@@ -29,8 +29,13 @@ private:
 
 class DelegatingRouteEntry : public Router::RouteEntry {
 public:
-  DelegatingRouteEntry(Router::RouteEntry* route_entry) : base_route_entry_(route_entry) {}
+  DelegatingRouteEntry(const Router::RouteEntry* route_entry) : base_route_entry_(route_entry) {}
 
+  // ResponseEntry virtual method
+  void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const StreamInfo::StreamInfo& stream_info) const override;
+
+  // RouteEntry virtual methods
   const std::string& clusterName() const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
@@ -70,7 +75,7 @@ public:
   const std::string& routeName() const override;
 
 private:
-  Router::RouteEntry* base_route_entry_;
+  const Router::RouteEntry* base_route_entry_;
 };
 
 } // namespace Router
