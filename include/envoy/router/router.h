@@ -63,6 +63,7 @@ public:
    * called now. This is useful if you want to obtain response header transforms at request time and
    * process them later. Note: do not use unless you are sure that there will be no route
    * modifications later in the filter chain.
+   * @param stream_info holds additional information about the request.
    */
   virtual Http::HeaderTransforms
   responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const PURE;

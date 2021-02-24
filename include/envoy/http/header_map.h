@@ -50,7 +50,7 @@ public:
   LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
     ASSERT(valid());
   }
-  LowerCaseString& operator=(LowerCaseString&& rhs) {
+  LowerCaseString& operator=(LowerCaseString&& rhs) noexcept {
     string_ = std::move(rhs.string_);
     ASSERT(valid());
     return *this;
@@ -73,8 +73,8 @@ public:
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
   bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
-  friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& bar) {
-    return os << bar.string_;
+  friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& lower_case_string) {
+    return os << lower_case_string.string_;
   }
 
 private:

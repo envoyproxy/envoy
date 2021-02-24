@@ -54,6 +54,7 @@ public:
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
    * modifying an existing HeaderMap.
+   * @param stream_info contains additional information about the request.
    */
   Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const;
 

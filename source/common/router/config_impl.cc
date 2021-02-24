@@ -622,7 +622,8 @@ RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& strea
         transforms,
         vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
   } else {
-    // Most specific mutations take precedence.
+    // Most specific mutations (route-level) take precedence by being applied
+    // last: if a header is specified at all levels, the last one applied wins.
     mergeTransforms(
         transforms,
         vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
