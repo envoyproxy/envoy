@@ -50,6 +50,8 @@ envoy_cc_library(
     deps = [
         ":xds_context_params_lib",
         "//include/envoy/config:context_provider_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 

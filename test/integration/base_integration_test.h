@@ -126,6 +126,9 @@ public:
 
   std::string listener_access_log_name_;
 
+  // Last node received on an xDS stream from the server.
+  envoy::config::core::v3::Node last_node_;
+
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();
   void createXdsConnection();

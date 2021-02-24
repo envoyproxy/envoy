@@ -102,7 +102,7 @@ public:
   Router::Context& routerContext() override { return router_context_; }
   ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
+  LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

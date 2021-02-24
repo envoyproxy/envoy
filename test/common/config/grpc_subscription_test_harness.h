@@ -185,12 +185,12 @@ public:
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{"cluster_name"};
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   GrpcMuxImplSharedPtr mux_;
   GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
 };

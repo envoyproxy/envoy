@@ -269,7 +269,7 @@ public:
   Router::Context& routerContext() override { return router_context_; }
   ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
+  LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
 

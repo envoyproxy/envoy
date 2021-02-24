@@ -37,6 +37,7 @@ public:
                  Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
+  ~NewGrpcMuxImpl() override { dynamic_update_callback_handle_->remove(); }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
@@ -137,6 +138,9 @@ private:
   // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
 
+  // Invoked when dynamic context parameters change for a resource type.
+  void onDynamicContextUpdate(absl::string_view resource_type_url);
+
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for
   // description of how it interacts with pause() and resume().
@@ -154,7 +158,7 @@ private:
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
-
+  Common::CallbackHandle* dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 
