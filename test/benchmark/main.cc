@@ -22,6 +22,9 @@ static bool skip_expensive_benchmarks = false;
 // TODO(pgenera): convert this to abseil/flags/ when benchmark also adopts abseil.
 int main(int argc, char** argv) {
 
+  // if the `--help` flag isn't considered separately, it runs "benchmark --help"
+  // and the help output doesn't contains details about custom defined flags
+  // like `--skip_expensive_benchmarks`, `--runtime_feature`, etc
   bool contains_help_flag = false;
 
   for (int i = 1; i < argc; ++i) {
