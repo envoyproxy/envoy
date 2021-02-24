@@ -750,8 +750,10 @@ TEST_F(Http1ServerConnectionImplTest, Http10AbsoluteNoOp) {
 TEST_F(Http1ServerConnectionImplTest, Http10Absolute) {
   initialize();
 
-  TestRequestHeaderMapImpl expected_headers{
-      {":authority", "www.somewhere.com"}, {":path", "/foobar"}, {":method", "GET"}};
+  TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                            {":scheme", "http"},
+                                            {":path", "/foobar"},
+                                            {":method", "GET"}};
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com/foobar HTTP/1.0\r\n\r\n");
   expectHeadersTest(Protocol::Http10, true, buffer, expected_headers);
 }
@@ -785,8 +787,10 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
 
   // Now send an HTTP/1.1 request and make sure the protocol is tracked correctly.
   {
-    TestRequestHeaderMapImpl expected_headers{
-        {":authority", "www.somewhere.com"}, {":path", "/foobar"}, {":method", "GET"}};
+    TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                              {":scheme", "http"},
+                                              {":path", "/foobar"},
+                                              {":method", "GET"}};
     Buffer::OwnedImpl buffer("GET /foobar HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
 
     Http::ResponseEncoder* response_encoder = nullptr;
@@ -806,7 +810,7 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath1) {
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{
-      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nHost: bah\r\n\r\n");
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
@@ -814,8 +818,10 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath1) {
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
   initialize();
 
-  TestRequestHeaderMapImpl expected_headers{
-      {":authority", "www.somewhere.com"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                            {":scheme", "http"},
+                                            {":path", "/foo/bar"},
+                                            {":method", "GET"}};
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com/foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
@@ -823,10 +829,23 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathWithPort) {
   initialize();
 
-  TestRequestHeaderMapImpl expected_headers{
-      {":authority", "www.somewhere.com:4532"}, {":path", "/foo/bar"}, {":method", "GET"}};
+  TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com:4532"},
+                                            {":scheme", "http"},
+                                            {":path", "/foo/bar"},
+                                            {":method", "GET"}};
   Buffer::OwnedImpl buffer(
       "GET http://www.somewhere.com:4532/foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathWithHttps) {
+  initialize();
+
+  TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                            {":scheme", "https"},
+                                            {":path", "/foo/bar"},
+                                            {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET https://www.somewhere.com/foo/bar HTTP/1.1\r\nHost: bah\r\n\r\n");
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
 
@@ -876,7 +895,7 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{
-      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
@@ -1627,7 +1646,7 @@ TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{
-      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
   Buffer::OwnedImpl buffer(
       "GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: "
       "Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: token64\r\nHost: bah\r\n\r\n");
@@ -1638,6 +1657,7 @@ TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2cClose) {
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                            {":scheme", "http"},
                                             {":path", "/"},
                                             {":method", "GET"},
                                             {"connection", "Close"}};
@@ -1651,6 +1671,7 @@ TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2cCloseEtc) {
   initialize();
 
   TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                            {":scheme", "http"},
                                             {":path", "/"},
                                             {":method", "GET"},
                                             {"connection", "Close"}};

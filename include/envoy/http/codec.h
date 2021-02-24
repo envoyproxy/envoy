@@ -410,6 +410,10 @@ struct Http1Settings {
   // - if true, the HTTP/1.1 connection is left open (where possible)
   // - if false, the HTTP/1.1 connection is terminated
   bool stream_error_on_invalid_http_message_{false};
+
+  // True if this is an edge Envoy (using downstream address, no trusted hops)
+  // and https:// URLs should be rejected over unencrypted connections.
+  bool validate_scheme_{false};
 };
 
 /**

@@ -46,6 +46,8 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
   const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
   const absl::string_view ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
+  const absl::string_view HttpsInPlaintext = "http1.https_url_on_plaintext_connection";
+  const absl::string_view InvalidScheme = "http1.invalid_scheme";
 };
 
 struct Http1HeaderTypesValues {
@@ -1014,6 +1016,22 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int 
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
   headers.setHost(absolute_url.hostAndPort());
+  // Add the scheme and validate to ensure no https://
+  // requests are accepted over unencrypted connections by front-line Envoys.
+  if (!is_connect &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+    headers.setScheme(absolute_url.scheme());
+    if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
+      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
+      return codecProtocolError("http/1.1 protocol error: invalid scheme");
+    }
+    if (codec_settings_.validate_scheme_ &&
+        absolute_url.scheme() == Headers::get().SchemeValues.Https && !connection().ssl()) {
+      error_code_ = Http::Code::Forbidden;
+      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpsInPlaintext));
+      return codecProtocolError("http/1.1 protocol error: https in the clear");
+    }
+  }
 
   if (!absolute_url.pathAndQueryParams().empty()) {
     headers.setPath(absolute_url.pathAndQueryParams());

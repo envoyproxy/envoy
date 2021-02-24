@@ -174,6 +174,10 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
+bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
+  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
+}
+
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
                                     header_value.size()) != 0;
