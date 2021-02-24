@@ -96,7 +96,7 @@ message VmConfig {
 
   // Specifies environment variables to be injected to this VM which will be available through
   // WASI's `environ_get` and `environ_get_sizes` system calls. Note that these functions are mostly implicitly
-  // called in your language's std libs, so you do not need to call them directly and you can access to env
+  // called in your language's standard library, so you do not need to call them directly and you can access to env
   // vars just like when you do on native platforms.
   EnvironmentVariables environment_variables = 7;
 }
@@ -106,7 +106,7 @@ message EnvironmentVariables {
   // variables, then that key-value pair will be injected. Note that if a key does not exist, it will be ignored.
   repeated string host_env_keys = 1;
 
-  // Explicitly given key-value paris to be injected to this VM in the form of "KEY=VALUE".
+  // Explicitly given key-value pairs to be injected to this VM in the form of "KEY=VALUE".
   map<string, string> key_values = 2;
 }
 
