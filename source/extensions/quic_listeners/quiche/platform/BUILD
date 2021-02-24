@@ -156,17 +156,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = [
-        "quic_cert_utils_impl.cc",
         "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
     ],
     hdrs = [
-        "quic_cert_utils_impl.h",
         "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_pcc_sender_impl.h",
-        "quic_string_utils_impl.h",
     ],
     external_deps = [
         "quiche_quic_platform_base",
@@ -251,10 +248,8 @@ envoy_cc_library(
         "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
         "quiche_map_util_impl.h",
-        "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
-        "quiche_unordered_containers_impl.h",
     ],
     external_deps = [
         "abseil_hash",
@@ -275,7 +270,6 @@ envoy_cc_library(
         "spdy_containers_impl.h",
         "spdy_estimate_memory_usage_impl.h",
         "spdy_logging_impl.h",
-        "spdy_macros_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
