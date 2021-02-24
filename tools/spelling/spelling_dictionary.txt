@@ -37,6 +37,7 @@ Preconnecting
 STATNAME
 SkyWalking
 TIDs
+WASI
 ceil
 CCM
 CHACHA
@@ -116,6 +117,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+guarddog
 GC
 GCC
 GCE
@@ -188,6 +190,7 @@ MD
 MERCHANTABILITY
 MGET
 MQ
+MSDN
 MSET
 MSVC
 MTLS
@@ -201,6 +204,7 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NLOHMANN
 NOAUTH
 NOCHECKRESP
 NODELAY
@@ -447,6 +451,7 @@ bools
 boringssl
 borks
 broadcasted
+brotli
 buf
 buflen
 bugprone
@@ -551,6 +556,7 @@ deflater
 deletable
 deleter
 delim
+denylist
 deque
 deprecations
 dereference
@@ -597,6 +603,7 @@ enqueued
 enqueues
 enum
 enums
+environ
 epoll
 errno
 etag
@@ -1076,6 +1083,7 @@ src
 ssize
 stackdriver
 stacktrace
+starttls
 startup
 stateful
 statsd

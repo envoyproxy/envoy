@@ -46,8 +46,7 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
 
   case ResetHeaderFormat::UnixTimestamp:
     if (absl::SimpleAtoi(header_value, &num_seconds)) {
-      const auto time_now = time_source.systemTime().time_since_epoch();
-      const uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(time_now).count();
+      const uint64_t timestamp = DateUtil::nowToSeconds(time_source);
 
       if (num_seconds < timestamp) {
         return absl::nullopt;

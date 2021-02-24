@@ -8,6 +8,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -52,6 +53,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
@@ -89,10 +91,11 @@ class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory,
-                  std::chrono::milliseconds transport_socket_connect_timeout)
+                  std::chrono::milliseconds transport_socket_connect_timeout,
+                  absl::string_view name)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)),
-        transport_socket_connect_timeout_(transport_socket_connect_timeout) {}
+        transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -112,11 +115,14 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
+  absl::string_view name() const override { return name_; }
+
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
+  const std::string name_;
 };
 
 /**
@@ -132,6 +138,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
   bool healthCheckFailed() override;
