@@ -84,7 +84,7 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  bool open();
+  void open();
   void createFlushStructures();
 
   // return default flags set which used by open

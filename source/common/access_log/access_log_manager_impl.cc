@@ -59,16 +59,12 @@ Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
   return default_flags;
 }
 
-bool AccessLogFileImpl::open() {
+void AccessLogFileImpl::open() {
   const Api::IoCallBoolResult result = file_->open(defaultFlags());
   if (!result.rc_) {
-    /*
-    ENVOY_LOG(debug,
-        "unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails());
-        */
-    return false;
+    throw EnvoyException(
+        fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));
   }
-  return true;
 }
 
 void AccessLogFileImpl::reopen() { reopen_file_ = true; }
@@ -151,21 +147,19 @@ void AccessLogFileImpl::flushThreadFunc() {
 
     // if we failed to open file before, then simply ignore
     if (file_->isOpen()) {
-      bool open_success = true;
-      if (reopen_file_) {
-        reopen_file_ = false;
-        const Api::IoCallBoolResult result = file_->close();
-        ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                        result.err_->getErrorDetails()));
-        open_success = open();
-      }
-      if (open_success) {
+      try {
+        if (reopen_file_) {
+          reopen_file_ = false;
+          const Api::IoCallBoolResult result = file_->close();
+          ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
+                                         result.err_->getErrorDetails()));
+          open();
+        }
+
         doWrite(about_to_write_buffer_);
-      }
-      else {
+      } catch (const EnvoyException&) {
         stats_.reopen_failed_.inc();
       }
- 
     }
   }
 }
