@@ -1003,7 +1003,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
                "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
                "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
                "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
-               "  current_stream_id_: null, Number of active streams: 0 Dumping 0 Active Streams:\n"
+               "  Number of active streams: 0, current_stream_id_: null Dumping 0 Active Streams:\n"
                "  current_slice_: null\n"));
 }
 
@@ -1036,7 +1036,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     EXPECT_THAT(
         ostream.contents(),
         HasSubstr(
-            "current_stream_id_: null, Number of active streams: 1 Dumping 1 Active Streams:\n"
+            "Number of active streams: 1, current_stream_id_: null Dumping 1 Active Streams:\n"
             "  stream: \n"
             "    ConnectionImpl::StreamImpl"));
     EXPECT_THAT(ostream.contents(),
@@ -1062,7 +1062,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     EXPECT_THAT(
         ostream.contents(),
         HasSubstr(
-            "current_stream_id_: null, Number of active streams: 1 Dumping 1 Active Streams:\n"
+            "Number of active streams: 1, current_stream_id_: null Dumping 1 Active Streams:\n"
             "  stream: \n"
             "    ConnectionImpl::StreamImpl"));
     EXPECT_THAT(ostream.contents(),

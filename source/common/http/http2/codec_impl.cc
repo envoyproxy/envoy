@@ -1438,13 +1438,8 @@ void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
 
   // Try to dump details for the current stream.
   // If none, dump a subset of our active streams.
-  os << spaces << "current_stream_id_: ";
-  if (current_stream_id_.has_value()) {
-    os << current_stream_id_.value() << ",";
-  } else {
-    os << "null,";
-  }
-  os << " Number of active streams: " << active_streams_.size();
+  os << spaces << "Number of active streams: " << active_streams_.size()
+     << DUMP_OPTIONAL_MEMBER(current_stream_id_);
 
   if (current_stream_id_.has_value()) {
     os << " Dumping current stream:\n";
