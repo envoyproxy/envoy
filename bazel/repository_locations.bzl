@@ -87,7 +87,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-11-04",
+        release_date = "2021-01-25",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -760,7 +760,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.transport_sockets.quic", "envoy.listener.quic"],
-        release_date = "2020-11-10",
+        release_date = "2021-02-24",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
