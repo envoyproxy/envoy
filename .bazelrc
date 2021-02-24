@@ -325,12 +325,6 @@ build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
 build:windows --cxxopt="/std:c++17"
 
-# TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
-# See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
-build:windows --copt="-DCARES_STATICLIB"
-build:windows --copt="-DNGHTTP2_STATICLIB"
-build:windows --copt="-DCURL_STATICLIB"
-
 # Override any clang preference if building msvc-cl
 # Drop the determinism feature (-DDATE etc are a no-op in msvc-cl)
 build:msvc-cl --action_env=USE_CLANG_CL=""

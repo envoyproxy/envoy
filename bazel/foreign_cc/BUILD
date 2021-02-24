@@ -139,7 +139,6 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     defines = ["CURL_STATICLIB"],
-    generate_crosstool_file = True,
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["libcurl.lib"],
