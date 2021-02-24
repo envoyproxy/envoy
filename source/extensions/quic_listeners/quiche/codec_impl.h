@@ -31,9 +31,7 @@ public:
   // stream send buffer.
   bool wantsToWrite() override;
 
-  void runWatermarkCallbacksForEachStream(
-      quic::QuicSmallMap<quic::QuicStreamId, std::unique_ptr<quic::QuicStream>, 10>& stream_map,
-      bool high_watermark);
+  static void runWatermarkCallbacksForStream(quic::QuicStream* quic_stream, bool high_watermark);
 
 protected:
   QuicFilterManagerConnectionImpl& quic_session_;

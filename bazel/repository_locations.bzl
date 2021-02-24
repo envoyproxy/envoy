@@ -81,9 +81,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-88.0.4324.96
-        version = "fbbf8781456c38a90f674d4771126ed39132855b",
-        sha256 = "76a571c1c3f6f6618d538384319ccc2b7ba9f7ae3f60087ba67894faba11a6b6",
+        # chromium-90.0.4395.0(linux/dev)
+        version = "b049eae83d25977661556dcd913b35fbafb3a93a",
+        sha256 = "d78f7b11b8665feea1b6def8e6f235ad8671db8de950f5429f1bf2b3503b3894",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
@@ -754,9 +754,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ecc28c0d7428f3323ea26eb1ddb98a5e06b23dea.tar.gz
-        version = "ecc28c0d7428f3323ea26eb1ddb98a5e06b23dea",
-        sha256 = "52680dea984dbe899c27176155578b97276e1f1516b7c3a63fb16ba593061859",
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2475cc8246d3e77e391347ae319f0ab9db132fb4.tar.gz
+        version = "6fec8e97a1ab1a945b86bd6b7252666294448ddb",
+        sha256 = "3045254cbf03c29ee7166fb01b1072a463c58df405669b8573677d4638869290",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.transport_sockets.quic", "envoy.listener.quic"],

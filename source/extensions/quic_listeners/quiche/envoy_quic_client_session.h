@@ -62,7 +62,7 @@ public:
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
-  using quic::QuicSpdyClientSession::stream_map;
+  using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
   // quic::QuicSpdyClientSession

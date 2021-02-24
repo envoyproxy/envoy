@@ -44,7 +44,6 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -103,6 +102,9 @@ public:
 
   void TearDown() override {
     if (quic_connection_.connected()) {
+      EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _)).Times(testing::AtMost(1u));
+      EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, quic::QUIC_STREAM_NO_ERROR))
+          .Times(testing::AtMost(1u));
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
   }
@@ -275,19 +277,28 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
 
 TEST_P(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  }
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithReset) {
+TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
+  quic::SetVerbosityLogThreshold(1);
   receiveRequest(request_body_, false, request_body_.size() * 2);
   // Write response headers with FIN before finish receiving request.
   quic_stream_->encodeHeaders(response_headers_, true);
-  // Resetting the stream now means stop reading and sending QUIC_STREAM_NO_ERROR.
+  // Resetting the stream now means stop reading and sending QUIC_STREAM_NO_ERROR or STOP_SENDING.
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  } else {
+    EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  }
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
-  EXPECT_TRUE(quic_stream_->rst_sent());
   EXPECT_TRUE(quic_stream_->reading_stopped());
   EXPECT_EQ(quic::QUIC_STREAM_NO_ERROR, quic_stream_->stream_error());
 }
@@ -507,7 +518,10 @@ TEST_P(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
                                              32 * 1024);
   quic_stream_->OnWindowUpdateFrame(window_update1);
-
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  }
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     spdy::SpdyHeaderBlock spdy_headers;
@@ -543,7 +557,10 @@ TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   size_t offset = receiveRequest(request_body_, false, request_body_.size() * 2);
 
   quic_stream_->OnWindowUpdateFrame(window_update1);
-
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  }
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     spdy::SpdyHeaderBlock spdy_trailers;

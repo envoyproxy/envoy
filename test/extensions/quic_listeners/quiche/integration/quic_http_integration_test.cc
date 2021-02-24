@@ -104,7 +104,6 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
@@ -526,7 +525,8 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
       GetParam().second == QuicVersionType::GquicQuicCrypto
           ? "QUIC_PROOF_INVALID with details: Proof invalid: X509_verify_cert: certificate "
             "verification error at depth 0: ok"
-          : "QUIC_HANDSHAKE_FAILED with details: TLS handshake failure (ENCRYPTION_HANDSHAKE) 46: "
+          : "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
+            "(ENCRYPTION_HANDSHAKE) 46: "
             "certificate unknown";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }

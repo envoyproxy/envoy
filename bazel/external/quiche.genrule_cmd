@@ -40,7 +40,14 @@ cat <<EOF >sed_commands
 /^#include/ s!net/tools/epoll_server/platform/impl!test/extensions/quic_listeners/quiche/platform/!
 
 # Strip "net/third_party" from include directives to other QUICHE files.
-/^#include/ s!net/third_party/quiche/src/!quiche/!
+/^#include/ s!"quic/!"quiche/quic/!
+/^#include/ s!"spdy/!"quiche/spdy/!
+/^#include/ s!"http2/!"quiche/http2/!
+/^#include/ s!"common/!"quiche/common/!
+/^#include/ s!"epoll_server/!"quiche/epoll_server/!
+
+/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"extensions/quic_listeners/quiche/platform/quiche_logging_impl.h!
+/^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!
 
 # Rewrite gmock & gtest includes.
 /^#include/ s!testing/gmock/include/gmock/!gmock/!
@@ -50,7 +57,7 @@ cat <<EOF >sed_commands
 /^#include/ s!third_party/boringssl/src/include/!!
 /^#include/ s!third_party/zlib/zlib!zlib!
 
-/^import/ s!cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!
+/^import/ s!quic/core/proto/cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!
 
 # Rewrite #pragma clang
 /^#pragma/ s!clang!GCC!
