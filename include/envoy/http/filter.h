@@ -164,6 +164,18 @@ enum class FilterMetadataStatus {
 };
 
 /**
+ * Return codes for onLocalReply filter invocations.
+ */
+enum class LocalErrorStatus {
+  // Continue sending the local reply after onLocalError has been sent to all filters.
+  Continue,
+
+  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
+  // informed rather than sending the local reply.
+  ContinueAndResetStream,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -596,6 +608,27 @@ public:
    * @param action the resulting match action
    */
   virtual void onMatchCallback(const Matcher::Action&) {}
+
+  struct LocalReplyData {
+    Http::Code code_;
+    absl::string_view details_;
+  };
+
+  /**
+   * Called after sendLocalReply is called, and before any local reply is
+   * serialized either to filters, or downstream.
+   *
+   * Note that in rare circumstances, onLocalReply may be called more than once
+   * for a given stream, because it is possible that a filter call
+   * sendLocalReply while processing the original local reply response.
+   *
+   * Filters implementing onLocalReply are responsible for never calling sendLocalReply
+   * from onLocalReply, as that has the potential for looping.
+   *
+   * @param data data associated with the sendLocalReply call.
+   * @param LocalErrorStatus the action to take after onLocalError completes.
+   */
+  virtual LocalErrorStatus onLocalReply(LocalReplyData&) { return LocalErrorStatus::Continue; }
 };
 
 /**

@@ -1589,6 +1589,7 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   upstream_request_->encodeHeaders(response_headers, true);
 
   // Upstream sends metadata.
+
   const Http::MetadataMap response_metadata_map = {{"resp_key1", "resp_value1"}};
   Http::MetadataMapPtr metadata_map_ptr =
       std::make_unique<Http::MetadataMap>(response_metadata_map);
@@ -1601,6 +1602,30 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+static std::string on_local_reply_filter = R"EOF(
+name: on-local-reply-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
+)EOF";
+
+TEST_P(Http2IntegrationTest, OnLocalReply) {
+  config_helper_.addFilter(on_local_reply_filter);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+  }
+  {
+    default_request_headers_.addCopy("reset", "yes");
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForReset();
+    ASSERT_FALSE(response->complete());
+  }
 }
 
 } // namespace Envoy

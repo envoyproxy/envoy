@@ -812,6 +812,18 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
+LocalErrorStatus FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  filter_manager_callbacks_.onLocalReply(data.code_);
+
+  LocalErrorStatus status = LocalErrorStatus::Continue;
+  for (auto entry : filters_) {
+    if (entry->onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
+      status = LocalErrorStatus::ContinueAndResetStream;
+    }
+  }
+  return status;
+}
+
 void FilterManager::sendLocalReply(
     bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -824,7 +836,13 @@ void FilterManager::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
 
-  filter_manager_callbacks_.onLocalReply(code);
+  StreamFilterBase::LocalReplyData data{code, details};
+  if (FilterManager::onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
+    ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
+                     details);
+    filter_manager_callbacks_.resetStream();
+    return;
+  }
 
   if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.

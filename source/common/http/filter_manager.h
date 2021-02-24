@@ -760,6 +760,7 @@ public:
   // Http::FilterChainFactoryCallbacks
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, false);
+    filters_.push_back(filter.get());
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
@@ -776,6 +777,7 @@ public:
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
     addStreamEncoderFilterWorker(filter, nullptr, false);
+    filters_.push_back(filter.get());
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
@@ -793,6 +795,8 @@ public:
   void addStreamFilter(StreamFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, true);
     addStreamEncoderFilterWorker(filter, nullptr, true);
+    StreamDecoderFilter* decoder_filter = filter.get();
+    filters_.push_back(decoder_filter);
   }
   void addStreamFilter(StreamFilterSharedPtr filter,
                        Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
@@ -909,6 +913,13 @@ public:
    * @param end_stream whether encoding is complete.
    */
   void maybeEndEncode(bool end_stream);
+
+  /**
+   * Called before local reply is made by the filter manager.
+   * @param data the data associated with the local reply.
+   * @param LocalErrorStatus the status from the filter chain.
+   */
+  LocalErrorStatus onLocalReply(StreamFilterBase::LocalReplyData& data);
 
   void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -1061,6 +1072,7 @@ private:
 
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+  std::list<StreamFilterBase*> filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
