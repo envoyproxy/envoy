@@ -7,8 +7,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-using envoy::extensions::filters::common::dependency::v3::Dependency;
-
 bool DependencyManager::validDecodeDependencies() {
   using DependencyTuple = std::tuple<const std::string&, int>;
   absl::flat_hash_set<DependencyTuple> satisfied;
