@@ -126,6 +126,7 @@ void resetEnvoyBugCountersForTest();
 
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE) ||                              \
     defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
+// This if condition represents any case where ASSERT()s are compiled in.
 
 #if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
@@ -169,13 +170,14 @@ void resetEnvoyBugCountersForTest();
 #else
 // Non-implementation of SLOW_ASSERTs when building only ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE.
 #define SLOW_ASSERT _NULL_ASSERT_IMPL
-#endif
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 #else
 #define ASSERT _NULL_ASSERT_IMPL
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
 #define SLOW_ASSERT _NULL_ASSERT_IMPL
-#endif // !defined(NDEBUG) || defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE) ||
+       // defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
 
 /**
  * Indicate a panic situation and exit.
