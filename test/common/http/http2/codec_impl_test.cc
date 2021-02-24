@@ -1111,7 +1111,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
 TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithoutAllocatingMemory) {
   initialize();
   // Replace the request_encoder to use the UpstreamToDownstream
-  // as it would if we weren't using as many mocks..
+  // as it would if we weren't using as many mocks.
   Router::MockUpstreamToDownstream upstream_to_downstream;
   request_encoder_ = &client_->newStream(upstream_to_downstream);
 
@@ -1144,6 +1144,11 @@ TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithout
   response_encoder_->encodeHeaders(response_headers, false);
 
   // Check contents for the corresponding downstream request.
+  EXPECT_THAT(
+      ostream.contents(),
+      HasSubstr("Number of active streams: 2, current_stream_id_: 1 Dumping current stream:\n"
+                "  stream: \n"
+                "    ConnectionImpl::StreamImpl"));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("Dumping corresponding downstream request for upstream stream 1:\n"));
 }
