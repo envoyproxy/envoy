@@ -109,13 +109,13 @@ void GradientController::enterMinRTTSamplingWindow() {
 }
 
 void GradientController::updateMinRTT() {
-  // Only update minRTT when it is in minRTT sampling window and 
+  // Only update minRTT when it is in minRTT sampling window and
   // number of samples is greater than or equal to the minRTTAggregateRequestCount.
   if (!inMinRTTSamplingWindow() ||
       hist_sample_count(latency_sample_hist_.get()) < config_.minRTTAggregateRequestCount()) {
     return;
   }
-  
+
   min_rtt_ = processLatencySamplesAndClear();
   stats_.min_rtt_msecs_.set(
       std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
@@ -216,7 +216,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   }
 
   synchronizer_.syncPoint("pre_minrtt_update");
-  if (sample_mutation_mtx_.TryLock()) {  
+  if (sample_mutation_mtx_.TryLock()) {
     updateMinRTT();
     sample_mutation_mtx_.Unlock();
   }
