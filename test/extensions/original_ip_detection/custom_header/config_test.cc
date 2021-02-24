@@ -14,7 +14,7 @@ namespace CustomHeader {
 
 TEST(CustomHeaderFactoryTest, Basic) {
   auto* factory = Registry::FactoryRegistry<Envoy::Http::OriginalIPDetectionFactory>::getFactory(
-      "envoy.original_ip_detection.custom_header");
+      "envoy.http.original_ip_detection.custom_header");
   ASSERT_NE(factory, nullptr);
 
   auto empty = factory->createEmptyConfigProto();

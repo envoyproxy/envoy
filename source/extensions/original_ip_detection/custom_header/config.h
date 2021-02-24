@@ -20,7 +20,7 @@ public:
         envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig>();
   }
 
-  std::string name() const override { return "envoy.original_ip_detection.custom_header"; }
+  std::string name() const override { return "envoy.http.original_ip_detection.custom_header"; }
 };
 
 } // namespace CustomHeader

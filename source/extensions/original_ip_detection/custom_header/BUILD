@@ -26,7 +26,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.original_ip_detection",
+    category = "envoy.http.original_ip_detection",
     security_posture = "robust_to_untrusted_downstream",
     # This extensions is core code.
     visibility = ["//visibility:public"],

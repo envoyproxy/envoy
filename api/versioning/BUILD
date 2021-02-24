@@ -127,7 +127,6 @@ proto_library(
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
         "//envoy/extensions/network/socket_interface/v3:pkg",
-        "//envoy/extensions/original_ip_detection/common/v3:pkg",
         "//envoy/extensions/original_ip_detection/custom_header/v3:pkg",
         "//envoy/extensions/original_ip_detection/xff/v3:pkg",
         "//envoy/extensions/rate_limit_descriptors/expr/v3:pkg",

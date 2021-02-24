@@ -19,7 +19,7 @@ public:
     return std::make_unique<envoy::extensions::original_ip_detection::xff::v3::XffConfig>();
   }
 
-  std::string name() const override { return "envoy.original_ip_detection.xff"; }
+  std::string name() const override { return "envoy.http.original_ip_detection.xff"; }
 };
 
 } // namespace Xff

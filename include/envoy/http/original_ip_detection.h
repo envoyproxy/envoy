@@ -78,7 +78,7 @@ public:
    */
   virtual OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message& config) const PURE;
 
-  std::string category() const override { return "envoy.original_ip_detection"; }
+  std::string category() const override { return "envoy.http.original_ip_detection"; }
 };
 
 using OriginalIPDetectionFactoryPtr = std::unique_ptr<OriginalIPDetectionFactory>;

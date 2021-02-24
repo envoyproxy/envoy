@@ -237,9 +237,9 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  reserved 27, 11;
+  reserved 27, 11, 19;
 
-  reserved "idle_timeout";
+  reserved "idle_timeout", "xff_num_trusted_hops";
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -425,13 +425,6 @@ message HttpConnectionManager {
   google.protobuf.BoolValue use_remote_address = 14
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
-  // The number of additional ingress proxy hops from the right side of the
-  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
-  // determining the origin client's IP address. The default is zero if this option
-  // is not specified. See the documentation for
-  // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
-  uint32 xff_num_trusted_hops = 19;
-
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
   // See the documentation for :ref:`config_http_conn_man_headers_x-envoy-internal` for more
@@ -607,7 +600,7 @@ message HttpConnectionManager {
   // Two available extensions are the :ref:`xff
   // extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` and the
   // :ref:`custom header extension <envoy_api_msg_extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig>`.
-  // [#extension-category: envoy.original_ip_detection]
+  // [#extension-category: envoy.http.original_ip_detection]
   repeated config.core.v4alpha.TypedExtensionConfig original_ip_detection_extensions = 43;
 }
 

@@ -26,7 +26,7 @@ TEST_F(OriginalIPDetectionIntegrationTest, HeaderBasedDetection) {
         config.set_header_name("x-cdn-detected-ip");
 
         auto* extension = hcm.add_original_ip_detection_extensions();
-        extension->set_name("envoy.original_ip_detection.custom_header");
+        extension->set_name("envoy.http.original_ip_detection.custom_header");
         extension->mutable_typed_config()->PackFrom(config);
 
         hcm.mutable_use_remote_address()->set_value(false);

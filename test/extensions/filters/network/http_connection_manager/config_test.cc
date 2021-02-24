@@ -1737,7 +1737,7 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   route_config:
     name: local_route
   original_ip_detection_extensions:
-  - name: envoy.original_ip_detection.custom_header
+  - name: envoy.http.original_ip_detection.custom_header
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig
       header_name: x-ip-header

@@ -18,14 +18,12 @@ protected:
   CustomHeaderTest() {
     envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
+    config.set_allow_trusted_address_checks(true);
 
-    auto* common_config = config.mutable_common_config();
-    common_config->set_allow_trusted_address_checks(true);
-    common_config->set_reject_request_if_detection_fails(true);
-    common_config->set_body_on_error("detection failed");
-    common_config->set_details_on_error("rejecting because detection failed");
-
-    auto* status_on_error = common_config->mutable_status_on_error();
+    auto* reject_options = config.mutable_reject_options();
+    reject_options->set_body_on_error("detection failed");
+    reject_options->set_details_on_error("rejecting because detection failed");
+    auto* status_on_error = reject_options->mutable_status_on_error();
     status_on_error->set_code(envoy::type::v3::StatusCode::Unauthorized);
 
     custom_header_extension_ = std::make_shared<CustomHeaderIPDetection>(config);

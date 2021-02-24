@@ -430,7 +430,13 @@ message HttpConnectionManager {
   // determining the origin client's IP address. The default is zero if this option
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
-  uint32 xff_num_trusted_hops = 19;
+  //
+  // .. note::
+  //    This field is deprecated and instead :ref:`original_ip_detection_extensions
+  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+  //    should be used to configure the :ref:`xff extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>`
+  //    to configure IP detection using the :ref:`config_http_conn_man_headers_x-forwarded-for` header.
+  uint32 hidden_envoy_deprecated_xff_num_trusted_hops = 19 [deprecated = true];
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
@@ -607,7 +613,7 @@ message HttpConnectionManager {
   // Two available extensions are the :ref:`xff
   // extension <envoy_api_msg_extensions.original_ip_detection.xff.v3.XffConfig>` and the
   // :ref:`custom header extension <envoy_api_msg_extensions.original_ip_detection.custom_header.v3.CustomHeaderConfig>`.
-  // [#extension-category: envoy.original_ip_detection]
+  // [#extension-category: envoy.http.original_ip_detection]
   repeated config.core.v4alpha.TypedExtensionConfig original_ip_detection_extensions = 43;
 }
 

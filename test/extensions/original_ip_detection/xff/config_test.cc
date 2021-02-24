@@ -14,7 +14,7 @@ namespace Xff {
 
 TEST(CustomHeaderFactoryTest, Basic) {
   auto* factory = Registry::FactoryRegistry<Envoy::Http::OriginalIPDetectionFactory>::getFactory(
-      "envoy.original_ip_detection.xff");
+      "envoy.http.original_ip_detection.xff");
   ASSERT_NE(factory, nullptr);
 
   auto empty = factory->createEmptyConfigProto();
