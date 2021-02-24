@@ -1222,6 +1222,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
 
     filter_callbacks_.connection_.read_enabled_ = true;
     filter_callbacks_.connection_.state_ = Network::Connection::State::Open;
+    filter_callbacks_.connection_.callbacks_.clear();
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
