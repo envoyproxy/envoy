@@ -697,17 +697,17 @@ class ClusterInfo {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
-    static const uint64_t HTTP2 = 0x1;
+    static constexpr uint64_t HTTP2 = 0x1;
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
-    static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
+    static constexpr uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
-    static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    static constexpr uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
     // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
     // If ALPN is attempted but not supported by the upstream HTTP/1.1 is used.
-    static const uint64_t USE_ALPN = 0x8;
+    static constexpr uint64_t USE_ALPN = 0x8;
     // Whether the upstream supports HTTP3. This is used when creating connection pools.
-    static const uint64_t HTTP3 = 0x10;
+    static constexpr uint64_t HTTP3 = 0x10;
   };
 
   virtual ~ClusterInfo() = default;

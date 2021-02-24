@@ -58,6 +58,7 @@ constexpr const char* runtime_features[] = {
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.always_apply_route_header_rules",
     "envoy.reloadable_features.activate_timers_next_event_loop",
+    "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
@@ -100,6 +101,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // TODO(#14890) flip once this has been validated in prod.
+    "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     // v2 is fatal-by-default.
     "envoy.reloadable_features.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
