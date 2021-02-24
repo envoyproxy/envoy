@@ -307,11 +307,10 @@ public:
       // it should be used as the final status.
       Status final_status = Status::JwtMissed;
       for (const auto& it : verifiers_) {
-        // If a Jwt is extracted from a location not specified by the required provider,
-        // the authenticator returns JwtUnknownIssuer. It should be treated the same as
-        // JwtMissed.
+        // Prefer to return non-JwtMissed and non-JwtUnknownIssuer error.
         Status child_status = context.getCompletionState(it.get()).status_;
-        if (child_status != Status::JwtMissed && child_status != Status::JwtUnknownIssuer) {
+        if ((child_status != Status::JwtMissed && child_status != Status::JwtUnknownIssuer) ||
+            final_status == Status::JwtMissed) {
           final_status = child_status;
         }
       }
