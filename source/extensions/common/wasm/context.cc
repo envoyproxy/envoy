@@ -450,13 +450,14 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     return {};
   }
-
+ 
   switch (part_token->second) {
   case PropertyToken::METADATA:
     if (info) {
       return CelProtoWrapper::CreateMessage(&info->dynamicMetadata(), arena);
     }
     break;
+
   case PropertyToken::REQUEST:
     if (info) {
       return CelValue::CreateMap(Protobuf::Arena::Create<Filters::Common::Expr::RequestWrapper>(
@@ -587,6 +588,7 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
       end = start + path.size();
     }
     auto part = path.substr(start, end - start);
+
     start = end + 1;
 
     if (first) {
@@ -1125,6 +1127,49 @@ WasmResult Context::setProperty(absl::string_view path, absl::string_view value)
   if (!stream_info) {
     return WasmResult::NotFound;
   }
+
+  bool first = true;
+  size_t start = 0;
+  std::string fist_key;
+  std::string second_key;
+
+  while (true) {
+    if (start >= path.size()) {
+      break;
+    }
+
+    size_t end = path.find('\0', start);
+    if (end == absl::string_view::npos) {
+      end = start + path.size();
+    }
+    auto part = path.substr(start, end - start);
+
+    start = end + 1;
+
+    if (first) {
+      // top-level identifier
+      first = false;
+      fist_key = part;
+    } else {
+      if (fist_key == "metadata") {
+        second_key = part;
+        ProtobufWkt::Struct metadata_val;
+        std::string json_string;
+        absl::StrAppend(&json_string, value);
+        try {
+          MessageUtil::loadFromJson(json_string, metadata_val);
+        } catch (EnvoyException& e) {
+          ENVOY_LOG(trace, "invalid JSON format");
+          return WasmResult::BadArgument;
+        }
+        stream_info->dynamicMetadata().mutable_filter_metadata()->clear();
+          stream_info->setDynamicMetadata(second_key, metadata_val);
+        
+        return WasmResult::Ok;
+      }
+    }
+  }
+
   std::string key;
   absl::StrAppend(&key, CelStateKeyPrefix, path);
   CelState* state;
@@ -1132,6 +1177,7 @@ WasmResult Context::setProperty(absl::string_view path, absl::string_view value)
     state = &stream_info->filterState()->getDataMutable<CelState>(key);
   } else {
     const auto& it = rootContext()->state_prototypes_.find(path);
+
     const CelStatePrototype& prototype =
         it == rootContext()->state_prototypes_.end()
             ? Filters::Common::Expr::DefaultCelStatePrototype::get()
