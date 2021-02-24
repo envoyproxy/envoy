@@ -62,7 +62,7 @@ public:
   void setAuthPluginName(const std::string& name) { auth_plugin_name_ = name; }
 
 private:
-  bool is_old_auth_switch_;
+  bool is_old_auth_switch_{false};
   std::string auth_plugin_data_;
   std::string auth_plugin_name_;
 };
@@ -86,10 +86,10 @@ public:
   const std::string& getInfo() const { return info_; }
 
 private:
-  uint64_t affected_rows_;
-  uint64_t last_insert_id_;
-  uint16_t status_;
-  uint16_t warnings_;
+  uint64_t affected_rows_{0};
+  uint64_t last_insert_id_{0};
+  uint16_t status_{0};
+  uint16_t warnings_{0};
   std::string info_;
   std::string session_state_changes_;
 };
@@ -111,8 +111,8 @@ public:
   const std::string& getErrorMessage() const { return error_message_; }
 
 private:
-  uint8_t marker_;
-  uint16_t error_code_;
+  uint8_t marker_{0};
+  uint16_t error_code_{0};
   std::string sql_state_;
   std::string error_message_;
 };
