@@ -223,9 +223,14 @@ size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
   if (ca_certs_.empty()) {
     return 0;
   }
-  // TODO(mathetake): with the current interface, we cannot pass the multiple cert information.
-  // So temporarily we return the first CA's info here.
-  return Utility::getDaysUntilExpiration(ca_certs_[0].get(), time_source_);
+  size_t ret = SIZE_MAX;
+  for (auto& cert : ca_certs_) {
+    size_t tmp = Utility::getDaysUntilExpiration(cert.get(), time_source_);
+    if (tmp < ret) {
+      ret = tmp;
+    }
+  }
+  return ret;
 }
 
 Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const {
