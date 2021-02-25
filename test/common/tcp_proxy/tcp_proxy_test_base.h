@@ -117,11 +117,20 @@ public:
     return config;
   }
 
-  virtual void
-  setup(uint32_t connections,
-        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) PURE;
+  void setup(uint32_t connections) { setup(connections, false, defaultConfig()); }
 
-  void setup(uint32_t connections) { setup(connections, defaultConfig()); }
+  void setup(uint32_t connections,
+             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
+    setup(connections, false, config);
+  }
+
+  void setup(uint32_t connections, bool set_redirect_records) {
+    setup(connections, set_redirect_records, defaultConfig());
+  }
+
+  virtual void
+  setup(uint32_t connections, bool set_redirect_records,
+        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) PURE;
 
   void raiseEventUpstreamConnected(uint32_t conn_index) {
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
@@ -174,6 +183,7 @@ public:
       new_connection_functions_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
+  std::string redirect_records_data_ = "some data";
 };
 
 } // namespace TcpProxy

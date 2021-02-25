@@ -46,6 +46,8 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
   const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
   const absl::string_view ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
+  const absl::string_view HttpsInPlaintext = "http1.https_url_on_plaintext_connection";
+  const absl::string_view InvalidScheme = "http1.invalid_scheme";
 };
 
 struct Http1HeaderTypesValues {
@@ -114,7 +116,8 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
-                                          absl::optional<uint64_t> status, bool end_stream) {
+                                          absl::optional<uint64_t> status, bool end_stream,
+                                          bool bodiless_request) {
   bool saw_content_length = false;
   headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
     absl::string_view key_to_use = header.key().getStringView();
@@ -163,8 +166,14 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
+      // Also do not add content length for requests which should not have a
+      // body, per https://tools.ietf.org/html/rfc7230#section-3.3.2
       if (!status || (*status >= 200 && *status != 204)) {
-        encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
+        if (!bodiless_request ||
+            !Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests")) {
+          encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
+        }
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
@@ -366,7 +375,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream);
+  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream, false);
 }
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
@@ -401,7 +410,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
-  encodeHeadersBase(headers, absl::nullopt, end_stream);
+  encodeHeadersBase(headers, absl::nullopt, end_stream,
+                    HeaderUtility::requestShouldHaveNoBody(headers));
   return okStatus();
 }
 
@@ -1006,6 +1016,22 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int 
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
   headers.setHost(absolute_url.hostAndPort());
+  // Add the scheme and validate to ensure no https://
+  // requests are accepted over unencrypted connections by front-line Envoys.
+  if (!is_connect &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+    headers.setScheme(absolute_url.scheme());
+    if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
+      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
+      return codecProtocolError("http/1.1 protocol error: invalid scheme");
+    }
+    if (codec_settings_.validate_scheme_ &&
+        absolute_url.scheme() == Headers::get().SchemeValues.Https && !connection().ssl()) {
+      error_code_ = Http::Code::Forbidden;
+      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpsInPlaintext));
+      return codecProtocolError("http/1.1 protocol error: https in the clear");
+    }
+  }
 
   if (!absolute_url.pathAndQueryParams().empty()) {
     headers.setPath(absolute_url.pathAndQueryParams());

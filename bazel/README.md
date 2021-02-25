@@ -174,6 +174,8 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
 
+    The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
+
     Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
     Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
     the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
@@ -561,7 +563,7 @@ bazel test -c dbg --config=docker-tsan //test/...
 Alternatively, you can build a local copy of TSAN-instrumented libc++. Follow the [quick start](#quick-start-bazel-build-for-developers) instruction to setup Clang+LLVM environment. Download LLVM sources from the [LLVM official site](https://github.com/llvm/llvm-project)
 
 ```
-curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-10.0.0.tar.gz" | tar zx
+curl -sSfL "https://github.com/llvm/llvm-project/archive/llvmorg-11.0.1.tar.gz" | tar zx
 
 ```
 
@@ -572,7 +574,7 @@ mkdir tsan
 pushd tsan
 
 cmake -GNinja -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx" -DLLVM_USE_LINKER=lld -DLLVM_USE_SANITIZER=Thread -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-10.0.0/llvm"
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX="/opt/libcxx_tsan" "../llvm-project-llvmorg-11.0.1/llvm"
 ninja install-cxx install-cxxabi
 
 rm -rf /opt/libcxx_tsan/include
@@ -860,7 +862,7 @@ also have 'buildifier' installed from the bazel distribution.
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
