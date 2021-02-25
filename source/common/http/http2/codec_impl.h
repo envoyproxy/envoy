@@ -431,7 +431,7 @@ protected:
   // NOTE: Always use non debug nullptr checks against the return value of this function. There are
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
-  const StreamImpl* getConstStream(int32_t stream_id) const;
+  const StreamImpl* getStream(int32_t stream_id) const;
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 

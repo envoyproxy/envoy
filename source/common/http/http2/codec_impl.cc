@@ -687,7 +687,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   return sendPendingFrames();
 }
 
-const ConnectionImpl::StreamImpl* ConnectionImpl::getConstStream(int32_t stream_id) const {
+const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) const {
   return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
 }
 
@@ -1443,7 +1443,7 @@ void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
 
   if (current_stream_id_.has_value()) {
     os << " Dumping current stream:\n";
-    const ConnectionImpl::StreamImpl* stream = getConstStream(current_stream_id_.value());
+    const ConnectionImpl::StreamImpl* stream = getStream(current_stream_id_.value());
     DUMP_DETAILS(stream);
   } else {
     os << " Dumping " << std::min<size_t>(25, active_streams_.size()) << " Active Streams:\n";
@@ -1471,11 +1471,13 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
      << current_stream_id_.value() << ":\n";
 
   const ClientStreamImpl* client_stream =
-      static_cast<const ClientStreamImpl*>(getConstStream(current_stream_id_.value()));
+      static_cast<const ClientStreamImpl*>(getStream(current_stream_id_.value()));
   if (client_stream) {
     client_stream->response_decoder_.dumpState(os, indent_level + 1);
   } else {
-    os << spaces << " Failed to get current stream.\n";
+    os << spaces
+       << " Failed to get the upstream stream with stream id: " << current_stream_id_.value()
+       << " Unable to dump downstream request.\n";
   }
 }
 
