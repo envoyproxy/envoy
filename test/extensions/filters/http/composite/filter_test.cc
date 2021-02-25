@@ -38,7 +38,7 @@ public:
 
   // Templated since MockStreamFilter and MockStreamEncoder filter doesn't share a mock base class.
   void doAllEncodingCallbacks() {
-    filter_.encode100Continue(default_response_headers_);
+    filter_.encode100ContinueHeaders(default_response_headers_);
 
     filter_.encodeHeaders(default_response_headers_, false);
 
