@@ -49,6 +49,10 @@ typed_config:
       value: ""
     vm_config:
       vm_id: "my_vm_id"
+      environment_variables: 
+        host_keys: ["NON_EXIST]
+        key_values:
+          KEY: VALUE
       runtime: "envoy.wasm.runtime.{}"
       code:
         local:

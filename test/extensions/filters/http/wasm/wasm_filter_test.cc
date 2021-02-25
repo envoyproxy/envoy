@@ -6,6 +6,7 @@
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/wasm_base.h"
+#include <string>
 
 using testing::Eq;
 using testing::InSequence;
@@ -64,10 +65,8 @@ public:
     };
   }
 
-  void setup(const std::string& code, std::string root_id = "", std::string vm_configuration = "") {
-    setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
-  }
-  void setupTest(std::string root_id = "", std::string vm_configuration = "") {
+  void setupTest(std::string root_id = "", std::string vm_configuration = "",
+                 envoy::extensions::wasm::v3::EnvironmentVariables envs = {}) {
     std::string code;
     if (std::get<0>(GetParam()) == "null") {
       code = "HttpWasmTestCpp";
@@ -82,8 +81,13 @@ public:
         code = TestEnvironment::readFileToStringForTest(basic_path + "_rust.wasm");
       }
     }
-    setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
+
+    setRootId(root_id);
+    setEnvs(envs);
+    setVmConfiguration(vm_configuration);
+    setupBase(std::get<0>(GetParam()), code, createContextFn());
   }
+
   void setupFilter() { setupFilterBase<TestFilter>(); }
 
   void setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& callbacks);
@@ -101,15 +105,28 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
 
 // Bad code in initial config.
 TEST_P(WasmHttpFilterTest, BadCode) {
-  setup("bad code");
+  setupBase(std::get<0>(GetParam()), "bad code", createContextFn());
   EXPECT_EQ(wasm_, nullptr);
 }
 
 // Script touching headers only, request that is headers only.
 TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
-  setupTest("", "headers");
+  // Setup env vars.
+  envoy::extensions::wasm::v3::EnvironmentVariables envs;
+  std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
+  std::string host_env_value = "foo";
+  std::string env_key = "KEY";
+  std::string env_value = "bar";
+  TestEnvironment::setEnvVar(host_env_key, host_env_value, 0);
+  envs.mutable_host_env_keys()->AddAllocated(&host_env_key);
+  (*envs.mutable_key_values())[env_key] = env_value;
+
+  setupTest("", "headers", envs);
   setupFilter();
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::trace, Eq(absl::StrCat(host_env_key, ": ", host_env_value, "\n",
+                                                         env_key, ": ", env_value))));
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));

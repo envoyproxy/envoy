@@ -1,5 +1,6 @@
 #include <cstdio>
 
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
 
@@ -10,6 +11,7 @@
 
 #include "extensions/common/wasm/wasm.h"
 
+#include "source/extensions/common/wasm/_virtual_includes/wasm_hdr/extensions/common/wasm/wasm.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -56,30 +58,28 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   void SetUp() override { clearCodeCacheForTesting(); }
 
-  void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root,
-                 std::string root_id = "", std::string vm_configuration = "",
-                 bool fail_open = false, std::string plugin_configuration = "",
-                 proxy_wasm::AllowedCapabilitiesMap allowed_capabilities = {}) {
+  void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root) {
     envoy::extensions::wasm::v3::VmConfig vm_config;
     vm_config.set_vm_id("vm_id");
     vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
     ProtobufWkt::StringValue vm_configuration_string;
-    vm_configuration_string.set_value(vm_configuration);
+    vm_configuration_string.set_value(vm_configuration_);
     vm_config.mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config.mutable_code()->mutable_local()->set_inline_bytes(code);
+    *vm_config.mutable_environment_variables() = envs_;
     envoy::extensions::wasm::v3::CapabilityRestrictionConfig cr_config;
-    Protobuf::Map<std::string, SanitizationConfig> allowed_capabilities_;
-    for (auto& capability : allowed_capabilities) {
+    Protobuf::Map<std::string, SanitizationConfig> allowed_capabilities;
+    for (auto& capability : allowed_capabilities_) {
       // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
-      allowed_capabilities_[capability.first] = SanitizationConfig();
+      allowed_capabilities[capability.first] = SanitizationConfig();
     }
-    *cr_config.mutable_allowed_capabilities() = allowed_capabilities_;
+    *cr_config.mutable_allowed_capabilities() = allowed_capabilities;
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
     auto name = "plugin_name";
     auto vm_id = "";
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        name, root_id, vm_id, runtime, plugin_configuration, fail_open,
+        name, root_id_, vm_id, runtime, plugin_configuration_, fail_open_,
         envoy::config::core::v3::TrafficDirection::INBOUND, local_info_, &listener_metadata_);
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
@@ -119,6 +119,25 @@ public:
   envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+
+  void setRootId(std::string root_id) { root_id_ = root_id; }
+  void setVmConfiguration(std::string vm_configuration) { vm_configuration_ = vm_configuration; }
+  void setPluginConfiguration(std::string plugin_configuration) {
+    plugin_configuration_ = plugin_configuration;
+  }
+  void setFailOpen(bool fail_open) { fail_open_ = fail_open; }
+  void setAllowedCapabilities(proxy_wasm::AllowedCapabilitiesMap allowed_capabilities) {
+    allowed_capabilities_ = allowed_capabilities;
+  }
+  void setEnvs(envoy::extensions::wasm::v3::EnvironmentVariables envs) { envs_ = envs; }
+
+private:
+  std::string root_id_ = "";
+  std::string vm_configuration_ = "";
+  bool fail_open_ = false;
+  std::string plugin_configuration_ = "";
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
+  envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {

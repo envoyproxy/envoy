@@ -37,12 +37,11 @@ public:
   WasmCommonContextTest() = default;
 
   void setup(const std::string& code, std::string root_id = "") {
-    setupBase(
-        GetParam(), code,
-        [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-          return new TestContext(wasm, plugin);
-        },
-        root_id);
+    setRootId(root_id);
+    setupBase(GetParam(), code,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new TestContext(wasm, plugin);
+              });
   }
   void setupContext() {
     context_ = std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_);
