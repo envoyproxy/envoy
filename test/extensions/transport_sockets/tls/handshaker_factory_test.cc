@@ -55,7 +55,7 @@ private:
 };
 
 // Example SslHandshakerFactoryImpl demonstrating special-case behavior; in this
-// case, using a processcontext to modify the SSL_CTX.
+// case, using a process context to modify the SSL_CTX.
 class HandshakerFactoryImplForTest
     : public Extensions::TransportSockets::Tls::HandshakerFactoryImpl {
   std::string name() const override { return "envoy.testonly_handshaker"; }
