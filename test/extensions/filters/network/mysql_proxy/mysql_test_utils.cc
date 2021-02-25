@@ -46,8 +46,18 @@ std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string u
 }
 
 std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, uint8_t seq_force) {
-  ClientLoginResponse* mysql_login_resp_encode;
-
+  ClientLoginResponse* mysql_login_resp_encode = nullptr;
+  auto encodeToString = [it, seq_force, &mysql_login_resp_encode]() {
+    ASSERT(mysql_login_resp_encode != nullptr);
+    uint8_t seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
+    if (seq_force > 0) {
+      seq = seq_force;
+    }
+    Buffer::OwnedImpl buffer;
+    mysql_login_resp_encode->encode(buffer);
+    BufferHelper::encodeHdr(buffer, seq);
+    return buffer.toString();
+  };
   switch (srv_resp) {
   case MYSQL_RESP_OK: {
     OkMessage ok{};
@@ -56,7 +66,7 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
     ok.setLastInsertId(MYSQL_SM_LAST_ID);
     ok.setServerStatus(MYSQL_SM_SERVER_OK);
     ok.setWarnings(MYSQL_SM_SERVER_WARNINGS);
-    break;
+    return encodeToString();
   }
   case MYSQL_RESP_ERR: {
     ErrMessage err{};
@@ -65,7 +75,7 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
     err.setSqlStateMarker('#');
     err.setSqlState(MySQLTestUtils::getSqlState());
     err.setErrorMessage(MySQLTestUtils::getErrorMessage());
-    break;
+    return encodeToString();
   }
   case MYSQL_RESP_AUTH_SWITCH: {
     AuthSwitchMessage auth_switch{};
@@ -73,30 +83,21 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
     auth_switch.setIsOldAuthSwitch(false);
     auth_switch.setAuthPluginData(MySQLTestUtils::getAuthPluginData20());
     auth_switch.setAuthPluginName(MySQLTestUtils::getAuthPluginName());
-    break;
+    return encodeToString();
   }
   case MYSQL_RESP_MORE: {
     AuthMoreMessage auth_more{};
     mysql_login_resp_encode = &auth_more;
     auth_more.setAuthMoreData(MySQLTestUtils::getAuthPluginData20());
-    break;
+    return encodeToString();
   }
   default: {
     AuthMoreMessage unknown{};
     mysql_login_resp_encode = &unknown;
     unknown.setRespCode(srv_resp);
-    break;
+    return encodeToString();
   }
   }
-
-  uint8_t seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
-  if (seq_force > 0) {
-    seq = seq_force;
-  }
-  Buffer::OwnedImpl buffer;
-  mysql_login_resp_encode->encode(buffer);
-  BufferHelper::encodeHdr(buffer, seq);
-  return buffer.toString();
 }
 
 std::string MySQLTestUtils::encodeAuthSwitchResp() {
