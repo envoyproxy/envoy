@@ -95,8 +95,6 @@ protected:
   HandshakerFactoryImplForTest handshaker_factory_;
   Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory_;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
-
-  friend class SslSocket;
 };
 
 TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
