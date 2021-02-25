@@ -11,8 +11,14 @@ class ResponseHeadersTest {
   }
 
   @Test
-  fun `parsing invalid status code returns null`() {
+  fun `parsing invalid status string returns null`() {
     val headers = ResponseHeaders(mapOf(":status" to listOf("invalid"), "other" to listOf("1")))
+    assertThat(headers.httpStatus).isNull()
+  }
+
+  @Test
+  fun `parsing negative status returns null`() {
+    val headers = ResponseHeaders(mapOf(":status" to listOf("-123"), "other" to listOf("1")))
     assertThat(headers.httpStatus).isNull()
   }
 
@@ -28,5 +34,13 @@ class ResponseHeadersTest {
       .addHttpStatus(200)
       .build()
     assertThat(headers.value(":status")).containsExactly("200")
+  }
+
+  @Test
+  fun `adding negative HTTP status code no-ops`() {
+    val headers = ResponseHeadersBuilder()
+      .addHttpStatus(-123)
+      .build()
+    assertThat(headers.value(":status")).isNull()
   }
 }

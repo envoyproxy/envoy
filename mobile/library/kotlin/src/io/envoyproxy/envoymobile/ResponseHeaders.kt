@@ -14,7 +14,9 @@ class ResponseHeaders : Headers {
   /**
    * HTTP status code received with the response.
    */
-  val httpStatus: Int? by lazy { value(":status")?.first()?.toIntOrNull() }
+  val httpStatus: Int? by lazy {
+    value(":status")?.first()?.toIntOrNull()?.takeIf { it >= 0 }
+  }
 
   /**
    * Convert the headers back to a builder for mutation.

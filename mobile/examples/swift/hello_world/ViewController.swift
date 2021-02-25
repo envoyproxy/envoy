@@ -70,7 +70,7 @@ final class ViewController: UITableViewController {
     streamClient
       .newStreamPrototype()
       .setOnResponseHeaders { [weak self] headers, _ in
-        let statusCode = headers.httpStatus ?? -1
+        let statusCode = headers.httpStatus.map(String.init) ?? "nil"
         let message = "received headers with status \(statusCode)"
 
         let headerMessage = headers.allHeaders()
