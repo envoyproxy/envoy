@@ -1011,6 +1011,52 @@ TEST_P(IntegrationTest, AbsolutePath) {
   EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
 }
 
+TEST_P(IntegrationTest, UnknownSchemeRejected) {
+  // Sent an HTTPS request over non-TLS. It should be rejected.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET hps://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_use_remote_address()->set_value(true); });
+  // Sent an HTTPS request over non-TLS. It should be rejected.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 403 Forbidden\r\n"));
+}
+
+TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
+  // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
+  // and match the configured redirect.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 301"));
+}
+
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
 TEST_P(IntegrationTest, TestHostWithAddress) {
   useAccessLog("%REQ(Host)%\n");
@@ -1266,14 +1312,6 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 // Validate that 100-continue works as expected with via header addition on both request and
 // response path.
 TEST_P(IntegrationTest, ViaAppendWith100Continue) {
-  config_helper_.addConfigModifier(setVia("foo"));
-  testEnvoyHandling100Continue(false, "foo");
-}
-
-// Pick a random test and use the old nodelay for coverage. This test can be
-// removed when the code path is removed.
-TEST_P(IntegrationTest, ViaAppendWith100ContinueWithOldNodelay) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
   config_helper_.addConfigModifier(setVia("foo"));
   testEnvoyHandling100Continue(false, "foo");
 }

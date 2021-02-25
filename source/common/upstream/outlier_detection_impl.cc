@@ -250,8 +250,11 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       enforcing_local_origin_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_local_origin_success_rate,
                                           DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))),
-      max_ejection_time_ms_(static_cast<uint64_t>(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, max_ejection_time, DEFAULT_MAX_EJECTION_TIME_MS))) {}
+      // If max_ejection_time was not specified in the config, apply the default or
+      // base_ejection_time whatever is larger.
+      max_ejection_time_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, max_ejection_time,
+          std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
