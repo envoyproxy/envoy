@@ -818,32 +818,35 @@ min_rtt_calc_params:
   // the actual function call to update the value.
   EXPECT_TRUE(controller->inMinRTTSamplingWindow());
   synchronizer.waitOn("pre_minrtt_update");
+  synchronizer.waitOn("post_minrtt_update");
+  
   std::thread t1([this, &controller]() {
     tryForward(controller, true);
     sampleLatency(controller, std::chrono::microseconds(1337));
   });
 
-  // Wait for the thread to wait.
+  // Wait for the thread t1 to wait.
   synchronizer.barrierOn("pre_minrtt_update");
 
   // We can now kick off another thread to sample another request, but we don't expect this one to
-  // block since there is another thread in that critical section. We can just immediately join
-  // after.
+  // block since thread1 is already in that critical section.
   std::thread t2([this, &controller]() {
     tryForward(controller, true);
     sampleLatency(controller, std::chrono::microseconds(1337));
   });
-  t2.join();
 
-  // When t2 thread completes, it becomes not in the minRTT sampling window.
-  EXPECT_FALSE(controller->inMinRTTSamplingWindow());
-
-  // Complete the minRTT update in t1 and verify we've exited the window.
+  // Wait for the thread t2 to wait, thread t2 acquires the mutex
+  synchronizer.barrierOn("post_minrtt_update");
+  
   synchronizer.signal("pre_minrtt_update");
+
+  // Thread t1 is unable to acquire the mutex, and won't update minRTT.
   t1.join();
 
-  // As it hasn't been in minRTT sampling window, t1 thread doesn't meet the condition of updating
-  // minRTT, then early exit the method. It remains not in the minRTT sampling window.
+  synchronizer.signal("post_minrtt_update");
+
+  t2.join();
+
   EXPECT_FALSE(controller->inMinRTTSamplingWindow());
 }
 
