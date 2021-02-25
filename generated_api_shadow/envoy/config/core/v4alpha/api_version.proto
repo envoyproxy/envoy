@@ -17,6 +17,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // Describes a SemVer (<Major>.<Minor>.<Patch>) version of the API that the
 // client supports. Note that the major version is set by the proto package path, where
 // the minor and patch versions are updated upon incremental changes to the API.
+// [#not-implemented-hide:]
 message ApiVersionNumber {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.ApiVersionNumber";
