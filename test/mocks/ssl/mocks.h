@@ -85,7 +85,7 @@ public:
   MOCK_METHOD(const std::string&, ecdhCurves, (), (const));
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
-  MOCK_METHOD(CertificateValidationContextConfig*, certificateValidationContext, (), (const));
+  MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -110,7 +110,7 @@ public:
   MOCK_METHOD(const std::string&, ecdhCurves, (), (const));
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
-  MOCK_METHOD(CertificateValidationContextConfig*, certificateValidationContext, (), (const));
+  MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -156,7 +156,7 @@ public:
   MOCK_METHOD(bool, allowExpiredCertificate, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
               customValidatorConfig, (), (const));
-  MOCK_METHOD(Api::Api&, api, (), ());
+  MOCK_METHOD(Api::Api&, api, (), (const));
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const));
