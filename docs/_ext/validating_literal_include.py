@@ -4,7 +4,7 @@ from docutils.parsers.rst import Directive
 from docutils.parsers.rst import directives
 from sphinx.application import Sphinx
 from sphinx.util.docutils import SphinxDirective
-from sphinx.directives.code import LiteralInclude 
+from sphinx.directives.code import LiteralInclude
 from sphinx.errors import ExtensionError
 
 import os
@@ -45,9 +45,8 @@ class ValidatingLiteralInclude(LiteralInclude):
                                  stderr=subprocess.PIPE,
                                  encoding='utf-8')
       if completed.returncode != 0:
-        raise ExtensionError(
-            "Failed config validation for type: '{0}' in: {1}:\n {2}".format(
-                self.options.get('type-name'), relative_filename, completed.stderr))
+        raise ExtensionError("Failed config validation for type: '{0}' in: {1}:\n {2}".format(
+            self.options.get('type-name'), relative_filename, completed.stderr))
 
     self.options.pop('type-name', None)
     return list(LiteralInclude.run(self))

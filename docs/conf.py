@@ -72,7 +72,8 @@ sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
     'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
-    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe', 'validating_literal_include'
+    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe',
+    'validating_literal_include'
 ]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
