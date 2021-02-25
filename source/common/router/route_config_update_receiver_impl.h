@@ -49,10 +49,10 @@ public:
     return config_info_;
   }
   bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
-  const envoy::config::route::v3::RouteConfiguration& routeConfiguration() override {
+  const envoy::config::route::v3::RouteConfiguration& protobufConfiguration() override {
     return route_config_proto_;
   }
-  ConfigConstSharedPtr config() const override { return config_; }
+  ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
     return resource_ids_in_last_update_;

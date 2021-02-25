@@ -42,24 +42,28 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
 
-  std::map<std::string, envoy::config::route::v3::VirtualHost> vhosts_after_this_update(
+  std::map<std::string, envoy::config::route::v3::VirtualHost> vhosts_before_this_update(
       vhds_virtual_hosts_);
-  const bool removed = removeVhosts(vhosts_after_this_update, removed_resources);
-  const bool updated = updateVhosts(vhosts_after_this_update, added_vhosts);
+  const bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
+  const bool updated = updateVhosts(vhds_virtual_hosts_, added_vhosts);
 
-  envoy::config::route::v3::RouteConfiguration latest_route_config;
-  latest_route_config.CopyFrom(route_config_proto_);
-  rebuildRouteConfig(rds_virtual_hosts_, vhosts_after_this_update, latest_route_config);
+  envoy::config::route::v3::RouteConfiguration route_config_before_this_update;
+  route_config_before_this_update.CopyFrom(route_config_proto_);
+  rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);
+  ConfigConstSharedPtr new_config;
 
-  // ConfigImpl ctor throws exception on validation failures
-  ConfigConstSharedPtr new_config(new ConfigImpl(
-      latest_route_config, factory_context_,
-      factory_context_.messageValidationContext().dynamicValidationVisitor(), false));
+  try {
+    new_config = std::make_shared<ConfigImpl>(
+        route_config_proto_, factory_context_,
+        factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
+  } catch (const Envoy::EnvoyException& e) {
+    // revert the changes that failed validation
+    vhds_virtual_hosts_ = vhosts_before_this_update;
+    route_config_proto_.CopyFrom(route_config_before_this_update);
+    throw e;
+  }
 
-  // no exception
   config_ = new_config;
-  route_config_proto_.CopyFrom(latest_route_config);
-  vhds_virtual_hosts_ = vhosts_after_this_update;
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
   config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_proto_, last_config_version_});

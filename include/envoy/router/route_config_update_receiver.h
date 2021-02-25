@@ -80,12 +80,13 @@ public:
   /**
    * @return envoy::config::route::v3::RouteConfiguration& current RouteConfiguration.
    */
-  virtual const envoy::config::route::v3::RouteConfiguration& routeConfiguration() PURE;
+  virtual const envoy::config::route::v3::RouteConfiguration& protobufConfiguration() PURE;
 
   /**
-   * @return Router::ConfigConstSharedPtr a route configuration after the latest update.
+   * @return Router::ConfigConstSharedPtr a parsed and validated copy of current RouteConfiguration.
+   * @see protobufConfiguration()
    */
-  virtual ConfigConstSharedPtr config() const PURE;
+  virtual ConfigConstSharedPtr parsedConfiguration() const PURE;
 
   /**
    * @return SystemTime the time of the last update.
