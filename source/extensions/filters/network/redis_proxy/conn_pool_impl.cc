@@ -262,7 +262,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
                                                            config_->readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
-    ENVOY_LOG(debug, "redis: host not found: '{}'", key);
+    ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
   }
   pending_requests_.emplace_back(*this, std::move(request), callbacks);

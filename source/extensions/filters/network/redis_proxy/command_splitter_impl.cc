@@ -152,7 +152,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
         makeSingleServerRequest(route, base_request->asArray()[0].asString(),
                                 base_request->asArray()[1].asString(), base_request, *request_ptr);
   } else {
-    ENVOY_LOG(debug, "redis: route not found: '{}'", incoming_request->toString());
+    ENVOY_LOG(debug, "route not found: '{}'", incoming_request->toString());
   }
 
   if (!request_ptr->handle_) {
@@ -285,7 +285,7 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   ASSERT(num_pending_responses_ > 0);
   if (--num_pending_responses_ == 0) {
     updateStats(error_count_ == 0);
-    ENVOY_LOG(debug, "redis: response: '{}'", pending_response_->toString());
+    ENVOY_LOG(debug, "response: '{}'", pending_response_->toString());
     callbacks_.onResponse(std::move(pending_response_));
   }
 }
@@ -318,7 +318,7 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
       // Create composite array for a single set command.
       const Common::Redis::RespValue single_set(
           base_request, Common::Redis::Utility::SetRequest::instance(), i, i + 1);
-      ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set.toString());
+      ENVOY_LOG(debug, "parallel set: '{}'", single_set.toString());
       pending_request.handle_ = makeFragmentedRequest(
           route, "set", base_request->asArray()[i].asString(), single_set, pending_request);
     }
@@ -384,7 +384,7 @@ SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& 
 
     // Create the composite array for a single fragment.
     const Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
-    ENVOY_LOG(debug, "redis: parallel {}: '{}'", base_request->asArray()[0].asString(),
+    ENVOY_LOG(debug, "parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment.toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
@@ -540,7 +540,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // downstream metrics reflect any faults added (with special fault metrics) or extra latency from
   // a delay. 2) we use a ternary operator for the callback parameter- we want to use the
   // delay_fault as callback if there is a delay per the earlier comment.
-  ENVOY_LOG(debug, "redis: splitting '{}'", request->toString());
+  ENVOY_LOG(debug, "splitting '{}'", request->toString());
   handler->command_stats_.total_.inc();
 
   SplitRequestPtr request_ptr;
