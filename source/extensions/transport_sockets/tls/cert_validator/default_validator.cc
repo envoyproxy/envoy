@@ -295,16 +295,19 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
 
 bool DefaultCertValidator::dnsNameMatch(const absl::string_view dns_name,
                                         const absl::string_view pattern) {
-  if (dns_name == pattern) {
+  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
+  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
+  if (lower_case_dns_name == lower_case_pattern) {
     return true;
   }
 
-  size_t pattern_len = pattern.length();
-  if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (dns_name.length() > pattern_len - 1) {
-      const size_t off = dns_name.length() - pattern_len + 1;
-      return dns_name.substr(0, off).find('.') == std::string::npos &&
-             dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
+  size_t pattern_len = lower_case_pattern.length();
+  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
+    if (lower_case_dns_name.length() > pattern_len - 1) {
+      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
+      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
+             lower_case_dns_name.substr(off, pattern_len - 1) ==
+                 lower_case_pattern.substr(1, pattern_len - 1);
     }
   }
 
