@@ -17,7 +17,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                  const Upstream::HostConstSharedPtr& host,
                                  uint64_t concurrent_stream_limit)
     : Envoy::ConnectionPool::ActiveClient(
-          parent, host->cluster().commonHttpProtocolOptions().max_requests_connection(),
+          parent, host->cluster().commonHttpProtocolOptions().max_requests_connection().value(),
           concurrent_stream_limit),
       parent_(parent) {
   Upstream::Host::CreateConnectionData data = host->createConnection(

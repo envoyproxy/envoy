@@ -57,7 +57,7 @@ uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
 
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().commonHttpProtocolOptions().max_requests_connection(),
+          parent, maxStreamsPerConnection(parent.host()->cluster().commonHttpProtocolOptions().max_requests_connection().value(),
           parent.host()->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
@@ -67,7 +67,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().commonHttpProtocolOptions().max_requests_connection()),
+          parent, maxStreamsPerConnection(parent.host()->cluster().commonHttpProtocolOptions().max_requests_connection().value()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
