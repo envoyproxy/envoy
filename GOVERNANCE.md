@@ -100,7 +100,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   [stable releases](RELEASES.md#stable-releases).
 * Monitor the AZP tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
-  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
@@ -169,7 +169,7 @@ take on API shepherd review load and participate in meetings. They should be act
 and responsive to GitHub issues and PRs on which they are tagged.
 
 The API shepherds are distinct to the [UDPA working
-group](https://github.com/cncf/udpa/blob/master/README.md), which aims to evolve xDS directionally
+group](https://github.com/cncf/udpa/blob/main/README.md), which aims to evolve xDS directionally
 towards a universal dataplane API. API shepherds are responsible for the execution of the xDS
 day-to-day and guiding xDS implementation changes. Proposals from UDPA-WG will be aligned with the
 xDS API shepherds to ensure that xDS is heading towards the UDPA goal. xDS API shepherds operate

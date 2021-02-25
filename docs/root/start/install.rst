@@ -177,10 +177,10 @@ The following table shows the available Docker images
    In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
 
    In the above *dev* repositories, the *latest* tag points to a container including the last
-   Envoy build on master that passed tests.
+   Envoy build on main that passed tests.
 
-   The Envoy project considers master to be release candidate quality at all times, and many
-   organizations track and deploy master in production. We encourage you to do the same so that
+   The Envoy project considers main to be release candidate quality at all times, and many
+   organizations track and deploy main in production. We encourage you to do the same so that
    issues can be reported as early as possible in the development process.
 
    The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for
