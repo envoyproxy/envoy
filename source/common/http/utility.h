@@ -106,8 +106,8 @@ struct OptionsLimits {
   static const uint32_t DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM = 100;
   // Default limit on the number of inbound frames of type WINDOW_UPDATE (per DATA frame sent).
   static const uint32_t DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT = 10;
-  // defaults to unlimited, value in octet
-  static const uint32_t DEFAULT_MAX_HEADER_LIST_SIZE = std::numeric_limits<uint32_t>::max();
+  // Initial value for NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE is 60 KiB.
+  static const uint32_t DEFAULT_MAX_HEADER_LIST_SIZE = 60;
 };
 
 /**

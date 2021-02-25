@@ -390,7 +390,7 @@ message Http2ProtocolOptions {
   // `SETTINGS_MAX_HEADER_LIST_SIZE <https://tools.ietf.org/html/rfc7540#section-10.5.1>`_
   // This option informs upstream peers the maximum size of header list the sender is ready to accept
   // in octets. The requests that exceed this value will receive a 431 response.
-  // Initial value of this setting is unlimited.
+  // Initial value of this setting is 60 KiB.
   google.protobuf.UInt32Value max_header_list_size = 16;
 }
 
