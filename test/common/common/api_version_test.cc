@@ -72,7 +72,7 @@ TEST(ApiVersionTest, OldestLatestVersionsAssumptions) {
   const auto oldest_version = ApiVersionInfo::oldestApiVersion();
   // Same major number, minor number difference is at most 1, and the oldest patch is 0.
   EXPECT_EQ(latest_version.version().major_number(), oldest_version.version().major_number());
-  ASSERT_TRUE(latest_version.version().minor_number() >= oldest_version.version().minor_number() &&
+  EXPECT_TRUE(latest_version.version().minor_number() >= oldest_version.version().minor_number() &&
               latest_version.version().minor_number() - oldest_version.version().minor_number() <=
                   1);
   EXPECT_EQ(0, oldest_version.version().patch());
