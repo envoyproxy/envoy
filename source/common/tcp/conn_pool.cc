@@ -6,7 +6,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -25,7 +24,6 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   real_host_description_ = data.host_description_;
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
-  connection_->detectEarlyCloseWhenReadDisabled(false);
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
   connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
@@ -33,10 +31,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
                                    &host->cluster().stats().bind_errors_, nullptr});
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-    connection_->noDelay(true);
-  }
+  connection_->noDelay(true);
   connection_->connect();
 }
 
@@ -64,6 +59,13 @@ void ActiveTcpClient::clearCallbacks() {
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
+  // If this is a newly established TCP connection, readDisable. This is to handle a race condition
+  // for TCP for protocols like MySQL where the upstream writes first, and the data needs to be
+  // preserved until a downstream connection is associated.
+  // This is also necessary for prefetch to be used with such protocols.
+  if (event == Network::ConnectionEvent::Connected) {
+    connection_->readDisable(true);
+  }
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.

@@ -116,10 +116,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
   }
-  for (auto* provider : route_config_providers_) {
-    // This seems inefficient, though it is necessary to validate config in each context,
-    // especially when it comes with per_filter_config,
-    provider->validateConfig(route_config);
+  if (route_config_provider_opt_.has_value()) {
+    route_config_provider_opt_.value()->validateConfig(route_config);
   }
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> resume_rds;
@@ -133,7 +131,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
           route_config_name_, config_update_info_->configHash());
       maybeCreateInitManager(version_info, noop_init_manager, resume_rds);
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
-          config_update_info_, factory_context_, stat_prefix_, route_config_providers_,
+          config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_,
           config_update_info_->routeConfiguration().vhds().config_source().resource_api_version());
       vhds_subscription_->registerInitTargetWithInitManager(
           noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
@@ -142,8 +140,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               config_update_info_->configHash());
 
-    for (auto* provider : route_config_providers_) {
-      provider->onConfigUpdate();
+    if (route_config_provider_opt_.has_value()) {
+      route_config_provider_opt_.value()->onConfigUpdate();
     }
     // RDS update removed VHDS configuration
     if (!config_update_info_->routeConfiguration().has_vhds()) {
@@ -240,14 +238,13 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
   // It should be 1:1 mapping due to shared rds config.
-  ASSERT(subscription_->routeConfigProviders().empty());
-  subscription_->routeConfigProviders().insert(this);
+  ASSERT(!subscription_->routeConfigProvider().has_value());
+  subscription_->routeConfigProvider().emplace(this);
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
-  subscription_->routeConfigProviders().erase(this);
-  // It should be 1:1 mapping due to shared rds config.
-  ASSERT(subscription_->routeConfigProviders().empty());
+  ASSERT(subscription_->routeConfigProvider().has_value());
+  subscription_->routeConfigProvider().reset();
 }
 
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() { return tls_->config_; }
@@ -374,7 +371,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     // in the RdsRouteConfigSubscription destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
     ASSERT(subscription);
-    ASSERT(!subscription->route_config_providers_.empty());
+    ASSERT(subscription->route_config_provider_opt_.has_value());
 
     if (subscription->routeConfigUpdate()->configInfo()) {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
