@@ -65,6 +65,7 @@ The following sandboxes are available:
     skywalking_tracing
     tls-sni
     tls
+    udp
     wasm-cc
     websocket
     zipkin_tracing
