@@ -210,6 +210,26 @@ max_ejection_time: 3s
                EnvoyException);
 }
 
+// Test verifies that legacy config without max_ejection_time value
+// specified and base_ejection_time value larger than default value
+// of max_ejection_time will be accepted.
+// Values of base_ejection_time and max_ejection_time will be equal.
+TEST_F(OutlierDetectorImplTest, DetectorStaticConfigBaseLargerThanMaxNoMax) {
+  const std::string yaml = R"EOF(
+interval: 0.1s
+base_ejection_time: 400s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_));
+
+  EXPECT_EQ(100UL, detector->config().intervalMs());
+  EXPECT_EQ(400000UL, detector->config().baseEjectionTimeMs());
+  EXPECT_EQ(400000UL, detector->config().maxEjectionTimeMs());
+}
+
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
