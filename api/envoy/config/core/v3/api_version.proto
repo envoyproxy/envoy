@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/type/v3/semantic_version.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "ApiVersionProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: API Versioning]
+
+// Describes a SemVer (<Major>.<Minor>.<Patch>) version of the API that the
+// client supports. Note that the major version is set by the proto package path, where
+// the minor and patch versions are updated upon incremental changes to the API.
+message ApiVersionNumber {
+  // SemVer version of the API.
+  type.v3.SemanticVersion version = 1;
+}

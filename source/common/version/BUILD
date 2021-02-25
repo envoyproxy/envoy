@@ -19,6 +19,14 @@ genrule(
 )
 
 genrule(
+    name = "generate_api_version_number",
+    srcs = ["//:API_VERSION"],
+    outs = ["api_version_number.h"],
+    cmd = """echo "#define API_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
+    visibility = ["//visibility:private"],
+)
+
+genrule(
     name = "generate_version_linkstamp",
     outs = ["manual_linkstamp.cc"],
     cmd = select({
@@ -57,6 +65,26 @@ envoy_cc_library(
         ":version_includes",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "api_version_includes",
+    hdrs = [
+        "api_version.h",
+        ":generate_api_version_number",
+    ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "api_version_lib",
+    srcs = ["api_version.cc"],
+    deps = [
+        ":api_version_includes",
     ],
 )
 
