@@ -36,7 +36,7 @@ public:
 
 namespace {
 
-// Test-only custom process object which accepts an SslCtxCb for in-test SSL_CTX
+// Test-only custom process object which accepts an `SslCtxCb` for in-test SSL_CTX
 // manipulation.
 class CustomProcessObjectForTest : public ProcessObject {
 public:
@@ -122,7 +122,7 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
 
   SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
 
-  // Compare to the next test, where our custom sslctxcb reaches in and sets
+  // Compare to the next test, where our custom `sslctxcb` reaches in and sets
   // this option.
   EXPECT_FALSE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_NO_TLSv1);
 }
@@ -148,7 +148,7 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
 
   SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
 
-  // Compare to the previous test, where our mock sslctxcb is called, but does
+  // Compare to the previous test, where our mock `sslctxcb` is called, but does
   // not set this option.
   EXPECT_TRUE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_NO_TLSv1);
 }
