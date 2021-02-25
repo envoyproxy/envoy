@@ -20,7 +20,8 @@ Envoy::Matcher::InputMatcherPtr ConsistentHashingConfig::createInputMatcher(
   }
 
   return std::make_unique<Matcher>(consistent_hashing_config.threshold(),
-                                   consistent_hashing_config.modulo());
+                                   consistent_hashing_config.modulo(),
+                                   consistent_hashing_config.seed());
 }
 /**
  * Static registration for the consistent hashing matcher. @see RegisterFactory.

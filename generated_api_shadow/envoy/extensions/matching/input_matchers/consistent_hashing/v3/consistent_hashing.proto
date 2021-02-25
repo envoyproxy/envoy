@@ -31,4 +31,9 @@ message ConsistentHashing {
   // specifying the range of possible values.
   // This value must be above the configured threshold.
   uint32 modulo = 2 [(validate.rules).uint32 = {gt: 0}];
+
+  // Optional seed passed through the hash function. This allows using additional information when computing
+  // the hash value: by changing the seed value, a different partition of matching and non-matching inputs will
+  // be created that remains consistent for that seed value.
+  uint64 seed = 3;
 }
