@@ -57,6 +57,7 @@ quiche_common_copts = [
     "-Wno-unused-function",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
+    "-Wno-parentheses",
 ]
 
 quiche_copts = select({
