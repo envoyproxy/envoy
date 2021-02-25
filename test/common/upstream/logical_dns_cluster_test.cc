@@ -315,6 +315,7 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
         endpoints:
           - lb_endpoints:
             - endpoint:
+                hostname: foo
                 address:
                   socket_address:
                     address: foo.bar.com
@@ -335,6 +336,9 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
   dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("foo", cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
 
   // Therefore, a subsequent failure should get a [0,base * 1] refresh.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
