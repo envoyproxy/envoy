@@ -72,6 +72,7 @@ public:
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
 
 protected:
+  friend class SslSocketFriend;
   SSL* rawSsl() const { return info_->ssl_.get(); }
 
 private:
