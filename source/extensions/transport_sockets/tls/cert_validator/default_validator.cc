@@ -40,8 +40,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-DefaultCertValidator::DefaultCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
-                                           SslStats& stats, TimeSource& time_source)
+DefaultCertValidator::DefaultCertValidator(
+    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+    TimeSource& time_source)
     : config_(config), stats_(stats), time_source_(time_source) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
@@ -477,7 +478,7 @@ size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
 
 class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr createCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                        SslStats& stats, TimeSource& time_source) override {
     return std::make_unique<DefaultCertValidator>(config, stats, time_source);
   }

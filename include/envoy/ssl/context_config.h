@@ -50,7 +50,7 @@ public:
   /**
    * @return CertificateValidationContextConfig the certificate validation context config.
    */
-  virtual CertificateValidationContextConfig* certificateValidationContext() const PURE;
+  virtual const CertificateValidationContextConfig* certificateValidationContext() const PURE;
 
   /**
    * @return The minimum TLS protocol version to negotiate.

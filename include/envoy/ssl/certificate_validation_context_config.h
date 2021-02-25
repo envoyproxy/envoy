@@ -82,7 +82,7 @@ public:
   /**
    * @return a reference to the api object.
    */
-  virtual Api::Api& api() PURE;
+  virtual Api::Api& api() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

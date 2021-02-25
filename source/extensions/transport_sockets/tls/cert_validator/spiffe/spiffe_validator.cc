@@ -39,7 +39,7 @@ namespace Tls {
 
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
-SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
+SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats, TimeSource& time_source)
     : stats_(stats), time_source_(time_source) {
   ASSERT(config != nullptr);
@@ -244,7 +244,7 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr createCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                        SslStats& stats, TimeSource& time_source) override {
     return std::make_unique<SPIFFEValidator>(config, stats, time_source);
   }

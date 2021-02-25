@@ -34,7 +34,7 @@ class SPIFFEValidator : public CertValidator {
 public:
   SPIFFEValidator(SslStats& stats, TimeSource& time_source)
       : stats_(stats), time_source_(time_source){};
-  SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+  SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   TimeSource& time_source);
   ~SPIFFEValidator() override = default;
 

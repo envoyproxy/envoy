@@ -30,8 +30,8 @@ namespace Tls {
 
 class DefaultCertValidator : public CertValidator {
 public:
-  DefaultCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                       TimeSource& time_source);
+  DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                       SslStats& stats, TimeSource& time_source);
 
   ~DefaultCertValidator() override = default;
 
