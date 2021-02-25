@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
     ],
 )
@@ -29,6 +30,7 @@ envoy_cc_extension(
     name = "kill_request_config",
     srcs = ["kill_request_config.cc"],
     hdrs = ["kill_request_config.h"],
+    category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",

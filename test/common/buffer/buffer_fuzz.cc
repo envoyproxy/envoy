@@ -167,8 +167,8 @@ public:
 
   void commit(uint64_t length, absl::Span<Buffer::RawSlice>,
               Buffer::ReservationSlicesOwnerPtr) override {
-    size_ += length;
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
+    size_ += length;
   }
 
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
@@ -457,23 +457,26 @@ void executeActions(const test::common::buffer::BufferFuzzTestCase& input, Buffe
       // return the pointer to its std::string array, we can avoid the
       // toString() copy here.
       const uint64_t linear_buffer_length = linear_buffers[j]->length();
-      if (buffers[j]->toString() !=
-          absl::string_view(
+      // We may have spilled over TotalMaxAllocation at this point. Only compare up to
+      // TotalMaxAllocation.
+      if (absl::string_view(
               static_cast<const char*>(linear_buffers[j]->linearize(linear_buffer_length)),
-              linear_buffer_length)) {
+              linear_buffer_length)
+              .compare(buffers[j]->toString().substr(0, TotalMaxAllocation)) != 0) {
         ENVOY_LOG_MISC(debug, "Mismatched buffers at index {}", j);
         ENVOY_LOG_MISC(debug, "B: {}", buffers[j]->toString());
         ENVOY_LOG_MISC(debug, "L: {}", linear_buffers[j]->toString());
         FUZZ_ASSERT(false);
       }
-      FUZZ_ASSERT(buffers[j]->length() == linear_buffer_length);
+      FUZZ_ASSERT(std::min(TotalMaxAllocation, static_cast<uint32_t>(buffers[j]->length())) ==
+                  linear_buffer_length);
       current_allocated_bytes += linear_buffer_length;
     }
     ENVOY_LOG_MISC(debug, "[{} MB allocated total]", current_allocated_bytes / (1024.0 * 1024));
     // We bail out if buffers get too big, otherwise we will OOM the sanitizer.
     // We can't use Memory::Stats::totalCurrentlyAllocated() here as we don't
     // have tcmalloc in ASAN builds, so just do a simple count.
-    if (current_allocated_bytes > TotalMaxAllocation) {
+    if (current_allocated_bytes >= TotalMaxAllocation) {
       ENVOY_LOG_MISC(debug, "Terminating early with total buffer length {} to avoid OOM",
                      current_allocated_bytes);
       break;

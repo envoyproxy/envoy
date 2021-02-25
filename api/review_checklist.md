@@ -26,6 +26,9 @@ consider the answers to these questions before sending a PR.
     "Genericness" below -- if this is not part of the API, will every xDS
     client need to add a different knob?  Is consistency across clients
     important for this?)
+- If the feature is modeled as a proto3 scalar, is it plausible that its
+  default value may change in the future? If so, it should be wrapped with
+  a Well-Known Type (WKT), e.g. `bool` becomes `google.protobuf.BoolValue`.
 
 ## Style
 - Is the PR aligned with the [API style guidelines](STYLE.md)?

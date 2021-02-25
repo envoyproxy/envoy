@@ -580,6 +580,16 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param filter_chain_name Network filter chain name of the downstream connection.
+   */
+  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
+
+  /**
+   * @return Network filter chain name of the downstream connection.
+   */
+  virtual const std::string& filterChainName() const PURE;
 };
 
 } // namespace StreamInfo
