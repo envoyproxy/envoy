@@ -56,4 +56,26 @@ TEST(ApiVersionTest, ValidOldestApiVersion) {
   }
 }
 
+// Verify the version to string converter.
+TEST(ApiVersionTest, ApiVersionToString) {
+  const auto api_version1 = ApiVersionInfoTestPeer::makeApiVersion("10.20.3");
+  EXPECT_EQ("10.20.3", ApiVersionInfo::apiVersionToString(api_version1));
+  const auto api_version2 = ApiVersionInfoTestPeer::makeApiVersion("10.020.3");
+  EXPECT_EQ("10.20.3", ApiVersionInfo::apiVersionToString(api_version2));
+  const auto api_version3 = ApiVersionInfoTestPeer::makeApiVersion("10.020.bad");
+  EXPECT_EQ("0.0.0", ApiVersionInfo::apiVersionToString(api_version3));
+}
+
+// Verify assumptions about oldest version vs latest version.
+TEST(ApiVersionTest, OldestLatestVersionsAssumptions) {
+  const auto latest_version = ApiVersionInfo::apiVersion();
+  const auto oldest_version = ApiVersionInfo::oldestApiVersion();
+  // Same major number, minor number difference is at most 1, and the oldest patch is 0.
+  EXPECT_EQ(latest_version.version().major_number(), oldest_version.version().major_number());
+  ASSERT_TRUE(latest_version.version().minor_number() >= oldest_version.version().minor_number() &&
+              latest_version.version().minor_number() - oldest_version.version().minor_number() <=
+                  1);
+  EXPECT_EQ(0, oldest_version.version().patch());
+}
+
 } // namespace Envoy
