@@ -112,7 +112,12 @@ public:
         file_updater_1_(injected_resource_filename_1_),
         file_updater_2_(injected_resource_filename_2_) {}
 
-  ~QuicHttpIntegrationTest() override { cleanupUpstreamAndDownstream(); }
+  ~QuicHttpIntegrationTest() override {
+    cleanupUpstreamAndDownstream();
+    // Release the client before destroying |conn_helper_|. No such need once |conn_helper_| is
+    // moved into a client connection factory in the base test class.
+    codec_client_.reset();
+  }
 
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
