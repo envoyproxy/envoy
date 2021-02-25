@@ -819,7 +819,7 @@ min_rtt_calc_params:
   EXPECT_TRUE(controller->inMinRTTSamplingWindow());
   synchronizer.waitOn("pre_minrtt_update");
   synchronizer.waitOn("post_minrtt_update");
-  
+
   std::thread t1([this, &controller]() {
     tryForward(controller, true);
     sampleLatency(controller, std::chrono::microseconds(1337));
@@ -837,7 +837,7 @@ min_rtt_calc_params:
 
   // Wait for the thread t2 to wait, thread t2 acquires the mutex
   synchronizer.barrierOn("post_minrtt_update");
-  
+
   synchronizer.signal("pre_minrtt_update");
 
   // Thread t1 is unable to acquire the mutex, and won't update minRTT.
