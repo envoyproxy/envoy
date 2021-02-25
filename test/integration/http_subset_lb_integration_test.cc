@@ -216,8 +216,8 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {
   runTest(type_b_request_headers_, "b");
 }
 
-// Tests subset-compatible load balancer policy with empty metadata
-TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer_null_metadata) {
+// Tests subset-compatible load balancer policy without metadata does not crash on initialization.
+TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerNoMetadata) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
@@ -236,6 +236,15 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer_null_metadata) {
   });
 
   initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("404"));
 }
 
 } // namespace Envoy

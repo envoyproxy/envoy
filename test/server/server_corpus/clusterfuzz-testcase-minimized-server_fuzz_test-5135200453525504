@@ -1,0 +1,32 @@
+static_resources {
+  clusters {
+    name: "0"
+    connect_timeout {
+      nanos: 813
+    }
+    lb_policy: RING_HASH
+    lb_subset_config {
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors {
+        keys: "\010,"
+        single_host_per_subset: true
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "y"
+              }
+            }
+            hostname: "y"
+          }
+          health_status: UNHEALTHY
+        }
+      }
+    }
+  }
+}
