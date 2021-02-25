@@ -719,7 +719,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(HttpConnectionManagerImplTest, FilterSetRoute) {
+TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverride) {
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
@@ -746,32 +746,37 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRoute) {
 
   std::shared_ptr<Router::MockRoute> default_route =
       std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(default_route->route_entry_, clusterName())
-      .WillRepeatedly(ReturnRef(default_cluster_name));
-
-  std::shared_ptr<Router::MockRoute> foo_route = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(foo_route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(foo_cluster_name));
 
   using ::testing::InSequence;
   {
     InSequence seq;
+    // Expected from refreshCachedRoute
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
         .WillOnce(Return(default_route));
 
-    // This filter calls setRoute from its StreamDecoderFilterCallbacks to manually mutate the
-    // cached route for the current request.
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
           EXPECT_EQ(default_route->routeEntry(),
                     decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          EXPECT_EQ(default_cluster_name,
+                    decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
-          decoder_filters_[0]->callbacks_->setRoute(foo_route);
+          // Invokes setRoute from StreamFilterCallbacks to manually set the cached route to a
+          // DelegatingRoute child class.
+          std::shared_ptr<ExampleDelegatingRouteDerived> route_override(
+              new ExampleDelegatingRouteDerived(decoder_filters_[0]->callbacks_->route(),
+                                                foo_cluster_name));
+          decoder_filters_[0]->callbacks_->setRoute(route_override);
 
-          EXPECT_EQ(foo_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(foo_route->routeEntry(),
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+          // The route filter determines the finalized route's cluster via
+          // routeEntry()->clusterName()
+          EXPECT_EQ(foo_cluster_name,
+                    decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
+          EXPECT_EQ(foo_cluster_name,
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry()->clusterName());
+          // Note: Since cached_route_ has a value set, clusterInfo won't invoke refreshCachedRoute.
           EXPECT_EQ(foo_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           return FilterHeadersStatus::StopIteration;

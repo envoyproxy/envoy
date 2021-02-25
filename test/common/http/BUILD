@@ -217,6 +217,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
+        "//source/common/router:delegating_route_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
