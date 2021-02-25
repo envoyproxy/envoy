@@ -757,10 +757,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route->routeEntry(),
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
           EXPECT_EQ(default_cluster_name,
                     decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
+          EXPECT_EQ(default_route->routeEntry(),
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           // Invokes setRoute from StreamFilterCallbacks to manually set the cached route to a
@@ -770,12 +770,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
                                                 foo_cluster_name));
           decoder_filters_[0]->callbacks_->setRoute(route_override);
 
-          // The route filter determines the finalized route's cluster via
-          // routeEntry()->clusterName()
+          EXPECT_EQ(route_override, decoder_filters_[0]->callbacks_->route());
+          // Note: The route filter determines the finalized route's upstream cluster name via
+          // routeEntry()->clusterName(), so that's the key piece to check.
           EXPECT_EQ(foo_cluster_name,
                     decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
-          EXPECT_EQ(foo_cluster_name,
-                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry()->clusterName());
+          EXPECT_EQ(route_override->routeEntry(),
+                    decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
           // Note: Since cached_route_ has a value set, clusterInfo won't invoke refreshCachedRoute.
           EXPECT_EQ(foo_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
