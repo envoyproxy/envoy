@@ -86,7 +86,6 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
@@ -448,6 +447,16 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "win32_redirect_records_option_test",
+    srcs = ["win32_redirect_records_option_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//source/common/network:address_lib",
+        "//source/common/network:win32_redirect_records_option_lib",
     ],
 )
 

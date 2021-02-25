@@ -96,7 +96,7 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
-    external_http_archive("io_bazel_rules_rust")
+    external_http_archive("rules_rust")
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
@@ -145,6 +145,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
+    _com_github_nlohmann_json()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -158,6 +159,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
+    _org_brotli()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
@@ -352,6 +354,19 @@ def _com_github_zlib_ng_zlib_ng():
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
+def _org_brotli():
+    external_http_archive(
+        name = "org_brotli",
+    )
+    native.bind(
+        name = "brotlienc",
+        actual = "@org_brotli//:brotlienc",
+    )
+    native.bind(
+        name = "brotlidec",
+        actual = "@org_brotli//:brotlidec",
+    )
+
 def _com_google_cel_cpp():
     external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
@@ -440,6 +455,16 @@ def _com_github_tencent_rapidjson():
     native.bind(
         name = "rapidjson",
         actual = "@com_github_tencent_rapidjson//:rapidjson",
+    )
+
+def _com_github_nlohmann_json():
+    external_http_archive(
+        name = "com_github_nlohmann_json",
+        build_file = "@envoy//bazel/external:json.BUILD",
+    )
+    native.bind(
+        name = "json",
+        actual = "@com_github_nlohmann_json//:json",
     )
 
 def _com_github_nodejs_http_parser():

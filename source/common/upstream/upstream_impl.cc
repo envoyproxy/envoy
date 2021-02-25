@@ -639,10 +639,12 @@ public:
                      Server::Configuration::TransportSocketFactoryContext& c)
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
-        singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()) {}
+        singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
+        options_(c.options()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  const Server::Options& options() override { return options_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
@@ -666,6 +668,7 @@ private:
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;
+  const Server::Options& options_;
 };
 
 std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
@@ -895,8 +898,12 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
   } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
     return {Http::Protocol::Http2, Http::Protocol::Http11};
   } else {
+    if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
+      return {Http::Protocol::Http3};
+    }
     return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                  : Http::Protocol::Http11};
   }
@@ -919,15 +926,26 @@ ClusterImplBase::ClusterImplBase(
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
-                                            runtime, std::move(socket_matcher),
-                                            std::move(stats_scope), added_via_api, factory_context);
+  auto& dispatcher = factory_context.dispatcher();
+  info_ = std::shared_ptr<const ClusterInfoImpl>(
+      new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
+                          std::move(socket_matcher), std::move(stats_scope), added_via_api,
+                          factory_context),
+      [&dispatcher](const ClusterInfoImpl* self) {
+        ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
+        dispatcher.deleteInDispatcherThread(
+            std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
+      });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
       !raw_factory_pointer->supportsAlpn()) {
     throw EnvoyException(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
+  }
+  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
+    throw EnvoyException(
+        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
   }
 
   // Create the default (empty) priority set before registering callbacks to
@@ -1109,7 +1127,7 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
-    HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+    HostVectorConstSharedPtr hosts_copy = std::make_shared<HostVector>(host_set->hosts());
 
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     prioritySet().updateHosts(priority,
@@ -1300,10 +1318,10 @@ void PriorityStateManager::registerHostForPriority(
   auto metadata = lb_endpoint.has_metadata()
                       ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
                       : nullptr;
-  const HostSharedPtr host(new HostImpl(
+  const auto host = std::make_shared<HostImpl>(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source));
+      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
