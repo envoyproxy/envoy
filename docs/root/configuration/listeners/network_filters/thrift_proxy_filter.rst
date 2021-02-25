@@ -20,7 +20,7 @@ Downstream Requests Limit
 Thrift Proxy can set the
 :ref:`maximum number of requests<envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.max_requests_per_connection>`
 that each downstream connection can handle. When the number of requests exceeds the connection limit, Thrift Proxy will
-actively disconnect from the Thrfit client.
+actively disconnect from the Thrift client.
 
 
 Thrift Request Metadata
