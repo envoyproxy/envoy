@@ -70,7 +70,7 @@ public:
     return custom_validator_config_;
   }
 
-  Api::Api& api() override { return *api_; }
+  Api::Api& api() const override { return *api_; }
 
 private:
   Api::ApiPtr api_;
