@@ -7,8 +7,13 @@ final class ResponseHeadersTests: XCTestCase {
     XCTAssertEqual(204, ResponseHeaders(headers: headers).httpStatus)
   }
 
-  func testParsingInvalidStatusCodeReturnsNil() {
+  func testParsingInvalidStatusStringReturnsNil() {
     let headers = [":status": ["invalid"], "other": ["1"]]
+    XCTAssertNil(ResponseHeaders(headers: headers).httpStatus)
+  }
+
+  func testParsingNegativeStatusReturnsNil() {
+    let headers = [":status": ["-123"], "other": ["1"]]
     XCTAssertNil(ResponseHeaders(headers: headers).httpStatus)
   }
 

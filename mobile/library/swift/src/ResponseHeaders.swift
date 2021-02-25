@@ -4,8 +4,8 @@ import Foundation
 @objcMembers
 public final class ResponseHeaders: Headers {
   /// HTTP status code received with the response.
-  public private(set) lazy var httpStatus: Int? =
-    self.value(forName: ":status")?.first.flatMap(Int.init)
+  public private(set) lazy var httpStatus: UInt? =
+    self.value(forName: ":status")?.first.flatMap(UInt.init)
 
   /// Convert the headers back to a builder for mutation.
   ///

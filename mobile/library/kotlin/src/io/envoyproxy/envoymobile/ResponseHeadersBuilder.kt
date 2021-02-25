@@ -39,13 +39,16 @@ class ResponseHeadersBuilder : HeadersBuilder {
   }
 
   /**
-   * Add an HTTP status to the response headers.
+   * Add an HTTP status to the response headers. Must be a positive integer.
    *
    * @param status: The HTTP status to add.
    *
    * @return ResponseHeadersBuilder, This builder.
    */
   fun addHttpStatus(status: Int): ResponseHeadersBuilder {
+    if (status < 0) {
+      return this
+    }
     internalSet(":status", mutableListOf("$status"))
     return this
   }
