@@ -80,7 +80,7 @@ public:
   MOCK_METHOD(Router::Context&, routerContext, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
+  MOCK_METHOD(LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Configuration::StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
@@ -145,6 +145,7 @@ public:
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
