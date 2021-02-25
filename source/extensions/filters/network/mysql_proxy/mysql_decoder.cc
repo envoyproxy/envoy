@@ -15,7 +15,6 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}", seq, len);
   // Run the MySQL state machine
   switch (session_.getState()) {
-
   case MySQLSession::State::Init: {
     // Expect Server Challenge packet
     ServerGreeting greeting;
@@ -25,7 +24,6 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     session_.setState(MySQLSession::State::ChallengeReq);
     break;
   }
-
   case MySQLSession::State::ChallengeReq: {
     // Process Client Handshake Response
     ClientLogin client_login{};
@@ -41,12 +39,10 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     }
     break;
   }
-
   case MySQLSession::State::SslPt:
     // just consume
     message.drain(len);
     break;
-
   case MySQLSession::State::ChallengeResp41:
   case MySQLSession::State::ChallengeResp320: {
     uint8_t resp_code;

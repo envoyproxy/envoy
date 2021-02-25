@@ -227,6 +227,35 @@ TEST_F(MySQLFilterTest, MySqlHandshake41ErrTest) {
 }
 
 /**
+ * Test MySQL Handshake with protocol version 41
+ * Server responds with Error
+ * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-more
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake41AuthMoreTest) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp41, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_MORE);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
+}
+
+/**
  * Test MySQL Handshake with protocol version 320
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-ok
  */
@@ -252,6 +281,34 @@ TEST_F(MySQLFilterTest, MySqlHandshake320OkTest) {
   Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
   EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 320
+ * SM: greeting(p=10) -> challenge-req(v320) -> incomplete response code
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320OkTestIncomplete) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeMessage(0);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
 /**
@@ -356,6 +413,45 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchTest) {
 
 /**
  * Test MySQL Handshake with protocol version 320
+ * Server responds with Auth Switch
+ * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
+ * -> auth_switch_resp -> serv-resp-auth-switch[error state]
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchAuthSwitchTest) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+
+  std::string auth_switch_resp = encodeAuthSwitchResp();
+  Buffer::InstancePtr client_switch_resp(new Buffer::OwnedImpl(auth_switch_resp));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_switch_resp, false));
+  EXPECT_EQ(MySQLSession::State::AuthSwitchMore, filter_->getSession().getState());
+
+  std::string srv_resp_ok_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH, 1);
+  Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 320
  * Server responds with Auth Switch and error
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
  * -> auth_switch_resp -> serv-resp-err
@@ -403,6 +499,45 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchErrTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(client_query_data, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(1UL, config_->stats().queries_parsed_.value());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 320
+ * Server responds with Auth Switch and error
+ * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
+ * -> auth_switch_resp -> incomplete response code
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchIncompleteRespcode) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+
+  std::string auth_switch_resp = encodeAuthSwitchResp();
+  Buffer::InstancePtr client_switch_resp(new Buffer::OwnedImpl(auth_switch_resp));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_switch_resp, false));
+  EXPECT_EQ(MySQLSession::State::AuthSwitchMore, filter_->getSession().getState());
+
+  std::string srv_resp_ok_data = encodeMessage(0, 1);
+  Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
 /**

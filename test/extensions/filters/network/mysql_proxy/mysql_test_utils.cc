@@ -1,5 +1,7 @@
 #include "mysql_test_utils.h"
 
+#include <bits/stdint-uintn.h>
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
@@ -107,6 +109,19 @@ std::string MySQLTestUtils::encodeAuthSwitchResp() {
   Buffer::OwnedImpl buffer;
   mysql_switch_resp_encode.encode(buffer);
   BufferHelper::encodeHdr(buffer, AUTH_SWITH_RESP_SEQ);
+  return buffer.toString();
+}
+
+// encode message for specific packet_len
+std::string MySQLTestUtils::encodeMessage(uint32_t packet_len, uint8_t it, uint8_t seq_force) {
+  Buffer::OwnedImpl buffer;
+  std::string res(packet_len, '0');
+  buffer.add(res);
+  uint8_t seq = CHALLENGE_RESP_SEQ_NUM + 2 * it;
+  if (seq_force > 0) {
+    seq = seq_force;
+  }
+  BufferHelper::encodeHdr(buffer, seq);
   return buffer.toString();
 }
 
