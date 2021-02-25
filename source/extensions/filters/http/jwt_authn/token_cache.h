@@ -24,7 +24,7 @@ class TokenCache : public SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>
 public:
   TokenCache(int cache_size);
   ~TokenCache();
-  void find(const std::string& token, bool& cache_hit);
+  ::google::jwt_verify::Jwt* find(const std::string& token, bool& cache_hit);
 };
 
 } // namespace JwtAuthn

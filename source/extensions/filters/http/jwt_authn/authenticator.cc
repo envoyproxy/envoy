@@ -170,11 +170,10 @@ void AuthenticatorImpl::startVerify() {
   // isIssuerSpecified() check already make sure the issuer is in the cache.
   ASSERT(jwks_data_ != nullptr);
 
-  jwks_data_->getTokenCache()->find(curr_token_->token(), jwt_cache_hited_);
+  auto cache_jwt = jwks_data_->getTokenCache()->find(curr_token_->token(), jwt_cache_hited_);
   if (jwt_cache_hited_) {
     ENVOY_LOG(debug, "{}: verified token with cache hit: tokens size {}", name(), tokens_.size());
-    doneWithStatus(Status::Ok);
-    return;
+    jwt_.reset(cache_jwt);
   }
 
   // Default is 60 seconds
