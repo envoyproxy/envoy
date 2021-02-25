@@ -1,7 +1,5 @@
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -21,7 +19,7 @@ public:
    * from the filter factory. Filters must be registered in decode path order.
    */
   void registerFilter(
-      absl::string_view name,
+      const std::string& name,
       const envoy::extensions::filters::common::dependency::v3::FilterDependencies& dependencies) {
     filter_chain_.push_back({name, dependencies});
   }
@@ -37,7 +35,7 @@ public:
   bool validDecodeDependencies();
 
 private:
-  std::vector<std::pair<absl::string_view,
+  std::vector<std::pair<const std::string&,
                         envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
       filter_chain_;
 };
