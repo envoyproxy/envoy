@@ -9,6 +9,7 @@ Incompatible Behavior Changes
   from true to false, in order to avoid possible memory exhaustion due to an untrusted downstream sending a large number of unique method names. The previous
   default value was deprecated in version 1.14.0. This only changes the behavior when the value is not set. The previous behavior can be used by setting the value
   to true. This behavior change by be overridden by setting runtime feature `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+* http: when a protocol error is detected in response from upstream, Envoy sends 502 BadGateway downstream and access log entry contains UPE flag. This behavior change can be overwritten to use error code 503 by setting `envoy.reloadable_features.return_502_for_upstream_protocol_errors` to false.
 
 Minor Behavior Changes
 ----------------------
