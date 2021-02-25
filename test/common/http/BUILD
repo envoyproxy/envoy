@@ -215,6 +215,7 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
+        "//include/envoy/filesystem:filesystem_interface",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",

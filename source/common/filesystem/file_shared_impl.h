@@ -37,16 +37,20 @@ template <typename T> Api::IoCallResult<T> resultSuccess(T result) {
 
 class FileSharedImpl : public File {
 public:
-  FileSharedImpl(std::string path) : fd_(INVALID_HANDLE), path_(std::move(path)) {}
+  FileSharedImpl(const FilePathAndType& filepath_and_type)
+      : fd_(INVALID_HANDLE), filepath_and_type_(filepath_and_type) {}
 
   ~FileSharedImpl() override = default;
 
   bool isOpen() const override;
   std::string path() const override;
+  DestinationType destinationType() const override;
 
 protected:
   filesystem_os_id_t fd_;
-  const std::string path_;
+  const FilePathAndType filepath_and_type_;
+  // const std::string path_;
+  // const DestinationType destination_type;
 };
 
 } // namespace Filesystem

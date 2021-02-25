@@ -224,6 +224,52 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #endif
 }
 
+TEST_F(FileSystemImplTest, ConstructedFile) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+  FilePathAndType new_file_info {
+    Filesystem::DestinationType::File,
+    new_file_path
+  };
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_EQ(file->path(), new_file_path);
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::File);
+}
+
+TEST_F(FileSystemImplTest, ConstructedConsoleFile) {
+  FilePathAndType new_file_info {
+    Filesystem::DestinationType::Console,
+    ""
+  };
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Console);
+}
+
+TEST_F(FileSystemImplTest, ConstructedStdErrFile) {
+  FilePathAndType new_file_info {
+    Filesystem::DestinationType::Stderr,
+    ""
+  };
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stderr);
+}
+
+TEST_F(FileSystemImplTest, ConstructedStdOutFile) {
+  FilePathAndType new_file_info {
+    Filesystem::DestinationType::Stdout,
+    ""
+  };
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stdout);
+}
+
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());

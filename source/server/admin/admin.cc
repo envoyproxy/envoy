@@ -120,7 +120,7 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const std::string& access_log_path,
+void AdminImpl::startHttpListener(const Filesystem::FilePathAndType& file_info,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   const Network::Socket::OptionsSharedPtr& socket_options,
@@ -128,7 +128,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);

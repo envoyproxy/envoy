@@ -78,7 +78,7 @@ public:
     EXPECT_CALL(read_filter_callbacks_.connection_, streamInfo())
         .WillRepeatedly(ReturnRef(stream_info_));
 
-    EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
+    EXPECT_CALL(log_manager_, createAccessLog(testing::Matcher<const std::string&>(_))).WillOnce(Return(file_));
     access_log_ = std::make_shared<AccessLog>("test", log_manager_, dispatcher_.timeSource());
   }
 

@@ -182,12 +182,13 @@ public:
 private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
-    const std::string& accessLogPath() const override { return access_log_path_; }
+    const std::string& accessLogPath() const override { return access_log_file_info_.path_; }
+    Filesystem::DestinationType access_log_destination() const override { return access_log_file_info_.file_type_;}
     const std::string& profilePath() const override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
 
-    std::string access_log_path_;
+    Filesystem::FilePathAndType access_log_file_info_;
     std::string profile_path_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;

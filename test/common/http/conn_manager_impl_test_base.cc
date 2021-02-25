@@ -1,3 +1,4 @@
+#include "envoy/filesystem/filesystem.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
 
 using testing::AtLeast;
@@ -11,8 +12,12 @@ namespace Http {
 
 HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
     : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
+      Filesystem::FilePathAndType file_info {
+        Filesystem::DestinationType::File,
+        access_log_path_
+      };
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-          access_log_path_, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+          file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
           log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),

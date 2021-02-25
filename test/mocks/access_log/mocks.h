@@ -42,6 +42,7 @@ public:
   // AccessLog::AccessLogManager
   MOCK_METHOD(void, reopen, ());
   MOCK_METHOD(AccessLogFileSharedPtr, createAccessLog, (const std::string& file_name));
+  MOCK_METHOD(AccessLogFileSharedPtr, createAccessLog, (const Envoy::Filesystem::FilePathAndType& file_info));
 
   std::shared_ptr<MockAccessLogFile> file_{new testing::NiceMock<MockAccessLogFile>()};
 };

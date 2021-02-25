@@ -126,6 +126,11 @@ public:
    * @return const std::string& the admin access log path.
    */
   virtual const std::string& accessLogPath() const PURE;
+  
+  /**
+   * @return const  the admin access log destination type.
+   */
+  virtual Filesystem::DestinationType access_log_destination() const PURE;
 
   /**
    * @return const std::string& profiler output path.

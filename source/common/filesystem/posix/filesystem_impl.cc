@@ -36,7 +36,7 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
   }
 
   const auto flags_and_mode = translateFlag(in);
-  fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+  fd_ = ::open(path().c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
@@ -75,8 +75,23 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
   return {out, mode};
 }
 
+FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
+  switch (file_info.file_type_) {
+  case DestinationType::File:
+    return std::make_unique<FileImplPosix>(file_info);
+  case DestinationType::Console:
+    return std::make_unique<ConsoleFileImplPosix>();
+  case DestinationType::Stderr:
+    return std::make_unique<StdErrFileImplPosix>();
+  case DestinationType::Stdout:
+    return std::make_unique<StdOutFileImplPosix>();
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 FilePtr InstanceImplPosix::createFile(const std::string& path) {
-  return std::make_unique<FileImplPosix>(path);
+  return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::File, path});
 }
 
 bool InstanceImplPosix::fileExists(const std::string& path) {
