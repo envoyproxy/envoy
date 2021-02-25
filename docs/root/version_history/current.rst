@@ -78,9 +78,9 @@ Removed Config or Runtime
 New Features
 ------------
 
+* access log: added a new :ref:`OpenTelemetry access logger <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>` extension, allowing a flexible log structure with native Envoy access log formatting.
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
-* access log: added a new :ref:`OpenTelemetry access logger <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>` extension, allowing a flexible log structure with native Envoy access log formatting.
 * compression: add brotli :ref:`compressor <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`.
 * config: add `envoy.features.fail_on_any_deprecated_feature` runtime key, which matches the behaviour of compile-time flag `ENVOY_DISABLE_DEPRECATED_FEATURES`, i.e. use of deprecated fields will cause a crash.
 * dispatcher: supports a stack of `Envoy::ScopeTrackedObject` instead of a single tracked object. This will allow Envoy to dump more debug information on crash.

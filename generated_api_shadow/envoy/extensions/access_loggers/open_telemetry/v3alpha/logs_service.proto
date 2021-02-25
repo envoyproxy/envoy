@@ -19,8 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the built-in *envoy.access_loggers.open_telemetry*
 // :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
-// populate :ref:`ExportLogsServiceRequest.resource_logs
-// <opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs>`.
+// populate [opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto).
 // OpenTelemetry [Resource](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/resource/v1/resource.proto)
 // attributes are filled with Envoy node info. In addition, the request start time is set in the
 // dedicated field.
