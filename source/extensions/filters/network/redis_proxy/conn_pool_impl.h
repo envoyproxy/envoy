@@ -126,7 +126,8 @@ private:
   };
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
-                           public Upstream::ClusterUpdateCallbacks {
+                           public Upstream::ClusterUpdateCallbacks,
+                           public Logger::Loggable<Logger::Id::redis> {
     ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
                     std::string cluster_name);
     ~ThreadLocalPool() override;
