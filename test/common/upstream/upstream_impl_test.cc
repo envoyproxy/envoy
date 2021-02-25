@@ -2301,7 +2301,6 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
         max_retries: 123
       # 1 - Empty budget config, should have defaults.
       - priority: DEFAULT
-        max_retries: 123
         retry_budget: {}
       # 2 - Empty budget config with max retries, should have budget defaults.
       - priority: DEFAULT
