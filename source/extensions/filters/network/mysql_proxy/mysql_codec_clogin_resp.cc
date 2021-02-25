@@ -122,7 +122,7 @@ DecodeStatus AuthMoreMessage::parseMessage(Buffer::Instance& buffer, uint32_t re
   return DecodeStatus::Success;
 }
 
-void AuthSwitchMessage::encode(Buffer::Instance& out) {
+void AuthSwitchMessage::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, resp_code_);
   if (isOldAuthSwitch()) {
     return;
@@ -132,7 +132,7 @@ void AuthSwitchMessage::encode(Buffer::Instance& out) {
   BufferHelper::addString(out, auth_plugin_data_);
 }
 
-void OkMessage::encode(Buffer::Instance& out) {
+void OkMessage::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, resp_code_);
   BufferHelper::addLengthEncodedInteger(out, affected_rows_);
   BufferHelper::addLengthEncodedInteger(out, last_insert_id_);
@@ -141,7 +141,7 @@ void OkMessage::encode(Buffer::Instance& out) {
   BufferHelper::addString(out, info_);
 }
 
-void ErrMessage::encode(Buffer::Instance& out) {
+void ErrMessage::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, resp_code_);
   BufferHelper::addUint16(out, error_code_);
   BufferHelper::addUint8(out, marker_);
@@ -149,7 +149,7 @@ void ErrMessage::encode(Buffer::Instance& out) {
   BufferHelper::addString(out, error_message_);
 }
 
-void AuthMoreMessage::encode(Buffer::Instance& out) {
+void AuthMoreMessage::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, resp_code_);
   BufferHelper::addString(out, more_plugin_data_);
 }

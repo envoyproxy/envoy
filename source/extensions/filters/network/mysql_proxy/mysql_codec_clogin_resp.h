@@ -38,7 +38,7 @@ public:
   // ClientLoginResponse
   AuthMoreMessage() : ClientLoginResponse(MYSQL_RESP_MORE) {}
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   const std::string& getAuthMoreData() const { return more_plugin_data_; }
   void setAuthMoreData(const std::string& data) { more_plugin_data_ = data; }
@@ -52,7 +52,7 @@ public:
   AuthSwitchMessage() : ClientLoginResponse(MYSQL_RESP_AUTH_SWITCH) {}
   // ClientLoginResponse
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   bool isOldAuthSwitch() const { return is_old_auth_switch_; }
   const std::string& getAuthPluginData() const { return auth_plugin_data_; }
@@ -72,7 +72,7 @@ public:
   OkMessage() : ClientLoginResponse(MYSQL_RESP_OK) {}
   // ClientLoginResponse
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   void setAffectedRows(uint64_t affected_rows) { affected_rows_ = affected_rows; }
   void setLastInsertId(uint64_t last_insert_id) { last_insert_id_ = last_insert_id; }
@@ -99,7 +99,7 @@ public:
   ErrMessage() : ClientLoginResponse(MYSQL_RESP_ERR) {}
   // ClientLoginResponse
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   void setErrorCode(uint16_t error_code) { error_code_ = error_code; }
   void setSqlStateMarker(uint8_t marker) { marker_ = marker; }

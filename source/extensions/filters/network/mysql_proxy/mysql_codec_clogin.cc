@@ -188,7 +188,7 @@ DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t re
   return DecodeStatus::Success;
 }
 
-void ClientLogin::encode(Buffer::Instance& out) {
+void ClientLogin::encode(Buffer::Instance& out) const {
   if (client_cap_ & CLIENT_SSL) {
     encodeResponseSsl(out);
     return;
@@ -200,7 +200,7 @@ void ClientLogin::encode(Buffer::Instance& out) {
   encodeResponse320(out);
 }
 
-void ClientLogin::encodeResponseSsl(Buffer::Instance& out) {
+void ClientLogin::encodeResponseSsl(Buffer::Instance& out) const {
   BufferHelper::addUint32(out, client_cap_);
   BufferHelper::addUint32(out, max_packet_);
   BufferHelper::addUint8(out, charset_);
@@ -209,7 +209,7 @@ void ClientLogin::encodeResponseSsl(Buffer::Instance& out) {
   }
 }
 
-void ClientLogin::encodeResponse41(Buffer::Instance& out) {
+void ClientLogin::encodeResponse41(Buffer::Instance& out) const {
   uint8_t enc_end_string = 0;
   BufferHelper::addUint32(out, client_cap_);
   BufferHelper::addUint32(out, max_packet_);
@@ -239,7 +239,7 @@ void ClientLogin::encodeResponse41(Buffer::Instance& out) {
   }
 }
 
-void ClientLogin::encodeResponse320(Buffer::Instance& out) {
+void ClientLogin::encodeResponse320(Buffer::Instance& out) const {
   uint8_t enc_end_string = 0;
   BufferHelper::addUint16(out, getBaseClientCap());
   BufferHelper::addUint24(out, max_packet_);

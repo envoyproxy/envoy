@@ -38,7 +38,7 @@ public:
 
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t len) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   Cmd parseCmd(Buffer::Instance& data);
   Cmd getCmd() const { return cmd_; }
@@ -63,7 +63,7 @@ class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
   const std::string& getData() const { return data_; }
   void setData(const std::string& data) { data_ = data; }
 

@@ -13,7 +13,7 @@ class ClientSwitchResponse : public MySQLCodec {
 public:
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   void setAuthPluginResp(const std::string& auth_plugin_resp) {
     auth_plugin_resp_ = auth_plugin_resp;

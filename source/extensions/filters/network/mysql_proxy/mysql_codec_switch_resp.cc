@@ -21,7 +21,7 @@ DecodeStatus ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32
   return DecodeStatus::Success;
 }
 
-void ClientSwitchResponse::encode(Buffer::Instance& out) {
+void ClientSwitchResponse::encode(Buffer::Instance& out) const {
   BufferHelper::addString(out, auth_plugin_resp_);
 }
 

@@ -12,7 +12,7 @@ class ServerGreeting : public MySQLCodec {
 public:
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   uint8_t getProtocol() const { return protocol_; }
   const std::string& getVersion() const { return version_; }

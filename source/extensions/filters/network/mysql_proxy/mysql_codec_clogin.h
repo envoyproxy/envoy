@@ -15,7 +15,7 @@ class ClientLogin : public MySQLCodec {
 public:
   // MySQLCodec
   DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  void encode(Buffer::Instance&) override;
+  void encode(Buffer::Instance&) const override;
 
   uint32_t getClientCap() const { return client_cap_; }
   uint16_t getBaseClientCap() const { return client_cap_ & 0xffff; }
@@ -46,9 +46,9 @@ private:
   DecodeStatus parseResponseSsl(Buffer::Instance& buffer);
   DecodeStatus parseResponse41(Buffer::Instance& buffer);
   DecodeStatus parseResponse320(Buffer::Instance& buffer, uint32_t);
-  void encodeResponseSsl(Buffer::Instance& out);
-  void encodeResponse41(Buffer::Instance& out);
-  void encodeResponse320(Buffer::Instance& out);
+  void encodeResponseSsl(Buffer::Instance& out) const;
+  void encodeResponse41(Buffer::Instance& out) const;
+  void encodeResponse320(Buffer::Instance& out) const;
 
   uint32_t client_cap_{0};
   uint32_t max_packet_{0};

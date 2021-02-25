@@ -113,7 +113,7 @@ public:
     return parseMessage(data, len);
   }
 
-  virtual void encode(Buffer::Instance& out) PURE;
+  virtual void encode(Buffer::Instance& out) const PURE;
 
 protected:
   virtual DecodeStatus parseMessage(Buffer::Instance& data, uint32_t len) PURE;

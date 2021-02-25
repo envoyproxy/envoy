@@ -152,7 +152,7 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   return DecodeStatus::Success;
 }
 
-void ServerGreeting::encode(Buffer::Instance& out) {
+void ServerGreeting::encode(Buffer::Instance& out) const {
   // https://github.com/mysql/mysql-proxy/blob/ca6ad61af9088147a568a079c44d0d322f5bee59/src/network-mysqld-packet.c#L1339
   uint8_t enc_end_string = 0;
   BufferHelper::addUint8(out, protocol_);

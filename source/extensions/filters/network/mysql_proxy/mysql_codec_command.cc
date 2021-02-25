@@ -58,7 +58,7 @@ DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
 
 void Command::setData(const std::string& data) { data_.assign(data); }
 
-void Command::encode(Buffer::Instance& out) {
+void Command::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, static_cast<int>(cmd_));
   BufferHelper::addString(out, data_);
 }
@@ -71,7 +71,7 @@ DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t le
   return DecodeStatus::Success;
 }
 
-void CommandResponse::encode(Buffer::Instance& out) { BufferHelper::addString(out, data_); }
+void CommandResponse::encode(Buffer::Instance& out) const { BufferHelper::addString(out, data_); }
 
 } // namespace MySQLProxy
 } // namespace NetworkFilters
