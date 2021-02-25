@@ -85,7 +85,7 @@ vhds:
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   const std::string context_ = "vhds_test";
-  absl::node_hash_set<Envoy::Router::RouteConfigProvider*> providers_;
+  absl::optional<Envoy::Router::RouteConfigProvider*> provider_;
   Protobuf::util::MessageDifferencer messageDifferencer_;
   std::string default_vhds_config_;
   NiceMock<Envoy::Config::MockSubscriptionFactory> subscription_factory_;
@@ -97,7 +97,7 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_));
+  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, provider_));
 }
 
 // verify that api_type: GRPC fails validation
@@ -115,7 +115,7 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_),
+  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, provider_),
                EnvoyException);
 }
 
@@ -125,7 +125,7 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, provider_);
   EXPECT_EQ(0UL, config_update_info->protobufConfiguration().virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
@@ -184,7 +184,7 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
+  VhdsSubscription subscription(config_update_info, factory_context_, context_, provider_);
   EXPECT_EQ(1UL, config_update_info->protobufConfiguration().virtual_hosts_size());
   EXPECT_EQ("vhost_rds1", config_update_info->protobufConfiguration().virtual_hosts(0).name());
 

@@ -101,12 +101,12 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   GrpcMuxImplPtr grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<MockOpaqueResourceDecoder> resource_decoder_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Stats::Gauge& control_plane_connected_state_;
@@ -136,6 +136,31 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   auto bar_zz_sub = grpc_mux_->addWatch("bar", {"zz"}, callbacks_, resource_decoder_);
   expectSendMessage("bar", {"z"}, "");
   expectSendMessage("bar", {}, "");
+  expectSendMessage("foo", {}, "");
+}
+
+// Validate behavior when dynamic context parameters are updated.
+TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_);
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_);
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, "", true);
+  expectSendMessage("bar", {}, "");
+  grpc_mux_->start();
+  // Unknown type, shouldn't do anything.
+  local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
+  // Update to foo type should resend Node.
+  expectSendMessage("foo", {"x", "y"}, "", true);
+  local_info_.context_provider_.update_cb_handler_.runCallbacks("foo");
+  // Update to bar type should resend Node.
+  expectSendMessage("bar", {}, "", true);
+  local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  // Adding a new foo resource to the watch shouldn't send Node.
+  expectSendMessage("foo", {"z", "x", "y"}, "");
+  auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_);
+  expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("foo", {}, "");
 }
 
