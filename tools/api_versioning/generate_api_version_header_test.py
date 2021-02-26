@@ -5,6 +5,7 @@ from generate_api_version_header import GenerateHeaderFile
 import tempfile
 import unittest
 
+
 class GenerateApiVersionHeaderTest(unittest.TestCase):
   EXPECTED_TEMPLATE = """#pragma once
 namespace Envoy {
@@ -69,6 +70,7 @@ constexpr ApiVersion api_version = {%u, %u, %u};
         assert False, 'The call to GenerateHeaderFile should have thrown an exception'
       except:
         pass
+
 
 if __name__ == '__main__':
   unittest.main()
