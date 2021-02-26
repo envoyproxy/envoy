@@ -83,6 +83,7 @@ EXTENSION_CATEGORIES = [
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
     "envoy.rate_limit_descriptors",
+    "envoy.request_id",
     "envoy.resource_monitors",
     "envoy.retry_host_predicates",
     "envoy.retry_priorities",

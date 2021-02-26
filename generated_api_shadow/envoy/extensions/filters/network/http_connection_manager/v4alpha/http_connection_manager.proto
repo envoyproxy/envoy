@@ -527,15 +527,21 @@ message HttpConnectionManager {
   bool merge_slashes = 33;
 
   // The configuration of the request ID extension. This includes operations such as
-  // generation, validation, and associated tracing operations.
+  // generation, validation, and associated tracing operations. If empty, the
+  // :ref:`UuidRequestIdConfig <envoy_v3_api_msg_extensions.request_id.uuid.v3.UuidRequestIdConfig>`
+  // default extension is used with default parameters. See the documentation for that extension
+  // for details on what it does. Customizing the configuration for the default extension can be
+  // achieved by configuring it explicitly here. For example, to disable trace reason packing,
+  // the following configuration can be used:
   //
-  // If not set, Envoy uses the default UUID-based behavior:
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.network.http_connection_manager.v3.RequestIDExtension
   //
-  // 1. Request ID is propagated using *x-request-id* header.
+  //   typed_config:
+  //     "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
+  //     pack_trace_reason: false
   //
-  // 2. Request ID is a universally unique identifier (UUID).
-  //
-  // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
+  // [#extension-category: envoy.request_id]
   RequestIDExtension request_id_extension = 36;
 
   // The configuration to customize local reply returned by Envoy. It can customize status code,

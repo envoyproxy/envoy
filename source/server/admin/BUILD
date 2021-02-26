@@ -28,7 +28,6 @@ envoy_cc_library(
         ":utils_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/server:admin_interface",
@@ -53,7 +52,6 @@ envoy_cc_library(
         "//source/common/http:default_server_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
         "//source/common/memory:utils_lib",
         "//source/common/network:connection_balancer_lib",
@@ -64,6 +62,7 @@ envoy_cc_library(
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/request_id/uuid:config",
         "//source/server:listener_manager_lib",
     ],
 )

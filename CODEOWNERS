@@ -166,3 +166,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # user space socket pair and event
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
+# Default UUID4 request ID extension
+/*/extensions/request_id/uuid @mattklein123 @alyssawilk

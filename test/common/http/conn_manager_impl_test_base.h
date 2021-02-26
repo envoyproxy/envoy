@@ -134,7 +134,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
-  RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;

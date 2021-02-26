@@ -94,6 +94,8 @@ if __name__ == '__main__':
                            'test/extensions/filters/network/common/uber_per_readfilter.cc')
   # The TLS and generic upstream extensions are hard-coded into the build, so
   # not in source/extensions/extensions_build_config.bzl
+  # TODO(mattklein123): Read these special keys from all_extensions.bzl or a shared location to
+  # avoid duplicate logic.
   extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
       '//source/extensions/transport_sockets/tls:config')
   extension_db['envoy.upstreams.http.generic'] = GetExtensionMetadata(
@@ -102,5 +104,7 @@ if __name__ == '__main__':
       '//source/extensions/upstreams/tcp/generic:config')
   extension_db['envoy.upstreams.http.http_protocol_options'] = GetExtensionMetadata(
       '//source/extensions/upstreams/http:config')
+  extension_db['envoy.request_id.uuid'] = GetExtensionMetadata(
+      '//source/extensions/request_id/uuid:config')
 
   pathlib.Path(output_path).write_text(json.dumps(extension_db))

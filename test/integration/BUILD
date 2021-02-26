@@ -752,6 +752,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/common:thread_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/thread_local:thread_local_lib",

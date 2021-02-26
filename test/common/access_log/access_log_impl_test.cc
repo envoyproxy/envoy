@@ -493,24 +493,21 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   {
-    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(forced_header, Http::TraceStatus::Forced);
+    stream_info_.setTraceReason(Tracing::Reason::ServiceForced);
     EXPECT_CALL(*file_, write(_));
-    log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
+    stream_info_.setTraceReason(Tracing::Reason::NotTraceable);
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(sampled_header,
-                                                         Http::TraceStatus::Sampled);
+    stream_info_.setTraceReason(Tracing::Reason::Sampling);
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 

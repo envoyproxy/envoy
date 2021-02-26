@@ -103,13 +103,12 @@ public:
   static const std::string& toString(OperationName operation_name);
 
   /**
-   * Request might be traceable if x-request-id is traceable uuid or we do sampling tracing.
+   * Request might be traceable if the request ID is traceable or we do sampling tracing.
    * Note: there is a global switch which turns off tracing completely on server side.
    *
    * @return decision if request is traceable or not and Reason why.
    **/
-  static Decision isTracing(const StreamInfo::StreamInfo& stream_info,
-                            const Http::RequestHeaderMap& request_headers);
+  static Decision shouldTraceRequest(const StreamInfo::StreamInfo& stream_info);
 
   /**
    * Adds information obtained from the downstream request headers as tags to the active span.

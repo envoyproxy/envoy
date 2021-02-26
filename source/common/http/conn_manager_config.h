@@ -209,9 +209,9 @@ public:
   virtual ~ConnectionManagerConfig() = default;
 
   /**
-   * @return RequestIDExtensionSharedPtr The request id utilities instance to use
+   * @return RequestIDExtensionSharedPtr The request id utilities instance to use.
    */
-  virtual RequestIDExtensionSharedPtr requestIDExtension() PURE;
+  virtual const RequestIDExtensionSharedPtr& requestIDExtension() PURE;
 
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.

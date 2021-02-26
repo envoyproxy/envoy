@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.extensions.request_id.uuid.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.request_id.uuid.v3";
+option java_outer_classname = "UuidProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: UUID]
+// [#extension: envoy.request_id.uuid]
+
+// Configuration for the default UUID request ID extension which has the following behavior:
+//
+// 1. Request ID is propagated using the *x-request-id* header.
+//
+// 2. Request ID is a universally unique identifier (UUID).
+//
+// 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID. By default this will
+//    overwrite existing UUIDs received in the *x-request-id* header if the trace sampling decision
+//    is changed.
+message UuidRequestIdConfig {
+  // Whether the implementation alters the UUID to contain the trace sampling decision as per the
+  // `UuidRequestIdConfig` message documentation. This defaults to true. If disabled no
+  // modification to the UUID will be performed. It is important to note that if disabled,
+  // stable sampling of traces, access logs, etc. will no longer work and only random sampling will
+  // be possible.
+  google.protobuf.BoolValue pack_trace_reason = 1;
+}

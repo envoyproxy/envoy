@@ -5,6 +5,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/http/conn_manager_impl.h"
 #include "common/http/http1/codec_stats.h"
@@ -78,10 +79,11 @@ public:
 
   /**
    * Mutate request headers if request needs to be traced.
+   * @return the trace reason selected after header mutation to be stored in stream info.
    */
-  static void mutateTracingRequestHeader(RequestHeaderMap& request_headers,
-                                         Runtime::Loader& runtime, ConnectionManagerConfig& config,
-                                         const Router::Route* route);
+  static ABSL_MUST_USE_RESULT Tracing::Reason
+  mutateTracingRequestHeader(RequestHeaderMap& request_headers, Runtime::Loader& runtime,
+                             ConnectionManagerConfig& config, const Router::Route* route);
 
 private:
   static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,

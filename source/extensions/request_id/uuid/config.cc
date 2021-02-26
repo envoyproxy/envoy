@@ -1,19 +1,16 @@
-#include "common/http/request_id_extension_uuid_impl.h"
-
-#include <cstdint>
-#include <string>
+#include "extensions/request_id/uuid/config.h"
 
 #include "envoy/http/header_map.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/random_generator.h"
 #include "common/common/utility.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace RequestId {
 
-void UUIDRequestIDExtension::set(RequestHeaderMap& request_headers, bool force) {
+void UUIDRequestIDExtension::set(Http::RequestHeaderMap& request_headers, bool force) {
   if (!force && request_headers.RequestId()) {
     return;
   }
@@ -24,15 +21,15 @@ void UUIDRequestIDExtension::set(RequestHeaderMap& request_headers, bool force) 
   request_headers.setRequestId(uuid);
 }
 
-void UUIDRequestIDExtension::setInResponse(ResponseHeaderMap& response_headers,
-                                           const RequestHeaderMap& request_headers) {
+void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_headers,
+                                           const Http::RequestHeaderMap& request_headers) {
   if (request_headers.RequestId()) {
     response_headers.setRequestId(request_headers.getRequestIdValue());
   }
 }
 
-bool UUIDRequestIDExtension::modBy(const RequestHeaderMap& request_headers, uint64_t& out,
-                                   uint64_t mod) {
+bool UUIDRequestIDExtension::modBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
+                                   uint64_t mod) const {
   if (request_headers.RequestId() == nullptr) {
     return false;
   }
@@ -50,29 +47,31 @@ bool UUIDRequestIDExtension::modBy(const RequestHeaderMap& request_headers, uint
   return true;
 }
 
-TraceStatus UUIDRequestIDExtension::getTraceStatus(const RequestHeaderMap& request_headers) {
+Tracing::Reason
+UUIDRequestIDExtension::getTraceReason(const Http::RequestHeaderMap& request_headers) {
   if (request_headers.RequestId() == nullptr) {
-    return TraceStatus::NoTrace;
+    return Tracing::Reason::NotTraceable;
   }
   absl::string_view uuid = request_headers.getRequestIdValue();
   if (uuid.length() != Random::RandomGeneratorImpl::UUID_LENGTH) {
-    return TraceStatus::NoTrace;
+    return Tracing::Reason::NotTraceable;
   }
 
   switch (uuid[TRACE_BYTE_POSITION]) {
   case TRACE_FORCED:
-    return TraceStatus::Forced;
+    return Tracing::Reason::ServiceForced;
   case TRACE_SAMPLED:
-    return TraceStatus::Sampled;
+    return Tracing::Reason::Sampling;
   case TRACE_CLIENT:
-    return TraceStatus::Client;
+    return Tracing::Reason::ClientForced;
   default:
-    return TraceStatus::NoTrace;
+    return Tracing::Reason::NotTraceable;
   }
 }
 
-void UUIDRequestIDExtension::setTraceStatus(RequestHeaderMap& request_headers, TraceStatus status) {
-  if (request_headers.RequestId() == nullptr) {
+void UUIDRequestIDExtension::setTraceReason(Http::RequestHeaderMap& request_headers,
+                                            Tracing::Reason reason) {
+  if (!pack_trace_reason_ || request_headers.RequestId() == nullptr) {
     return;
   }
   absl::string_view uuid_view = request_headers.getRequestIdValue();
@@ -81,22 +80,27 @@ void UUIDRequestIDExtension::setTraceStatus(RequestHeaderMap& request_headers, T
   }
   std::string uuid(uuid_view);
 
-  switch (status) {
-  case TraceStatus::Forced:
+  switch (reason) {
+  case Tracing::Reason::ServiceForced:
     uuid[TRACE_BYTE_POSITION] = TRACE_FORCED;
     break;
-  case TraceStatus::Client:
+  case Tracing::Reason::ClientForced:
     uuid[TRACE_BYTE_POSITION] = TRACE_CLIENT;
     break;
-  case TraceStatus::Sampled:
+  case Tracing::Reason::Sampling:
     uuid[TRACE_BYTE_POSITION] = TRACE_SAMPLED;
     break;
-  case TraceStatus::NoTrace:
+  case Tracing::Reason::NotTraceable:
     uuid[TRACE_BYTE_POSITION] = NO_TRACE;
+    break;
+  default:
     break;
   }
   request_headers.setRequestId(uuid);
 }
 
-} // namespace Http
+REGISTER_FACTORY(UUIDRequestIDExtensionFactory, Server::Configuration::RequestIDExtensionFactory);
+
+} // namespace RequestId
+} // namespace Extensions
 } // namespace Envoy

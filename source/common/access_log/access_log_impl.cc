@@ -92,11 +92,9 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
-                                      const Http::RequestHeaderMap& request_headers,
-                                      const Http::ResponseHeaderMap&,
+                                      const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                       const Http::ResponseTrailerMap&) const {
-  Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
-
+  const Tracing::Decision decision = Tracing::HttpTracerUtility::shouldTraceRequest(info);
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
@@ -130,10 +128,9 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap&,
                              const Http::ResponseTrailerMap&) const {
-  auto rid_extension = stream_info.getRequestIDExtension();
   uint64_t random_value;
-  if (use_independent_randomness_ ||
-      !rid_extension->modBy(
+  if (use_independent_randomness_ || stream_info.getRequestIDProvider() == nullptr ||
+      !stream_info.getRequestIDProvider()->modBy(
           request_headers, random_value,
           ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
     random_value = random_.random();

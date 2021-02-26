@@ -8,10 +8,11 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
+
+#include "extensions/request_id/uuid/config.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -38,7 +39,7 @@ namespace Http {
 class MockRequestIDExtension : public RequestIDExtension {
 public:
   explicit MockRequestIDExtension(Random::RandomGenerator& random)
-      : real_(RequestIDExtensionFactory::defaultInstance(random)) {
+      : real_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random)) {
     ON_CALL(*this, set(_, _))
         .WillByDefault([this](Http::RequestHeaderMap& request_headers, bool force) {
           return real_->set(request_headers, force);
@@ -51,21 +52,22 @@ public:
     ON_CALL(*this, modBy(_, _, _))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers, uint64_t& out,
                               uint64_t mod) { return real_->modBy(request_headers, out, mod); });
-    ON_CALL(*this, getTraceStatus(_))
+    ON_CALL(*this, getTraceReason(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
-          return real_->getTraceStatus(request_headers);
+          return real_->getTraceReason(request_headers);
         });
-    ON_CALL(*this, setTraceStatus(_, _))
-        .WillByDefault([this](Http::RequestHeaderMap& request_headers, TraceStatus trace_status) {
-          real_->setTraceStatus(request_headers, trace_status);
-        });
+    ON_CALL(*this, setTraceReason(_, _))
+        .WillByDefault(
+            [this](Http::RequestHeaderMap& request_headers, Tracing::Reason trace_status) {
+              real_->setTraceReason(request_headers, trace_status);
+            });
   }
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(bool, modBy, (const Http::RequestHeaderMap&, uint64_t&, uint64_t));
-  MOCK_METHOD(TraceStatus, getTraceStatus, (const Http::RequestHeaderMap&));
-  MOCK_METHOD(void, setTraceStatus, (Http::RequestHeaderMap&, TraceStatus));
+  MOCK_METHOD(bool, modBy, (const Http::RequestHeaderMap&, uint64_t&, uint64_t), (const));
+  MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
+  MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
 
 private:
   RequestIDExtensionSharedPtr real_;
@@ -99,16 +101,18 @@ public:
     ON_CALL(config_, localReply()).WillByDefault(ReturnRef(*local_reply_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
-    ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));
+    ON_CALL(config_, requestIDExtension()).WillByDefault(ReturnRef(request_id_extension_));
   }
 
   struct MutateRequestRet {
     bool operator==(const MutateRequestRet& rhs) const {
-      return downstream_address_ == rhs.downstream_address_ && internal_ == rhs.internal_;
+      return downstream_address_ == rhs.downstream_address_ && internal_ == rhs.internal_ &&
+             trace_reason_ == rhs.trace_reason_;
     }
 
     std::string downstream_address_;
     bool internal_;
+    Tracing::Reason trace_reason_;
   };
 
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
@@ -119,7 +123,8 @@ public:
     ret.downstream_address_ = ConnectionManagerUtility::mutateRequestHeaders(
                                   headers, connection_, config_, route_config_, local_info_)
                                   ->asString();
-    ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
+    ret.trace_reason_ =
+        ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
   }
@@ -202,7 +207,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers;
 
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(connection_.stream_info_.downstream_address_provider_->remoteAddress()
                 ->ip()
@@ -219,7 +224,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers;
 
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has(Headers::get().ForwardedFor));
 }
@@ -233,7 +238,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
 
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("198.51.100.1", headers.getForwardedForValue());
 }
@@ -322,7 +327,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAdd
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
 
   TestRequestHeaderMapImpl headers;
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true}),
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("12.12.12.12", headers.get_(Headers::get().ForwardedFor));
 }
@@ -336,7 +341,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress)
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
   TestRequestHeaderMapImpl headers;
 
-  EXPECT_EQ((MutateRequestRet{"127.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"127.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(local_address.ip()->addressAsString(), headers.get_(Headers::get().ForwardedFor));
 }
@@ -348,7 +353,7 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
-  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false}),
+  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress()->value(), "198.51.100.1");
 }
@@ -360,7 +365,7 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
-  EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false}),
+  EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
 }
@@ -372,7 +377,7 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   TestRequestHeaderMapImpl request_headers;
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(request_headers, Protocol::Http2));
   EXPECT_FALSE(request_headers.has(Headers::get().Via));
 
@@ -390,7 +395,7 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
   TestRequestHeaderMapImpl request_headers;
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(request_headers, Protocol::Http2));
   EXPECT_EQ("foo", request_headers.get_(Headers::get().Via));
 
@@ -410,7 +415,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"user-agent", "foo"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
@@ -427,7 +432,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   TestRequestHeaderMapImpl headers{{"user-agent", ""},
                                    {"x-envoy-downstream-service-cluster", "foo"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
@@ -449,7 +454,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
                                An<const envoy::type::v3::FractionalPercent&>(), _))
         .WillOnce(Return(true));
 
-    EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+    EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::ServiceForced}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     // Traceable (forced trace) variant of uuid
     EXPECT_EQ("f4dca0a9-12c7-a307-8002-969403baf480", headers.get_(Headers::get().RequestId));
@@ -464,12 +469,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
                 featureEnabled("tracing.random_sampling",
                                An<const envoy::type::v3::FractionalPercent&>(), _))
         .WillOnce(Return(false));
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("tracing.global_enabled",
-                               An<const envoy::type::v3::FractionalPercent&>(), _))
-        .WillOnce(Return(true));
 
-    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ(uuid, headers.get_(Headers::get().RequestId));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyForceTrace));
@@ -493,7 +494,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
     EXPECT_CALL(runtime_.snapshot_,
                 featureEnabled("tracing.client_enabled", testing::Matcher<uint64_t>(_)))
         .Times(0);
-    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
@@ -511,7 +512,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    An<const envoy::type::v3::FractionalPercent&>()))
         .WillOnce(Return(false));
 
-    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
@@ -527,7 +528,7 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                                                    An<const envoy::type::v3::FractionalPercent&>()))
         .WillOnce(Return(true));
 
-    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+    EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false, Tracing::Reason::ClientForced}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
     // Traceable (client trace) variant of random_.uuid_
@@ -545,7 +546,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
 
   EXPECT_CALL(local_info_, nodeName()).Times(0);
 
-  EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
+  EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("foo", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
@@ -564,7 +565,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
                                    {"x-envoy-downstream-service-cluster", "foo"}};
   EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(empty_node_));
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceNode));
   EXPECT_EQ("foo", headers.get_(Headers::get().UserAgent));
@@ -579,7 +580,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   user_agent_ = "bar";
   TestRequestHeaderMapImpl headers;
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("bar", headers.get_(Headers::get().UserAgent));
   EXPECT_EQ("bar", headers.get_(Headers::get().EnvoyDownstreamServiceCluster));
@@ -591,7 +592,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
     TestRequestHeaderMapImpl headers{{":authority", "host"}, {":path", "/"}};
     EXPECT_CALL(random_, uuid()).WillOnce(Return("generated_uuid"));
 
-    EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+    EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ("generated_uuid", headers.get_("x-request-id"));
   }
@@ -602,7 +603,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
     const std::string uuid = rand.uuid();
     EXPECT_CALL(random_, uuid()).WillOnce(Return(uuid));
 
-    EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+    EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     // x-request-id should not be set to be traceable as it's not edge request
     EXPECT_EQ(uuid, headers.get_("x-request-id"));
@@ -617,7 +618,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
   TestRequestHeaderMapImpl headers{{"x-request-id", "original_request_id"}};
   EXPECT_CALL(random_, uuid()).Times(0);
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("original_request_id", headers.get_("x-request-id"));
 }
@@ -630,7 +631,7 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
   TestRequestHeaderMapImpl headers{{"x-request-id", "original"}};
   EXPECT_CALL(random_, uuid()).WillOnce(Return("override"));
 
-  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("override", headers.get_("x-request-id"));
 }
@@ -657,7 +658,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                                    {"x-envoy-original-url", "my_url"},
                                    {"custom_header", "foo"}};
 
-  EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false}),
+  EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
@@ -685,7 +686,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
   TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                                    {"x-forwarded-for", "60.0.0.1"}};
 
-  EXPECT_EQ((MutateRequestRet{"60.0.0.1:0", false}),
+  EXPECT_EQ((MutateRequestRet{"60.0.0.1:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("60.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_EQ("60.0.0.1", headers.get_("x-forwarded-for"));
@@ -698,7 +699,8 @@ TEST_F(ConnectionManagerUtilityTest, PipeAddressInvalidXFFtDontUseRemote) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "blah"}};
 
-  EXPECT_EQ((MutateRequestRet{"/blah", false}), callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ((MutateRequestRet{"/blah", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-envoy-external-address"));
 }
 
@@ -711,7 +713,7 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.2"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("10.0.0.2,10.0.0.1", headers.get_("x-forwarded-for"));
 }
@@ -725,7 +727,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
   TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "60.0.0.1"},
                                    {"x-envoy-expected-rq-timeout-ms", "10"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("60.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
@@ -736,7 +738,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRequests) {
   TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http11));
   EXPECT_EQ("upgrade", headers.get_("connection"));
   EXPECT_EQ("websocket", headers.get_("upgrade"));
@@ -746,7 +748,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketReq
 TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketRequests) {
   TestRequestHeaderMapImpl headers{{"connection", "close"}, {"upgrade", "websocket"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http11));
   EXPECT_FALSE(headers.has("connection"));
   EXPECT_FALSE(headers.has("upgrade"));
@@ -890,7 +892,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;URI=abc;DNS=example.com"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
@@ -907,7 +909,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
   TestRequestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be;DNS=example.com"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be;DNS=example.com",
@@ -942,7 +944,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestRequestHeaderMapImpl headers;
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;"
@@ -987,7 +989,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
                                                                "URI=test://bar.com/be;"
                                                                "DNS=test.com;DNS=test.com"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ(
@@ -1018,7 +1020,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
   TestRequestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;Hash=xyz;URI=test://bar.com/be"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;Hash=xyz;URI=test://bar.com/be,"
@@ -1058,7 +1060,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   TestRequestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
@@ -1091,7 +1093,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   TestRequestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
@@ -1110,7 +1112,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;URI=abc"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
@@ -1127,7 +1129,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
   TestRequestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
@@ -1142,7 +1144,7 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsSanitizeClientCertWhenForward) {
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;URI=abc"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("x-forwarded-client-cert"));
 }
@@ -1157,7 +1159,7 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
   TestRequestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be"}};
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
@@ -1177,10 +1179,10 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled));
+              setTraceReason(testing::Ref(request_headers), Tracing::Reason::Sampling));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::Sampled, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::Sampling, request_id_extension_->getTraceReason(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
@@ -1196,20 +1198,16 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled));
+              setTraceReason(testing::Ref(request_headers), Tracing::Reason::Sampling));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::Sampled, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::Sampling, request_id_extension_->getTraceReason(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
   EXPECT_CALL(
       runtime_.snapshot_,
       featureEnabled("tracing.random_sampling", An<const envoy::type::v3::FractionalPercent&>(), _))
-      .WillOnce(Return(false));
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(false));
 
   NiceMock<Router::MockRouteTracing> tracingConfig;
@@ -1221,11 +1219,9 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
-  EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
 // Sampling must not be done on client traced.
@@ -1242,10 +1238,10 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
   // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::Forced, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::ServiceForced, request_id_extension_->getTraceReason(request_headers));
 }
 
 // Sampling, global off.
@@ -1262,12 +1258,12 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Sampled));
+              setTraceReason(testing::Ref(request_headers), Tracing::Reason::Sampling));
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::NoTrace));
+              setTraceReason(testing::Ref(request_headers), Tracing::Reason::NotTraceable));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
 // Client, client enabled, global on.
@@ -1284,10 +1280,10 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   EXPECT_CALL(*request_id_extension_,
-              setTraceStatus(testing::Ref(request_headers), TraceStatus::Client));
+              setTraceReason(testing::Ref(request_headers), Tracing::Reason::ClientForced));
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::Client, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::ClientForced, request_id_extension_->getTraceReason(request_headers));
 }
 
 // Client, client disabled, global on.
@@ -1299,18 +1295,14 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet
       runtime_.snapshot_,
       featureEnabled("tracing.random_sampling", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(false));
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
-      .WillOnce(Return(true));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
 // Forced, global on.
@@ -1325,11 +1317,12 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced));
+  EXPECT_CALL(*request_id_extension_,
+              setTraceReason(testing::Ref(headers), Tracing::Reason::ServiceForced));
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::ServiceForced}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(TraceStatus::Forced, request_id_extension_->getTraceStatus(headers));
+  EXPECT_EQ(Tracing::Reason::ServiceForced, request_id_extension_->getTraceReason(headers));
 }
 
 // Forced, global off.
@@ -1344,32 +1337,34 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
       runtime_.snapshot_,
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(false));
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::Forced));
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(testing::Ref(headers), TraceStatus::NoTrace));
+  EXPECT_CALL(*request_id_extension_,
+              setTraceReason(testing::Ref(headers), Tracing::Reason::ServiceForced));
+  EXPECT_CALL(*request_id_extension_,
+              setTraceReason(testing::Ref(headers), Tracing::Reason::NotTraceable));
 
-  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(headers));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(headers));
 }
 
 // Forced, global on, broken uuid.
 TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-force-trace", "true"},
                                                  {"x-request-id", "bb"}};
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
                                                    {"proxy-connection", "proxy-header"}};
-  EXPECT_CALL(*request_id_extension_, setTraceStatus(_, _)).Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "");
 
-  EXPECT_EQ(TraceStatus::NoTrace, request_id_extension_->getTraceStatus(request_headers));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
@@ -1491,7 +1486,7 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
                                    {"x-forwarded-for", "198.51.100.1"}};
   EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
-  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_CALL(random_, uuid()).Times(0);
   EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
@@ -1506,7 +1501,7 @@ TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
   EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
   EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
-  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
 }
@@ -1546,7 +1541,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGener
                                      {"x-request-id", "my-request-id"}};
     EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true));
     EXPECT_CALL(*request_id_extension_, set(_, false)).Times(0);
-    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
@@ -1556,7 +1551,7 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGener
     TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
     EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), true));
     EXPECT_CALL(*request_id_extension_, set(_, false)).Times(0);
-    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false, Tracing::Reason::NotTraceable}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
   }
