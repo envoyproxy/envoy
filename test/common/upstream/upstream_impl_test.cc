@@ -365,7 +365,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -704,7 +704,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -822,7 +822,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
@@ -911,7 +911,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
                                std::move(scope), false);
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -1108,7 +1108,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
                                std::move(scope), false);
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -2116,12 +2116,12 @@ TEST(PrioritySet, Extend) {
   uint32_t priority_changes = 0;
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
-  priority_set.addPriorityUpdateCb(
+  auto priority_update_cb = priority_set.addPriorityUpdateCb(
       [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
         last_priority = priority;
         ++priority_changes;
       });
-  priority_set.addMemberUpdateCb(
+  auto member_update_cb = priority_set.addMemberUpdateCb(
       [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
 
   // The initial priority set starts with priority level 0..
@@ -2174,9 +2174,10 @@ TEST(PrioritySet, Extend) {
 
   // We're going to do a noop host change, so add a callback to assert that we're not announcing
   // any host changes.
-  priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) -> void {
-    EXPECT_TRUE(added.empty() && removed.empty());
-  });
+  auto member_update_cb2 = priority_set.addMemberUpdateCb(
+      [&](const HostVector& added, const HostVector& removed) -> void {
+        EXPECT_TRUE(added.empty() && removed.empty());
+      });
 
   TestBatchUpdateCb batch_update(hosts, hosts_per_locality);
   priority_set.batchHostUpdate(batch_update);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -176,6 +177,7 @@ private:
   absl::node_hash_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
+  const Common::CallbackHandlePtr member_update_cb_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {

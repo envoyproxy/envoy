@@ -39,7 +39,6 @@ public:
               envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
-  ~GrpcMuxImpl() override { dynamic_update_callback_handle_->remove(); }
 
   void start() override;
 
@@ -176,7 +175,7 @@ private:
 
   Event::Dispatcher& dispatcher_;
   bool enable_type_url_downgrade_and_upgrade_;
-  Common::CallbackHandle* dynamic_update_callback_handle_;
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;

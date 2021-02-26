@@ -59,9 +59,9 @@ public:
   /**
    * Register a callback for notification when the dynamic context changes.
    * @param callback notification callback.
-   * @return Common::CallbackHandle* callback handle for removal.
+   * @return Common::CallbackHandlePtr callback handle for removal.
    */
-  virtual Common::CallbackHandle*
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addDynamicContextUpdateCallback(UpdateNotificationCb callback) const PURE;
 };
 

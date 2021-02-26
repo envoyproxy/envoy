@@ -75,7 +75,6 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
           })) {}
 
 UdpProxyFilter::ClusterInfo::~ClusterInfo() {
-  member_update_cb_handle_->remove();
   // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
   // not a performance critical path.
   while (!sessions_.empty()) {

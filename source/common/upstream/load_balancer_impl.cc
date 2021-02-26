@@ -119,15 +119,11 @@ LoadBalancerBase::LoadBalancerBase(
   // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
-  priority_set_.addPriorityUpdateCb([this](uint32_t priority, const HostVector&,
-                                           const HostVector&) -> void {
-    recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_,
-                                per_priority_degraded_, total_healthy_hosts_);
-  });
-
-  priority_set_.addPriorityUpdateCb(
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
-        UNREFERENCED_PARAMETER(priority);
+        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
+                                    per_priority_health_, per_priority_degraded_,
+                                    total_healthy_hosts_);
         recalculatePerPriorityPanic();
         stashed_random_.clear();
       });
@@ -363,7 +359,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       fail_traffic_on_panic_(common_config.zone_aware_lb_config().fail_traffic_on_panic()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
-  priority_set_.addPriorityUpdateCb(
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
@@ -386,12 +382,6 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           // based routing.
           regenerateLocalityRoutingStructures();
         });
-  }
-}
-
-ZoneAwareLoadBalancerBase::~ZoneAwareLoadBalancerBase() {
-  if (local_priority_set_member_update_cb_handle_ != nullptr) {
-    local_priority_set_member_update_cb_handle_->remove();
   }
 }
 
@@ -714,7 +704,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
-  priority_set.addPriorityUpdateCb(
+  priority_update_cb_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
 

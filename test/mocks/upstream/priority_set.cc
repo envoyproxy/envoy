@@ -18,11 +18,11 @@ MockPrioritySet::MockPrioritySet() {
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(testing::Const(*this), hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(*this, addMemberUpdateCb(_))
-      .WillByDefault(Invoke([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandle* {
+      .WillByDefault(Invoke([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandlePtr {
         return member_update_cb_helper_.add(cb);
       }));
   ON_CALL(*this, addPriorityUpdateCb(_))
-      .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandle* {
+      .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
         return priority_update_cb_helper_.add(cb);
       }));
 }
@@ -34,10 +34,11 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       auto host_set = new ::testing::NiceMock<MockHostSet>(i);
       host_sets_.push_back(HostSetPtr{host_set});
-      host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                         const HostVector& hosts_removed) {
-        runUpdateCallbacks(priority, hosts_added, hosts_removed);
-      });
+      member_update_cbs_.push_back(
+          host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                             const HostVector& hosts_removed) {
+            runUpdateCallbacks(priority, hosts_added, hosts_removed);
+          }));
     }
   }
   return *host_sets_[priority];

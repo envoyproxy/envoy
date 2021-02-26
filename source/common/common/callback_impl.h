@@ -20,14 +20,15 @@ public:
   /**
    * Add a callback.
    * @param callback supplies the callback to add.
-   * @return CallbackHandle* a handle that can be used to remove the callback.
+   * @return CallbackHandlePtr a handle that can be used to remove the callback.
    */
-  CallbackHandle* add(Callback callback) {
-    callbacks_.emplace_back(*this, callback);
-    // get the list iterator of added callback handle, which will be used to remove itself from
+  ABSL_MUST_USE_RESULT CallbackHandlePtr add(Callback callback) {
+    auto new_callback = std::make_unique<CallbackHolder>(*this, callback);
+    callbacks_.emplace_back(new_callback.get());
+    // Get the list iterator of added callback handle, which will be used to remove itself from
     // callbacks_ list.
-    callbacks_.back().it_ = (--callbacks_.end());
-    return &callbacks_.back();
+    new_callback->it_ = (--callbacks_.end());
+    return new_callback;
   }
 
   /**
@@ -39,33 +40,45 @@ public:
    */
   void runCallbacks(CallbackArgs... args) {
     for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
-      auto current = it++;
+      auto current = *(it++);
       current->cb_(args...);
     }
   }
 
 private:
   struct CallbackHolder : public CallbackHandle {
-    CallbackHolder(CallbackManager& parent, Callback cb) : parent_(parent), cb_(cb) {}
-
-    // CallbackHandle
-    void remove() override { parent_.remove(it_); }
+    CallbackHolder(CallbackManager& parent, Callback cb)
+        : parent_(parent), cb_(cb), still_alive_(parent.still_alive_) {}
+    ~CallbackHolder() override {
+      // Here we check if our parent manager is still alive via the still alive weak reference.
+      // This code is single threaded so expired() is sufficient for our purpose. Assuming the
+      // weak reference is not expired it is safe to remove ourselves from the manager.
+      if (!still_alive_.expired()) {
+        parent_.remove(it_);
+      }
+    }
 
     CallbackManager& parent_;
     Callback cb_;
+    const std::weak_ptr<bool> still_alive_;
 
-    // the iterator of this callback holder inside callbacks_ list
-    // upon removal, use this iterator to delete callback holder in O(1)
-    typename std::list<CallbackHolder>::iterator it_;
+    // The iterator of this callback holder inside callbacks_ list
+    // upon removal, use this iterator to delete callback holder in O(1).
+    typename std::list<CallbackHolder*>::iterator it_;
   };
 
   /**
    * Remove a member update callback added via add().
    * @param handle supplies the callback handle to remove.
    */
-  void remove(typename std::list<CallbackHolder>::iterator& it) { callbacks_.erase(it); }
+  void remove(typename std::list<CallbackHolder*>::iterator& it) { callbacks_.erase(it); }
 
-  std::list<CallbackHolder> callbacks_;
+  std::list<CallbackHolder*> callbacks_;
+  // This is a sentinel shared_ptr used for keeping track of whether the manager is still alive.
+  // It is only held by weak reference in the callback holder above. This is used versus having
+  // the manager inherit from shared_from_this to avoid the manager having to be allocated inside
+  // a shared_ptr at all call sites.
+  const std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 };
 
 } // namespace Common

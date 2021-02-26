@@ -108,7 +108,9 @@ public:
                                   factory_context, std::move(scope), false);
 
     cm_.initializeThreadLocalClusters({"primary", "secondary"});
+    primary_.cluster_.info_->name_ = "primary";
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("primary"))).WillRepeatedly(Return(&primary_));
+    secondary_.cluster_.info_->name_ = "secondary";
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));

@@ -49,7 +49,7 @@ MockTypedFactory::~MockTypedFactory() = default;
 
 MockContextProvider::MockContextProvider() {
   ON_CALL(*this, addDynamicContextUpdateCallback(_))
-      .WillByDefault(Invoke([this](UpdateNotificationCb update_cb) -> Common::CallbackHandle* {
+      .WillByDefault(Invoke([this](UpdateNotificationCb update_cb) -> Common::CallbackHandlePtr {
         return update_cb_handler_.add(update_cb);
       }));
   ON_CALL(*this, dynamicContext(_))

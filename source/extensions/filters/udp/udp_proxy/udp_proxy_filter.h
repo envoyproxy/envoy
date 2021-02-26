@@ -249,7 +249,7 @@ private:
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
 
-    Envoy::Common::CallbackHandle* member_update_cb_handle_;
+    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
     absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
                         HeterogeneousActiveSessionEqual>
         sessions_;

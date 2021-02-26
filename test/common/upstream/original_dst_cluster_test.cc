@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -85,7 +86,7 @@ public:
         singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<OriginalDstCluster>(cluster_config, runtime_, factory_context,
                                                     std::move(scope), false);
-    cluster_->prioritySet().addPriorityUpdateCb(
+    priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -108,6 +109,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
@@ -472,7 +474,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   setupFromYaml(yaml);
 
   PrioritySetImpl second;
-  cluster_->prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector& added, const HostVector& removed) -> void {
         // Update second hostset accordingly;
         HostVectorSharedPtr new_hosts(

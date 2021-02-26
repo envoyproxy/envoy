@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
@@ -129,6 +130,7 @@ private:
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 } // namespace Upstream

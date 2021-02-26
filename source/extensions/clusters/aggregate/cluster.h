@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
@@ -127,6 +128,7 @@ private:
   PriorityContextPtr priority_context_;
   const ClusterSetConstSharedPtr clusters_;
   Upstream::ClusterUpdateCallbacksHandlePtr handle_;
+  absl::flat_hash_map<std::string, Envoy::Common::CallbackHandlePtr> member_update_cbs_;
 };
 
 // Load balancer factory created by the main thread and will be called in each worker thread to
