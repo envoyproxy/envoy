@@ -126,7 +126,8 @@ private:
   };
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
-                           public Upstream::ClusterUpdateCallbacks {
+                           public Upstream::ClusterUpdateCallbacks,
+                           public Logger::Loggable<Logger::Id::redis> {
     ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
                     std::string cluster_name);
     ~ThreadLocalPool() override;
@@ -156,7 +157,7 @@ private:
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};
     absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
-    Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
+    Envoy::Common::CallbackHandlePtr host_set_member_update_cb_handle_;
     absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
     std::string auth_username_;
     std::string auth_password_;

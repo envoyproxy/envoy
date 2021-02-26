@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
@@ -341,26 +342,26 @@ private:
   const uint64_t enforcing_local_origin_success_rate_;
   const uint64_t max_ejection_time_ms_;
 
-  static const uint64_t DEFAULT_INTERVAL_MS = 10000;
-  static const uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
-  static const uint64_t DEFAULT_CONSECUTIVE_5XX = 5;
-  static const uint64_t DEFAULT_CONSECUTIVE_GATEWAY_FAILURE = 5;
-  static const uint64_t DEFAULT_MAX_EJECTION_PERCENT = 10;
-  static const uint64_t DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS = 5;
-  static const uint64_t DEFAULT_SUCCESS_RATE_REQUEST_VOLUME = 100;
-  static const uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
-  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_THRESHOLD = 85;
-  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS = 5;
-  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME = 50;
-  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_5XX = 100;
-  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE = 0;
-  static const uint64_t DEFAULT_ENFORCING_SUCCESS_RATE = 100;
-  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE = 0;
-  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN = 0;
-  static const uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
-  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
-  static const uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
-  static const uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
+  static constexpr uint64_t DEFAULT_INTERVAL_MS = 10000;
+  static constexpr uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
+  static constexpr uint64_t DEFAULT_CONSECUTIVE_5XX = 5;
+  static constexpr uint64_t DEFAULT_CONSECUTIVE_GATEWAY_FAILURE = 5;
+  static constexpr uint64_t DEFAULT_MAX_EJECTION_PERCENT = 10;
+  static constexpr uint64_t DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS = 5;
+  static constexpr uint64_t DEFAULT_SUCCESS_RATE_REQUEST_VOLUME = 100;
+  static constexpr uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
+  static constexpr uint64_t DEFAULT_FAILURE_PERCENTAGE_THRESHOLD = 85;
+  static constexpr uint64_t DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS = 5;
+  static constexpr uint64_t DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME = 50;
+  static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_5XX = 100;
+  static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE = 0;
+  static constexpr uint64_t DEFAULT_ENFORCING_SUCCESS_RATE = 100;
+  static constexpr uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE = 0;
+  static constexpr uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN = 0;
+  static constexpr uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
+  static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
+  static constexpr uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
+  static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
 };
 
 /**
@@ -460,6 +461,7 @@ private:
   std::list<ChangeStateCb> callbacks_;
   absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
+  Common::CallbackHandlePtr member_update_cb_;
 
   // EjectionPair for external and local origin events.
   // When external/local origin events are not split, external_origin_sr_num_ are used for
