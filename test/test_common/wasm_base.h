@@ -60,30 +60,31 @@ public:
                  std::string root_id = "", std::string vm_configuration = "",
                  bool fail_open = false, std::string plugin_configuration = "",
                  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities = {}) {
-    envoy::extensions::wasm::v3::VmConfig vm_config;
-    vm_config.set_vm_id("vm_id");
-    vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
-    ProtobufWkt::StringValue vm_configuration_string;
-    vm_configuration_string.set_value(vm_configuration);
-    vm_config.mutable_configuration()->PackFrom(vm_configuration_string);
-    vm_config.mutable_code()->mutable_local()->set_inline_bytes(code);
-    envoy::extensions::wasm::v3::CapabilityRestrictionConfig cr_config;
-    Protobuf::Map<std::string, SanitizationConfig> allowed_capabilities_;
-    for (auto& capability : allowed_capabilities) {
-      // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
-      allowed_capabilities_[capability.first] = SanitizationConfig();
-    }
-    *cr_config.mutable_allowed_capabilities() = allowed_capabilities_;
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
-    auto name = "plugin_name";
-    auto vm_id = "";
+
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    *plugin_config.mutable_root_id() = root_id;
+    *plugin_config.mutable_name() = "plugin_name";
+    plugin_config.set_fail_open(fail_open);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration);
+
+    auto vm_config = plugin_config.mutable_vm_config();
+    vm_config->set_vm_id("vm_id");
+    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
+    ProtobufWkt::StringValue vm_configuration_string;
+    vm_configuration_string.set_value(vm_configuration);
+    vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+    vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        name, root_id, vm_id, runtime, plugin_configuration, fail_open,
-        envoy::config::core::v3::TrafficDirection::INBOUND, local_info_, &listener_metadata_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
+        &listener_metadata_);
     // Passes ownership of root_context_.
+    auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
+    base_config.allowedCapabilitiesMap() = allowed_capabilities;
     Extensions::Common::Wasm::createWasm(
-        vm_config, cr_config, plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api,
+        base_config, plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api,
         lifecycle_notifier_, remote_data_provider_,
         [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     if (wasm_) {

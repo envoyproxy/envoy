@@ -1866,6 +1866,20 @@ WasmResult Context::grpcCancel(uint32_t token) {
   return WasmResult::Ok;
 }
 
+std::string anyToBytes(const ProtobufWkt::Any& any) {
+  if (any.Is<ProtobufWkt::StringValue>()) {
+    ProtobufWkt::StringValue s;
+    MessageUtil::unpackTo(any, s);
+    return s.value();
+  }
+  if (any.Is<ProtobufWkt::BytesValue>()) {
+    Protobuf::BytesValue b;
+    MessageUtil::unpackTo(any, b);
+    return b.value();
+  }
+  return any.value();
+}
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions

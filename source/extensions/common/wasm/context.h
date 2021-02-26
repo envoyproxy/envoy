@@ -99,14 +99,18 @@ private:
   ::Envoy::Buffer::Instance* buffer_instance_{};
 };
 
+std::string anyToBytes(const ProtobufWkt::Any& any);
+
 // Plugin contains the information for a filter/service.
 struct Plugin : public PluginBase {
-  Plugin(absl::string_view name, absl::string_view root_id, absl::string_view vm_id,
-         absl::string_view runtime, absl::string_view plugin_configuration, bool fail_open,
+  Plugin(const envoy::extensions::wasm::v3::PluginConfig& config,
          envoy::config::core::v3::TrafficDirection direction,
          const LocalInfo::LocalInfo& local_info,
          const envoy::config::core::v3::Metadata* listener_metadata)
-      : PluginBase(name, root_id, vm_id, runtime, plugin_configuration, fail_open),
+      : PluginBase(config.name(), config.root_id(), config.vm_config().vm_id(),
+                   config.vm_config().runtime(), anyToBytes(config.configuration()),
+                   config.fail_open()),
+
         direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata) {}
 
   envoy::config::core::v3::TrafficDirection direction_;

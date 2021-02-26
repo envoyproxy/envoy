@@ -49,19 +49,15 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  auto name = "";
-  auto root_id = "some_long_root_id";
-  auto vm_id = "";
-  auto vm_configuration = test;
-  auto vm_key = "";
-  auto plugin_configuration = "";
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_root_id() = "some_long_root_id";
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(test);
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      name, root_id, vm_id, runtime, plugin_configuration, false,
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", runtime), vm_id, vm_configuration, vm_key,
-      allowed_capabilities, scope, cluster_manager, *dispatcher);
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, "vm_key", scope,
+                                                               cluster_manager, *dispatcher);
   std::string code;
   if (runtime == "null") {
     code = "WasmSpeedCpp";

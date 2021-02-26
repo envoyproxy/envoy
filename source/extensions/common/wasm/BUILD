@@ -30,6 +30,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "wasm_hdr",
     hdrs = [
+        "base_config.h",
         "context.h",
         "wasm.h",
         "wasm_extension.h",
@@ -60,6 +61,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "wasm_lib",
     srcs = [
+        "base_config.cc",
         "context.cc",
         "foreign.cc",
         "wasm.cc",
