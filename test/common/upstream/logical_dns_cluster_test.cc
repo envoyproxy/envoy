@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
@@ -57,7 +58,7 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<LogicalDnsCluster>(cluster_config, runtime_, dns_resolver_,
                                                    factory_context, std::move(scope), false);
-    cluster_->prioritySet().addPriorityUpdateCb(
+    priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -215,6 +216,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Server::MockOptions options_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 using LogicalDnsConfigTuple =

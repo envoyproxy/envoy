@@ -550,10 +550,11 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       HostSetImplPtr host_set = createHostSet(i, overprovisioning_factor);
-      host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                           const HostVector& hosts_removed) {
-        runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
-      });
+      host_sets_priority_update_cbs_.push_back(
+          host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                               const HostVector& hosts_removed) {
+            runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
+          }));
       host_sets_.push_back(std::move(host_set));
     }
   }
@@ -951,7 +952,7 @@ ClusterImplBase::ClusterImplBase(
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
-  priority_set_.addPriorityUpdateCb(
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
         if (!hosts_added.empty() || !hosts_removed.empty()) {
           info_->stats().membership_change_.inc();
