@@ -692,6 +692,17 @@ Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_s
 
 .. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
+requestedServerName()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:requestedServerName()
+
+// TODO: fix this below
+Returns the string representation of :repo:`requested server name <include/envoy/stream_info/stream_info.h>`
+(e.g. SNI in TLS) for the current request if present.
+
 Dynamic metadata object API
 ---------------------------
 
