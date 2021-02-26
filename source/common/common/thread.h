@@ -194,5 +194,11 @@ private:
   assert(Thread::MainThread::isMainThread());                                                      \
   try
 
+#define TRY \
+try { \
+assert(Thread::MainThread::isMainThread());   
+
+#define END_TRY }
+
 } // namespace Thread
 } // namespace Envoy
