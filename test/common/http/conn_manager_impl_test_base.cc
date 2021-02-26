@@ -14,9 +14,8 @@ namespace Http {
 HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
     : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-          Filesystem::FilePathAndType{Filesystem::DestinationType::File,
-                                                access_log_path_},
-          {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
+          Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                       POOL_HISTOGRAM(fake_stats_))},
