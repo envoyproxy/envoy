@@ -874,8 +874,10 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
+  EXPECT_CALL(factory_.dispatcher_, deleteInDispatcherThread(_));
   create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
+  factory_.dispatcher_.to_delete_.clear();
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {
@@ -2944,6 +2946,22 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(0, factory_.stats_
                    .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
+}
+
+TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return =
+      Network::SocketOptionFactory::buildIpTransparentOptions();
+
+  EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
+
+  Tcp::ConnectionPool::Instance* cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                                          ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_NE(nullptr, cp);
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {

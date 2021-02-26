@@ -456,6 +456,34 @@ The following command operators are supported:
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
 
+%CLUSTER_METADATA(NAMESPACE:KEY*):Z%
+  HTTP
+    :ref:`Upstream cluster Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    will be logged as a JSON string. For example, for the following dynamic metadata:
+
+    ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+
+    * %CLUSTER_METADATA(com.test.my_filter)% will log: ``{"test_key": "foo", "test_object": {"inner_key": "bar"}}``
+    * %CLUSTER_METADATA(com.test.my_filter:test_key)% will log: ``"foo"``
+    * %CLUSTER_METADATA(com.test.my_filter:test_object)% will log: ``{"inner_key": "bar"}``
+    * %CLUSTER_METADATA(com.test.my_filter:test_object:inner_key)% will log: ``"bar"``
+    * %CLUSTER_METADATA(com.unknown_filter)% will log: ``-``
+    * %CLUSTER_METADATA(com.test.my_filter:unknown_key)% will log: ``-``
+    * %CLUSTER_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
+
+  TCP
+    Not implemented ("-").
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored
+
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%
@@ -464,8 +492,8 @@ The following command operators are supported:
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
-    F is an optional parameter used to indicate which method FilterState uses for serialization. 
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string. 
+    F is an optional parameter used to indicate which method FilterState uses for serialization.
+    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
     If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
 
   TCP
@@ -583,3 +611,6 @@ The following command operators are supported:
 
 %LOCAL_REPLY_BODY%
   The body text for the requests rejected by the Envoy.
+
+%FILTER_CHAIN_NAME%
+  The network filter chain name of the downstream connection.

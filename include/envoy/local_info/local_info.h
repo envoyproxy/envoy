@@ -51,6 +51,7 @@ public:
   /**
    * @return the xDS context provider for the node.
    */
+  virtual Config::ContextProvider& contextProvider() PURE;
   virtual const Config::ContextProvider& contextProvider() const PURE;
 };
 
