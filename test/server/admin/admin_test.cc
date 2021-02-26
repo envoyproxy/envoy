@@ -58,10 +58,11 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
       admin_bad_address_out_path.startHttpListener(
-          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+          file_info, bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
           listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
