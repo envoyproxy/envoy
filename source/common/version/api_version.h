@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/api_version.pb.h"
 
+// Declares the ApiVersion struct and defines Envoy::api_version.
 #include "common/version/api_version_number.h"
 
 namespace Envoy {
@@ -15,20 +16,15 @@ class ApiVersionInfoTestPeer;
  */
 class ApiVersionInfo {
 public:
-  // Converts a given API version to a string <Major>.<Minor>.<Patch>.
-  static std::string apiVersionToString(const envoy::config::core::v3::ApiVersionNumber& version);
-
   // Returns the most recent API version that is supported by the client.
-  static const envoy::config::core::v3::ApiVersionNumber& apiVersion();
+  static const ApiVersion& apiVersion();
 
   // Returns the oldest API version that is supported by the client.
-  static const envoy::config::core::v3::ApiVersionNumber& oldestApiVersion();
+  static const ApiVersion& oldestApiVersion();
 
 private:
   friend class Envoy::ApiVersionInfoTestPeer;
-  static envoy::config::core::v3::ApiVersionNumber makeApiVersion(const char* version);
-  static envoy::config::core::v3::ApiVersionNumber
-  computeOldestApiVersion(const envoy::config::core::v3::ApiVersionNumber& latest_version);
+  static ApiVersion computeOldestApiVersion(const ApiVersion& latest_version);
 };
 
 } // namespace Envoy

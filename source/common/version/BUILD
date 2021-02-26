@@ -22,7 +22,8 @@ genrule(
     name = "generate_api_version_number",
     srcs = ["//:API_VERSION"],
     outs = ["api_version_number.h"],
-    cmd = """echo "#define API_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
+    cmd = """./$(location //tools/api_versioning:generate_api_version_header_bin) $< >$@""",
+    tools = ["//tools/api_versioning:generate_api_version_header_bin"],
     visibility = ["//visibility:private"],
 )
 
