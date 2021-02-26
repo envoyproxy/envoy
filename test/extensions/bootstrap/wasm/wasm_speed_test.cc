@@ -83,18 +83,26 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   }
 }
 
-#if defined(ENVOY_WASM_WAVM)
+#if defined(ENVOY_WASM_V8)
 #define B(_t)                                                                                      \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, V8SpeedTest_##_t, std::string(#_t),                 \
-                    std::string("v8"));                                                            \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WavmSpeedTest_##_t, std::string(#_t),               \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("v8"));
+#elif defined(ENVOY_WASM_WAVM)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wavm"));
+#elif defined(ENVOY_WASM_WASMTIME)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("wasmtime"));
 #else
 #define B(_t)                                                                                      \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, V8SpeedTest_##_t, std::string(#_t),                 \
-                    std::string("v8"));                                                            \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));
 #endif
