@@ -1,5 +1,5 @@
-1.17.1 (Pending)
-================
+1.17.1 (February 25, 2021)
+==========================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -13,6 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* jwt_authn: reject requests with a proper error if JWT has the wrong issuer when allow_missing is used. Before this change, the requests are accepted.
 * overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
 
 Removed Config or Runtime
