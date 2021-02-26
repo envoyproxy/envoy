@@ -18,20 +18,6 @@ EnvoyQuicClientStream* quicStreamToEnvoyClientStream(quic::QuicStream* stream) {
 
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
-void QuicHttpConnectionImplBase::runWatermarkCallbacksForStream(quic::QuicStream* quic_stream,
-                                                                bool high_watermark) {
-  // Only call watermark callbacks on non QUIC static streams which are
-  // crypto stream and Google QUIC headers stream.
-  auto stream = quicStreamToEnvoyStream(quic_stream);
-  if (high_watermark) {
-    ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", quic_stream->id());
-    stream->runHighWatermarkCallbacks();
-  } else {
-    ENVOY_LOG(debug, "runLowWatermarkCallbacks on stream {}", quic_stream->id());
-    stream->runLowWatermarkCallbacks();
-  }
-}
-
 QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks)
     : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
@@ -40,14 +26,18 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   quic_server_session_.PerformActionOnActiveStreams([](quic::QuicStream* quic_stream) {
-    QuicHttpServerConnectionImpl::runWatermarkCallbacksForStream(quic_stream, true);
+    auto stream = quicStreamToEnvoyStream(quic_stream);
+    ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", quic_stream->id());
+    stream->runHighWatermarkCallbacks();
     return true;
   });
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   quic_server_session_.PerformActionOnActiveStreams([](quic::QuicStream* quic_stream) {
-    QuicHttpServerConnectionImpl::runWatermarkCallbacksForStream(quic_stream, false);
+    auto stream = quicStreamToEnvoyStream(quic_stream);
+    ENVOY_LOG(debug, "runLowWatermarkCallbacks on stream {}", quic_stream->id());
+    stream->runLowWatermarkCallbacks();
     return true;
   });
 }
@@ -91,14 +81,18 @@ QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder)
 
 void QuicHttpClientConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   quic_client_session_.PerformActionOnActiveStreams([](quic::QuicStream* quic_stream) {
-    QuicHttpClientConnectionImpl::runWatermarkCallbacksForStream(quic_stream, true);
+    auto stream = quicStreamToEnvoyStream(quic_stream);
+    ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", quic_stream->id());
+    stream->runHighWatermarkCallbacks();
     return true;
   });
 }
 
 void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   quic_client_session_.PerformActionOnActiveStreams([](quic::QuicStream* quic_stream) {
-    QuicHttpClientConnectionImpl::runWatermarkCallbacksForStream(quic_stream, false);
+    auto stream = quicStreamToEnvoyStream(quic_stream);
+    ENVOY_LOG(debug, "runLowWatermarkCallbacks on stream {}", quic_stream->id());
+    stream->runLowWatermarkCallbacks();
     return true;
   });
 }

@@ -1257,11 +1257,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     tags = ["nofips"],
-    deps =
-        [
-            ":quic_platform_export",
-            ":quiche_common_platform_export",
-        ],
+    deps = [
+        ":quic_platform_export",
+        ":quiche_common_platform_export",
+    ],
 )
 
 envoy_cc_library(

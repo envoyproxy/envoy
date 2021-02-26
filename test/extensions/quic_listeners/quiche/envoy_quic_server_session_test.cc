@@ -71,8 +71,7 @@ public:
   }
 
   MOCK_METHOD(void, SendConnectionClosePacket,
-              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes ietf_error,
-               const std::string&));
+              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
 };
 
