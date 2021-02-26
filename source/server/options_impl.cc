@@ -158,12 +158,12 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                            "600", "string", cmd);
 
   cmd.setExceptionHandling(false);
-  envoy_try {
+  TRY {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
-  }
+  } END_TRY
   catch (TCLAP::ArgException& e) {
-    envoy_try { cmd.getOutput()->failure(cmd, e); }
+    TRY { cmd.getOutput()->failure(cmd, e); } END_TRY
     catch (const TCLAP::ExitException&) {
       // failure() has already written an informative message to stderr, so all that's left to do
       // is throw our own exception with the original message.

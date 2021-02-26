@@ -61,7 +61,7 @@ void FilesystemSubscriptionImpl::refresh() {
   ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
   stats_.update_attempt_.inc();
   ProtobufTypes::MessagePtr config_update;
-  envoy_try {
+  TRY {
     const std::string version = refreshInternal(&config_update);
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(version));
@@ -69,7 +69,7 @@ void FilesystemSubscriptionImpl::refresh() {
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
               config_update->DebugString());
-  }
+  } END_TRY
   catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
   }

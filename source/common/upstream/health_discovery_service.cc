@@ -293,7 +293,7 @@ void HdsDelegate::onReceiveMessage(
   }
 
   // Validate message fields
-  envoy_try { MessageUtil::validate(*message, validation_visitor_); }
+  TRY { MessageUtil::validate(*message, validation_visitor_); } END_TRY
   catch (const ProtoValidationException& ex) {
     // Increment error count
     stats_.errors_.inc();

@@ -24,14 +24,14 @@ bool validateConfig(const Options& options,
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
-  envoy_try {
+  TRY {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
                               component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
-  }
+  } END_TRY
   catch (const EnvoyException& e) {
     return false;
   }
@@ -54,7 +54,7 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this) {
-  envoy_try { initialize(options, local_address, component_factory); }
+  TRY { initialize(options, local_address, component_factory); } END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());

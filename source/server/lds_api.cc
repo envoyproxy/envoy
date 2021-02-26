@@ -66,7 +66,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   std::string message;
   for (const auto& resource : added_resources) {
     envoy::config::listener::v3::Listener listener;
-    envoy_try {
+    TRY {
       listener =
           dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
       if (!listener_names.insert(listener.name()).second) {
@@ -80,7 +80,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       } else {
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
-    }
+    } END_TRY
     catch (const EnvoyException& e) {
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();

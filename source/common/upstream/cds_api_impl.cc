@@ -77,7 +77,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;
-    envoy_try {
+    TRY {
       cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
@@ -89,7 +89,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       } else {
         ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
       }
-    }
+    } END_TRY
     catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
     }

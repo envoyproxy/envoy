@@ -48,7 +48,7 @@ void SdsApi::resolveDataSource(const FileContentMap& files,
 void SdsApi::onWatchUpdate() {
   // Filesystem reads and update callbacks can fail if the key material is missing or bad. We're not
   // under an onConfigUpdate() context, so we need to catch these cases explicitly here.
-  envoy_try {
+  TRY {
     // Obtain a stable set of files. If a rotation happens while we're reading,
     // then we need to try again.
     uint64_t prev_hash = 0;
@@ -72,7 +72,7 @@ void SdsApi::onWatchUpdate() {
       update_callback_manager_.runCallbacks();
       files_hash_ = new_hash;
     }
-  }
+  } END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(warn, fmt::format("Failed to reload certificates: {}", e.what()));
     sds_api_stats_.key_rotation_failed_.inc();
