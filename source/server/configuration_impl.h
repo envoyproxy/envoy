@@ -183,7 +183,7 @@ private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
     const std::string& accessLogPath() const override { return access_log_file_info_.path_; }
-    Filesystem::DestinationType access_log_destination() const override {
+    Filesystem::DestinationType accessLogPath() const override {
       return access_log_file_info_.file_type_;
     }
     const std::string& profilePath() const override { return profile_path_; }

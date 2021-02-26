@@ -32,7 +32,7 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   }
 
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path_.c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+  fd_ = CreateFileA(path().c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
                     flags.creation_, 0, NULL);
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
@@ -87,8 +87,23 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   return {access, creation};
 }
 
+FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
+  switch (file_info.file_type_) {
+  case DestinationType::File:
+    return std::make_unique<FileImplWin32>(file_info);
+  case DestinationType::Console:
+    return std::make_unique<ConsoleFileImplWin32>();
+  case DestinationType::Stderr:
+    return std::make_unique<StdErrFileImplWin32>();
+  case DestinationType::Stdout:
+    return std::make_unique<StdOutFileImplWin32>();
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 FilePtr InstanceImplWin32::createFile(const std::string& path) {
-  return std::make_unique<FileImplWin32>(path);
+  return std::make_unique<FileImplWin32>(FilePathAndType{DestinationType::File, path});
 }
 
 bool InstanceImplWin32::fileExists(const std::string& path) {

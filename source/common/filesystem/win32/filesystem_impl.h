@@ -10,7 +10,7 @@ namespace Filesystem {
 
 class FileImplWin32 : public FileSharedImpl {
 public:
-  FileImplWin32(const std::string& path) : FileSharedImpl(path) {}
+  FileImplWin32(const FilePathAndType& file_info) : FileSharedImpl(file_info) {}
   ~FileImplWin32();
 
 protected:
@@ -28,9 +28,23 @@ private:
   friend class FileSystemImplTest;
 };
 
+struct ConsoleFileImplWin32 : public FileImplWin32 {
+  ConsoleFileImplWin32()
+      : FileImplWin32(FilePathAndType{DestinationType::Console, "/dev/console"}) {}
+};
+
+struct StdOutFileImplWin32 : public FileImplWin32 {
+  StdOutFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
+};
+
+struct StdErrFileImplWin32 : public FileImplWin32 {
+  StdErrFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stderr, "/dev/stderr"}) {}
+};
+
 class InstanceImplWin32 : public Instance {
 public:
   // Filesystem::Instance
+  FilePtr createFile(const FilePathAndType& file_info) override;
   FilePtr createFile(const std::string& path) override;
   bool fileExists(const std::string& path) override;
   bool directoryExists(const std::string& path) override;
