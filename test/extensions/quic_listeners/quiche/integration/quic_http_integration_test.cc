@@ -65,9 +65,11 @@ createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& opt
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
 )EOF";
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
-  auto* common_context = tls_context.mutable_common_tls_context();
+  envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
+      quic_transport_socket_config;
+  auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), *tls_context);
+  auto* common_context = tls_context->mutable_common_tls_context();
 
   if (options.alpn_) {
     common_context->add_alpn_protocols("h3");
@@ -80,17 +82,24 @@ createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& opt
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
   }
   if (!options.sni_.empty()) {
-    tls_context.set_sni(options.sni_);
+    tls_context->set_sni(options.sni_);
   }
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
   common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
 
+  envoy::config::core::v3::TransportSocket message;
+  // message.set_name(Extensions::TransportSockets::TransportSocketNames::get().Quic);
+  message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      tls_context, options.sigalgs_, mock_factory_ctx);
-  return std::make_unique<QuicClientTransportSocketFactory>(std::move(cfg));
+  return std::unique_ptr<QuicClientTransportSocketFactory>(
+      static_cast<QuicClientTransportSocketFactory*>(
+          config_factory
+              .createTransportSocketFactory(quic_transport_socket_config, mock_factory_ctx)
+              .release()));
 }
 
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
@@ -159,6 +168,7 @@ public:
     } else {
       codec->setCodecClientCallbacks(client_codec_callback_);
     }
+    EXPECT_EQ("", codec->connection()->requestedServerName());
     return codec;
   }
 
