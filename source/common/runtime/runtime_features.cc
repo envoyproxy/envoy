@@ -58,10 +58,10 @@ constexpr const char* runtime_features[] = {
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.always_apply_route_header_rules",
     "envoy.reloadable_features.activate_timers_next_event_loop",
+    "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.always_nodelay",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
@@ -100,6 +100,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // TODO(#14890) flip once this has been validated in prod.
+    "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     // v2 is fatal-by-default.
     "envoy.reloadable_features.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
@@ -107,6 +109,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
+    // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
+    "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
 };

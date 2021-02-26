@@ -302,7 +302,9 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
 
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
-    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    // Using 2x default timeout to cover for slow TLS implementations (no inline asm) on slow
+    // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners here.
+    Event::TestTimeSystem::RealTimeBound bound(2 * TestUtility::DefaultTimeout);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
@@ -473,7 +475,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+  envoy::service::discovery::v3::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
   if (expect_node) {
@@ -483,6 +485,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
   } else {
     EXPECT_FALSE(discovery_request.has_node());
   }
+  last_node_.CopyFrom(discovery_request.node());
 
   if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
@@ -533,13 +536,14 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.
   if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
     return AssertionFailure() << "Weird node field";
   }
+  last_node_.CopyFrom(request.node());
   if (request.type_url() != expected_type_url) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
                                              request.type_url(), expected_type_url);
