@@ -247,9 +247,6 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
   if (!tls_certificate_providers_.empty()) {
-    if (tc_update_callback_handle_) {
-      tc_update_callback_handle_->remove();
-    }
     // Once tls_certificate_config_ receives new secret, this callback updates
     // ContextConfigImpl::tls_certificate_config_ with new secret.
     tc_update_callback_handle_ =
@@ -263,9 +260,6 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
         });
   }
   if (certificate_validation_context_provider_) {
-    if (cvc_update_callback_handle_) {
-      cvc_update_callback_handle_->remove();
-    }
     if (default_cvc_) {
       // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with a combined certificate validation
@@ -293,18 +287,6 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
 
 Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
   return handshaker_factory_cb_;
-}
-
-ContextConfigImpl::~ContextConfigImpl() {
-  if (tc_update_callback_handle_) {
-    tc_update_callback_handle_->remove();
-  }
-  if (cvc_update_callback_handle_) {
-    cvc_update_callback_handle_->remove();
-  }
-  if (cvc_validation_callback_handle_) {
-    cvc_validation_callback_handle_->remove();
-  }
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(
@@ -434,21 +416,9 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   }
 }
 
-ServerContextConfigImpl::~ServerContextConfigImpl() {
-  if (stk_update_callback_handle_ != nullptr) {
-    stk_update_callback_handle_->remove();
-  }
-  if (stk_validation_callback_handle_ != nullptr) {
-    stk_validation_callback_handle_->remove();
-  }
-}
-
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
   ContextConfigImpl::setSecretUpdateCallback(callback);
   if (session_ticket_keys_provider_) {
-    if (stk_update_callback_handle_) {
-      stk_update_callback_handle_->remove();
-    }
     // Once session_ticket_keys_ receives new secret, this callback updates
     // ContextConfigImpl::session_ticket_keys_ with new session ticket keys.
     stk_update_callback_handle_ =
