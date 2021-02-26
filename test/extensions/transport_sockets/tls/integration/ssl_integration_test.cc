@@ -18,6 +18,7 @@
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/integration/autonomous_upstream.h"
@@ -485,6 +486,31 @@ TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaOnlyRsaOcspResponse) {
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
+}
+
+// Server has two certificates, but only ECDSA has OCSP, which should be returned.
+TEST_P(SslCertficateIntegrationTest, BothEcdsaAndRsaOnlyEcdsaOcspResponse) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_ocsp_staple_ = true;
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    // Enable OCSP
+    auto client = makeSslClientConnection(ecdsaOnlyClientOptions());
+    const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+        client->ssl().get());
+    SSL_enable_ocsp_stapling(socket->ssl());
+    return client;
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+  // Check that there is an OCSP response
+  const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+      codec_client_->connection()->ssl().get());
+  const uint8_t* resp;
+  size_t resp_len;
+  SSL_get0_ocsp_response(socket->ssl(), &resp, &resp_len);
+  EXPECT_NE(0, resp_len);
 }
 
 // Server has ECDSA and RSA certificates with OCSP responses and stapling required policy works.

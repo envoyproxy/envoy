@@ -63,6 +63,7 @@ Bug Fixes
 * overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
 * sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.
 * tls: fix the subject alternative name of the presented certificate matches the specified matchers as the case-insensitive way when it uses DNS name.
+* tls: fix issue where OCSP was inadvertently removed from SSL response in multi-context scenarios.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
 
 Removed Config or Runtime
