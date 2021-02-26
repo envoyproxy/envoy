@@ -136,9 +136,15 @@ void FilterConfigSubscription::onConfigUpdate(
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
+  const auto pending_update =
+      std::make_shared<std::atomic<uint64_t>>(factory_context_.admin().concurrency() + 1);
   if (filter_config_provider_.has_value()) {
     filter_config_provider_.value()->onConfigUpdate(factory_callback, version_info,
-                                                    [this]() { stats_.config_reload_.inc(); });
+                                                    [this, pending_update]() {
+                                                      if (--(*pending_update) == 0) {
+                                                        stats_.config_reload_.inc();
+                                                      }
+                                                    });
   }
   last_config_hash_ = new_hash;
 }
