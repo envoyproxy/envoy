@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/config/core/v3/api_version.pb.h"
-
 // Declares the ApiVersion struct and defines Envoy::api_version.
 #include "common/version/api_version_number.h"
 

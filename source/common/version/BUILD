@@ -75,10 +75,6 @@ envoy_cc_library(
         "api_version.h",
         ":generate_api_version_number",
     ],
-    deps = [
-        "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
 )
 
 envoy_cc_library(

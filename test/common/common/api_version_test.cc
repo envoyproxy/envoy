@@ -1,5 +1,3 @@
-#include "envoy/config/core/v3/api_version.pb.h"
-
 #include "common/version/api_version.h"
 
 #include "gmock/gmock.h"
