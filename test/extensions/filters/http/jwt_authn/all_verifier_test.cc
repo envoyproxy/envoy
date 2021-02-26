@@ -197,7 +197,7 @@ TEST_F(SingleAllowMissingInOrListTest, BadJwt) {
 }
 
 TEST_F(SingleAllowMissingInOrListTest, MissingIssToken) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -471,6 +471,15 @@ TEST_F(AllowMissingInOrListTest, OtherGoodJwt) {
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
+TEST_F(AllowMissingInOrListTest, WrongIssuer) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // x-other JWT should be ignored.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
 TEST_F(AllowMissingInOrListTest, BadAndGoodJwts) {
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken},
@@ -589,7 +598,7 @@ TEST_F(AllowMissingInAndOfOrListTest, TwoGoodJwts) {
 }
 
 TEST_F(AllowMissingInAndOfOrListTest, GoodAndBadJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
   // Use the token with example.com issuer for x-other.
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, GoodToken}};
