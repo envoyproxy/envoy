@@ -1042,6 +1042,19 @@ TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {
   ASSERT_EQ(absl::nullopt, io_handle_->lastRoundTripTime());
 }
 
+// IoHandleImpl can support EmulatedEdge trigger type but not level trigger type.
+TEST_F(IoHandleImplTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
+  // schedulable_cb will be destroyed by IoHandle.
+  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, cancel());
+  io_handle_->initializeFileEvent(
+      dispatcher_, [this](uint32_t events) { cb_.called(events); },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+  io_handle_->close();
+  io_handle_peer_->close();
+}
+
 class IoHandleImplNotImplementedTest : public testing::Test {
 public:
   IoHandleImplNotImplementedTest() {
@@ -1102,6 +1115,7 @@ TEST_F(IoHandleImplNotImplementedTest, ErrorOnSetOption) {
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnGetOption) {
   EXPECT_THAT(io_handle_->getOption(0, 0, nullptr, nullptr), IsNotSupportedResult());
 }
+
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket
