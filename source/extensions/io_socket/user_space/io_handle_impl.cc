@@ -51,7 +51,6 @@ uint64_t moveUpTo(Buffer::Instance& dst, Buffer::Instance& src, uint64_t max_len
 
 const Network::Address::InstanceConstSharedPtr& IoHandleImpl::getCommonInternalAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
-                         // std::static_pointer_cast<Network::Address::InstanceSharedPtr>(
                          std::make_shared<const Network::Address::EnvoyInternalInstance>(
                              "internal_address_for_user_space_io_handle"));
 }
