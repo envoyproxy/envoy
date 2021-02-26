@@ -831,6 +831,61 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
   }
 }
 
+TEST_P(WasmHttpFilterTest, GrpcCallFallback) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): gRPC call outs not yet supported in the Rust SDK.
+    return;
+  }
+  setupTest("grpc_call_fallback");
+  setupFilter();
+  NiceMock<Grpc::MockAsyncRequest> request;
+  Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
+  Grpc::MockAsyncClientManager client_manager;
+  auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+  auto async_client = std::make_unique<Grpc::MockAsyncClient>();
+  Tracing::Span* parent_span{};
+  EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
+                           Buffer::InstancePtr&& message, Grpc::RawAsyncRequestCallbacks& cb,
+                           Tracing::Span& span, const Http::AsyncClient::RequestOptions& options)
+                           -> Grpc::AsyncRequest* {
+        EXPECT_EQ(service_full_name, "service");
+        EXPECT_EQ(method_name, "method");
+        ProtobufWkt::Value value;
+        EXPECT_TRUE(value.ParseFromArray(message->linearize(message->length()), message->length()));
+        EXPECT_EQ(value.string_value(), "request");
+        callbacks = &cb;
+        parent_span = &span;
+        EXPECT_EQ(options.timeout->count(), 1000);
+        return &request;
+      }));
+  EXPECT_CALL(*client_factory, create).WillOnce(Invoke([&]() -> Grpc::RawAsyncClientPtr {
+    return std::move(async_client);
+  }));
+  EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
+      .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
+  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
+        return std::move(client_factory);
+      }));
+  EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response")));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
+
+  ProtobufWkt::Value value;
+  value.set_string_value("response");
+  std::string response_string;
+  EXPECT_TRUE(value.SerializeToString(&response_string));
+  auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
+  EXPECT_NE(callbacks, nullptr);
+  NiceMock<Tracing::MockSpan> span;
+  if (callbacks) {
+    callbacks->onCreateInitialMetadata(request_headers);
+    callbacks->onSuccessRaw(std::move(response), span);
+  }
+}
+
 TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
   if (std::get<1>(GetParam()) == "rust") {
     // TODO(PiotrSikora): gRPC call outs not yet supported in the Rust SDK.

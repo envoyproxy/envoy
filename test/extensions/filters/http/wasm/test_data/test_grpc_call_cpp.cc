@@ -80,4 +80,59 @@ FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stre
   return FilterHeadersStatus::StopIteration;
 }
 
+class GrpcCallFallbackRootContext : public RootContext {
+public:
+  explicit GrpcCallFallbackRootContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
+
+  void onQueueReady(uint32_t op) override {
+    if (op == 0) {
+      handler_->cancel();
+    } else {
+      grpcClose(handler_->token());
+    }
+  }
+
+  MyGrpcCallHandler* handler_ = nullptr;
+};
+
+class GrpcCallFallbackContext : public Context {
+public:
+  explicit GrpcCallFallbackContext(uint32_t id, RootContext* root) : Context(id, root) {}
+
+  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
+
+  GrpcCallRootContext* root() { return static_cast<GrpcCallRootContext*>(Context::root()); }
+};
+
+static RegisterContextFactory register_GrpcCallFallbackContext(CONTEXT_FACTORY(GrpcCallFallbackContext),
+                                                       ROOT_FACTORY(GrpcCallFallbackRootContext),
+                                                       "grpc_call_fallback");
+
+FilterHeadersStatus GrpcCallFallbackContext::onRequestHeaders(uint32_t, bool end_of_stream) {
+  std::string grpc_service_string = R"(
+envoy_grpc:
+  cluster_name: cluster
+  )";
+  google::protobuf::Value value;
+  value.set_string_value("request");
+  HeaderStringPairs initial_metadata;
+  root()->handler_ = new MyGrpcCallHandler();
+  if (end_of_stream) {
+    if (root()->grpcCallHandler(grpc_service_string, "service", "method", initial_metadata, value,
+                                1000, std::unique_ptr<GrpcCallHandlerBase>(root()->handler_)) ==
+        WasmResult::Ok) {
+      logError("expected failure did not occur");
+    }
+    return FilterHeadersStatus::Continue;
+  }
+  root()->grpcCallHandler(grpc_service_string, "service", "method", initial_metadata, value, 1000,
+                          std::unique_ptr<GrpcCallHandlerBase>(root()->handler_));
+  if (root()->grpcCallHandler(
+          "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
+          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::Ok) {
+    logError("bogus grpc_service accepted error");
+  }
+  return FilterHeadersStatus::StopIteration;
+}
+
 END_WASM_PLUGIN

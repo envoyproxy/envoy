@@ -23,6 +23,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/common/wasm/wasm.h"
@@ -980,7 +982,13 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
                              uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    try {
+      ProtobufMessage::StrictValidationVisitorImpl validation_visitor;
+      MessageUtil::loadFromYaml(std::string(grpc_service.substr(0, grpc_service.size())),
+                                service_proto, validation_visitor);
+    } catch (const EnvoyException& e) {
+      return WasmResult::ParseFailure;
+    }
   }
   uint32_t token = nextGrpcCallToken();
   auto& handler = grpc_call_request_[token];
@@ -999,7 +1007,6 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
-
   auto grpc_request = grpc_client->sendRaw(service_name, method_name,
                                            std::make_unique<::Envoy::Buffer::OwnedImpl>(request),
                                            handler, Tracing::NullSpan::instance(), options);

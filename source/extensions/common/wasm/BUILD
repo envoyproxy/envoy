@@ -44,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_object",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_includes",
