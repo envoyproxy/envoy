@@ -12,21 +12,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-namespace {
-// Translate zero to UINT64_MAX so that the zero/unlimited case doesn't
-// have to be handled specially.
-uint64_t translateZeroToUnlimited(uint64_t limit) {
-  return (limit != 0) ? limit : std::numeric_limits<uint64_t>::max();
-}
-} // namespace
-
 ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_source)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator), time_source_(time_source),
-      remaining_streams_(translateZeroToUnlimited(config.maxRequestsPerConnection())) {}
+      random_generator_(random_generator), time_source_(time_source) {}
 
 ConnectionManager::~ConnectionManager() = default;
 
@@ -421,8 +412,9 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
 
   parent_.stats_.request_.inc();
 
-  parent_.remaining_streams_--;
-  if (parent_.remaining_streams_ == 0) {
+  parent_.accumulated_requests_++;
+  if (parent_.config_.maxRequestsPerConnection() > 0 &&
+      parent_.accumulated_requests_ >= parent_.config_.maxRequestsPerConnection()) {
     parent_.read_callbacks_->connection().readDisable(true);
     parent_.requests_overflow_ = true;
     parent_.stats_.downstream_cx_max_requests_.inc();

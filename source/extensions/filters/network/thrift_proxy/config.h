@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <map>
 #include <string>
 
@@ -99,7 +98,7 @@ private:
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
   const bool payload_passthrough_;
 
-  uint64_t max_requests_per_connection_{};
+  const uint64_t max_requests_per_connection_{};
 };
 
 } // namespace ThriftProxy

@@ -274,8 +274,8 @@ private:
   bool half_closed_{false};
   TimeSource& time_source_;
 
-  // The maximum number of requests remaining to be processed on the current connection.
-  uint64_t remaining_streams_{};
+  // The number of requests accumulated on the current connection.
+  uint64_t accumulated_requests_{};
   bool requests_overflow_{false};
 };
 
