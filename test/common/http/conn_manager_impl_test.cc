@@ -765,9 +765,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
 
           // Invokes setRoute from StreamFilterCallbacks to manually set the cached route to a
           // DelegatingRoute child class.
-          std::shared_ptr<ExampleDelegatingRouteDerived> route_override(
-              new ExampleDelegatingRouteDerived(decoder_filters_[0]->callbacks_->route(),
-                                                foo_cluster_name));
+          std::shared_ptr<const ExampleDelegatingRouteDerived> route_override =
+              std::make_shared<ExampleDelegatingRouteDerived>(
+                  decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
+
           decoder_filters_[0]->callbacks_->setRoute(route_override);
 
           EXPECT_EQ(route_override, decoder_filters_[0]->callbacks_->route());
