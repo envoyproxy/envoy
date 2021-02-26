@@ -109,7 +109,9 @@ public:
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
     p.add_auth_scopes("email");
-    p.set_resource("oauth2-resource");
+    p.add_resouces("oauth2-resource");
+    p.add_resouces("http://example.com");
+    p.add_resouces("https://example.com");
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->set_exact_match("OPTIONS");
@@ -199,7 +201,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   EXPECT_EQ(test_config_->encodedAuthScopes(), TEST_DEFAULT_SCOPE);
 
   // resource by default is not set
-  EXPECT_EQ(test_config_->resource(), "");
+  EXPECT_EQ(test_config_->encodedResources(), "");
 
   // Recreate the filter with current config and test if the scope was added
   // as a query parameter in response headers.
@@ -329,7 +331,8 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
            "&response_type=code&"
            "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"
-           "&resource=oauth2-resource"},
+           "&resource=oauth2-resource&resource=http%3A%2F%2example.com"
+           "&resource=https%3A%2F%2example.com"},
   };
 
   // explicitly tell the validator to fail the validation
@@ -640,7 +643,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
            "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
            "3Fname%3Dadmin%26level%3Dtrace"
-           "&resource=oauth2-resource"},
+           "&resource=oauth2-resource&resource=http%3A%2F%2example.com"
+           "&resource=https%3A%2F%2example.com"},
   };
 
   // Fail the validation to trigger the OAuth flow.

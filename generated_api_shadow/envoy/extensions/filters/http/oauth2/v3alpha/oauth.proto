@@ -79,7 +79,7 @@ message OAuth2Config {
 
   // Optional resource parameter for authorization request
   // RFC: https://tools.ietf.org/html/rfc8707
-  string resource = 10;
+  repeated string resources = 10;
 }
 
 // Filter config.
