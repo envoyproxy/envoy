@@ -73,7 +73,8 @@ BAZEL_BUILD_OPTIONS+=(
 
 # Generate extension database. This maps from extension name to extension
 # metadata, based on the envoy_cc_extension() Bazel target attributes.
-./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
+bazel build //tools/extensions:generate_extension_db
+bazel run //tools/extensions:generate_extension_db
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
