@@ -21,11 +21,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "envoy.retry_host_predicates",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":previous_hosts_predicate_lib",
         "//include/envoy/registry",
         "//include/envoy/upstream:retry_interface",
-        "@envoy_api//envoy/config/retry/previous_hosts/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/retry/host/previous_hosts/v3:pkg_cc_proto",
     ],
 )

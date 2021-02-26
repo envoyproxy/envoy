@@ -13,6 +13,8 @@ namespace Server {
 using HotRestartMessage = envoy::HotRestartMessage;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
+static constexpr absl::Duration CONNECTION_REFUSED_RETRY_DELAY = absl::Seconds(1);
+static constexpr int SENDMSG_MAX_RETRIES = 10;
 
 HotRestartingBase::~HotRestartingBase() {
   if (my_domain_socket_ != -1) {
@@ -67,6 +69,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
 
 void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
                                               const HotRestartMessage& proto) {
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const uint64_t serialized_size = proto.ByteSizeLong();
   const uint64_t total_size = sizeof(uint64_t) + serialized_size;
   // Fill with uint64_t 'length' followed by the serialized HotRestartMessage.
@@ -110,10 +113,36 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
       ASSERT(sent == total_size, "an fd passing message was too long for one sendmsg().");
     }
 
-    const int rc = sendmsg(my_domain_socket_, &message, 0);
-    RELEASE_ASSERT(rc == static_cast<int>(cur_chunk_size),
-                   fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc, errno));
+    // A transient connection refused error probably means the old process is not ready.
+    int saved_errno = 0;
+    int rc = 0;
+    bool sent = false;
+    for (int i = 0; i < SENDMSG_MAX_RETRIES; i++) {
+      auto result = os_sys_calls.sendmsg(my_domain_socket_, &message, 0);
+      rc = result.rc_;
+      saved_errno = result.errno_;
+
+      if (rc == static_cast<int>(cur_chunk_size)) {
+        sent = true;
+        break;
+      }
+
+      if (saved_errno == ECONNREFUSED) {
+        ENVOY_LOG(error, "hot restart sendmsg() connection refused, retrying");
+        absl::SleepFor(CONNECTION_REFUSED_RETRY_DELAY);
+        continue;
+      }
+
+      RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
+                                        saved_errno));
+    }
+
+    if (!sent) {
+      RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
+                                        saved_errno));
+    }
   }
+
   RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                  fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
 }

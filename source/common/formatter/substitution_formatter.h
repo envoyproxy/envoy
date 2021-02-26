@@ -431,6 +431,23 @@ public:
 };
 
 /**
+ * FormatterProvider for ClusterMetadata from StreamInfo.
+ */
+class ClusterMetadataFormatter : public FormatterProvider, MetadataFormatter {
+public:
+  ClusterMetadataFormatter(const std::string& filter_namespace,
+                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+};
+
+/**
  * FormatterProvider for FilterState from StreamInfo.
  */
 class FilterStateFormatter : public FormatterProvider {

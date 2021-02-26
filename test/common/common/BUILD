@@ -26,6 +26,17 @@ envoy_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "assert2_test",
+    srcs = ["assert2_test.cc"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -266,6 +277,16 @@ envoy_cc_test(
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
         "//source/common/common:token_bucket_impl_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "shared_token_bucket_impl_test",
+    srcs = ["shared_token_bucket_impl_test.cc"],
+    deps = [
+        "//source/common/common:shared_token_bucket_impl_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],

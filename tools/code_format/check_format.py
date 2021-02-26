@@ -159,6 +159,8 @@ VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
 OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
+# C++17 feature, lacks sufficient support across various libraries / compilers.
+FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -337,9 +339,9 @@ class FormatChecker:
           "installed, but the binary name is different or it's not available in "
           "PATH, please use CLANG_FORMAT environment variable to specify the path. "
           "Examples:\n"
-          "    export CLANG_FORMAT=clang-format-10.0.0\n"
-          "    export CLANG_FORMAT=/opt/bin/clang-format-10\n"
-          "    export CLANG_FORMAT=/usr/local/opt/llvm@10/bin/clang-format".format(
+          "    export CLANG_FORMAT=clang-format-11.0.1\n"
+          "    export CLANG_FORMAT=/opt/bin/clang-format-11\n"
+          "    export CLANG_FORMAT=/usr/local/opt/llvm@11/bin/clang-format".format(
               CLANG_FORMAT_PATH))
 
     def checkBazelTool(name, path, var):
@@ -786,6 +788,8 @@ class FormatChecker:
       reportError("Test names should be CamelCase, starting with a capital letter")
     if OLD_MOCK_METHOD_REGEX.search(line):
       reportError("The MOCK_METHODn() macros should not be used, use MOCK_METHOD() instead")
+    if FOR_EACH_N_REGEX.search(line):
+      reportError("std::for_each_n should not be used, use an alternative for loop instead")
 
     if not self.allowlistedForSerializeAsString(file_path) and "SerializeAsString" in line:
       # The MessageLite::SerializeAsString doesn't generate deterministic serialization,

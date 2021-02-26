@@ -355,6 +355,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "win32_redirect_records_option_lib",
+    srcs = ["win32_redirect_records_option_impl.cc"],
+    hdrs = ["win32_redirect_records_option_impl.h"],
+    deps = [
+        ":address_lib",
+        ":socket_lib",
+        ":socket_option_lib",
+        "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:scalar_to_byte_vector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "socket_option_factory_lib",
     srcs = ["socket_option_factory.cc"],
     hdrs = ["socket_option_factory.h"],
@@ -363,6 +380,7 @@ envoy_cc_library(
         ":addr_family_aware_socket_option_lib",
         ":address_lib",
         ":socket_option_lib",
+        ":win32_redirect_records_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -475,6 +493,19 @@ envoy_cc_library(
     hdrs = ["proxy_protocol_filter_state.h"],
     deps = [
         "//include/envoy/network:proxy_protocol_options_lib",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_socket_options_filter_state_lib",
+    srcs = ["upstream_socket_options_filter_state.cc"],
+    hdrs = ["upstream_socket_options_filter_state.h"],
+    deps = [
+        ":socket_interface_lib",
+        ":socket_option_factory_lib",
+        "//include/envoy/network:io_handle_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],

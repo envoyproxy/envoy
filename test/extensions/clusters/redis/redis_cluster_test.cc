@@ -3,9 +3,10 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
@@ -105,23 +106,23 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
 
-    envoy::config::cluster::redis::RedisClusterConfig config;
+    envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
         cluster_config,
-        TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
-            config),
+        TestUtility::downcastAndValidate<
+            const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
         cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
-    cluster_->prioritySet().addPriorityUpdateCb(
+    priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -135,9 +136,9 @@ protected:
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
 
-    envoy::config::cluster::redis::RedisClusterConfig config;
+    envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            validation_visitor_, config);
@@ -148,7 +149,7 @@ protected:
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_,
         dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, validation_visitor_, api);
+        std::move(outlier_event_logger), false, validation_visitor_, api, options_);
 
     RedisClusterFactory factory = RedisClusterFactory();
     factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
@@ -566,6 +567,7 @@ protected:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* interval_timer_{};
@@ -575,6 +577,7 @@ protected:
   std::shared_ptr<RedisCluster> cluster_;
   std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
   Network::MockActiveDnsQuery active_dns_query_;
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
 };
 
 using RedisDnsConfigTuple = std::tuple<std::string, Network::DnsLookupFamily,
@@ -916,7 +919,7 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
                 address:
                   socket_address:
                     address: foo.bar.com
-                    port_value: 22120               
+                    port_value: 22120
             - endpoint:
                 address:
                   socket_address:

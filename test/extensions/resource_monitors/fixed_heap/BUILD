@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
-        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )
 
@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/fixed_heap:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
-        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg_cc_proto",
+        "//test/mocks/server:options_mocks",
+        "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )
