@@ -16,9 +16,11 @@ namespace Http {
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
     FilterConfigSubscriptionSharedPtr&& subscription,
     const std::set<std::string>& require_type_urls,
-    Server::Configuration::FactoryContext& factory_context)
+    Server::Configuration::FactoryContext& factory_context,
+    FilterConfigProviderManagerImpl& filter_config_provider_manager, const std::string& provider_id)
     : subscription_(std::move(subscription)), require_type_urls_(require_type_urls),
-      tls_(factory_context.threadLocal()),
+      tls_(factory_context.threadLocal()), provider_id_(provider_id),
+      filter_config_provider_manager_(filter_config_provider_manager),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
         // This init target is used to activate the subscription but not wait
@@ -35,6 +37,8 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
 DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
   ASSERT(subscription_->filter_config_provider_.has_value());
   subscription_->filter_config_provider_.reset();
+  // Remove the provider from the provider manager.
+  filter_config_provider_manager_.dynamic_filter_config_providers_.erase(provider_id_);
 }
 
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
@@ -184,7 +188,7 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
       factory_context.initManager().add(subscription->initTarget());
     }
     auto provider = std::make_shared<DynamicFilterConfigProviderImpl>(
-        std::move(subscription), require_type_urls, factory_context);
+        std::move(subscription), require_type_urls, factory_context, *this, provider_identifier);
     // Ensure the subscription starts if it has not already.
     if (apply_without_warming) {
       factory_context.initManager().add(provider->init_target_);

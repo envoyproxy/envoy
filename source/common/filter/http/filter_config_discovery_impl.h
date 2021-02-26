@@ -33,7 +33,9 @@ class DynamicFilterConfigProviderImpl : public FilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr&& subscription,
                                   const std::set<std::string>& require_type_urls,
-                                  Server::Configuration::FactoryContext& factory_context);
+                                  Server::Configuration::FactoryContext& factory_context,
+                                  FilterConfigProviderManagerImpl& filter_config_provider_manager,
+                                  const std::string& provider_id);
   ~DynamicFilterConfigProviderImpl() override;
 
   // Config::ExtensionConfigProvider
@@ -56,6 +58,10 @@ private:
   // it.
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
+
+  const std::string provider_id_;
+  // FilterConfigProviderManagerImpl maintains active providers in a map.
+  FilterConfigProviderManagerImpl& filter_config_provider_manager_;
 
   // Local initialization target to ensure that the subscription starts in
   // case no warming is requested by any other filter config provider.
@@ -176,7 +182,7 @@ public:
 private:
   absl::flat_hash_map<std::string, std::weak_ptr<DynamicFilterConfigProviderImpl>>
       dynamic_filter_config_providers_;
-  friend class FilterConfigSubscription;
+  friend class DynamicFilterConfigProviderImpl;
 };
 
 } // namespace Http
