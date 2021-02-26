@@ -1,5 +1,6 @@
-#include "envoy/filesystem/filesystem.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
+
+#include "envoy/filesystem/filesystem.h"
 
 using testing::AtLeast;
 using testing::InSequence;
@@ -11,22 +12,20 @@ namespace Envoy {
 namespace Http {
 
 HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
-    : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
-      Filesystem::FilePathAndType file_info {
-        Filesystem::DestinationType::File,
-        access_log_path_
-      };
-      access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-          file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-          log_manager_)}},
-      codec_(new NiceMock<MockServerConnection>()),
-      stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
-                                      POOL_HISTOGRAM(fake_stats_))},
-             "", fake_stats_),
+    : http_context_(fake_stats_.symbolTable()),
+      access_log_path_("dummy_path"), Filesystem::FilePathAndType file_info{
+                                          Filesystem::DestinationType::File, access_log_path_};
+access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
+    file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+    log_manager_)}},
+    codec_(new NiceMock<MockServerConnection>()),
+    stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
+                                    POOL_HISTOGRAM(fake_stats_))},
+           "", fake_stats_),
 
-      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
-      request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
-      local_reply_(LocalReply::Factory::createDefault()) {
+    listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
+    request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
+    local_reply_(LocalReply::Factory::createDefault()) {
 
   ON_CALL(route_config_provider_, lastUpdated())
       .WillByDefault(Return(test_time_.timeSystem().systemTime()));

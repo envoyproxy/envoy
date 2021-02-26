@@ -62,9 +62,8 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     break;
   }
   Filesystem::FilePathAndType file_info{
-    static_cast<Filesystem::DestinationType>(fal_config.access_log_destination()),
-    fal_config.path()
-  };
+      static_cast<Filesystem::DestinationType>(fal_config.access_log_destination()),
+      fal_config.path()};
   return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
                                          context.accessLogManager());
 }

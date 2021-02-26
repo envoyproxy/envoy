@@ -8,10 +8,7 @@ AdminInstanceTest::AdminInstanceTest()
       cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
       admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
       admin_filter_(admin_.createCallbackFunction()) {
-  Filesystem::FilePathAndType file_info {
-    Filesystem::DestinationType::File,
-    "/dev/null"
-  };
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   admin_.startHttpListener(file_info, address_out_path_,
                            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
                            listener_scope_.createScope("listener.admin."));

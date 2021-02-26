@@ -126,7 +126,7 @@ public:
    * @return const std::string& the admin access log path.
    */
   virtual const std::string& accessLogPath() const PURE;
-  
+
   /**
    * @return const  the admin access log destination type.
    */

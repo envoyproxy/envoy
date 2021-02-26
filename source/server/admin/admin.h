@@ -89,7 +89,8 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(const Filesystem::FilePathAndType& file_info, const std::string& address_out_path,
+  void startHttpListener(const Filesystem::FilePathAndType& file_info,
+                         const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;

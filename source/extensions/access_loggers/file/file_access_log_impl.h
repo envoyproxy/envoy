@@ -14,8 +14,9 @@ namespace File {
  */
 class FileAccessLog : public Common::ImplBase {
 public:
-  FileAccessLog(const Filesystem::FilePathAndType& access_log_file_info, AccessLog::FilterPtr&& filter,
-                Formatter::FormatterPtr&& formatter, AccessLog::AccessLogManager& log_manager);
+  FileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
+                AccessLog::FilterPtr&& filter, Formatter::FormatterPtr&& formatter,
+                AccessLog::AccessLogManager& log_manager);
 
 private:
   // Common::ImplBase

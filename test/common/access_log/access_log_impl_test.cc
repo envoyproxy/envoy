@@ -30,10 +30,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
-using testing::Matcher;
 
 namespace Envoy {
 namespace AccessLog {
@@ -51,8 +51,11 @@ public:
   AccessLogImplTest() : file_(new MockAccessLogFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
-    ON_CALL(log_manager_, createAccessLog(testing::Matcher<const std::string&>(_))).WillByDefault(Return(file_));
-    ON_CALL(log_manager_, createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_))).WillByDefault(Return(file_));
+    ON_CALL(log_manager_, createAccessLog(testing::Matcher<const std::string&>(_)))
+        .WillByDefault(Return(file_));
+    ON_CALL(log_manager_,
+            createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+        .WillByDefault(Return(file_));
     ON_CALL(*file_, write(_)).WillByDefault(SaveArg<0>(&output_));
   }
 

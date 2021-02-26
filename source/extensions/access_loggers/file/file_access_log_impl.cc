@@ -5,8 +5,8 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-FileAccessLog::FileAccessLog(const Filesystem::FilePathAndType& access_log_file_info, AccessLog::FilterPtr&& filter,
-                             Formatter::FormatterPtr&& formatter,
+FileAccessLog::FileAccessLog(const Filesystem::FilePathAndType& access_log_file_info,
+                             AccessLog::FilterPtr&& filter, Formatter::FormatterPtr&& formatter,
                              AccessLog::AccessLogManager& log_manager)
     : ImplBase(std::move(filter)), formatter_(std::move(formatter)) {
   log_file_ = log_manager.createAccessLog(access_log_file_info);

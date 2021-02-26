@@ -56,7 +56,8 @@ public:
    * @param file_info specifies the file to create/open.
    * @return the opened file.
    */
-  virtual AccessLogFileSharedPtr createAccessLog(const Envoy::Filesystem::FilePathAndType& file_info) PURE;
+  virtual AccessLogFileSharedPtr
+  createAccessLog(const Envoy::Filesystem::FilePathAndType& file_info) PURE;
 };
 
 using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
