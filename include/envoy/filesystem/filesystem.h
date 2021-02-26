@@ -85,6 +85,9 @@ struct PathSplitResult {
  * Contains the file type and the path.
  */
 struct FilePathAndType {
+  bool operator==(const FilePathAndType& rhs) const {
+    return file_type_ == rhs.file_type_ && path_ == rhs.path_;
+  }
   DestinationType file_type_;
   std::string path_;
 };
