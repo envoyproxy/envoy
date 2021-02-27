@@ -89,7 +89,6 @@ createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& opt
   common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
 
   envoy::config::core::v3::TransportSocket message;
-  // message.set_name(Extensions::TransportSockets::TransportSocketNames::get().Quic);
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
@@ -168,7 +167,7 @@ public:
     } else {
       codec->setCodecClientCallbacks(client_codec_callback_);
     }
-    EXPECT_EQ("", codec->connection()->requestedServerName());
+    EXPECT_EQ(server_id_.host(), codec->connection()->requestedServerName());
     return codec;
   }
 

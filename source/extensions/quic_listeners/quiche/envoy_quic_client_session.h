@@ -78,6 +78,7 @@ private:
   // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
+  const absl::string_view host_name_;
 };
 
 } // namespace Quic
