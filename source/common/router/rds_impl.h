@@ -136,7 +136,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);
   }
 
