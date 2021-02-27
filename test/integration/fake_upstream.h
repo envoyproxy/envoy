@@ -321,7 +321,7 @@ public:
              << "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is "
                 "false."
                 "\n See "
-                "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+                "https://github.com/envoyproxy/envoy/blob/main/test/integration/README.md#"
                 "unexpected-disconnects";
     }
     return testing::AssertionSuccess();
@@ -361,7 +361,7 @@ public:
                      "with a fake connection. Either manage the connection via "
                      "waitForRawConnection() or waitForHttpConnection(), or "
                      "set_allow_unexpected_disconnects(true).\n See "
-                     "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+                     "https://github.com/envoyproxy/envoy/blob/main/test/integration/README.md#"
                      "unparented-upstream-connections");
     });
   }
