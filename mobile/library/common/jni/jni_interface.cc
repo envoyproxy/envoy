@@ -142,7 +142,6 @@ static void pass_headers(const char* method, envoy_headers headers, jobject j_co
   JNIEnv* env = get_env();
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmCallbackContext, method, "([B[BZ)V");
-  env->PushLocalFrame(headers.length * 2);
   jboolean start_headers = JNI_TRUE;
 
   for (envoy_header_size_t i = 0; i < headers.length; i++) {
@@ -172,13 +171,14 @@ static void pass_headers(const char* method, envoy_headers headers, jobject j_co
 
     // Pass this header pair to the platform
     env->CallVoidMethod(j_context, jmid_passHeader, key, value, start_headers);
+    env->DeleteLocalRef(key);
+    env->DeleteLocalRef(value);
 
     // We don't release local refs currently because we've pushed a large enough frame, but we could
     // consider this and/or periodically popping the frame.
     start_headers = JNI_FALSE;
   }
 
-  env->PopLocalFrame(nullptr);
   env->DeleteLocalRef(jcls_JvmCallbackContext);
   release_envoy_headers(headers);
 }
