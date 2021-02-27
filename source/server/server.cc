@@ -497,7 +497,7 @@ void InstanceImpl::initialize(const Options& options,
       throw EnvoyException("An admin access log path is required for a listening server.");
     }
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    Filesystem::FilePathAndType file_info{initial_config.admin().accessLogPath(),
+    Filesystem::FilePathAndType file_info{initial_config.admin().accessLogDestination(),
                                           initial_config.admin().accessLogPath()};
     admin_->startHttpListener(
         file_info, options.adminAddressPath(), initial_config.admin().address(),
