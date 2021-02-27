@@ -1116,6 +1116,9 @@ TEST_F(IoHandleImplNotImplementedTest, ErrorOnGetOption) {
   EXPECT_THAT(io_handle_->getOption(0, 0, nullptr, nullptr), IsNotSupportedResult());
 }
 
+TEST_F(IoHandleImplNotImplementedTest, ErrorOnIoctl) {
+  EXPECT_THAT(io_handle_->ioctl(0, nullptr, 0, nullptr, 0, nullptr), IsNotSupportedResult());
+}
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket

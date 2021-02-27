@@ -289,6 +289,11 @@ Api::SysCallIntResult IoHandleImpl::getOption(int, int, void*, socklen_t*) {
   return makeInvalidSyscallResult();
 }
 
+Api::SysCallIntResult IoHandleImpl::ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
+                                          unsigned long*) {
+  return makeInvalidSyscallResult();
+}
+
 Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscallResult(); }
 
 absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }

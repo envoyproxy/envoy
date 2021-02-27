@@ -73,6 +73,8 @@ public:
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
                                   socklen_t optlen) override;
   Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
+  Api::SysCallIntResult ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
+                              unsigned long*) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
   Network::Address::InstanceConstSharedPtr localAddress() override;
