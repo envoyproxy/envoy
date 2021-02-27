@@ -1458,7 +1458,7 @@ name: local-reply-during-encode-data
   upstream_request_->encodeTrailers(response_trailers);
 
   // Response was aborted after headers were sent to the client.
-  // The entire connection is reset. Client does not receive body or trailers.
+  // The stream was reset. Client does not receive body or trailers.
   response->waitForReset();
   EXPECT_FALSE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());

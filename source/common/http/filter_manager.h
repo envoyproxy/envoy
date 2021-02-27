@@ -1108,16 +1108,19 @@ private:
 
   struct State {
     State()
-        : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
-          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false) {}
+        : remote_complete_(false), local_complete_(false), end_stream_encoded_(false),
+          has_continue_headers_(false), created_filter_chain_(false), is_head_request_(false),
+          is_grpc_request_(false), non_100_response_headers_encoded_(false) {}
 
     uint32_t filter_call_state_{0};
 
     bool remote_complete_ : 1;
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
+    // This indicates that local is complete prior to filter processing.
+    // A filter can still stop the stream from being complete as seen
+    // by the codec.
+    bool local_complete_ : 1;
+    // Indicates whether envoy has sent a complete response for the current stream.
+    bool end_stream_encoded_ : 1;
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_ : 1;
