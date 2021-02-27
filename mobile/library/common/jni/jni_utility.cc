@@ -45,6 +45,7 @@ void jni_delete_const_global_ref(const void* context) {
 int unbox_integer(JNIEnv* env, jobject boxedInteger) {
   jclass jcls_Integer = env->FindClass("java/lang/Integer");
   jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
+  env->DeleteLocalRef(jcls_Integer);
   return env->CallIntMethod(boxedInteger, jmid_intValue);
 }
 
@@ -67,7 +68,11 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
     // implemented in the JVM layer.
     jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
     jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
-    return array_to_native_data(env, array);
+    env->DeleteLocalRef(jcls_ByteBuffer);
+
+    envoy_data native_data = array_to_native_data(env, array);
+    env->DeleteLocalRef(array);
+    return native_data;
   }
 
   envoy_data native_data;
@@ -125,6 +130,8 @@ envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
     envoy_data header_value = {value_length, native_value, free, native_value};
 
     header_array[i / 2] = {header_key, header_value};
+    env->DeleteLocalRef(j_key);
+    env->DeleteLocalRef(j_value);
   }
 
   envoy_headers native_headers = {length / 2, header_array};
