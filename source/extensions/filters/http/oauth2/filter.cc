@@ -95,15 +95,14 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 
 // Transforms the proto list into encoded resource params
 // Takes care of percentage encoding http and https is needed
-std::string
-encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
+std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
   std::string result = "";
 
   if (!resources_protos.empty()) {
     std::string h1 = "http://";
     std::string h2 = "https://";
 
-    for (const resource & scope : resources_protos) {
+    for (const auto& resource : resources_protos) {
       if (resource.rfind(h1, 0) == 0 || resource.rfind(h2, 0) == 0) {
         result += "&resource=" + Http::Utility::PercentEncoding::encode(resource, ":/=&? ");
       } else {
