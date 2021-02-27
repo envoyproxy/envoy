@@ -48,7 +48,7 @@ PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
 }
 
 WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
-  return [](WasmBaseConfig& config, const Stats::ScopeSharedPtr& scope,
+  return [](WasmConfig& config, const Stats::ScopeSharedPtr& scope,
             Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
             Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {

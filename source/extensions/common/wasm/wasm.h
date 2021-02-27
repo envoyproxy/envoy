@@ -20,8 +20,8 @@
 #include "common/stats/symbol_table_impl.h"
 #include "common/version/version.h"
 
-#include "extensions/common/wasm/base_config.h"
 #include "extensions/common/wasm/context.h"
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm_extension.h"
 #include "extensions/common/wasm/wasm_vm.h"
 #include "extensions/common/wasm/well_known_names.h"
@@ -47,7 +47,7 @@ struct WasmStats {
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
 public:
-  Wasm(WasmBaseConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
+  Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
        Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher);
   Wasm(std::shared_ptr<WasmHandle> other, Event::Dispatcher& dispatcher);
   ~Wasm() override;
@@ -164,9 +164,9 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // all failures synchronously as it has no facility to report configuration update failures
 // asynchronously. Callers should throw an exception if they are part of a synchronous xDS update
 // because that is the mechanism for reporting configuration errors.
-bool createWasm(WasmBaseConfig& config, const PluginSharedPtr& plugin,
-                const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-                Init::Manager& init_manager, Event::Dispatcher& dispatcher, Api::Api& api,
+bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
                 Envoy::Server::ServerLifecycleNotifier& lifecycle_notifier,
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& callback,

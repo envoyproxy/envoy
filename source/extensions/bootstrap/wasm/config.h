@@ -60,7 +60,6 @@ public:
 
 private:
   void createWasm(Server::Configuration::ServerFactoryContext& context);
-  Envoy::Extensions::Common::Wasm::WasmBaseConfigPtr base_config_;
   envoy::extensions::wasm::v3::WasmService config_;
   Server::Configuration::ServerFactoryContext& context_;
   WasmServicePtr wasm_service_;

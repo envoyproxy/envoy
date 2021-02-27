@@ -7,7 +7,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/common/wasm/base_config.h"
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -23,7 +23,7 @@ using Envoy::Extensions::Common::Wasm::Wasm;
 
 class FilterConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
-  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& base_config,
+  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                Server::Configuration::FactoryContext& context);
 
   std::shared_ptr<Context> createFilter() {
@@ -45,7 +45,6 @@ public:
   }
 
 private:
-  Envoy::Extensions::Common::Wasm::WasmBaseConfigPtr base_config_;
   PluginSharedPtr plugin_;
   ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;

@@ -81,12 +81,10 @@ public:
         plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
         &listener_metadata_);
     // Passes ownership of root_context_.
-    auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-    base_config.allowedCapabilitiesMap() = allowed_capabilities;
+    plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities;
     Extensions::Common::Wasm::createWasm(
-        base_config, plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api,
-        lifecycle_notifier_, remote_data_provider_,
-        [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
+        plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
+        remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     if (wasm_) {
       plugin_handle_ = getOrCreateThreadLocalPlugin(
           wasm_, plugin_, dispatcher_,

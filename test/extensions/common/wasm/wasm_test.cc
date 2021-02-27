@@ -106,9 +106,8 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
   auto wasm = std::make_shared<WasmHandle>(
-      std::make_unique<Wasm>(base_config, "", scope, cluster_manager, *dispatcher));
+      std::make_unique<Wasm>(plugin->wasmConfig(), "", scope, cluster_manager, *dispatcher));
   auto wasm_base = std::dynamic_pointer_cast<proxy_wasm::WasmHandleBase>(wasm);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVM);
   EXPECT_EQ(toWasmEvent(wasm_base), EnvoyWasm::WasmEvent::UnableToCreateVM);
@@ -175,7 +174,6 @@ TEST_P(WasmCommonTest, Logging) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   std::string code;
   if (GetParam() != "null") {
@@ -190,7 +188,7 @@ TEST_P(WasmCommonTest, Logging) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
-  auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   EXPECT_NE(wasm->buildVersion(), "");
@@ -258,9 +256,9 @@ TEST_P(WasmCommonTest, BadSignature) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", "", code);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
+
   EXPECT_FALSE(wasm->initialize(code, false));
   EXPECT_TRUE(wasm->isFailed());
 }
@@ -284,12 +282,10 @@ TEST_P(WasmCommonTest, Segv) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
   EXPECT_TRUE(wasm->initialize(code, false));
   TestContext* root_context = nullptr;
@@ -325,7 +321,6 @@ TEST_P(WasmCommonTest, DivByZero) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
@@ -333,7 +328,7 @@ TEST_P(WasmCommonTest, DivByZero) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
@@ -360,7 +355,6 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   std::string code;
   if (GetParam() != "null") {
@@ -374,8 +368,9 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
+
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -401,7 +396,6 @@ TEST_P(WasmCommonTest, Utilities) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   std::string code;
   if (GetParam() != "null") {
@@ -415,7 +409,7 @@ TEST_P(WasmCommonTest, Utilities) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
@@ -471,7 +465,6 @@ TEST_P(WasmCommonTest, Stats) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   std::string code;
   if (GetParam() != "null") {
@@ -485,8 +478,9 @@ TEST_P(WasmCommonTest, Stats) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
+
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->initialize(code, false));
   wasm->setCreateContextForTesting(
@@ -517,11 +511,10 @@ TEST_P(WasmCommonTest, Foreign) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, "", scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
                                                                cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
@@ -562,12 +555,11 @@ TEST_P(WasmCommonTest, OnForeign) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, "", scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
                                                                cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
@@ -610,11 +602,10 @@ TEST_P(WasmCommonTest, WASI) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, "", scope,
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
                                                                cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
@@ -656,8 +647,6 @@ TEST_P(WasmCommonTest, VmCache) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
@@ -687,16 +676,16 @@ TEST_P(WasmCommonTest, VmCache) {
   EXPECT_FALSE(code.empty());
   vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
   WasmHandleSharedPtr wasm_handle;
-  createWasm(base_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
-             lifecycle_notifier, remote_data_provider,
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
+             remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
   Event::PostCb post_cb = [] {};
   lifecycle_callback(post_cb);
 
   WasmHandleSharedPtr wasm_handle2;
-  createWasm(base_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
-             lifecycle_notifier, remote_data_provider,
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
+             remote_data_provider,
              [&wasm_handle2](const WasmHandleSharedPtr& w) { wasm_handle2 = w; });
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
@@ -758,8 +747,6 @@ TEST_P(WasmCommonTest, RemoteCode) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
@@ -804,7 +791,8 @@ TEST_P(WasmCommonTest, RemoteCode) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(base_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
+
              lifecycle_notifier, remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
@@ -867,8 +855,6 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
@@ -926,8 +912,8 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(base_config, plugin, scope, cluster_manager, init_manager, *dispatcher, *api,
-             lifecycle_notifier, remote_data_provider,
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
+             remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
   EXPECT_CALL(init_watcher, ready());
@@ -985,7 +971,6 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
@@ -997,8 +982,8 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
   // restriction enforced if allowed_capabilities is non-empty
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"foo", proxy_wasm::SanitizationConfig()}};
-  base_config.allowedCapabilitiesMap() = allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1039,7 +1024,6 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
@@ -1049,8 +1033,8 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()}};
-  base_config.allowedCapabilitiesMap() = allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1095,7 +1079,6 @@ TEST_P(WasmCommonTest, AllowLog) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
@@ -1106,8 +1089,8 @@ TEST_P(WasmCommonTest, AllowLog) {
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"proxy_log", proxy_wasm::SanitizationConfig()}};
-  base_config.allowedCapabilitiesMap() = allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   // Restrict capabilities, but allow proxy_log
@@ -1148,7 +1131,6 @@ TEST_P(WasmCommonTest, AllowWASI) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
@@ -1159,8 +1141,8 @@ TEST_P(WasmCommonTest, AllowWASI) {
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"fd_write", proxy_wasm::SanitizationConfig()}};
-  base_config.allowedCapabilitiesMap() = allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   // Restrict capabilities, but allow fd_write
@@ -1201,7 +1183,6 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
@@ -1213,8 +1194,8 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
       {"proxy_log", proxy_wasm::SanitizationConfig()}};
-  base_config.allowedCapabilitiesMap() = allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   // Restrict capabilities, but allow proxy_log
@@ -1256,7 +1237,6 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   *plugin_config.mutable_vm_config()->mutable_runtime() =
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
 
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_restriction_cpp.wasm"));
@@ -1267,8 +1247,8 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
       {"fd_write", proxy_wasm::SanitizationConfig()}};
-  base_config.allowedCapabilitiesMap() = allowed_capabilities;
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(base_config, vm_key, scope,
+  plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
+  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
   // Restrict capabilities

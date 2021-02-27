@@ -46,7 +46,6 @@ public:
   Wasm* wasmForTest() { return tls_slot_->get()->wasm().get(); }
 
 private:
-  Envoy::Extensions::Common::Wasm::WasmBaseConfigPtr base_config_;
   PluginSharedPtr plugin_;
   ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;

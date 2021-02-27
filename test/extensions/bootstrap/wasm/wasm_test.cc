@@ -54,10 +54,9 @@ public:
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
         plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_,
         nullptr);
-    auto base_config = Envoy::Extensions::Common::Wasm::WasmBaseConfig(plugin_config);
-
-    base_config.allowedCapabilitiesMap() = allowed_capabilities_;
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(base_config, vm_key_, scope_,
+    auto config = plugin_->wasmConfig();
+    config.allowedCapabilities() = allowed_capabilities_;
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
                                                              cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(
