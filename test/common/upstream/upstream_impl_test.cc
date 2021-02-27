@@ -320,6 +320,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                     address: localhost1
                     port_value: 11001
             - endpoint:
+                hostname: foo
                 address:
                   socket_address:
                     address: localhost2
@@ -416,6 +417,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());

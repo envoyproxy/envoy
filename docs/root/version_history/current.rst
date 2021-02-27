@@ -12,6 +12,13 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* dns: both the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and
+  :ref:`logical DNS <arch_overview_service_discovery_types_logical_dns>` cluster types now honor the
+  :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field if not empty.
+  Previously resolved hosts would have their hostname set to the configured DNS address for use with
+  logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
+  Setting the hostname manually allows overriding the internal hostname used for such features while
+  still allowing the original DNS resolution name to be used.
 * hds: support custom health check port via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 * healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
   :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
