@@ -372,10 +372,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "api_version_test",
     srcs = ["api_version_test.cc"],
-    deps = [
-        "//source/common/version:api_version_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    deps = ["//source/common/version:api_version_lib"],
 )
 
 envoy_cc_test(
