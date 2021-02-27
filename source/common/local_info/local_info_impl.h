@@ -58,7 +58,6 @@ public:
               (*node_.mutable_dynamic_parameters())[resource_type_url].CopyFrom(
                   context_provider_.dynamicContext(resource_type_url));
             })) {}
-  ~LocalInfoImpl() override { dynamic_update_callback_handle_->remove(); }
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& zoneName() const override { return node_.locality().zone(); }
@@ -75,7 +74,7 @@ private:
   Config::ContextProviderImpl context_provider_;
   const Stats::StatNameManagedStorage zone_stat_name_storage_;
   const Stats::StatName zone_stat_name_;
-  Common::CallbackHandle* dynamic_update_callback_handle_;
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
 };
 
 } // namespace LocalInfo

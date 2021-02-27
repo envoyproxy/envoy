@@ -144,7 +144,6 @@ private:
     ~RdsRouteConfigProviderHelper() {
       // Only remove the rds update when the rds provider has been initialized.
       if (route_provider_) {
-        rds_update_callback_handle_->remove();
         parent_.stats_.active_scopes_.dec();
       }
       if (on_demand_) {
@@ -172,7 +171,7 @@ private:
     RdsRouteConfigProviderImplSharedPtr route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
-    Common::CallbackHandle* rds_update_callback_handle_;
+    Common::CallbackHandlePtr rds_update_callback_handle_;
     std::vector<std::function<void()>> on_demand_update_callbacks_;
   };
 

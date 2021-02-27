@@ -101,9 +101,6 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> par
 }
 
 InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
-  if (host_set_member_update_cb_handle_ != nullptr) {
-    host_set_member_update_cb_handle_->remove();
-  }
   while (!pending_requests_.empty()) {
     pending_requests_.pop_front();
   }
@@ -166,10 +163,7 @@ void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_
 
   // Treat cluster removal as a removal of all hosts. Close all connections and fail all pending
   // requests.
-  if (host_set_member_update_cb_handle_ != nullptr) {
-    host_set_member_update_cb_handle_->remove();
-    host_set_member_update_cb_handle_ = nullptr;
-  }
+  host_set_member_update_cb_handle_ = nullptr;
   while (!client_map_.empty()) {
     client_map_.begin()->second->redis_client_->close();
   }

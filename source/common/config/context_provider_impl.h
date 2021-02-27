@@ -38,7 +38,7 @@ public:
     dynamic_context_[resource_type_url].mutable_params()->erase(key);
     update_cb_helper_.runCallbacks(resource_type_url);
   }
-  Common::CallbackHandle*
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addDynamicContextUpdateCallback(UpdateNotificationCb callback) const override {
     ASSERT(Thread::MainThread::isMainThread());
     return update_cb_helper_.add(callback);
