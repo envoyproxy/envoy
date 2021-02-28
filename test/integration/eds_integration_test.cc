@@ -349,7 +349,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
                            .prioritySet();
 
   // Keep track of how many times we're seeing a member update callback.
-  priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
     // We should see both hosts present in the member update callback.
     EXPECT_EQ(2, hosts_added.size());
     member_update_count++;
