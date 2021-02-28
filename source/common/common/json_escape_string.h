@@ -27,45 +27,44 @@ public:
 
     for (const auto& character : input) {
       switch (character) {
-      // Quotation mark (0x22).
       case '"':
+        // Quotation mark (0x22).
         result[position + 1] = '"';
         position += 2;
         break;
 
-      // Reverse solidus (0x5c).
       case '\\':
+        // Reverse solidus (0x5c).
         // Nothing to change.
         position += 2;
         break;
 
-      // Backspace (0x08).
-      case '\b': {
+      case '\b':
+        // Backspace (0x08).
         result[position + 1] = 'b';
         position += 2;
         break;
-      }
 
-      // Form feed (0x0c).
       case '\f':
+        // Form feed (0x0c).
         result[position + 1] = 'f';
         position += 2;
         break;
 
-      // Newline (0x0a).
       case '\n':
+        // Newline (0x0a).
         result[position + 1] = 'n';
         position += 2;
         break;
 
-      // Carriage return (0x0d).
       case '\r':
+        // Carriage return (0x0d).
         result[position + 1] = 'r';
         position += 2;
         break;
 
-      // Horizontal tab (0x09).
       case '\t':
+        // Horizontal tab (0x09).
         result[position + 1] = 't';
         position += 2;
         break;
