@@ -28,18 +28,16 @@ public:
     for (const auto& character : input) {
       switch (character) {
       // Quotation mark (0x22).
-      case '"': {
+      case '"':
         result[position + 1] = '"';
         position += 2;
         break;
-      }
 
       // Reverse solidus (0x5c).
-      case '\\': {
+      case '\\':
         // Nothing to change.
         position += 2;
         break;
-      }
 
       // Backspace (0x08).
       case '\b': {
@@ -49,34 +47,30 @@ public:
       }
 
       // Form feed (0x0c).
-      case '\f': {
+      case '\f':
         result[position + 1] = 'f';
         position += 2;
         break;
-      }
 
       // Newline (0x0a).
-      case '\n': {
+      case '\n':
         result[position + 1] = 'n';
         position += 2;
         break;
-      }
 
       // Carriage return (0x0d).
-      case '\r': {
+      case '\r':
         result[position + 1] = 'r';
         position += 2;
         break;
-      }
 
       // Horizontal tab (0x09).
-      case '\t': {
+      case '\t':
         result[position + 1] = 't';
         position += 2;
         break;
-      }
 
-      default: {
+      default:
         if (character >= 0x00 and character <= 0x1f) {
           // Print character as unicode hex.
           sprintf(&result[position + 1], "u%04x", int(character));
@@ -88,7 +82,6 @@ public:
           result[position++] = character;
         }
         break;
-      }
       }
     }
 
@@ -131,6 +124,6 @@ public:
     }
     return result;
   }
-};
+}; // namespace Envoy
 
 } // namespace Envoy
