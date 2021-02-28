@@ -22,7 +22,7 @@ ENVOY_SOURCE = os.getenv('ENVOY_SOURCE', '/source')
 
 if not os.path.exists(ENVOY_SOURCE):
   raise SystemExit(
-    "Envoy source must either be located at /source, or ENVOY_SOURCE env var must be set")
+      "Envoy source must either be located at /source, or ENVOY_SOURCE env var must be set")
 
 # source/extensions/extensions_build_config.bzl must have a .bzl suffix for Starlark
 # import, so we are forced to do this workaround.
@@ -44,7 +44,9 @@ def IsMissing(value):
 
 def NumReadFiltersFuzzed():
   data = pathlib.Path(
-    os.path.join(ENVOY_SOURCE, 'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc')).read_text()
+      os.path.join(
+          ENVOY_SOURCE,
+          'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc')).read_text()
   # Hack-ish! We only search the first 50 lines to capture the filters in filterNames().
   return len(re.findall('NetworkFilterNames::get()', ''.join(data.splitlines()[:50])))
 
@@ -89,9 +91,11 @@ def GetExtensionMetadata(target):
 
 if __name__ == '__main__':
   try:
-    output_path = (os.environ["EXTENSION_DB_PATH"] if os.getenv("EXTENSION_DB_PATH") else sys.argv[1])
+    output_path = (os.environ["EXTENSION_DB_PATH"]
+                   if os.getenv("EXTENSION_DB_PATH") else sys.argv[1])
   except IndexError:
-    raise SystemExit("Output path must be either specified as arg or with EXTENSION_DB_PATH env var")
+    raise SystemExit(
+        "Output path must be either specified as arg or with EXTENSION_DB_PATH env var")
 
   extension_db = {}
   # Include all extensions from source/extensions/extensions_build_config.bzl
