@@ -2090,7 +2090,7 @@ TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   // When the response check status is error, we skip emitting dynamic metadata.
-  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(1);
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
