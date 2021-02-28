@@ -34,12 +34,13 @@ private:
 
     StrictDnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
-    std::string dns_address_;
-    uint32_t port_;
-    Event::TimerPtr resolve_timer_;
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoints_;
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint_;
+    const std::string dns_address_;
+    const std::string hostname_;
+    const uint32_t port_;
+    const Event::TimerPtr resolve_timer_;
     HostVector hosts_;
-    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint_;
-    const envoy::config::endpoint::v3::LbEndpoint lb_endpoint_;
     HostMap all_hosts_;
   };
 
