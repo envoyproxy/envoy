@@ -366,7 +366,7 @@ private:
 // Common code for tests that deliver EDS update via the filesystem.
 class EdsHelper {
 public:
-  EdsHelper();
+  explicit EdsHelper(const std::string& path = "eds.pb_text");
 
   // Set EDS contents on filesystem and wait for Envoy to pick this up.
   void setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>&

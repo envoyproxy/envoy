@@ -163,6 +163,34 @@ public:
            initial_memory;
   }
 
+  static size_t computeEdsMemoryDelta(int initial_num_clusters, int initial_num_hosts,
+                                      int final_num_clusters, int final_num_hosts,
+                                      int initial_concurrency, int final_concurrency,
+                                      bool allow_stats) {
+    // Use the same number of fake upstreams for both helpers in order to exclude memory overhead
+    // added by the fake upstreams.
+    int fake_upstreams_count = 1;
+
+    size_t initial_memory;
+    {
+      ClusterMemoryTestHelper helper;
+      helper.setUpstreamCount(fake_upstreams_count);
+      helper.skipPortUsageValidation();
+      initial_memory = helper.edsClusterMemoryHelper(initial_num_clusters, initial_num_hosts,
+                                                     initial_concurrency, allow_stats);
+    }
+    FANCY_LOG(debug, "initial memory for {} cluster {} hosts {} concurrency is {}",
+              initial_num_clusters, initial_num_hosts, initial_concurrency, initial_memory);
+
+    ClusterMemoryTestHelper helper;
+    helper.setUpstreamCount(fake_upstreams_count);
+    auto final_memory = helper.edsClusterMemoryHelper(final_num_clusters, final_num_hosts,
+                                                      final_concurrency, allow_stats);
+    FANCY_LOG(debug, "final memory for {} cluster {} hosts {} concurrency is {}",
+              final_num_clusters, final_num_hosts, final_concurrency, final_memory);
+    return final_memory - initial_memory;
+  }
+
 private:
   /**
    * @param num_clusters number of clusters appended to bootstrap_config
@@ -196,6 +224,69 @@ private:
     });
     initialize();
 
+    return memory_test.consumedBytes();
+  }
+
+  size_t edsClusterMemoryHelper(int num_clusters, int num_hosts, int concurrency,
+                                bool allow_stats) {
+    CdsHelper cds_helper;
+    Stats::TestUtil::MemoryTest memory_test;
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      if (!allow_stats) {
+        *bootstrap.mutable_stats_config()
+             ->mutable_stats_matcher()
+             ->mutable_exclusion_list()
+             ->add_patterns()
+             ->mutable_prefix() = "clusters.";
+      }
+
+      // Switch predefined cluster_0 to CDS filesystem sourcing.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper.cds_path());
+      bootstrap.mutable_static_resources()->clear_clusters();
+    });
+
+    // Set validate_clusters to false to allow us to reference a CDS cluster.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+
+    std::vector<envoy::config::cluster::v3::Cluster> clusters;
+    clusters.reserve(num_clusters);
+    std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment;
+    cluster_load_assignment.reserve(num_clusters);
+    std::vector<EdsHelper> eds_helpers;
+    cluster_load_assignment.reserve(num_clusters);
+
+    for (int i = 0; i < num_clusters; ++i) {
+      eds_helpers.emplace_back(absl::StrCat("cluster_", i, ".eds.pb_text"));
+      cluster_load_assignment.emplace_back();
+      cluster_load_assignment.back().set_cluster_name(absl::StrCat("cluster_", i));
+      auto* endpoints = cluster_load_assignment.back().add_endpoints();
+      for (int j = 0; j < num_hosts; ++j) {
+        auto* host = endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address();
+        auto* socket_address = host->mutable_socket_address();
+        socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
+        socket_address->set_address("0.0.0.0");
+        socket_address->set_port_value(0);
+      }
+      eds_helpers.back().setEds({cluster_load_assignment.back()});
+
+      clusters.emplace_back();
+      auto& cluster = clusters.back();
+      cluster.set_name(absl::StrCat("cluster_", i));
+      cluster.mutable_connect_timeout()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      cluster.set_type(envoy::config::cluster::v3::Cluster::EDS);
+      auto* eds_cluster_config = cluster.mutable_eds_cluster_config();
+      eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      eds_cluster_config->mutable_eds_config()->set_path(eds_helpers.back().eds_path());
+    }
+    cds_helper.setCds(clusters);
+    initialize();
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
     return memory_test.consumedBytes();
   }
 };
@@ -335,6 +426,63 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
     // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
   EXPECT_MEMORY_LE(m_per_host, 2000); // Round up to allow platform variations.
+}
+
+class EdsClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
+protected:
+  EdsClusterMemoryTestRunner()
+      : ip_version_(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
+
+  Network::Address::IpVersion ip_version_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, EdsClusterMemoryTestRunner,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+TEST_P(EdsClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m_delta = ClusterMemoryTestHelper::computeEdsMemoryDelta(1, 1, 1, 101, 1, 1, true);
+  FANCY_LOG(debug, "delta memory = {}", m_delta);
+
+  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
+  // different number of bytes. We still run the approximate test.
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_host, 1380);
+  }
+}
+
+TEST_P(EdsClusterMemoryTestRunner, MemoryLargeClusterSize) {
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m_delta = ClusterMemoryTestHelper::computeEdsMemoryDelta(1, 1, 101, 1, 1, 1, true);
+  FANCY_LOG(debug, "delta memory = {}", m_delta);
+
+  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
+  // different number of bytes. We still run the approximate test.
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
+  }
+}
+
+TEST_P(EdsClusterMemoryTestRunner, MemoryLargeConcurrency) {
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m_delta =
+      ClusterMemoryTestHelper::computeEdsMemoryDelta(100, 1, 100, 1, 1, 101, true);
+  FANCY_LOG(debug, "delta memory = {}", m_delta);
+
+  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
+  // different number of bytes. We still run the approximate test.
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
+  }
 }
 
 } // namespace

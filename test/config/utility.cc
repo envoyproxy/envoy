@@ -1285,7 +1285,8 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   TestEnvironment::renameFile(path, cds_path_);
 }
 
-EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
+EdsHelper::EdsHelper(const std::string& path)
+    : eds_path_(TestEnvironment::writeStringToFileForTest(path, "")) {
   // cluster.cluster_0.update_success will be incremented on the initial
   // load when Envoy comes up.
   ++update_successes_;
