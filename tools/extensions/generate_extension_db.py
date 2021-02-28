@@ -3,6 +3,13 @@
 # Generate an extension database, a JSON file mapping from qualified well known
 # extension name to metadata derived from the envoy_cc_extension target.
 
+# This script expects a copy of the envoy source to be located at /source
+# Alternatively, you can specify a path to the source dir with `ENVOY_SRCDIR`
+
+# You must specify the target file to save the generated json db to.
+# You can do this either as an arg to this script/target or with the env var
+# `EXTENSION_DB_PATH`
+
 import ast
 import json
 import os
@@ -18,18 +25,18 @@ from importlib.machinery import SourceFileLoader
 BUILDOZER_PATH = os.path.abspath(
     "external/com_github_bazelbuild_buildtools/buildozer/buildozer_/buildozer")
 
-ENVOY_SOURCE = os.getenv('ENVOY_SOURCE', '/source')
+ENVOY_SRCDIR = os.getenv('ENVOY_SRCDIR', '/source')
 
-if not os.path.exists(ENVOY_SOURCE):
+if not os.path.exists(ENVOY_SRCDIR):
   raise SystemExit(
-      "Envoy source must either be located at /source, or ENVOY_SOURCE env var must be set")
+      "Envoy source must either be located at /source, or ENVOY_SRCDIR env var must be set")
 
 # source/extensions/extensions_build_config.bzl must have a .bzl suffix for Starlark
 # import, so we are forced to do this workaround.
 _extensions_build_config_spec = spec_from_loader(
     'extensions_build_config',
     SourceFileLoader('extensions_build_config',
-                     os.path.join(ENVOY_SOURCE, 'source/extensions/extensions_build_config.bzl')))
+                     os.path.join(ENVOY_SRCDIR, 'source/extensions/extensions_build_config.bzl')))
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
@@ -45,7 +52,7 @@ def IsMissing(value):
 def NumReadFiltersFuzzed():
   data = pathlib.Path(
       os.path.join(
-          ENVOY_SOURCE,
+          ENVOY_SRCDIR,
           'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc')).read_text()
   # Hack-ish! We only search the first 50 lines to capture the filters in filterNames().
   return len(re.findall('NetworkFilterNames::get()', ''.join(data.splitlines()[:50])))
@@ -106,7 +113,7 @@ if __name__ == '__main__':
   if NumRobustToDownstreamNetworkFilters(extension_db) != NumReadFiltersFuzzed():
     raise ExtensionDbError('Check that all network filters robust against untrusted'
                            'downstreams are fuzzed by adding them to filterNames() in'
-                           '/source/test/extensions/filters/network/common/uber_per_readfilter.cc')
+                           'test/extensions/filters/network/common/uber_per_readfilter.cc')
   # The TLS and generic upstream extensions are hard-coded into the build, so
   # not in source/extensions/extensions_build_config.bzl
   extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
