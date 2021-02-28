@@ -32,43 +32,36 @@ public:
         result[position + 1] = '"';
         position += 2;
         break;
-
       case '\\':
         // Reverse solidus (0x5c).
         // Nothing to change.
         position += 2;
         break;
-
       case '\b':
         // Backspace (0x08).
         result[position + 1] = 'b';
         position += 2;
         break;
-
       case '\f':
         // Form feed (0x0c).
         result[position + 1] = 'f';
         position += 2;
         break;
-
       case '\n':
         // Newline (0x0a).
         result[position + 1] = 'n';
         position += 2;
         break;
-
       case '\r':
         // Carriage return (0x0d).
         result[position + 1] = 'r';
         position += 2;
         break;
-
       case '\t':
         // Horizontal tab (0x09).
         result[position + 1] = 't';
         position += 2;
         break;
-
       default:
         if (character >= 0x00 and character <= 0x1f) {
           // Print character as unicode hex.
