@@ -288,7 +288,7 @@ public:
       return it->second;
     }
     const Grpc::AsyncClientFactoryPtr factory =
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
+        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true);
     const auto logger = createLogger(
         config, factory->create(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
