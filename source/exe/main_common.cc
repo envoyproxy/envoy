@@ -119,7 +119,8 @@ void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_gener
         TRY {
           restarter = std::make_unique<Server::HotRestartImpl>(base_id, 0, options_.socketPath(),
                                                                options_.socketMode());
-        } END_TRY
+        }
+        END_TRY
         catch (Server::HotRestartDomainSocketInUseException& ex) {
           // No luck, try again.
           ENVOY_LOG_MISC(debug, "dynamic base id: {}", ex.what());
@@ -220,7 +221,8 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
     if (server != nullptr && hook != nullptr) {
       hook(*server);
     }
-  } END_TRY
+  }
+  END_TRY
   catch (const Envoy::NoServingException& e) {
     return EXIT_SUCCESS;
   }

@@ -156,7 +156,8 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     address = Utility::parseInternetAddress(dns_name);
     ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
               dns_name, address->asString());
-  } END_TRY
+  }
+  END_TRY
   catch (const EnvoyException& e) {
     // Resolution via Apple APIs
     ENVOY_LOG(trace, "DNS resolver local resolution failed with: {}", e.what());

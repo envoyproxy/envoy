@@ -241,7 +241,8 @@ void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   TRY {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
-  } END_TRY
+  }
+  END_TRY
   catch (const ProtoValidationException& ex) {
     ENVOY_LOG(error, "unable to validate fraction percent runtime proto: {}", ex.what());
     return;
@@ -574,7 +575,8 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
         TRY {
           layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
           ++disk_layers;
-        } END_TRY
+        }
+        END_TRY
         catch (EnvoyException& e) {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.

@@ -69,7 +69,8 @@ void FilesystemSubscriptionImpl::refresh() {
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
               config_update->DebugString());
-  } END_TRY
+  }
+  END_TRY
   catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
   }
