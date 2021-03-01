@@ -664,6 +664,95 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
 }
 
+TEST_F(ConfigurationImplTest, DestinationTypeFile) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log_destination": "FILE",
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  ASSERT_EQ(config.admin().accessLogPath(), "/dev/null");
+  ASSERT_EQ(config.admin().accessLogDestination(), Filesystem::DestinationType::File);
+}
+
+TEST_F(ConfigurationImplTest, DestinationTypeStdout) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log_destination": "STDOUT",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  ASSERT_EQ(config.admin().accessLogPath(), "");
+  ASSERT_EQ(config.admin().accessLogDestination(), Filesystem::DestinationType::Stdout);
+}
+
+TEST_F(ConfigurationImplTest, DestinationTypeStdErr) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log_destination": "STDERR",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  ASSERT_EQ(config.admin().accessLogPath(), "");
+  ASSERT_EQ(config.admin().accessLogDestination(), Filesystem::DestinationType::Stderr);
+}
+
+TEST_F(ConfigurationImplTest, DestinationTypeConsole) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log_destination": "CONSOLE",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  ASSERT_EQ(config.admin().accessLogPath(), "");
+  ASSERT_EQ(config.admin().accessLogDestination(), Filesystem::DestinationType::Console);
+}
+
 TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
   const std::string json = R"EOF(
   {
