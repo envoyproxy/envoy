@@ -1,5 +1,7 @@
 #include "server/server.h"
 
+#include <sys/prctl.h>
+
 #include <csignal>
 #include <cstdint>
 #include <ctime>
@@ -90,6 +92,13 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), server_contexts_(*this) {
+
+#ifdef PR_SET_DUMPABLE
+  if (options.coreDumpEnabled()) {
+    prctl(PR_SET_DUMPABLE, 1);
+  }
+#endif
+
   try {
     if (!options.logPath().empty()) {
       try {

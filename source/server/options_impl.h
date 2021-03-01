@@ -146,6 +146,7 @@ public:
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
+  bool coreDumpEnabled() const override { return core_dump_enabled_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -199,6 +200,7 @@ private:
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
+  bool core_dump_enabled_;
   bool cpuset_threads_;
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
