@@ -20,6 +20,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
@@ -417,6 +418,7 @@ public:
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;
     Api::Api& api_;
+    const Server::Options& options_;
   };
 
   /**

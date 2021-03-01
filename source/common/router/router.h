@@ -376,7 +376,8 @@ public:
   }
 
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
-    return callbacks_->getUpstreamSocketOptions();
+    return (upstream_options_ != nullptr) ? upstream_options_
+                                          : callbacks_->getUpstreamSocketOptions();
   }
 
   Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
@@ -538,6 +539,7 @@ private:
   uint32_t pending_retries_{0};
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
 };
 
 class ProdFilter : public Filter {

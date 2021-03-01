@@ -24,7 +24,7 @@ namespace Server {
  * Logic shared by the implementations of both sides of the child<-->parent hot restart protocol:
  * domain socket communication, and our ad hoc RPC protocol.
  */
-class HotRestartingBase {
+class HotRestartingBase : public Logger::Loggable<Logger::Id::main> {
 protected:
   HotRestartingBase(uint64_t base_id) : base_id_(base_id) {}
   ~HotRestartingBase();

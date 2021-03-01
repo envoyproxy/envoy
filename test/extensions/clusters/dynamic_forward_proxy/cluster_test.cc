@@ -12,6 +12,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -42,7 +43,7 @@ public:
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _, _));
     }
@@ -59,7 +60,7 @@ public:
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
 
-    cluster_->prioritySet().addMemberUpdateCb(
+    member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added,
                const Upstream::HostVector& hosts_removed) -> void {
           onMemberUpdateCb(hosts_added, hosts_removed);
@@ -123,6 +124,7 @@ public:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  Server::MockOptions options_;
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   std::shared_ptr<Cluster> cluster_;
@@ -135,6 +137,7 @@ public:
   absl::flat_hash_map<std::string,
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
 
   const std::string default_yaml_config_ = R"EOF(
 name: name
@@ -206,7 +209,8 @@ protected:
         Upstream::parseClusterFromV3Yaml(yaml_config, avoid_boosting);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, dispatcher_, log_manager_,
-        local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_);
+        local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_,
+        options_);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
@@ -228,6 +232,7 @@ private:
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
+  Server::MockOptions options_;
 };
 
 // Verify that using 'sni' causes a failure.
