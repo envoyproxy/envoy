@@ -152,7 +152,8 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
 
-  // TODO: how do I check req was sent to the right (overridden) upstream cluster? response->body()? stat counters?
+  // TODO: how do I check req was sent to the right (overridden) upstream cluster? response->body()?
+  // stat counters?
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_200")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
