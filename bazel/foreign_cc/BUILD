@@ -79,6 +79,7 @@ configure_make(
 envoy_cmake_external(
     name = "ares",
     cache_entries = {
+        "CARES_BUILD_TOOLS": "no",
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_CXX_COMPILER_FORCED": "on",

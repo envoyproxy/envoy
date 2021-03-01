@@ -83,7 +83,11 @@ LogicalDnsCluster::LogicalDnsCluster(
   }
 
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-  hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
+  if (lbEndpoint().endpoint().hostname().empty()) {
+    hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
+  } else {
+    hostname_ = lbEndpoint().endpoint().hostname();
+  }
   Network::Utility::portFromTcpUrl(dns_url_);
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 }
