@@ -69,7 +69,10 @@ public:
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
 
-  // HTTP/1 and TCP pools can not have negative delta. HTTP/2 can, so overrides this function.
+  // This function is called onStreamClosed to see if there was a negative delta
+  // and (if necessary) update associated bookkeeping.
+  // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
+  // false. The HTTP/2 connection pool can have this state, so overrides this function.
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {

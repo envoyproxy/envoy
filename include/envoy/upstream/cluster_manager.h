@@ -82,7 +82,7 @@ struct ClusterConnectivityState {
   }
 
   template <class T> void checkAndDecrement(T& value, uint32_t delta) {
-    ASSERT(value - delta <= value);
+    ASSERT(std::numeric_limits<T>::min() + delta <= value);
     value -= delta;
   }
 
