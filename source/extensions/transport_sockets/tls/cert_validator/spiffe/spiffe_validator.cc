@@ -73,8 +73,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store.get(), item->x509);
-        X509_up_ref(item->x509);
         ca_certs_.push_back(bssl::UniquePtr<X509>(item->x509));
+        X509_up_ref(item->x509);
         if (!ca_loaded) {
           // TODO: With the current interface, we cannot return the multiple
           // cert information on getCaCertInformation method.
