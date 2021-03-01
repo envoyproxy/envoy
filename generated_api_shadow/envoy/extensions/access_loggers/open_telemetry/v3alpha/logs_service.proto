@@ -33,10 +33,10 @@ message OpenTelemetryAccessLogConfig {
   // fields, following `Envoy access logging formatting <https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage>`_.
   //
   // See 'body' in the LogResource proto for more details.
-  // Example: body { string_value: "%PROTOCOL%" }.
+  // Example: ``body { string_value: "%PROTOCOL%" }``.
   opentelemetry.proto.common.v1.AnyValue body = 2;
 
   // See 'attributes' in the LogResource proto for more details.
-  // Example: attributes { values { key: "user_agent" value { string_value: "%REQ(USER-AGENT)%" } } }.
+  // Example: ``attributes { values { key: "user_agent" value { string_value: "%REQ(USER-AGENT)%" } } }``.
   opentelemetry.proto.common.v1.KeyValueList attributes = 3;
 }
