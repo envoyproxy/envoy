@@ -13,7 +13,7 @@ modifications later in the filter chain, you should not use this API.
 
 To obtain the response header transformations at request time:
 
-```
+``` cpp
 Http::FilterHeadersStatus MyFilter::decodeHeaders(Http::RequestHeaderMap&
 headers, bool) {
 auto transforms =
