@@ -121,7 +121,7 @@ public:
   }
 
   // Return the number of requests actually sent.
-  uint32_t sendSomeThriftRequest(uint32_t request_number) {
+  uint32_t sendRequests(uint32_t request_number) {
     for (uint32_t i = 0; i < request_number; i++) {
       writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
       writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
@@ -1090,7 +1090,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithNoMaxRequestsLimit) {
   initializeFilter("");
   EXPECT_EQ(0, config_->maxRequestsPerConnection());
 
-  EXPECT_EQ(50, sendSomeThriftRequest(50));
+  EXPECT_EQ(50, sendRequests(50));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -1119,7 +1119,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitButNotReach) {
   initializeFilter(yaml);
   EXPECT_EQ(50, config_->maxRequestsPerConnection());
 
-  EXPECT_EQ(49, sendSomeThriftRequest(49));
+  EXPECT_EQ(49, sendRequests(49));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -1152,7 +1152,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReached) {
   // all 50 requests is completed.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
-  EXPECT_EQ(50, sendSomeThriftRequest(50));
+  EXPECT_EQ(50, sendRequests(50));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -1185,7 +1185,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedWithMor
   // all 50 requests is completed.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
-  EXPECT_EQ(50, sendSomeThriftRequest(55));
+  EXPECT_EQ(50, sendRequests(55));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -1236,11 +1236,11 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
     filter_->onBelowWriteBufferLowWatermark();
   };
 
-  EXPECT_EQ(5, sendSomeThriftRequest(6));
+  EXPECT_EQ(5, sendRequests(6));
 
   for (size_t i = 0; i < 4; i++) {
     mock_new_connection();
-    EXPECT_EQ(5, sendSomeThriftRequest(6));
+    EXPECT_EQ(5, sendRequests(6));
   }
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
