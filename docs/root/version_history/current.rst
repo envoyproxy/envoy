@@ -72,6 +72,7 @@ Bug Fixes
 * sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.
 * tls: fix the subject alternative name of the presented certificate matches the specified matchers as the case-insensitive way when it uses DNS name.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
+* upstream: retry budgets will now set default values for xDS configurations.
 
 Removed Config or Runtime
 -------------------------
