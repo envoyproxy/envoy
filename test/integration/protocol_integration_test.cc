@@ -122,6 +122,47 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
             response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
 }
 
+// Add a filter that overrides the cached route/cluster selection with a DelegatingRoute
+TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
+  config_helper_.addFilter(R"EOF(
+  name: set-route-filter
+  )EOF");
+
+  auto host_a = config_helper_.createVirtualHost("foo.com", "/", "cluster_0");
+  host_a.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host_a);
+
+  auto host_b = config_helper_.createVirtualHost("foo.com", "/", "cluster_override");
+  host_b.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host_b);
+
+  initialize();
+
+  // BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+  //   lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "foo.com");
+
+  // Instead of IntegrationUtil::makeSingleRequest?
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  // TODO: how do I check req was sent to the right (overridden) upstream cluster? response->body()? stat counters?
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_200")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
+  // DEBUG: This isn't testing anything, changing values doesn't affect anything??
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+}
+
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   initialize();
 
