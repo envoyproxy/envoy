@@ -523,13 +523,13 @@ TEST_P(IntegrationTest, TestSmuggling) {
   }
   {
     std::string response;
-    const std::string full_request =
-        "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\n\ttransfer-encoding: chunked\r\n\r\n" +
-        smuggled_request;
+    const std::string full_request = "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: "
+                                     "36\r\n\ttransfer-encoding: chunked\r\n\r\n" +
+                                     smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
     EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
- {
+  {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked "
                                 "\r\ncontent-length: 36\r\n\r\n" +
