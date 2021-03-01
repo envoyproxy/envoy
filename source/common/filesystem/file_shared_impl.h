@@ -49,8 +49,6 @@ public:
 protected:
   filesystem_os_id_t fd_;
   const FilePathAndType filepath_and_type_;
-  // const std::string path_;
-  // const DestinationType destination_type;
 };
 
 } // namespace Filesystem
