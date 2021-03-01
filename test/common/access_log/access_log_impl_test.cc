@@ -46,6 +46,109 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
   return access_log;
 }
 
+
+struct AccessLogDestinationTest : public testing::Test {
+  AccessLogDestinationTest() : file_(new MockAccessLogFile()) {}
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
+  std::shared_ptr<MockAccessLogFile> file_;
+};
+
+TEST_F(AccessLogDestinationTest, File) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_,
+          createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
+        EXPECT_EQ(file_info_.path_, "/dev/null");
+        EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::File);
+        return file_;
+      }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+}
+
+TEST_F(AccessLogDestinationTest, FileThrows) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  access_log_destination: FILE
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_), EnvoyException);
+}
+
+TEST_F(AccessLogDestinationTest, Stdout) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  access_log_destination: STDOUT
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_,
+          createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
+        EXPECT_EQ(file_info_.path_, "");
+        EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::Stdout);
+
+        return file_;
+      }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+}
+
+TEST_F(AccessLogDestinationTest, Stderr) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  access_log_destination: STDERR
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_,
+          createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
+        EXPECT_EQ(file_info_.path_, "");
+        EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::Stderr);
+        return file_;
+      }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+}
+
+TEST_F(AccessLogDestinationTest, Console) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  access_log_destination: CONSOLE
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_,
+          createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+      .WillOnce(Invoke([this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
+        EXPECT_EQ(file_info_.path_, "");
+        EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::Console);
+        return file_;
+      }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+}
+
 class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AccessLogImplTest() : file_(new MockAccessLogFile()) {
