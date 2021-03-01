@@ -97,7 +97,9 @@ InstanceImpl::InstanceImpl(
 
 #ifdef PR_SET_DUMPABLE
   if (options.coreDumpEnabled()) {
-    prctl(PR_SET_DUMPABLE, 1);
+    if (prctl(PR_SET_DUMPABLE, 1) == -1) {
+      ENVOY_LOG(error, "prctl call to enable core dumps failed");
+    }
   }
 #endif
 
