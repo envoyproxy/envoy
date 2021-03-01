@@ -90,7 +90,7 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
            Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
     : WasmBase(createWasmVm(config.config().vm_config().runtime()),
                config.config().vm_config().vm_id(),
-               anyToBytes(config.config().vm_config().configuration()), vm_key,
+               MessageUtil::anyToBytes(config.config().vm_config().configuration()), vm_key,
                config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
@@ -373,8 +373,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
-  auto vm_key =
-      proxy_wasm::makeVmKey(vm_config.vm_id(), anyToBytes(vm_config.configuration()), code);
+  auto vm_key = proxy_wasm::makeVmKey(vm_config.vm_id(),
+                                      MessageUtil::anyToBytes(vm_config.configuration()), code);
   auto complete_cb = [cb, vm_key, plugin, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
                       create_root_context_for_testing, wasm_extension](std::string code) -> bool {
     if (code.empty()) {
@@ -385,7 +385,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     auto wasm_factory = wasm_extension->wasmFactory();
     auto config = plugin->wasmConfig();
     proxy_wasm::WasmHandleFactory proxy_wasm_factory =
-        [scope, &config, &cluster_manager, &dispatcher, &lifecycle_notifier,
+        [&config, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
          wasm_factory](absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
       return wasm_factory(config, scope, cluster_manager, dispatcher, lifecycle_notifier, vm_key);
     };

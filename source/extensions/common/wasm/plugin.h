@@ -6,6 +6,7 @@
 #include "envoy/local_info/local_info.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "include/proxy-wasm/wasm.h"
 
@@ -13,8 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Wasm {
-
-std::string anyToBytes(const ProtobufWkt::Any& any);
 
 class WasmConfig {
 public:
@@ -37,7 +36,7 @@ public:
          const LocalInfo::LocalInfo& local_info,
          const envoy::config::core::v3::Metadata* listener_metadata)
       : PluginBase(config.name(), config.root_id(), config.vm_config().vm_id(),
-                   config.vm_config().runtime(), anyToBytes(config.configuration()),
+                   config.vm_config().runtime(), MessageUtil::anyToBytes(config.configuration()),
                    config.fail_open()),
         direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata),
         wasm_config_(std::make_unique<WasmConfig>(config)) {}
