@@ -336,10 +336,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   // As late as possible, run the custom SSL_CTX configuration callback on each
-  // SSL_CTX.
-  auto sslctx_cb = config.sslctx_cb();
-  for (TlsContext& ctx : tls_contexts_) {
-    sslctx_cb(ctx.ssl_ctx_.get());
+  // SSL_CTX, if set.
+  if (auto sslctx_cb = config.sslctx_cb(); sslctx_cb) {
+    for (TlsContext& ctx : tls_contexts_) {
+      sslctx_cb(ctx.ssl_ctx_.get());
+    }
   }
 
   // Add supported cipher suites from the TLS 1.3 spec:
