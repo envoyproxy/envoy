@@ -1,6 +1,6 @@
 #include "server/server.h"
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__APPLE__)
 #include <sys/prctl.h>
 #endif
 
