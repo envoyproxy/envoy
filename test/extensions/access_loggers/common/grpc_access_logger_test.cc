@@ -343,7 +343,7 @@ public:
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
     async_client_ = new Grpc::MockAsyncClient;
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};

@@ -33,16 +33,13 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   if (skip_cluster_check) {
     return;
   }
-  ASSERT(Thread::MainThread::isMainThread(),
-         "async client factory cluster checks should only be performed on the main thread");
 
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
-  auto all_clusters = cm_.clusters();
-  const auto& it = all_clusters.active_clusters_.find(cluster_name);
-  if (it == all_clusters.active_clusters_.end()) {
+  const auto cluster = cm_.getThreadLocalCluster(cluster_name);
+  if (!cluster) {
     throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
   }
-  if (it->second.get().info()->addedViaApi()) {
+  if (cluster->info()->addedViaApi()) {
     throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
   }
 }
