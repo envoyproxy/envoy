@@ -174,6 +174,10 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
+bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
+  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
+}
+
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
                                     header_value.size()) != 0;
@@ -197,6 +201,15 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
   return request_headers && isConnect(*request_headers) &&
          static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers)) ==
              Http::Code::OK;
+}
+
+bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
+  return (headers.Method() &&
+          (headers.Method()->value() == Http::Headers::get().MethodValues.Get ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Head ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Delete ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Trace ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Connect));
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
