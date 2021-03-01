@@ -97,17 +97,11 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 // Takes care of percentage encoding http and https is needed
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
   std::string result = "";
-
-  if (!resources_protos.empty()) {
-    std::string h1 = "http://";
-    std::string h2 = "https://";
-
-    for (const auto& resource : resources_protos) {
-      if (resource.rfind(h1, 0) == 0 || resource.rfind(h2, 0) == 0) {
-        result += "&resource=" + Http::Utility::PercentEncoding::encode(resource, ":/=&? ");
-      } else {
-        result += "&resource=" + resource;
-      }
+  for (const auto& resource : resources_protos) {
+    if (absl::StartsWith(resource, "http://") || absl::StartsWith(resource, "https://")) {
+      result += "&resource=" + Http::Utility::PercentEncoding::encode(resource, ":/=&? ");
+    } else {
+      result += "&resource=" + resource;
     }
   }
   return result;
@@ -322,7 +316,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
         config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
 
-    const std::string resource_param = config_->encodedResources();
+    const std::string& resource_param = config_->encodedResources();
 
     response_headers->setLocation(new_url + resource_param);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);

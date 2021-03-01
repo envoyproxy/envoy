@@ -124,7 +124,7 @@ public:
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
   const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
-  const std::string encodedResources() const { return encoded_resources_; }
+  const std::string& encodedResources() const { return encoded_resources_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
