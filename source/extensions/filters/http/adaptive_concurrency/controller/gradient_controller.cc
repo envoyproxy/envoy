@@ -126,7 +126,6 @@ void GradientController::updateMinRTT() {
   min_rtt_calc_timer_->enableTimer(
       applyJitter(config_.minRTTCalcInterval(), config_.jitterPercent()));
   sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
-  synchronizer_.syncPoint("post_minrtt_update");
 }
 
 std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseconds interval,
@@ -211,15 +210,11 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   const std::chrono::microseconds rq_latency =
       std::chrono::duration_cast<std::chrono::microseconds>(time_source_.monotonicTime() -
                                                             rq_send_time);
+  synchronizer_.syncPoint("pre_hist_insert");
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
     hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
-  }
-
-  synchronizer_.syncPoint("pre_minrtt_update");
-  if (sample_mutation_mtx_.TryLock()) {
     updateMinRTT();
-    sample_mutation_mtx_.Unlock();
   }
 }
 
