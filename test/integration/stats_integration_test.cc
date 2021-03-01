@@ -229,6 +229,7 @@ private:
 
   size_t edsClusterMemoryHelper(int num_clusters, int num_hosts, int concurrency,
                                 bool allow_stats) {
+    concurrency_ = concurrency;
     CdsHelper cds_helper;
     Stats::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
