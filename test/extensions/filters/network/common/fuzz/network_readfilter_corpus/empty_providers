@@ -1,0 +1,12 @@
+config {
+  name: "envoy.filters.network.http_connection_manager"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+    value: "\022\001.\"\002P\001\262\001\010/dev/fd/\210\002\001\262\002\014\022\n\022\010\n\006\n\000\022\002\032\000"
+  }
+}
+actions {
+  on_data {
+    data: "set"
+  }
+}

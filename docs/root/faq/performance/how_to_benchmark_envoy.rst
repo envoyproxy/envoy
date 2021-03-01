@@ -11,7 +11,7 @@ the following guidance:
   is used on the Bazel command line. When consuming Envoy point releases, make
   sure you are using the latest point release; given the pace of Envoy development
   it's not reasonable to pick older versions when making a statement about Envoy
-  performance. Similarly, if working on a master build, please perform due diligence
+  performance. Similarly, if working on a main build, please perform due diligence
   and ensure no regressions or performance improvements have landed proximal to your
   benchmark work and that your are close to HEAD.
 
