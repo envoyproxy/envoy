@@ -106,7 +106,7 @@ consider the answers to these questions before sending a PR.
 - Does this feature pull in any new dependencies for clients?
 - Are these dependencies optional or required?
 - Will the dependencies cause problems for any known xDS clients (e.g.,
-  [Envoy's dependency policy](https://github.com/envoyproxy/envoy/blob/master/DEPENDENCY_POLICY.md))?
+  [Envoy's dependency policy](https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md))?
 
 ## Failure Modes
 - What is the failure mode if this feature is configured but is not working
