@@ -2092,7 +2092,7 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\n\r\n", output);
 }
 
 TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
@@ -2108,7 +2108,7 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {"my-custom-header", "hey"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\nContent-Length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\n\r\n", output);
 }
 
 TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
@@ -2122,7 +2122,7 @@ TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\n\r\n", output);
 }
 
 TEST_F(Http1ClientConnectionImplTest, Reset) {
@@ -2155,7 +2155,7 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   // Request.
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder->encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\n\r\n", output);
   output.clear();
 
   // When the response is sent, the read disable should be unwound.
@@ -2986,7 +2986,7 @@ TEST_F(Http1ClientConnectionImplTest, LargePathRequestEncode) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET " + long_path + " HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET " + long_path + " HTTP/1.1\r\nhost: host\r\n\r\n", output);
 }
 
 // As with LargeMethodEncode, but for an arbitrary header. This was not an issue
@@ -3002,9 +3002,7 @@ TEST_F(Http1ClientConnectionImplTest, LargeHeaderRequestEncode) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\nfoo: " + long_header_value +
-                "\r\ncontent-length: 0\r\n\r\n",
-            output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\nfoo: " + long_header_value + "\r\n\r\n", output);
 }
 
 // Exception called when the number of response headers exceeds the default value of 100.
