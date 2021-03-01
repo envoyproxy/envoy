@@ -360,7 +360,9 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   }
 
   auto it = error_state_tracker_.find(name);
-  TRY_ASSERT_MAIN_THREAD { return addOrUpdateListenerInternal(config, version_info, added_via_api, name); }
+  TRY_ASSERT_MAIN_THREAD {
+    return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
+  }
   END_TRY
   catch (const EnvoyException& e) {
     if (it == error_state_tracker_.end()) {
