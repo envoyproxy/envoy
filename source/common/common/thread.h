@@ -192,7 +192,7 @@ private:
 
 #define TRY                                                                                        \
   try {                                                                                            \
-    assert(Thread::MainThread::isMainThread());
+    ASSERT(Thread::MainThread::isMainThread());
 
 #define END_TRY }
 
