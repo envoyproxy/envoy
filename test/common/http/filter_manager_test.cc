@@ -17,6 +17,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::InSequence;
 using testing::Return;
 
 namespace Envoy {
@@ -36,7 +37,7 @@ public:
   Event::MockDispatcher dispatcher_;
   NiceMock<Network::MockConnection> connection_;
   Envoy::Http::MockFilterChainFactory filter_factory_;
-  LocalReply::MockLocalReply local_reply_;
+  NiceMock<LocalReply::MockLocalReply> local_reply_;
   Protocol protocol_{Protocol::Http2};
   NiceMock<MockTimeSystem> time_source_;
   StreamInfo::FilterStateSharedPtr filter_state_ =
@@ -345,6 +346,108 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   filter_manager_->decodeHeaders(*grpc_headers, true);
   filter_manager_->destroyFilters();
 }
+
+TEST_F(FilterManagerTest, OnLocalReply) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamEncoderFilter> encoder_filter(new NiceMock<MockStreamEncoderFilter>());
+  std::shared_ptr<MockStreamFilter> stream_filter(new NiceMock<MockStreamFilter>());
+
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+        callbacks.addStreamFilter(stream_filter);
+        callbacks.addStreamEncoderFilter(encoder_filter);
+      }));
+
+  filter_manager_->createFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*headers, true);
+
+  // Make sure all 3 filters get onLocalReply, and that the reset is preserved
+  // even if not the last return.
+  EXPECT_CALL(*decoder_filter, onLocalReply(_));
+  EXPECT_CALL(*stream_filter, onLocalReply(_))
+      .WillOnce(Return(LocalErrorStatus::ContinueAndResetStream));
+  EXPECT_CALL(*encoder_filter, onLocalReply(_));
+  EXPECT_CALL(filter_manager_callbacks_, resetStream());
+  decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
+                                             absl::nullopt, "details");
+
+  // The reason for the response (in this case the reset) will still be tracked
+  // but as no response is sent the response code will remain absent.
+  ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
+  EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
+  EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, MultipleOnLocalReply) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamEncoderFilter> encoder_filter(new NiceMock<MockStreamEncoderFilter>());
+  std::shared_ptr<MockStreamFilter> stream_filter(new NiceMock<MockStreamFilter>());
+
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+        callbacks.addStreamFilter(stream_filter);
+        callbacks.addStreamEncoderFilter(encoder_filter);
+      }));
+
+  filter_manager_->createFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*headers, true);
+
+  {
+    // Set up expectations to be triggered by sendLocalReply at the bottom of
+    // thi block.
+    InSequence s;
+
+    // Make sure all 3 filters get onLocalReply
+    EXPECT_CALL(*decoder_filter, onLocalReply(_));
+    EXPECT_CALL(*stream_filter, onLocalReply(_));
+    EXPECT_CALL(*encoder_filter, onLocalReply(_));
+
+    // Now response encoding begins. Assume a filter co-opts the original reply
+    // with a new local reply.
+    EXPECT_CALL(*encoder_filter, encodeHeaders(_, _))
+        .WillOnce(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+          decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body2", nullptr,
+                                                     absl::nullopt, "details2");
+          return FilterHeadersStatus::StopIteration;
+        }));
+
+    // All 3 filters should get the second onLocalReply.
+    EXPECT_CALL(*decoder_filter, onLocalReply(_));
+    EXPECT_CALL(*stream_filter, onLocalReply(_));
+    EXPECT_CALL(*encoder_filter, onLocalReply(_));
+
+    decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
+                                               absl::nullopt, "details");
+  }
+
+  // The final details should be details2.
+  ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
+  EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
+  EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

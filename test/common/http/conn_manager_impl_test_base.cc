@@ -1,5 +1,6 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
+using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
@@ -90,11 +91,11 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
   // scope.
   for (int i = 0; i < num_decoder_filters * num_requests; i++) {
-    decoder_filters_.push_back(new MockStreamDecoderFilter());
+    decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   }
 
   for (int i = 0; i < num_encoder_filters * num_requests; i++) {
-    encoder_filters_.push_back(new MockStreamEncoderFilter());
+    encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
   }
 
   InSequence s;

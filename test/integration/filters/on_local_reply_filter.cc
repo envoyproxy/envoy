@@ -13,7 +13,7 @@ namespace Envoy {
 class OnLocalReplyFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_headers, bool) override {
-    if (request_headers.get(Http::LowerCaseString("reset")).size() != 0) {
+    if (!request_headers.get(Http::LowerCaseString("reset")).empty()) {
       reset_ = true;
     }
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "body", nullptr, absl::nullopt,
