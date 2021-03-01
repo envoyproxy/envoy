@@ -468,9 +468,9 @@ private:
 
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
-                const std::string& version_info, bool added_via_api, ClusterSharedPtr&& cluster,
-                TimeSource& time_source)
-        : cluster_config_(cluster_config), config_hash_(MessageUtil::hash(cluster_config)),
+                const uint64_t cluster_config_hash, const std::string& version_info,
+                bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
+        : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()) {}
 
@@ -563,8 +563,8 @@ private:
    * nullptr if cluster_map did not contain the same cluster.
    */
   ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                             const std::string& version_info, bool added_via_api,
-                             ClusterMap& cluster_map);
+                             const uint64_t cluster_hash, const std::string& version_info,
+                             bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
