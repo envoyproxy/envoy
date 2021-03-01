@@ -2111,6 +2111,25 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
   EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\n\r\n", output);
 }
 
+TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasingLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.dont_add_content_length_for_bodiless_requests", "false"}});
+  codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
+
+  initialize();
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {"my-custom-header", "hey"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+  EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\nContent-Length: 0\r\n\r\n", output);
+}
+
 TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
   initialize();
 
