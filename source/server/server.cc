@@ -1,6 +1,8 @@
 #include "server/server.h"
 
+#ifndef WIN32
 #include <sys/prctl.h>
+#endif
 
 #include <csignal>
 #include <cstdint>
