@@ -699,7 +699,6 @@ requestedServerName()
 
   streamInfo:requestedServerName()
 
-// TODO: fix this below
 Returns the string representation of :repo:`requested server name <include/envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
 
