@@ -180,9 +180,13 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
 
   std::string trust_domain;
   for (const GENERAL_NAME* general_name : san_names.get()) {
+    if (general_name->type != GEN_URI) {
+      continue;
+    }
+
     const std::string san = Utility::generalNameAsString(general_name);
     trust_domain = SPIFFEValidator::extractTrustDomain(san);
-    // We can assume that valid SVID has only one san.
+    // We can assume that valid SVID has only one URI san.
     break;
   }
 

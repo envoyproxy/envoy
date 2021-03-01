@@ -1,8 +1,8 @@
 // NOLINT(namespace-envoy)
 constexpr char TEST_SPIFFE_SAN_CERT_256_HASH[] =
-    "7e107378ec276f4bdd58b6310ef0af6397b72b67a26583b46eadabe4d361f645";
-constexpr char TEST_SPIFFE_SAN_CERT_1_HASH[] = "adbbe8488082c50ca1c73448addb4dde94d88ce9";
-constexpr char TEST_SPIFFE_SAN_CERT_SPKI[] = "4eIY7EzJdIddfSSYIEDODf2G8hDGbOP95lC74b9ybkM=";
-constexpr char TEST_SPIFFE_SAN_CERT_SERIAL[] = "6ac34617e0438a7efd7723cd4b806810e2c8e550";
-constexpr char TEST_SPIFFE_SAN_CERT_NOT_BEFORE[] = "Feb  3 14:51:23 2021 GMT";
-constexpr char TEST_SPIFFE_SAN_CERT_NOT_AFTER[] = "Feb  3 14:51:23 2023 GMT";
+    "52c784aa74dc6aadd581d6a9aad0a379a8cf8fb0b175e30874e19acf924dfe10";
+constexpr char TEST_SPIFFE_SAN_CERT_1_HASH[] = "3c2978c764c322a776bfb8aa04bb9a69e0f8bff2";
+constexpr char TEST_SPIFFE_SAN_CERT_SPKI[] = "7drIzHFClgoBw1tG6lbnubSOw9d9cKhKyUTWT77hpX0=";
+constexpr char TEST_SPIFFE_SAN_CERT_SERIAL[] = "2df569abadf7815e26c1b163ee7c269f91986858";
+constexpr char TEST_SPIFFE_SAN_CERT_NOT_BEFORE[] = "Mar  1 00:55:59 2021 GMT";
+constexpr char TEST_SPIFFE_SAN_CERT_NOT_AFTER[] = "Mar  1 00:55:59 2023 GMT";
