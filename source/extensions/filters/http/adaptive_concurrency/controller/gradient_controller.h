@@ -10,6 +10,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/thread_synchronizer.h"
+
 #include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/base/thread_annotations.h"
@@ -214,6 +216,12 @@ public:
                      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
                      Random::RandomGenerator& random, TimeSource& time_source);
 
+  // Used in unit tests to validate worker thread interactions.
+  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
+
+  // True if there is a minRTT sampling window active.
+  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
+
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(MonotonicTime rq_send_time) override;
@@ -223,12 +231,11 @@ public:
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
-  void updateMinRTT();
+  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void enterMinRTTSamplingWindow();
-  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
@@ -283,6 +290,9 @@ private:
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
+
+  // Used for testing only.
+  Thread::ThreadSynchronizer synchronizer_;
 };
 using GradientControllerSharedPtr = std::shared_ptr<GradientController>;
 
