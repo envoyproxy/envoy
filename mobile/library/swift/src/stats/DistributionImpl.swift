@@ -3,7 +3,7 @@ import Foundation
 
 /// The implementation of distribution tracking quantile/sum/average stats
 @objcMembers
-class DistributionImpl: NSObject, Distribution {
+final class DistributionImpl: NSObject, Distribution {
   private let series: String
   private weak var engine: EnvoyEngine?
 
@@ -14,12 +14,8 @@ class DistributionImpl: NSObject, Distribution {
   }
 
   /// Record a new int value for the distribution.
-  /// TODO: potentially raise error to platform if the operation is not successful.
   func recordValue(value: Int) {
-    guard let engine = self.engine else {
-      return
-    }
-
-    engine.recordHistogramValue(self.series, value: numericCast(value))
+    // TODO(jingwei99) potentially surface error up if engine is nil.
+    self.engine?.recordHistogramValue(self.series, value: numericCast(value))
   }
 }

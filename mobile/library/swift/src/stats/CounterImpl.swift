@@ -3,7 +3,7 @@ import Foundation
 
 /// The implementation of time series counter.
 @objcMembers
-class CounterImpl: NSObject, Counter {
+final class CounterImpl: NSObject, Counter {
   private let series: String
   private weak var engine: EnvoyEngine?
 
@@ -14,12 +14,8 @@ class CounterImpl: NSObject, Counter {
   }
 
   /// Increment the counter by the given count.
-  /// TODO: potentially raise error to platform if the operation is not successful.
   func increment(count: Int) {
-    guard let engine = self.engine else {
-      return
-    }
-
-    engine.recordCounterInc(self.series, count: numericCast(count))
+    // TODO(jingwei99) potentially surface error up if engine is nil.
+    self.engine?.recordCounterInc(self.series, count: numericCast(count))
   }
 }
