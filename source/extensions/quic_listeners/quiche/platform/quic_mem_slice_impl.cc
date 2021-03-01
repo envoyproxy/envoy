@@ -15,6 +15,9 @@ namespace quic {
 QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
     : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
           buffer.get(), length,
+          // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
+          // of copy, so that the ownership of |buffer| can be transfered to lambda via capture here
+          // and below to unify and simplify the constructor implementations.
           [allocator = buffer.get_deleter().allocator()](const void* p, size_t,
                                                          const Envoy::Buffer::BufferFragmentImpl*) {
             quic::QuicBufferDeleter deleter(allocator);
