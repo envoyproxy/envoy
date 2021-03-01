@@ -88,7 +88,7 @@ public:
   /**
    * @return a callback for configuring an SSL_CTX before use.
    */
-  virtual SslCtxCb sslctx_cb() const PURE;
+  virtual SslCtxCb sslctxCb() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

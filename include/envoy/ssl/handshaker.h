@@ -125,7 +125,7 @@ public:
    * |handshaker_factory_context| as an argument allows callsites to access the
    * API and other factory context methods.
    */
-  virtual SslCtxCb sslctx_cb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
+  virtual SslCtxCb sslctxCb(HandshakerFactoryContext& handshaker_factory_context) const PURE;
 };
 
 } // namespace Ssl

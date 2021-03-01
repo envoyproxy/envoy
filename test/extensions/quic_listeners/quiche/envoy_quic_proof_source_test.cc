@@ -43,7 +43,7 @@ public:
         .WillByDefault(ReturnRef(empty_string));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
-    ON_CALL(client_context_config_, sslctx_cb()).WillByDefault(Return([](SSL_CTX*) {}));
+    ON_CALL(client_context_config_, sslctxCb()).WillByDefault(Return([](SSL_CTX*) {}));
 
     // Getting the last cert in the chain as the root CA cert.
     std::string cert_chain(quic::test::kTestCertificateChainPem);

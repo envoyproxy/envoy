@@ -60,8 +60,7 @@ class HandshakerFactoryImplForTest
     : public Extensions::TransportSockets::Tls::HandshakerFactoryImpl {
   std::string name() const override { return "envoy.testonly_handshaker"; }
 
-  Ssl::SslCtxCb
-  sslctx_cb(Ssl::HandshakerFactoryContext& handshaker_factory_context) const override {
+  Ssl::SslCtxCb sslctxCb(Ssl::HandshakerFactoryContext& handshaker_factory_context) const override {
     // Get process object, cast to custom process object, and return custom
     // callback.
     return CustomProcessObjectForTest::Get(handshaker_factory_context.api().processContext())

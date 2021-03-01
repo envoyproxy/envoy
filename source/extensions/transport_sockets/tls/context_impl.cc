@@ -337,7 +337,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
-  if (auto sslctx_cb = config.sslctx_cb(); sslctx_cb) {
+  if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
     for (TlsContext& ctx : tls_contexts_) {
       sslctx_cb(ctx.ssl_ctx_.get());
     }

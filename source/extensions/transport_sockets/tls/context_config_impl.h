@@ -57,7 +57,7 @@ public:
   void setSecretUpdateCallback(std::function<void()> callback) override;
   Ssl::HandshakerFactoryCb createHandshaker() const override;
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
-  Ssl::SslCtxCb sslctx_cb() const override { return sslctx_cb_; }
+  Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
 
   Ssl::CertificateValidationContextConfigPtr getCombinedValidationContextConfig(
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
