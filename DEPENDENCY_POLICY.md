@@ -40,7 +40,7 @@ Dependency declarations must:
   and `urls` to reference the version. If you need to reference version `X.Y.Z` as `X_Y_Z`, this
   may appear in a string as `{underscore_version}`, similarly for `X-Y-Z` you can use
   `{dash_version}`.
-* Versions should prefer release versions over master branch GitHub SHA tarballs. A comment is
+* Versions should prefer release versions over main branch GitHub SHA tarballs. A comment is
   necessary if the latter is used. This comment should contain the reason that a non-release
   version is being used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
@@ -94,7 +94,7 @@ basis:
 
 * Extension [CODEOWNERS](CODEOWNERS) should update extension specific dependencies.
 
-Where possible, we prefer the latest release version for external dependencies, rather than master
+Where possible, we prefer the latest release version for external dependencies, rather than main
 branch GitHub SHA tarballs.
 
 ## Dependency patches

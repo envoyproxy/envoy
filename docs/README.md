@@ -6,7 +6,7 @@ In both cases, the generated output can be found in `generated/docs`.
 
 ## Building in an existing Envoy development environment
 
-If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/master/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
+If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/main/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
 
 ```bash
 ./docs/build.sh
@@ -48,7 +48,7 @@ To do this:
 
 1. The docs are published to [docs/envoy/latest](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy/latest)
    on every commit to master. This process is handled by CircleCI with the
-  [`publish.sh`](https://github.com/envoyproxy/envoy/blob/master/docs/publish.sh) script.
+  [`publish.sh`](https://github.com/envoyproxy/envoy/blob/main/docs/publish.sh) script.
 
 2. The docs are published to [docs/envoy](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy)
    in a directory named after every tagged commit in this repo. Thus, on every tagged release there

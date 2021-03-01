@@ -296,7 +296,7 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
   }
 
   // In the specific case of:
-  // https://github.com/envoyproxy/envoy/blob/master/source/common/upstream/health_checker_impl.cc#L489
+  // https://github.com/envoyproxy/envoy/blob/main/source/common/upstream/health_checker_impl.cc#L489
   // This blows away client, should create a new one
   if (event_type == Network::ConnectionEvent::Connected && empty_response_) {
     ENVOY_LOG_MISC(trace, "Will create client from connected event and empty response.");

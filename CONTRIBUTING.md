@@ -47,7 +47,7 @@ versioning guidelines:
 
 * Features may be marked as deprecated in a given versioned API at any point in time, but this may
   only be done when a replacement implementation and configuration path is available in Envoy on
-  master. Deprecators must implement a conversion from the deprecated configuration to the latest
+  main. Deprecators must implement a conversion from the deprecated configuration to the latest
   `vNalpha` (with the deprecated field) that Envoy uses internally. A field may be deprecated if
   this tool would be able to perform the conversion. For example, removing a field to describe
   HTTP/2 window settings is valid if a more comprehensive HTTP/2 protocol options field is being
@@ -72,7 +72,7 @@ versioning guidelines:
   config ([example](configs/using_deprecated_config.v2.yaml)). Finally, following the deprecation
   of the API major version where the field was first
   marked deprecated, the entire implementation code will be removed from the Envoy implementation.
-* This policy means that organizations deploying master should have some time to get ready for
+* This policy means that organizations deploying main should have some time to get ready for
   breaking changes at the next major API version. This is typically a window of at least 12 months
   or until the organization moves to the next major API version.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
@@ -143,7 +143,7 @@ versioning guidelines:
 * If your PR involves any changes to
   [envoy-filter-example](https://github.com/envoyproxy/envoy-filter-example) (for example making a new
   branch so that CI can pass) it is your responsibility to follow through with merging those
-  changes back to master once the CI dance is done.
+  changes back to main once the CI dance is done.
 * If your PR is a high risk change, the reviewer may ask that you runtime guard
   it. See the section on runtime guarding below.
 
@@ -188,18 +188,18 @@ maintainer's discretion. Generally all runtime guarded features will be set true
 release is cut. Old code paths for refactors can be cleaned up after a release and there has been
 some production run time. Old code for behavioral changes will be deprecated after six months.
 Runtime features are set true by default by inclusion in
-[source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.cc)
+[source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/runtime/runtime_features.cc)
 
 There are four suggested options for testing new runtime features:
 
-1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/master/test/common/protobuf/utility_test.cc)
+1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/main/test/common/protobuf/utility_test.cc)
 2. Create a [parameterized test](https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#how-to-write-value-parameterized-tests)
    where the set up of the test sets the new runtime value explicitly to
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
-   [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
+   [integration test README](https://github.com/envoyproxy/envoy/blob/main/test/integration/README.md)
 4. Run a given unit test with the new runtime value explicitly set true or false as done
-   for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD)
+   for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/main/test/common/runtime/BUILD)
 
 Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
