@@ -264,8 +264,8 @@ message HttpConnectionManager {
     // [#not-implemented-hide] Normalization only applies internally before any processing of
     // requests by HTTP filters, routing, and matching. These will be applied after full
     // transformation is applied. The *:path* header before this transformation will be restored in
-    // the router filter and sent upstream unless it was mutated by a filter. Defaults to :ref:`None
-    // <envoy_api_msg_type.v3.TextTransformation.Operation.None>`.
+    // the router filter and sent upstream unless it was mutated by a filter. Defaults to no
+    // transformations.
     type.v3.TextTransformation internal_transformation = 2;
   }
 
