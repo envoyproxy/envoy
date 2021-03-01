@@ -814,7 +814,7 @@ min_rtt_calc_params:
     sampleLatency(controller, std::chrono::microseconds(1337));
   }
 
-  // The next sample will trigger the minrtt value update. We'll spin off a thread and block before
+  // The next sample will trigger the minRTT value update. We'll spin off a thread and block before
   // the actual function call to update the value.
   EXPECT_TRUE(controller->inMinRTTSamplingWindow());
   synchronizer.waitOn("pre_hist_insert");
@@ -841,7 +841,7 @@ min_rtt_calc_params:
   synchronizer.signal("pre_hist_insert");
   t1.join();
 
-  // Thread t1 is unable to update minrtt, it remains not in the minrtt sampling window.
+  // Thread t1 is unable to update minRTT, it remains not in the minRTT sampling window.
   EXPECT_FALSE(controller->inMinRTTSamplingWindow());
 }
 
