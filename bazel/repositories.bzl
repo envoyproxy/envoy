@@ -592,7 +592,12 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    external_http_archive("rules_python")
+    external_http_archive(
+        name = "rules_python",
+        patches = ["@envoy//bazel:rules_python.patch"],
+        patch_args = ["-p1"],
+    )
+
     external_http_archive(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
