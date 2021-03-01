@@ -11,8 +11,9 @@ namespace Envoy {
 
 // The JSON string escape implementation is taken from:
 // https://github.com/nlohmann/json/blob/ec7a1d834773f9fee90d8ae908a0c9933c5646fc/src/json.hpp#L4604-L4697.
-// Assumption: the input string will be ASCII only. This is here to reduce dependencies that
-// minimal_logger_lib maintains.
+// Note: UTF-8 encoded strings are passed through without modification.
+//
+// This is here to reduce dependencies that minimal_logger_lib maintains.
 class JsonEscaper {
 public:
   // Escape a string by replacing certain special characters by a sequence of an escape character
