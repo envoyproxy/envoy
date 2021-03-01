@@ -63,9 +63,9 @@ public:
         position += 2;
         break;
       default:
-        if (character >= 0x00 and character <= 0x1f) {
+        if (character >= 0x00 && character <= 0x1f) {
           // Print character as unicode hex.
-          sprintf(&result[position + 1], "u%04x", int(character));
+          sprintf(&result[position + 1], "u%04x", static_cast<int>(character));
           position += 6;
           // Overwrite trailing null character.
           result[position] = '\\';
@@ -80,7 +80,7 @@ public:
     return result;
   }
 
-  // Calculates the extra space to build a JSON escaped string.
+  // Calculate the extra space to build a JSON escaped string.
   // @param input input string.
   // @return uint64_t the number of extra characters required to to build a JSON escaped string.
   static uint64_t extraSpace(absl::string_view input) {
@@ -106,7 +106,7 @@ public:
       }
 
       default: {
-        if (character >= 0x00 and character <= 0x1f) {
+        if (character >= 0x00 && character <= 0x1f) {
           // From character (1 byte) to unicode hex (6 bytes).
           result += 5;
         }
@@ -116,6 +116,5 @@ public:
     }
     return result;
   }
-}; // namespace Envoy
-
+};
 } // namespace Envoy
