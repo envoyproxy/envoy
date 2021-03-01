@@ -632,12 +632,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Python rules for Bazel",
         project_desc = "Bazel rules for the Python language",
         project_url = "https://github.com/bazelbuild/rules_python",
-        # TODO(htuch): revert back to a point releases when pip3_import appears.
-        version = "a0fbf98d4e3a232144df4d0d80b577c7a693b570",
-        sha256 = "76a8fd4e7eca2a3590f816958faa0d83c9b2ce9c32634c5c375bcccf161d3bb5",
+        version = "0.1.0",
+        sha256 = "48f7e716f4098b85296ad93f5a133baf712968c13fbc2fdf3a6136158fe86eac",
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
-        release_date = "2020-04-09",
+        release_date = "2020-10-15",
         use_category = ["build"],
     ),
     six = dict(
