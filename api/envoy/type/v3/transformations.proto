@@ -23,10 +23,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message TextTransformation {
   // A type of operation to alter text.
   message Operation {
-    // No operation.
-    message None {
-    }
-
     // Should text be normalized according to RFC 3986? This typically is used for path headers
     // before any processing of requests by HTTP filters or routing. This applies percent-encoded
     // normalization and path segment normalization. Fails on characters disallowed in URLs
@@ -47,8 +43,7 @@ message TextTransformation {
     }
 
     oneof Kind {
-      // No transformation.
-      None none = 1;
+      option (validate.required) = true;
 
       // Enable path normalization per RFC 3986.
       NormalizePathRFC3986 normalize_path_rfc_3986 = 2;
