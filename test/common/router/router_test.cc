@@ -513,13 +513,12 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   ON_CALL(callbacks_.route_->route_entry_, priority())
       .WillByDefault(Return(Upstream::ResourcePriority::High));
-  EXPECT_CALL(cm_.thread_local_cluster_,
-              httpConnPool(Upstream::ResourcePriority::High, _, &router_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Timeout, "connect_timeout",
-                                cm_.thread_local_cluster_.conn_pool_.host_);
+                                cm_.conn_pool_.host_);
         return nullptr;
       }));
 
@@ -551,13 +550,12 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeoutLegacy) {
       {{"envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure", "false"}});
   ON_CALL(callbacks_.route_->route_entry_, priority())
       .WillByDefault(Return(Upstream::ResourcePriority::High));
-  EXPECT_CALL(cm_.thread_local_cluster_,
-              httpConnPool(Upstream::ResourcePriority::High, _, &router_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Timeout, "connect_timeout",
-                                cm_.thread_local_cluster_.conn_pool_.host_);
+                                cm_.conn_pool_.host_);
         return nullptr;
       }));
 
