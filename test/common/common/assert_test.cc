@@ -32,6 +32,13 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
                       ASSERT(0, "With some logs"));
   expected_counted_failures = 3;
+#elif defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
+  // ASSERTs always run when ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE is compiled in.
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
+                      ASSERT(0, "With some logs"));
+  expected_counted_failures = 3;
 #else
   EXPECT_NO_LOGS(ASSERT(0));
   EXPECT_NO_LOGS(ASSERT(0, ""));
@@ -79,6 +86,43 @@ TEST(EnvoyBugDeathTest, TestResetCounters) {
   for (int i = 0; i < 2; i++) {
     EXPECT_ENVOY_BUG(TestEnvoyBug::callEnvoyBug(), "envoy bug failure: false.");
   }
+}
+
+TEST(SlowAssertTest, TestSlowAssertInFastAssertInReleaseMode) {
+  int expected_counted_failures;
+  int slow_assert_fail_count = 0;
+  auto debug_assert_action_registration =
+      Assert::setDebugAssertionFailureRecordAction([&]() { slow_assert_fail_count++; });
+
+#ifndef NDEBUG
+  EXPECT_DEATH({ SLOW_ASSERT(0); }, ".*assert failure: 0.*");
+  EXPECT_DEATH({ SLOW_ASSERT(0, ""); }, ".*assert failure: 0.*");
+  EXPECT_DEATH({ SLOW_ASSERT(0, "With some logs"); },
+               ".*assert failure: 0. Details: With some logs.*");
+  expected_counted_failures = 0;
+#elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  // SLOW_ASSERTs are included in ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0", SLOW_ASSERT(0));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0", SLOW_ASSERT(0, ""));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
+                      SLOW_ASSERT(0, "With some logs"));
+  expected_counted_failures = 3;
+#elif defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE) &&                                           \
+    !defined(ENVOY_LOG_SLOW_DEBUG_ASSERT_IN_RELEASE)
+  // Non-implementation for slow debug asserts when only ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE is
+  // compiled in.
+  EXPECT_NO_LOGS(SLOW_ASSERT(0));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, ""));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, "With some logs"));
+  expected_counted_failures = 0;
+#else
+  EXPECT_NO_LOGS(SLOW_ASSERT(0));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, ""));
+  EXPECT_NO_LOGS(SLOW_ASSERT(0, "With some logs"));
+  expected_counted_failures = 0;
+#endif
+
+  EXPECT_EQ(expected_counted_failures, slow_assert_fail_count);
 }
 
 } // namespace Envoy
