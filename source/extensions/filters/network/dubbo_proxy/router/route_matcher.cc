@@ -170,7 +170,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 
 SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
                                                Server::Configuration::FactoryContext&)
-    : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
+    : interface_matcher_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
@@ -184,7 +184,7 @@ RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadat
   ASSERT(metadata.hasInvocationInfo());
   const auto& invocation = metadata.invocationInfo();
 
-  if (service_name_ == invocation.serviceName() &&
+  if (interface_matcher_.match(invocation.serviceName()) &&
       (group_.value().empty() ||
        (invocation.serviceGroup().has_value() && invocation.serviceGroup().value() == group_)) &&
       (version_.value().empty() || (invocation.serviceVersion().has_value() &&
