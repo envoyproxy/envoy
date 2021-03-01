@@ -17,28 +17,46 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
-
-private:
   struct FlagsAndMode {
     DWORD access_ = 0;
     DWORD creation_ = 0;
   };
 
   FlagsAndMode translateFlag(FlagSet in);
+
+private:
   friend class FileSystemImplTest;
 };
 
 struct ConsoleFileImplWin32 : public FileImplWin32 {
-  ConsoleFileImplWin32()
-      : FileImplWin32(FilePathAndType{DestinationType::Console, "/dev/console"}) {}
+  ConsoleFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Console, "CONOUT$"}) {}
+
+protected:
+  Api::IoCallBoolResult open(FlagSet flag) override;
 };
 
 struct StdOutFileImplWin32 : public FileImplWin32 {
   StdOutFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
+  ~StdOutFileImplWin32() { fd_ = INVALID_HANDLE; }
+
+protected:
+  Api::IoCallBoolResult open(FlagSet) override;
+  Api::IoCallBoolResult close() override;
+
+private:
+  static constexpr DWORD std_handle_ = STD_OUTPUT_HANDLE;
 };
 
 struct StdErrFileImplWin32 : public FileImplWin32 {
   StdErrFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stderr, "/dev/stderr"}) {}
+  ~StdErrFileImplWin32() { fd_ = INVALID_HANDLE; }
+
+protected:
+  Api::IoCallBoolResult open(FlagSet) override;
+  Api::IoCallBoolResult close() override;
+
+private:
+  static constexpr DWORD std_handle_ = STD_ERROR_HANDLE;
 };
 
 class InstanceImplWin32 : public Instance {

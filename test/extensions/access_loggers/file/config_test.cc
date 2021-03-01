@@ -25,10 +25,9 @@ namespace {
 
 TEST(FileAccessLogNegativeTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-
   EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
                    envoy::extensions::access_loggers::file::v3::FileAccessLog(), nullptr, context),
-               ProtoValidationException);
+               EnvoyException);
 }
 
 TEST(FileAccessLogNegativeTest, InvalidNameFail) {

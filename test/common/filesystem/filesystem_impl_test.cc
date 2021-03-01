@@ -347,6 +347,55 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
   EXPECT_EQ(" new data", contents);
 }
 
+TEST_F(FileSystemImplTest, StdOut) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.rc_);
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.rc_) << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+TEST_F(FileSystemImplTest, StdErr) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stderr, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_);
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.rc_) << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+#ifdef WIN32
+TEST_F(FileSystemImplTest, Console) {
+  // Do not test `/dev/console` since it requires root permissions
+  FilePathAndType file_info{Filesystem::DestinationType::Console, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_);
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.rc_) << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+TEST_F(FileSystemImplTest, Win32InvalidHandleThrows) {
+  ENVOY_LOG_MISC(debug, "123");
+  FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  // We need to flush just to make sure that the write has been completed.
+  auto hh = GetStdHandle(STD_OUTPUT_HANDLE);
+  FlushFileBuffers(hh);
+  auto original_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, NULL));
+  EXPECT_THROW(file->open(DefaultFlags), EnvoyException);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, original_handle));
+}
+#endif
+
 TEST_F(FileSystemImplTest, Close) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());

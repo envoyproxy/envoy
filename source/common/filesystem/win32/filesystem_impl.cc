@@ -87,6 +87,62 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   return {access, creation};
 }
 
+Api::IoCallBoolResult ConsoleFileImplWin32::open(FlagSet) {
+  FlagsAndMode flags;
+  flags.access_ = GENERIC_WRITE | GENERIC_READ;
+  flags.creation_ = OPEN_EXISTING;
+  fd_ = CreateFileA(path().c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+                    flags.creation_, 0, NULL);
+  if (fd_ == INVALID_HANDLE) {
+    return resultFailure(false, ::GetLastError());
+  }
+  return resultSuccess(true);
+}
+
+Api::IoCallBoolResult StdOutFileImplWin32::open(FlagSet) {
+  fd_ = GetStdHandle(std_handle_);
+  if (fd_ == NULL) {
+    // If an application does not have associated standard handles,
+    // such as a service running on an interactive desktop
+    // and has not redirected them, the return value is NULL.
+    // In that case we throw an exception instead of failing since there is no last error.
+    throw EnvoyException(
+        fmt::format("The process does not have an associated handle for `stdout`"));
+  }
+  if (fd_ == INVALID_HANDLE) {
+    return resultFailure(false, ::GetLastError());
+  }
+  return resultSuccess(true);
+}
+Api::IoCallBoolResult StdOutFileImplWin32::close() {
+  // If we are writing to the standard output of the process we are
+  // not the owners of the handle, we are just using it.
+  fd_ = INVALID_HANDLE;
+  return resultSuccess(true);
+}
+
+Api::IoCallBoolResult StdErrFileImplWin32::open(FlagSet) {
+  fd_ = GetStdHandle(std_handle_);
+  if (fd_ == NULL) {
+    // If an application does not have associated standard handles,
+    // such as a service running on an interactive desktop
+    // and has not redirected them, the return value is NULL.
+    // In that case we throw an exception instead of failing since there is no last error.
+    throw EnvoyException(
+        fmt::format("The process does not have an associated handle for `stderr`"));
+  }
+  if (fd_ == INVALID_HANDLE) {
+    return resultFailure(false, ::GetLastError());
+  }
+  return resultSuccess(true);
+}
+Api::IoCallBoolResult StdErrFileImplWin32::close() {
+  // If we are writing to the standard error of the process we are
+  // not the owners of the handle, we are just using it.
+  fd_ = INVALID_HANDLE;
+  return resultSuccess(true);
+}
+
 FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   switch (file_info.file_type_) {
   case DestinationType::File:
