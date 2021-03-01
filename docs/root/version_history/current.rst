@@ -12,6 +12,13 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* dns: both the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and
+  :ref:`logical DNS <arch_overview_service_discovery_types_logical_dns>` cluster types now honor the
+  :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field if not empty.
+  Previously resolved hosts would have their hostname set to the configured DNS address for use with
+  logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
+  Setting the hostname manually allows overriding the internal hostname used for such features while
+  still allowing the original DNS resolution name to be used.
 * hds: support custom health check port via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 * healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
   :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
@@ -58,6 +65,7 @@ Bug Fixes
 * grpc_http_bridge: the downstream HTTP status is now correctly set for trailers-only responses from the upstream.
 * http: disallowing "host:" in request_headers_to_add for behavioral consistency with rejecting :authority header. This behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_host_like_authority` to false.
 * http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
+* jwt_authn: reject requests with a proper error if JWT has the wrong issuer when allow_missing is used. Before this change, the requests are accepted.
 * listener: prevent crashing when an unknown listener config proto is received and debug logging is enabled.
 * overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
 * sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.

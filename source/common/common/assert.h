@@ -119,11 +119,18 @@ void resetEnvoyBugCountersForTest();
  */
 #define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
-#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+// ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE compiles all ASSERTs in release mode.
+#ifdef ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
+#define ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE
+#endif
+
+#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE) ||                              \
+    defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
+// This if condition represents any case where ASSERT()s are compiled in.
 
 #if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
-#else // If this is not a debug build, but ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE is defined.
+#else // If this is not a debug build, but ENVOY_LOG_(FAST)_DEBUG_ASSERT_IN_RELEASE is defined.
 #define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly()
 #endif // !defined(NDEBUG)
 
@@ -156,10 +163,21 @@ void resetEnvoyBugCountersForTest();
 // _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
+
+#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+// debug build or all ASSERTs compiled in release.
+#define SLOW_ASSERT(...) ASSERT(__VA_ARGS__)
+#else
+// Non-implementation of SLOW_ASSERTs when building only ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE.
+#define SLOW_ASSERT _NULL_ASSERT_IMPL
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+
 #else
 #define ASSERT _NULL_ASSERT_IMPL
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
-#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+#define SLOW_ASSERT _NULL_ASSERT_IMPL
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE) ||
+       // defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
 
 /**
  * Indicate a panic situation and exit.

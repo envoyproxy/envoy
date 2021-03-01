@@ -37,7 +37,6 @@ public:
                  Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
-  ~NewGrpcMuxImpl() override { dynamic_update_callback_handle_->remove(); }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
@@ -158,7 +157,7 @@ private:
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
-  Common::CallbackHandle* dynamic_update_callback_handle_;
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 

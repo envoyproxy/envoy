@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -499,6 +500,8 @@ private:
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
     bool added_or_updated_{};
+    Common::CallbackHandlePtr member_update_cb_;
+    Common::CallbackHandlePtr priority_update_cb_;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
