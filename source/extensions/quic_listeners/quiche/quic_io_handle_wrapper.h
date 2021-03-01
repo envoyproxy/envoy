@@ -29,7 +29,8 @@ public:
     }
     return io_handle_.readv(max_length, slices, num_slice);
   }
-  Api::IoCallUint64Result read(Buffer::Instance& buffer, uint64_t max_length) override {
+  Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                               absl::optional<uint64_t> max_length) override {
     if (closed_) {
       return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
                                                         Network::IoSocketError::deleteIoError));
@@ -105,6 +106,15 @@ public:
                                   socklen_t* optlen) override {
     return io_handle_.getOption(level, optname, optval, optlen);
   }
+
+  Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                              unsigned long in_buffer_len, void* out_buffer,
+                              unsigned long out_buffer_len,
+                              unsigned long* bytes_returned) override {
+    return io_handle_.ioctl(control_code, in_buffer, in_buffer_len, out_buffer, out_buffer_len,
+                            bytes_returned);
+  }
+
   Api::SysCallIntResult setBlocking(bool blocking) override {
     return io_handle_.setBlocking(blocking);
   }

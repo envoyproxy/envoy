@@ -20,7 +20,8 @@ public:
     member_update_cb_helper_.runCallbacks(priority(), added, removed);
   }
 
-  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
     return member_update_cb_helper_.add(callback);
   }
 

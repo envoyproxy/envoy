@@ -71,6 +71,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["filter_factory.cc"],
     hdrs = ["filter_factory.h"],
+    category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream",
     status = "alpha",
     deps = [

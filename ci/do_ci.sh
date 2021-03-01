@@ -141,6 +141,29 @@ function run_process_test_result() {
   "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
 }
 
+function run_ci_verify () {
+  echo "verify examples..."
+  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  _images=$(docker image list --format "{{.Repository}}")
+  while read -r line; do images+=("$line"); done \
+      <<< "$_images"
+  _tags=$(docker image list --format "{{.Tag}}")
+  while read -r line; do tags+=("$line"); done \
+      <<< "$_tags"
+  for i in "${!images[@]}"; do
+      if [[ "${images[i]}" =~ "envoy" ]]; then
+          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
+      fi
+  done
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
+  export DOCKER_NO_PULL=1
+  umask 027
+  chmod -R o-rwx examples/
+  ci/verify_examples.sh "${@}" || exit
+}
+
 CI_TARGET=$1
 shift
 
@@ -306,6 +329,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # these tests under "-c opt" to save time in CI.
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
 
+  # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
+    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
+
   echo "Building binary with wasm=wavm..."
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
@@ -431,26 +457,10 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   python3.8 tools/dependency/cve_scan.py
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
-  done
-  docker images
-  sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
-  export DOCKER_NO_PULL=1
-  umask 027
-  chmod -R o-rwx examples/
-  ci/verify_examples.sh
+  run_ci_verify "*" wasm-cc
+  exit 0
+elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
+  run_ci_verify wasm-cc
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/upstream/upstream.h"
 
 #include "gmock/gmock.h"
@@ -17,8 +18,8 @@ public:
   void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed);
 
-  MOCK_METHOD(Common::CallbackHandle*, addMemberUpdateCb, (MemberUpdateCb callback), (const));
-  MOCK_METHOD(Common::CallbackHandle*, addPriorityUpdateCb, (PriorityUpdateCb callback), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addMemberUpdateCb, (MemberUpdateCb callback), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addPriorityUpdateCb, (PriorityUpdateCb callback), (const));
   MOCK_METHOD(const std::vector<HostSetPtr>&, hostSetsPerPriority, (), (const));
   MOCK_METHOD(std::vector<HostSetPtr>&, hostSetsPerPriority, ());
   MOCK_METHOD(void, updateHosts,
@@ -33,6 +34,7 @@ public:
   }
 
   std::vector<HostSetPtr> host_sets_;
+  std::vector<Common::CallbackHandlePtr> member_update_cbs_;
   Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;

@@ -19,6 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/filter/http/filter_config_discovery_impl.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
@@ -206,7 +207,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Utility::parseHttp1Settings(
-          config.http_protocol_options(), config.stream_error_on_invalid_http_message())),
+          config.http_protocol_options(), config.stream_error_on_invalid_http_message(),
+          xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -248,7 +250,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
-      strip_matching_port_(config.strip_matching_host_port()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
@@ -264,8 +265,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
-  // If we are provided a different request_id_extension implementation to use try and create a new
-  // instance of it, otherwise use default one.
+  if (config.strip_any_host_port() && config.strip_matching_host_port()) {
+    throw EnvoyException(fmt::format(
+        "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
+  }
+
+  if (config.strip_any_host_port()) {
+    strip_port_type_ = Http::StripPortType::Any;
+  } else if (config.strip_matching_host_port()) {
+    strip_port_type_ = Http::StripPortType::MatchingHost;
+  } else {
+    strip_port_type_ = Http::StripPortType::None;
+  }
+
+  // If we are provided a different request_id_extension implementation to use try and create a
+  // new instance of it, otherwise use default one.
   if (config.request_id_extension().has_typed_config()) {
     request_id_extension_ =
         Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
@@ -503,7 +517,7 @@ void HttpConnectionManagerConfig::processFilter(
       callback, proto_config.name());
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
+            MessageUtil::getJsonStringFromMessageOrError(
                 proto_config.has_typed_config()
                     ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                     : static_cast<const Protobuf::Message&>(

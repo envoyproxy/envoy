@@ -24,6 +24,9 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
     to_delete_.clear();
   }));
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
+  ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
+  ON_CALL(*this, createScaledTypedTimer_(_, _))
+      .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 
   ON_CALL(buffer_factory_, create_(_, _, _))
@@ -31,6 +34,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+  ON_CALL(*this, isThreadSafe()).WillByDefault(Return(true));
 }
 
 MockDispatcher::~MockDispatcher() = default;

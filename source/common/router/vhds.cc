@@ -20,11 +20,11 @@ namespace Envoy {
 namespace Router {
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(
-    RouteConfigUpdatePtr& config_update_info,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    absl::node_hash_set<RouteConfigProvider*>& route_config_providers,
-    envoy::config::core::v3::ApiVersion resource_api_version)
+VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   const std::string& stat_prefix,
+                                   absl::optional<RouteConfigProvider*>& route_config_provider_opt,
+                                   envoy::config::core::v3::ApiVersion resource_api_version)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
           resource_api_version,
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
@@ -32,10 +32,9 @@ VhdsSubscription::VhdsSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
-      init_target_(
-          fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-          [this]() { subscription_->start({config_update_info_->routeConfigName()}, true); }),
-      route_config_providers_(route_config_providers) {
+      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
+                   [this]() { subscription_->start({config_update_info_->routeConfigName()}); }),
+      route_config_provider_opt_(route_config_provider_opt) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
                                   .config_source()
@@ -48,7 +47,7 @@ VhdsSubscription::VhdsSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, true);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
@@ -86,8 +85,8 @@ void VhdsSubscription::onConfigUpdate(
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
               config_update_info_->routeConfigName(), config_update_info_->configHash());
-    for (auto* provider : route_config_providers_) {
-      provider->onConfigUpdate();
+    if (route_config_provider_opt_.has_value()) {
+      route_config_provider_opt_.value()->onConfigUpdate();
     }
   }
 

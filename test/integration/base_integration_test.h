@@ -126,6 +126,9 @@ public:
 
   std::string listener_access_log_name_;
 
+  // Last node received on an xDS stream from the server.
+  envoy::config::core::v3::Node last_node_;
+
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();
   void createXdsConnection();
@@ -372,6 +375,11 @@ protected:
 
   const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
 
+  void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
+    ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
+    proxy_buffer_factory_ = proxy_buffer_factory;
+  }
+
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
@@ -459,6 +467,9 @@ private:
   FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.
   bool initialized_{};
+  // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
+  // the proxy uses the default watermark buffer factory to create buffers.
+  Buffer::WatermarkFactorySharedPtr proxy_buffer_factory_;
 };
 
 } // namespace Envoy

@@ -117,11 +117,9 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
-    // Technically this should be
+    // Status is translated via Utility::httpToGrpcStatus per
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as WellKnownGrpcStatus::Canceled.
-    streamError(Status::WellKnownGrpcStatus::Canceled);
+    streamError(Utility::httpToGrpcStatus(http_response_status));
     return;
   }
   if (end_stream) {
@@ -212,6 +210,7 @@ void AsyncStreamImpl::cleanup() {
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (LinkedObject<AsyncStreamImpl>::inserted()) {
+    ASSERT(dispatcher_->isThreadSafe());
     dispatcher_->deferredDelete(
         LinkedObject<AsyncStreamImpl>::removeFromList(parent_.active_streams_));
   }

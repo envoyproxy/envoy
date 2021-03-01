@@ -38,13 +38,14 @@ public:
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
-  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                           const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
                            const bool use_namespace_matching = false) override;
 
   void requestOnDemandUpdate(const std::string& type_url,
-                             const std::set<std::string>& for_update) override;
+                             const absl::flat_hash_set<std::string>& for_update) override;
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
@@ -101,7 +102,7 @@ private:
       }
     }
 
-    void update(const std::set<std::string>& resources) override {
+    void update(const absl::flat_hash_set<std::string>& resources) override {
       parent_.updateWatch(type_url_, watch_, resources);
     }
 
@@ -117,8 +118,8 @@ private:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources,
-                   const bool creating_namespace_watch = false);
+                   const absl::flat_hash_set<std::string>& resources,
+                   bool creating_namespace_watch = false);
 
   void addSubscription(const std::string& type_url, const bool use_namespace_matching);
 
@@ -135,6 +136,9 @@ private:
   // Then, prioritizes non-ACK updates in the order the various types
   // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+
+  // Invoked when dynamic context parameters change for a resource type.
+  void onDynamicContextUpdate(absl::string_view resource_type_url);
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for
@@ -153,7 +157,7 @@ private:
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
-
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
 

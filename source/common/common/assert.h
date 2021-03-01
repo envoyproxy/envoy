@@ -71,6 +71,12 @@ void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly();
  */
 bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name);
 
+/**
+ * Resets all counters for EnvoyBugRegistrationImpl between tests.
+ *
+ */
+void resetEnvoyBugCountersForTest();
+
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
 #define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \
@@ -113,11 +119,18 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
  */
 #define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
-#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+// ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE compiles all ASSERTs in release mode.
+#ifdef ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE
+#define ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE
+#endif
+
+#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE) ||                              \
+    defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
+// This if condition represents any case where ASSERT()s are compiled in.
 
 #if !defined(NDEBUG) // If this is a debug build.
 #define ASSERT_ACTION abort()
-#else // If this is not a debug build, but ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE is defined.
+#else // If this is not a debug build, but ENVOY_LOG_(FAST)_DEBUG_ASSERT_IN_RELEASE is defined.
 #define ASSERT_ACTION Envoy::Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly()
 #endif // !defined(NDEBUG)
 
@@ -150,10 +163,21 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
 // _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
+
+#if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+// debug build or all ASSERTs compiled in release.
+#define SLOW_ASSERT(...) ASSERT(__VA_ARGS__)
+#else
+// Non-implementation of SLOW_ASSERTs when building only ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE.
+#define SLOW_ASSERT _NULL_ASSERT_IMPL
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+
 #else
 #define ASSERT _NULL_ASSERT_IMPL
 #define KNOWN_ISSUE_ASSERT _NULL_ASSERT_IMPL
-#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+#define SLOW_ASSERT _NULL_ASSERT_IMPL
+#endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE) ||
+       // defined(ENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE)
 
 /**
  * Indicate a panic situation and exit.
@@ -165,7 +189,9 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
     abort();                                                                                       \
   } while (false)
 
-#if !defined(NDEBUG)
+// We do not want to crash on failure in tests exercising ENVOY_BUGs while running coverage in debug
+// mode. Crashing causes flakes when forking to expect a debug death and reduces lines of coverage.
+#if !defined(NDEBUG) && !defined(ENVOY_CONFIG_COVERAGE)
 #define ENVOY_BUG_ACTION abort()
 #else
 #define ENVOY_BUG_ACTION Envoy::Assert::invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly()
@@ -203,6 +229,8 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
  * mode, it is logged and a stat is incremented with exponential back-off per ENVOY_BUG. In debug
  * mode, it will crash if the condition is not met. ENVOY_BUG must be called with two arguments for
  * verbose logging.
+ * Note: ENVOY_BUGs in coverage mode will never crash. They will log and increment a stat like in
+ * release mode. This prevents flakiness and increases code coverage.
  */
 #define ENVOY_BUG(...) PASS_ON(PASS_ON(_ENVOY_BUG_VERBOSE)(__VA_ARGS__))
 

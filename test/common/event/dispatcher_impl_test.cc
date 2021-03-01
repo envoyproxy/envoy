@@ -1,10 +1,13 @@
 #include <functional>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/common/scope_tracker.h"
+#include "common/common/utility.h"
 #include "common/event/deferred_task.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/timer_impl.h"
@@ -21,8 +24,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::InSequence;
+using testing::MockFunction;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Event {
@@ -234,6 +240,15 @@ private:
   std::function<void()> on_destroy_;
 };
 
+class TestDispatcherThreadDeletable : public DispatcherThreadDeletable {
+public:
+  TestDispatcherThreadDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
+  ~TestDispatcherThreadDeletable() override { on_destroy_(); }
+
+private:
+  std::function<void()> on_destroy_;
+};
+
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
@@ -325,27 +340,29 @@ protected:
   }
 
   void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
+    {
+      Thread::LockGuard lock(mu_);
+      work_finished_ = false;
+    }
     TimerPtr timer;
-    dispatcher_->post([this, &timer]() {
+    dispatcher_->post([this, &timer, enable_timer_delegate]() {
       {
         Thread::LockGuard lock(mu_);
         timer = dispatcher_->createTimer([this]() {
           {
             Thread::LockGuard lock(mu_);
+            ASSERT(!work_finished_);
             work_finished_ = true;
           }
           cv_.notifyOne();
         });
         EXPECT_FALSE(timer->enabled());
+        enable_timer_delegate(*timer);
+        EXPECT_TRUE(timer->enabled());
       }
-      cv_.notifyOne();
     });
 
     Thread::LockGuard lock(mu_);
-    while (timer == nullptr) {
-      cv_.wait(mu_);
-    }
-    enable_timer_delegate(*timer);
     while (!work_finished_) {
       cv_.wait(mu_);
     }
@@ -376,6 +393,7 @@ TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
     {
       Thread::LockGuard lock(mu_);
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -418,6 +436,7 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
     dispatcher_->post([this]() {
       {
         Thread::LockGuard lock(mu_);
+        ASSERT(!work_finished_);
         work_finished_ = true;
       }
       cv_.notifyOne();
@@ -459,6 +478,7 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
     dispatcher_->post([this]() {
       {
         Thread::LockGuard lock(mu_);
+        ASSERT(!work_finished_);
         work_finished_ = true;
       }
       cv_.notifyOne();
@@ -468,6 +488,100 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
   Thread::LockGuard lock(mu_);
   while (!work_finished_) {
     cv_.wait(mu_);
+  }
+}
+
+TEST_F(DispatcherImplTest, DispatcherThreadDeleted) {
+  dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>(
+      [this, id = api_->threadFactory().currentThreadId()]() {
+        ASSERT(id != api_->threadFactory().currentThreadId());
+        {
+          Thread::LockGuard lock(mu_);
+          ASSERT(!work_finished_);
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      }));
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
+  Api::ApiPtr api_(Api::createApiForTest());
+  DispatcherPtr dispatcher(api_->allocateDispatcher("test_thread"));
+  std::vector<std::unique_ptr<ReadyWatcher>> watchers;
+  watchers.reserve(3);
+  for (int i = 0; i < 3; ++i) {
+    watchers.push_back(std::make_unique<ReadyWatcher>());
+  }
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[0]->ready(); }));
+  EXPECT_CALL(*watchers[0], ready());
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[1]->ready(); }));
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[2]->ready(); }));
+  EXPECT_CALL(*watchers[1], ready());
+  EXPECT_CALL(*watchers[2], ready());
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+class DispatcherShutdownTest : public testing::Test {
+protected:
+  DispatcherShutdownTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(DispatcherShutdownTest, ShutdownClearThreadLocalDeletables) {
+  ReadyWatcher watcher;
+
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->shutdown();
+}
+
+TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
+  ReadyWatcher watcher;
+  ReadyWatcher deferred_watcher;
+  ReadyWatcher post_watcher;
+
+  {
+    InSequence s;
+
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+        [&deferred_watcher]() { deferred_watcher.ready(); }));
+    dispatcher_->post([&post_watcher]() { post_watcher.ready(); });
+    dispatcher_->deleteInDispatcherThread(
+        std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+    EXPECT_CALL(watcher, ready());
+    dispatcher_->shutdown();
+
+    ::testing::Mock::VerifyAndClearExpectations(&watcher);
+    EXPECT_CALL(deferred_watcher, ready());
+    dispatcher_.reset();
+  }
+}
+
+TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
+  ReadyWatcher watcher;
+  ReadyWatcher deferred_watcher;
+  dispatcher_->deferredDelete(
+      std::make_unique<TestDeferredDeletable>([&deferred_watcher]() { deferred_watcher.ready(); }));
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+  {
+    InSequence s;
+    EXPECT_CALL(deferred_watcher, ready());
+    EXPECT_CALL(watcher, ready());
+    dispatcher_.reset();
   }
 }
 
@@ -491,21 +605,18 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
         {
           Thread::LockGuard lock(mu_);
           static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(std::cerr);
+          ASSERT(!work_finished_);
           work_finished_ = true;
         }
         cv_.notifyOne();
       });
       EXPECT_FALSE(timer->enabled());
+      timer->enableTimer(std::chrono::milliseconds(50), &scope);
+      EXPECT_TRUE(timer->enabled());
     }
-    cv_.notifyOne();
   });
 
   Thread::LockGuard lock(mu_);
-  while (timer == nullptr) {
-    cv_.wait(mu_);
-  }
-  timer->enableTimer(std::chrono::milliseconds(50), &scope);
-
   while (!work_finished_) {
     cv_.wait(mu_);
   }
@@ -517,6 +628,7 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
       Thread::LockGuard lock(mu_);
       // Thread safe because it is called within the dispatcher thread's context.
       EXPECT_TRUE(dispatcher_->isThreadSafe());
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -530,9 +642,71 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
 
+TEST_F(DispatcherImplTest, ShouldDumpNothingIfNoTrackedObjects) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Call on FatalError to trigger dumps of tracked objects.
+  dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+    static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  // Check ostream still empty.
+  EXPECT_EQ(ostream.contents(), "");
+}
+
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
+
+TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Call on FatalError to trigger dumps of tracked objects.
+  dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+
+    // Add several tracked objects to the dispatcher
+    MessageTrackedObject first{"first"};
+    ScopeTrackerScopeState first_state{&first, *dispatcher_};
+    MessageTrackedObject second{"second"};
+    ScopeTrackerScopeState second_state{&second, *dispatcher_};
+    MessageTrackedObject third{"third"};
+    ScopeTrackerScopeState third_state{&third, *dispatcher_};
+
+    static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  // Check the dump includes and registered objects in a FILO order.
+  EXPECT_EQ(ostream.contents(), "thirdsecondfirst");
+}
+
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    ++times_ran_;
+  }
   bool isAsyncSignalSafe() const override { return true; }
   int getNumTimesRan() { return times_ran_; }
 
@@ -562,6 +736,7 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
     {
       Thread::LockGuard lock(mu_);
       static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -1264,6 +1439,48 @@ TEST_F(TimerUtilsTest, TimerValueConversion) {
 
   // Some arbitrary tests for good measure.
   checkConversion(std::chrono::milliseconds(600014), 600, 14000);
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreatesScaledTimerManager) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  EXPECT_CALL(*manager, createTimer_(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), _));
+  dispatcher->createScaledTimer(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), []() {});
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  EXPECT_CALL(*manager, createTypedTimer_(ScaledTimerType::UnscaledRealTimerForTest, _));
+  dispatcher->createScaledTimer(ScaledTimerType::UnscaledRealTimerForTest, []() {});
 }
 
 class DispatcherWithWatchdogTest : public testing::Test {

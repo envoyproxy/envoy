@@ -85,13 +85,13 @@ void ValidationInstance::initialize(const Options& options,
   bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      stats().symbolTable(), bootstrap.node(), bootstrap.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap, options);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_);
+      messageValidationContext().staticValidationVisitor(), *api_, options_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
@@ -101,7 +101,7 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, router_context_, accessLogManager(), singletonManager());
+      grpc_context_, router_context_, accessLogManager(), singletonManager(), options);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
@@ -116,6 +116,7 @@ void ValidationInstance::shutdown() {
     config_.clusterManager()->shutdown();
   }
   thread_local_.shutdownThread();
+  dispatcher_->shutdown();
 }
 
 } // namespace Server

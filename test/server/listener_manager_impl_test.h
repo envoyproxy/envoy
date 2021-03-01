@@ -181,7 +181,7 @@ protected:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    ON_CALL(*socket_, localAddress()).WillByDefault(ReturnRef(local_address_));
+    socket_->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
     ON_CALL(*socket_, detectedTransportProtocol())
@@ -194,7 +194,7 @@ protected:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    ON_CALL(*socket_, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+    socket_->address_provider_->setRemoteAddress(remote_address_);
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
@@ -269,14 +269,6 @@ protected:
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
-  }
-
-  ABSL_MUST_USE_RESULT
-  auto disableInplaceUpdateForThisTest() {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
-    return scoped_runtime;
   }
 
   ABSL_MUST_USE_RESULT

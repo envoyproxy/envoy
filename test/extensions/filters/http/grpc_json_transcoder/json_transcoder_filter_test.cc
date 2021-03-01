@@ -11,6 +11,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
@@ -24,6 +25,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
@@ -349,6 +351,10 @@ protected:
   bookstoreProtoConfig() {
     const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                                     "\",\"services\": [\"bookstore.Bookstore\"]}";
+    return makeProtoConfig(json_string);
+  }
+  static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  makeProtoConfig(const std::string json_string) {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(json_string, proto_config);
     return proto_config;
@@ -358,12 +364,57 @@ protected:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
+  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
+                        const Router::RouteSpecificFilterConfig* vhost_settings) {
+    ON_CALL(decoder_callbacks_.route_->route_entry_,
+            perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))
+        .WillByDefault(Return(route_settings));
+    ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
+            perFilterConfig(HttpFilterNames::get().GrpcJsonTranscoder))
+        .WillByDefault(Return(vhost_settings));
+  }
+
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
   JsonTranscoderConfig config_;
   JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
+
+TEST_F(GrpcJsonTranscoderFilterTest, EmptyRoute) {
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, EmptyRouteEntry) {
+  ON_CALL(*decoder_callbacks_.route_, routeEntry()).WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
+  // not setting up services list (which disables filter)
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg;
+  route_cfg.set_proto_descriptor_bin("");
+  JsonTranscoderConfig route_config(route_cfg, *api_);
+  routeLocalConfig(&route_config, nullptr);
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, PerVHostDisabledConfigOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg;
+  vhost_cfg.set_proto_descriptor_bin("");
+  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
+  routeLocalConfig(nullptr, &vhost_config);
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
 
 TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
@@ -708,6 +759,41 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutput) {
   EXPECT_EQ("/index", request_headers.get_("x-envoy-original-path"));
   EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
   EXPECT_EQ("/bookstore.Bookstore/GetIndex", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+
+  google::api::HttpBody response;
+  response.set_content_type("text/html");
+  response.set_data("<h1>Hello, world!</h1>");
+
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(*response_data, false));
+
+  EXPECT_EQ(response.content_type(), response_headers.get_("content-type"));
+  EXPECT_EQ(response.data(), response_data->toString());
+
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryOnRootPath) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/GetRoot", request_headers.get_(":path"));
   EXPECT_EQ("trailers", request_headers.get_("te"));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
@@ -1272,6 +1358,54 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
 
   std::string response_json = response_data->toString();
   EXPECT_EQ(GetParam().expected_response_, response_json);
+}
+
+class GrpcJsonTranscoderDisabledFilterTest : public GrpcJsonTranscoderFilterTest {
+protected:
+  GrpcJsonTranscoderDisabledFilterTest()
+      : GrpcJsonTranscoderFilterTest(
+            makeProtoConfig("{\"proto_descriptor_bin\": \"\", \"services\": []}")) {}
+};
+
+TEST_F(GrpcJsonTranscoderDisabledFilterTest, FilterDisabled) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+}
+
+TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerRouteEnabledOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder route_cfg =
+      bookstoreProtoConfig();
+  JsonTranscoderConfig route_config(route_cfg, *api_);
+  routeLocalConfig(&route_config, nullptr);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+}
+
+TEST_F(GrpcJsonTranscoderDisabledFilterTest, PerVhostEnabledOverride) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder vhost_cfg =
+      bookstoreProtoConfig();
+  JsonTranscoderConfig vhost_config(vhost_cfg, *api_);
+  routeLocalConfig(nullptr, &vhost_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/shelf", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelf", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
 }
 
 INSTANTIATE_TEST_SUITE_P(

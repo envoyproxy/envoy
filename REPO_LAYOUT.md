@@ -89,6 +89,8 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
     `Envoy::Extensions::ListenerFilters` namespace.
   * [filters/network/](/source/extensions/filters/network): L4 network filters which use the
     `Envoy::Extensions::NetworkFilters` namespace.
+  * [formatters](/source/extensions/formatters): Access log formatters which use the
+    `Envoy::Extensions::Formatters` namespace.
   * [grpc_credentials/](/source/extensions/grpc_credentials): Custom gRPC credentials which use the
     `Envoy::Extensions::GrpcCredentials` namespace.
   * [health_checker/](/source/extensions/health_checker): Custom health checkers which use the
@@ -111,6 +113,9 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
     `Envoy::Extensions::Upstreams` namespace.
   * [watchdog](/source/extensions/watchdog): Watchdog extensions use the
     `Envoy::Extensions::Watchdog` namespace.
+  * [descriptors](/source/extensions/rate_limit_descriptors): Rate limit
+    descriptor extensions use the `Envoy::Extensions::RateLimitDescriptors`
+    namespace.
 * Each extension is contained wholly in its own namespace. E.g.,
   `Envoy::Extensions::NetworkFilters::Echo`.
 * Common code that is used by multiple extensions should be in a `common/` directory as close to

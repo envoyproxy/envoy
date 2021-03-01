@@ -3,20 +3,66 @@
 #include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 
 namespace Envoy {
 namespace Network {
 
-class SocketImpl : public virtual Socket {
+class SocketAddressSetterImpl : public SocketAddressSetter {
 public:
-  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr);
+  SocketAddressSetterImpl(const Address::InstanceConstSharedPtr& local_address,
+                          const Address::InstanceConstSharedPtr& remote_address)
+      : local_address_(local_address), remote_address_(remote_address),
+        direct_remote_address_(remote_address) {}
 
-  // Network::Socket
+  void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
+    direct_remote_address_ = direct_remote_address;
+  }
+
+  void dumpState(std::ostream& os, int indent_level) const {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "SocketAddressSetterImpl " << this
+       << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
+       << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
+       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView()) << "\n";
+  }
+
+  // SocketAddressSetter
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
   }
+  void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+    setLocalAddress(local_address);
+    local_address_restored_ = true;
+  }
+  bool localAddressRestored() const override { return local_address_restored_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
+    remote_address_ = remote_address;
+  }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return direct_remote_address_;
+  }
 
+private:
+  Address::InstanceConstSharedPtr local_address_;
+  bool local_address_restored_{false};
+  Address::InstanceConstSharedPtr remote_address_;
+  Address::InstanceConstSharedPtr direct_remote_address_;
+};
+
+class SocketImpl : public virtual Socket {
+public:
+  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
+             const Address::InstanceConstSharedPtr& remote_address);
+
+  // Network::Socket
+  SocketAddressSetter& addressProvider() override { return *address_provider_; }
+  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+    return address_provider_;
+  }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
@@ -52,6 +98,10 @@ public:
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
                                         socklen_t* optlen) const override;
+  Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
+                              unsigned long in_buffer_len, void* out_buffer,
+                              unsigned long out_buffer_len, unsigned long* bytes_returned) override;
+
   Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }
@@ -60,10 +110,11 @@ public:
   absl::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
-  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
+  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
+             const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  Address::InstanceConstSharedPtr local_address_;
+  const std::shared_ptr<SocketAddressSetterImpl> address_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;

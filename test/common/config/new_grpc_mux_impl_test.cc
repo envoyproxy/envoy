@@ -29,9 +29,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Config {
@@ -56,15 +58,39 @@ public:
         local_info_);
   }
 
+  void expectSendMessage(const std::string& type_url,
+                         const std::vector<std::string>& resource_names_subscribe,
+                         const std::vector<std::string>& resource_names_unsubscribe,
+                         const std::string& nonce = "",
+                         const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+                         const std::string& error_message = "") {
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
+    expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
+    for (const auto& resource : resource_names_subscribe) {
+      expected_request.add_resource_names_subscribe(resource);
+    }
+    for (const auto& resource : resource_names_unsubscribe) {
+      expected_request.add_resource_names_unsubscribe(resource);
+    }
+    expected_request.set_response_nonce(nonce);
+    expected_request.set_type_url(type_url);
+    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
+      ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
+      error_detail->set_code(error_code);
+      error_detail->set_message(error_message);
+    }
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NewGrpcMuxImplPtr grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{"cluster_name"};
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   ControlPlaneStats control_plane_stats_;
@@ -75,6 +101,27 @@ class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
 public:
   Event::SimulatedTimeSystem time_system_;
 };
+
+// Validate behavior when dynamic context parameters are updated.
+TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_);
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_);
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, {});
+  expectSendMessage("bar", {}, {});
+  grpc_mux_->start();
+  // Unknown type, shouldn't do anything.
+  local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
+  // Update to foo type should resend Node.
+  expectSendMessage("foo", {}, {});
+  local_info_.context_provider_.update_cb_handler_.runCallbacks("foo");
+  // Update to bar type should resend Node.
+  expectSendMessage("bar", {}, {});
+  local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  expectSendMessage("foo", {}, {"x", "y"});
+}
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
 TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
@@ -265,6 +312,42 @@ TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
         }));
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
+}
+
+// Validate basic gRPC mux subscriptions to xdstp:// glob collections.
+TEST_F(NewGrpcMuxImplTest, XdsTpGlobCollection) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  xds::core::v3::ContextParams context_params;
+  EXPECT_CALL(local_info_.context_provider_, nodeContext()).WillOnce(ReturnRef(context_params));
+  // We verify that the gRPC mux normalizes the context parameter order below.
+  auto watch = grpc_mux_->addWatch(
+      type_url,
+      {"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/*?thing=some&some=thing"},
+      callbacks_, resource_decoder_, true);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("ignore");
+  auto* resource = response->add_resources();
+  resource->set_name(
+      "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/a?some=thing&thing=some");
+  resource->mutable_resource()->PackFrom(load_assignment);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+      }));
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 }
 
 } // namespace

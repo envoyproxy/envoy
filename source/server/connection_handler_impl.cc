@@ -153,7 +153,7 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
   for (auto& listener : listeners_) {
     listener.second.listener_->listener()->setRejectFraction(reject_fraction);
@@ -360,9 +360,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
 
-  if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
+  if (hand_off_restored_destination_connections_ &&
+      socket_->addressProvider().localAddressRestored()) {
     // Find a listener associated with the original destination address.
-    new_listener = listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
+    new_listener = listener_.parent_.findActiveTcpListenerByAddress(
+        *socket_->addressProvider().localAddress());
   }
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
@@ -460,10 +462,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-  // Refresh addresses in case they are modified by listener filters, such as proxy protocol or
-  // original_dst.
-  stream_info->setDownstreamLocalAddress(socket->localAddress());
-  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
@@ -477,6 +475,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     return;
   }
 
+  stream_info->setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);

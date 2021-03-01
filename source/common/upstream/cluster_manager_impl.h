@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -41,20 +42,23 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
-      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
-      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
+  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+                            Ssl::ContextManager& ssl_context_manager,
+                            Event::Dispatcher& main_thread_dispatcher,
+                            const LocalInfo::LocalInfo& local_info,
+                            Secret::SecretManager& secret_manager,
+                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                            Http::Context& http_context, Grpc::Context& grpc_context,
+                            Router::Context& router_context,
+                            AccessLog::AccessLogManager& log_manager,
+                            Singleton::Manager& singleton_manager, const Server::Options& options)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
         api_(api), http_context_(http_context), grpc_context_(grpc_context),
         router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager) {}
+        singleton_manager_(singleton_manager), options_(options) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -95,6 +99,7 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
+  const Server::Options& options_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -495,6 +500,8 @@ private:
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
     bool added_or_updated_{};
+    Common::CallbackHandlePtr member_update_cb_;
+    Common::CallbackHandlePtr priority_update_cb_;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -563,6 +570,7 @@ private:
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
+                              const ClusterConnectivityState& cluster_manager_state,
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterManagerFactory& factory_;

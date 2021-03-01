@@ -4,11 +4,11 @@ package envoy.config.listener.v4alpha;
 
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -23,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// [#next-free-field: 6]
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Filter";
 
@@ -34,10 +35,17 @@ message Filter {
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
   oneof config_type {
+    // Filter specific configuration which depends on the filter being
+    // instantiated. See the supported filters for further documentation.
+    // [#extension-category: envoy.filters.network]
     google.protobuf.Any typed_config = 4;
+
+    // Configuration source specifier for an extension configuration discovery
+    // service. In case of a failure and without the default configuration, the
+    // listener closes the connections.
+    // [#not-implemented-hide:]
+    core.v4alpha.ExtensionConfigSource config_discovery = 5;
   }
 }
 
@@ -236,6 +244,7 @@ message FilterChain {
   // :ref:`DownstreamTlsContext <envoy_api_msg_extensions.transport_sockets.tls.v4alpha.DownstreamTlsContext>` in the `typed_config`.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
+  // [#extension-category: envoy.transport_sockets.downstream]
   core.v4alpha.TransportSocket transport_socket = 6;
 
   // If present and nonzero, the amount of time to allow incoming connections to complete any
@@ -330,9 +339,10 @@ message ListenerFilter {
   // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being instantiated.
-  // See the supported filters for further documentation.
   oneof config_type {
+    // Filter specific configuration which depends on the filter being
+    // instantiated. See the supported filters for further documentation.
+    // [#extension-category: envoy.filters.listener]
     google.protobuf.Any typed_config = 3;
   }
 

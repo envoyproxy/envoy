@@ -107,8 +107,7 @@ public:
     }
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -126,7 +125,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
@@ -150,9 +150,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 133
       request_method: GET
     response:
       response_code:
@@ -173,9 +174,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 133
       request_method: GET
     response:
       response_code:
@@ -221,9 +223,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 133
       request_method: GET
     response:
       response_code:

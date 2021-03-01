@@ -9,16 +9,21 @@
 namespace Envoy {
 namespace Network {
 
-SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(ioHandleForAddr(sock_type, addr)), sock_type_(sock_type),
-      addr_type_(addr->type()) {}
+SocketImpl::SocketImpl(Socket::Type sock_type,
+                       const Address::InstanceConstSharedPtr& address_for_io_handle,
+                       const Address::InstanceConstSharedPtr& remote_address)
+    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)),
+      address_provider_(std::make_shared<SocketAddressSetterImpl>(nullptr, remote_address)),
+      sock_type_(sock_type), addr_type_(address_for_io_handle->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
-                       const Address::InstanceConstSharedPtr& local_address)
-    : io_handle_(std::move(io_handle)), local_address_(local_address) {
+                       const Address::InstanceConstSharedPtr& local_address,
+                       const Address::InstanceConstSharedPtr& remote_address)
+    : io_handle_(std::move(io_handle)),
+      address_provider_(std::make_shared<SocketAddressSetterImpl>(local_address, remote_address)) {
 
-  if (local_address_ != nullptr) {
-    addr_type_ = local_address_->type();
+  if (address_provider_->localAddress() != nullptr) {
+    addr_type_ = address_provider_->localAddress()->type();
     return;
   }
 
@@ -64,7 +69,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 
   bind_result = io_handle_->bind(address);
   if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
-    local_address_ = io_handle_->localAddress();
+    address_provider_->setLocalAddress(io_handle_->localAddress());
   }
   return bind_result;
 }
@@ -74,7 +79,7 @@ Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->liste
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
   auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
-    local_address_ = io_handle_->localAddress();
+    address_provider_->setLocalAddress(io_handle_->localAddress());
   }
   return result;
 }
@@ -89,6 +94,14 @@ Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* 
   return io_handle_->getOption(level, optname, optval, optlen);
 }
 
+Api::SysCallIntResult SocketImpl::ioctl(unsigned long control_code, void* in_buffer,
+                                        unsigned long in_buffer_len, void* out_buffer,
+                                        unsigned long out_buffer_len,
+                                        unsigned long* bytes_returned) {
+  return io_handle_->ioctl(control_code, in_buffer, in_buffer_len, out_buffer, out_buffer_len,
+                           bytes_returned);
+}
+
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
   return io_handle_->setBlocking(blocking);
 }
@@ -96,8 +109,8 @@ Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
 absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
   if (addr_type_ == Address::Type::Ip) {
     // Always hit after socket is initialized, i.e., accepted or connected
-    if (local_address_ != nullptr) {
-      return local_address_->ip()->version();
+    if (address_provider_->localAddress() != nullptr) {
+      return address_provider_->localAddress()->ip()->version();
     } else {
       auto domain = io_handle_->domain();
       if (!domain.has_value()) {

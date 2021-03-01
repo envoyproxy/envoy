@@ -105,11 +105,11 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   envoy::config::core::v3::ConfigSource config_source;
 
-  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
                         &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
-                                Config::OpaqueResourceDecoder&) -> Config::SubscriptionPtr {
+                                Config::OpaqueResourceDecoder&, bool) -> Config::SubscriptionPtr {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
                                                                     cbs, resource_decoder, stats,
                                                                     validation_visitor_, *api_);
@@ -134,7 +134,7 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
 TEST_F(SdsApiTest, BadConfigSource) {
   ::testing::InSequence s;
   envoy::config::core::v3::ConfigSource config_source;
-  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
         throw EnvoyException("bad config");
         return nullptr;
@@ -185,8 +185,6 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
-
-  handle->remove();
 }
 
 class SdsRotationApiTest : public SdsApiTestBase {
@@ -201,7 +199,7 @@ protected:
   }
 
   Secret::MockSecretCallbacks secret_callback_;
-  Common::CallbackHandle* handle_{};
+  Common::CallbackHandlePtr handle_;
   std::vector<Filesystem::Watcher::OnChangedCb> watch_cbs_;
   Event::MockDispatcher mock_dispatcher_;
   Filesystem::MockInstance filesystem_;
@@ -221,8 +219,6 @@ protected:
     initialize();
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
-
-  ~TlsCertificateSdsRotationApiTest() override { handle_->remove(); }
 
   void onConfigUpdate(const std::string& cert_value, const std::string& key_value) {
     const std::string yaml = fmt::format(
@@ -291,8 +287,6 @@ protected:
     initialize();
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
-
-  ~CertificateValidationContextSdsRotationApiTest() override { handle_->remove(); }
 
   void onConfigUpdate(const std::string& trusted_ca_path, const std::string& trusted_ca_value,
                       const std::string& watch_path) {
@@ -587,8 +581,6 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
-
-  handle->remove();
 }
 
 // Validate that CertificateValidationContextSdsApi updates secrets successfully if
@@ -625,8 +617,6 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
-
-  handle->remove();
 }
 
 class CvcValidationCallback {
@@ -713,9 +703,6 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   // secret contains SPKI list from dynamic CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateSpkiList().size());
   EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config.verifyCertificateSpkiList()[0]);
-
-  handle->remove();
-  validation_handle->remove();
 }
 
 class GenericSecretValidationCallback {
@@ -774,9 +761,6 @@ generic_secret:
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/aes_128_key";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(secret_path)),
             Config::DataSource::read(generic_secret.secret(), true, *api_));
-
-  handle->remove();
-  validation_handle->remove();
 }
 
 // Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().

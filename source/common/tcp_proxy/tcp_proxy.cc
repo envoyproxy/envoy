@@ -24,8 +24,10 @@
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
@@ -56,20 +58,24 @@ Config::RouteImpl::RouteImpl(
 
 bool Config::RouteImpl::matches(Network::Connection& connection) const {
   if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.remoteAddress(), source_port_ranges_)) {
+      !Network::Utility::portInRangeList(*connection.addressProvider().remoteAddress(),
+                                         source_port_ranges_)) {
     return false;
   }
 
-  if (!source_ips_.empty() && !source_ips_.contains(*connection.remoteAddress())) {
+  if (!source_ips_.empty() &&
+      !source_ips_.contains(*connection.addressProvider().remoteAddress())) {
     return false;
   }
 
   if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.localAddress(), destination_port_ranges_)) {
+      !Network::Utility::portInRangeList(*connection.addressProvider().localAddress(),
+                                         destination_port_ranges_)) {
     return false;
   }
 
-  if (!destination_ips_.empty() && !destination_ips_.contains(*connection.localAddress())) {
+  if (!destination_ips_.empty() &&
+      !destination_ips_.contains(*connection.addressProvider().localAddress())) {
     return false;
   }
 
@@ -425,13 +431,31 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              downstreamConnection()->remoteAddress(), downstreamConnection()->localAddress()}),
+          std::make_unique<Network::ProxyProtocolFilterState>(
+              Network::ProxyProtocolData{downstreamConnection()->addressProvider().remoteAddress(),
+                                         downstreamConnection()->addressProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
+
+    auto has_options_from_downstream =
+        downstreamConnection() && downstreamConnection()
+                                      ->streamInfo()
+                                      .filterState()
+                                      .hasData<Network::UpstreamSocketOptionsFilterState>(
+                                          Network::UpstreamSocketOptionsFilterState::key());
+    if (has_options_from_downstream) {
+      auto downstream_options = downstreamConnection()
+                                    ->streamInfo()
+                                    .filterState()
+                                    .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                        Network::UpstreamSocketOptionsFilterState::key())
+                                    .value();
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
+      Network::Socket::appendOptions(upstream_options_, downstream_options);
+    }
   }
 
   if (!maybeTunnel(*thread_local_cluster)) {

@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -69,7 +70,7 @@ namespace Upstream {
 class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
 public:
   // Upstream::HealthCheckHostMonitor
-  void setUnhealthy() override {}
+  void setUnhealthy(UnhealthyType) override {}
 };
 
 /**
@@ -204,13 +205,6 @@ public:
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) final { health_flags_ |= enumToInt(flag); }
 
-  ActiveHealthFailureType getActiveHealthFailureType() const override {
-    return active_health_failure_type_;
-  }
-  void setActiveHealthFailureType(ActiveHealthFailureType type) override {
-    active_health_failure_type_ = type;
-  }
-
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     health_checker_ = std::move(health_checker);
   }
@@ -253,7 +247,6 @@ private:
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);
 
   std::atomic<uint32_t> health_flags_{};
-  ActiveHealthFailureType active_health_failure_type_{};
   std::atomic<uint32_t> weight_;
   std::atomic<bool> used_;
 };
@@ -304,9 +297,10 @@ public:
   /**
    * Install a callback that will be invoked when the host set membership changes.
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* the callback handle.
+   * @return Common::CallbackHandlePtr the callback handle.
    */
-  Common::CallbackHandle* addPriorityUpdateCb(PrioritySet::PriorityUpdateCb callback) const {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addPriorityUpdateCb(PrioritySet::PriorityUpdateCb callback) const {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -441,10 +435,12 @@ class PrioritySetImpl : public PrioritySet {
 public:
   PrioritySetImpl() : batch_update_(false) {}
   // From PrioritySet
-  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
   }
-  Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addPriorityUpdateCb(PriorityUpdateCb callback) const override {
     return priority_update_cb_helper_.add(callback);
   }
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
@@ -483,6 +479,9 @@ protected:
   std::vector<std::unique_ptr<HostSet>> host_sets_;
 
 private:
+  // This is a matching vector to store the callback handles for host_sets_. It is kept separately
+  // because host_sets_ is directly returned so we avoid translation.
+  std::vector<Common::CallbackHandlePtr> host_sets_priority_update_cbs_;
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
@@ -517,7 +516,9 @@ private:
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
-class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::Id::upstream> {
+class ClusterInfoImpl : public ClusterInfo,
+                        public Event::DispatcherThreadDeletable,
+                        protected Logger::Loggable<Logger::Id::upstream> {
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
@@ -649,6 +650,12 @@ public:
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
+
+protected:
+  // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
+  // budget message is specified, defaults will be filled in if either params are unspecified.
+  static std::pair<absl::optional<double>, absl::optional<uint32_t>>
+  getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
   struct ResourceManagers {
@@ -843,6 +850,7 @@ private:
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
@@ -913,13 +921,15 @@ protected:
    * priority.
    * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
    * be updated with the hosts that remain in this priority after the update.
-   * @param all_hosts all known hosts prior to this host update.
+   * @param all_hosts all known hosts prior to this host update across all priorities.
+   * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
    */
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             HostMap& updated_hosts, const HostMap& all_hosts);
+                             HostMap& updated_hosts, const HostMap& all_hosts,
+                             const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 
 /**

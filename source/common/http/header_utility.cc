@@ -174,6 +174,10 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   return match != header_data.invert_match_;
 }
 
+bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
+  return scheme == Headers::get().SchemeValues.Https || scheme == Headers::get().SchemeValues.Http;
+}
+
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
                                     header_value.size()) != 0;
@@ -199,6 +203,15 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
              Http::Code::OK;
 }
 
+bool HeaderUtility::requestShouldHaveNoBody(const RequestHeaderMap& headers) {
+  return (headers.Method() &&
+          (headers.Method()->value() == Http::Headers::get().MethodValues.Get ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Head ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Delete ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Trace ||
+           headers.Method()->value() == Http::Headers::get().MethodValues.Connect));
+}
+
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
   headers_to_add.iterate([&headers](const HeaderEntry& header) -> HeaderMap::Iterate {
     HeaderString k;
@@ -216,7 +229,8 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port) {
+void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                      absl::optional<uint32_t> listener_port) {
 
   if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     // According to RFC 2817 Connect method should have port part in host header.
@@ -239,8 +253,9 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
     if (!absl::SimpleAtoi(port_str, &port)) {
       return;
     }
-    if (port != listener_port) {
-      // We would strip ports only if they are the same, as local port of the listener.
+    if (listener_port.has_value() && port != listener_port) {
+      // We would strip ports only if it is specified and they are the same, as local port of the
+      // listener.
       return;
     }
     const absl::string_view host = original_host.substr(0, port_start);
@@ -305,6 +320,17 @@ Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& h
     }
   }
   return Http::okStatus();
+}
+
+bool HeaderUtility::isRemovableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
+}
+
+bool HeaderUtility::isModifiableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
+          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
 }
 
 } // namespace Http

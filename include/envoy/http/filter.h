@@ -49,7 +49,7 @@ enum class FilterHeadersStatus {
   // injectDecodedDataToFilterChain()/injectEncodedDataToFilterChain(), possibly multiple times
   // if the body needs to be divided into several chunks. The filter may need to handle
   // watermark events when injecting a body, see:
-  // https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md.
+  // https://github.com/envoyproxy/envoy/blob/main/source/docs/flow_control.md.
   //
   // The last call to inject data MUST have end_stream set to true to conclude the stream.
   // If the filter cannot provide a body the stream should be reset.
@@ -412,6 +412,12 @@ public:
   virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
+   * Returns the 100-Continue headers provided to encode100ContinueHeaders. Returns absl::nullopt if
+   * no headers have been provided yet.
+   */
+  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+
+  /**
    * Called with headers to be encoded, optionally indicating end of stream.
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
@@ -428,6 +434,12 @@ public:
                              absl::string_view details) PURE;
 
   /**
+   * Returns the headers provided to encodeHeaders. Returns absl::nullopt if no headers have been
+   * provided yet.
+   */
+  virtual ResponseHeaderMapOptRef responseHeaders() const PURE;
+
+  /**
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
@@ -439,6 +451,12 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Returns the trailers provided to encodeTrailers. Returns absl::nullopt if no headers have been
+   * provided yet.
+   */
+  virtual ResponseTrailerMapOptRef responseTrailers() const PURE;
 
   /**
    * Called with metadata to be encoded.
@@ -572,6 +590,12 @@ public:
    * onDestroy().
    */
   virtual void onDestroy() PURE;
+
+  /**
+   * Called when a match result occurs that isn't handled by the filter manager.
+   * @param action the resulting match action
+   */
+  virtual void onMatchCallback(const Matcher::Action&) {}
 };
 
 /**
@@ -591,6 +615,7 @@ public:
    * Called with a decoded data frame.
    * @param data supplies the decoded data.
    * @param end_stream supplies whether this is the last data frame.
+   * Further note that end_stream is only true if there are no trailers.
    * @return FilterDataStatus determines how filter chain iteration proceeds.
    */
   virtual FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) PURE;
@@ -825,6 +850,7 @@ public:
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
+   * Further note that end_stream is only true if there are no trailers.
    * @return FilterDataStatus determines how filter chain iteration proceeds.
    */
   virtual FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) PURE;
@@ -867,6 +893,8 @@ using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
 class HttpMatchingData {
 public:
+  static absl::string_view name() { return "http"; }
+
   virtual ~HttpMatchingData() = default;
 
   virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;

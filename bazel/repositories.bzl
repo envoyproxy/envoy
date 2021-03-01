@@ -96,7 +96,7 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
-    external_http_archive("io_bazel_rules_rust")
+    external_http_archive("rules_rust")
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
@@ -142,8 +142,10 @@ def envoy_dependencies(skip_targets = []):
     _com_github_luajit_luajit()
     _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
+    _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
+    _com_github_nlohmann_json()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -157,10 +159,12 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
+    _org_brotli()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
+    _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
@@ -350,6 +354,19 @@ def _com_github_zlib_ng_zlib_ng():
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
+def _org_brotli():
+    external_http_archive(
+        name = "org_brotli",
+    )
+    native.bind(
+        name = "brotlienc",
+        actual = "@org_brotli//:brotlienc",
+    )
+    native.bind(
+        name = "brotlidec",
+        actual = "@org_brotli//:brotlidec",
+    )
+
 def _com_google_cel_cpp():
     external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
@@ -378,8 +395,7 @@ def _com_github_nghttp2_nghttp2():
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
-        # This patch cannot be picked up due to ABI rules. Better
-        # solve is likely at the next version-major. Discussion at;
+        # This patch cannot be picked up due to ABI rules. Discussion at;
         # https://github.com/nghttp2/nghttp2/pull/1395
         # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
@@ -419,6 +435,18 @@ def _com_github_datadog_dd_opentracing_cpp():
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
     )
 
+def _com_github_skyapm_cpp2sky():
+    external_http_archive(
+        name = "com_github_skyapm_cpp2sky",
+    )
+    external_http_archive(
+        name = "skywalking_data_collect_protocol",
+    )
+    native.bind(
+        name = "cpp2sky",
+        actual = "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
+    )
+
 def _com_github_tencent_rapidjson():
     external_http_archive(
         name = "com_github_tencent_rapidjson",
@@ -427,6 +455,16 @@ def _com_github_tencent_rapidjson():
     native.bind(
         name = "rapidjson",
         actual = "@com_github_tencent_rapidjson//:rapidjson",
+    )
+
+def _com_github_nlohmann_json():
+    external_http_archive(
+        name = "com_github_nlohmann_json",
+        build_file = "@envoy//bazel/external:json.BUILD",
+    )
+    native.bind(
+        name = "json",
+        actual = "@com_github_nlohmann_json//:json",
     )
 
 def _com_github_nodejs_http_parser():
@@ -633,12 +671,10 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        # Patch curl 7.72.0 due to CMake's problematic implementation of policy `CMP0091`
-        # introduced in CMake 3.15 and then deprecated in CMake 3.18. Curl forcing the CMake
-        # ruleset to 3.16 breaks the Envoy windows fastbuild target.
-        # Also cure a fatal assumption creating a static library using LLVM `lld-link.exe`
-        # adding dynamic link flags, which breaks the Envoy clang-cl library archive step.
-        # Upstream patch submitted: https://github.com/curl/curl/pull/6050
+        # Patch curl 7.74.0 due to CMake's problematic implementation of policy `CMP0091`
+        # and introduction of libidn2 dependency which is inconsistently available and must
+        # not be a dynamic dependency on linux.
+        # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
         # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
         # by elimination of the curl dependency.
         patches = ["@envoy//bazel/foreign_cc:curl.patch"],
@@ -691,10 +727,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     external_http_archive(
         name = "com_googlesource_googleurl",
-    )
-    native.bind(
-        name = "googleurl",
-        actual = "@com_googlesource_googleurl//url:url",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
 
 def _org_llvm_releases_compiler_rt():
@@ -746,12 +780,23 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _upb():
-    external_http_archive(
-        name = "upb",
-        patches = ["@envoy//bazel:upb.patch"],
-        patch_args = ["-p1"],
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
+
+    native.bind(
+        name = "upb_lib_descriptor",
+        actual = "@upb//:descriptor_upb_proto",
+    )
+
+    native.bind(
+        name = "upb_textformat_lib",
+        actual = "@upb//:textformat",
+    )
+
+def _upb():
+    external_http_archive(name = "upb")
 
     native.bind(
         name = "upb_lib",
@@ -775,7 +820,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7 || true",
+            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
         ],
     )
 
@@ -872,6 +917,14 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+
+def _rules_fuzzing():
+    external_http_archive(
+        name = "rules_fuzzing",
+        repo_mapping = {
+            "@fuzzing_py_deps": "@fuzzing_pip3",
+        },
     )
 
 def _kafka_deps():

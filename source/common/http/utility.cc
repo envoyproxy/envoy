@@ -487,8 +487,9 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 Http1Settings
 Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            const Protobuf::BoolValue& hcm_stream_error) {
+                            const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme) {
   Http1Settings ret = parseHttp1Settings(config);
+  ret.validate_scheme_ = validate_scheme;
 
   if (config.has_override_stream_error_on_invalid_http_message()) {
     // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
@@ -554,7 +555,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
-      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
       if (body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }

@@ -457,7 +457,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
   }
 
   // Now setup for cross-thread updates.
-  cluster.prioritySet().addMemberUpdateCb(
+  cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
@@ -477,43 +477,43 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
         }
       });
 
-  cluster.prioritySet().addPriorityUpdateCb([&cm_cluster, this](uint32_t priority,
-                                                                const HostVector& hosts_added,
-                                                                const HostVector& hosts_removed) {
-    // This fires when a cluster is about to have an updated member set. We need to send this
-    // out to all of the thread local configurations.
+  cluster_data->second->priority_update_cb_ = cluster.prioritySet().addPriorityUpdateCb(
+      [&cm_cluster, this](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) {
+        // This fires when a cluster is about to have an updated member set. We need to send this
+        // out to all of the thread local configurations.
 
-    // Should we save this update and merge it with other updates?
-    //
-    // Note that we can only _safely_ merge updates that have no added/removed hosts. That is,
-    // only those updates that signal a change in host healthcheck state, weight or metadata.
-    //
-    // We've discussed merging updates related to hosts being added/removed, but it's really
-    // tricky to merge those given that downstream consumers of these updates expect to see the
-    // full list of updates, not a condensed one. This is because they use the broadcasted
-    // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire list
-    // of removals, these maps will leak those HostSharedPtrs.
-    //
-    // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
-    bool scheduled = false;
-    const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(cm_cluster.cluster().info()->lbConfig(),
-                                                          update_merge_window, 1000);
-    // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
-    const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
+        // Should we save this update and merge it with other updates?
+        //
+        // Note that we can only _safely_ merge updates that have no added/removed hosts. That is,
+        // only those updates that signal a change in host healthcheck state, weight or metadata.
+        //
+        // We've discussed merging updates related to hosts being added/removed, but it's really
+        // tricky to merge those given that downstream consumers of these updates expect to see the
+        // full list of updates, not a condensed one. This is because they use the broadcasted
+        // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire
+        // list of removals, these maps will leak those HostSharedPtrs.
+        //
+        // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
+        bool scheduled = false;
+        const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
+            cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
+        // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
+        const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
 
-    if (merge_timeout > 0) {
-      // If this is not mergeable, we should cancel any scheduled updates since
-      // we'll deliver it immediately.
-      scheduled = scheduleUpdate(cm_cluster, priority, is_mergeable, merge_timeout);
-    }
+        if (merge_timeout > 0) {
+          // If this is not mergeable, we should cancel any scheduled updates since
+          // we'll deliver it immediately.
+          scheduled = scheduleUpdate(cm_cluster, priority, is_mergeable, merge_timeout);
+        }
 
-    // If an update was not scheduled for later, deliver it immediately.
-    if (!scheduled) {
-      cm_stats_.cluster_updated_.inc();
-      postThreadLocalClusterUpdate(
-          cm_cluster, ThreadLocalClusterUpdateParams(priority, hosts_added, hosts_removed));
-    }
-  });
+        // If an update was not scheduled for later, deliver it immediately.
+        if (!scheduled) {
+          cm_stats_.cluster_updated_.inc();
+          postThreadLocalClusterUpdate(
+              cm_cluster, ThreadLocalClusterUpdateParams(priority, hosts_added, hosts_removed));
+        }
+      });
 
   // Finally, post updates cross-thread so the per-thread load balancers are ready. First we
   // populate any update information that may be available after cluster init.
@@ -846,25 +846,32 @@ ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view 
 
 void ClusterManagerImpl::maybePreconnect(
     ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
+    const ClusterConnectivityState& state,
     std::function<ConnectionPool::Instance*()> pick_preconnect_pool) {
-  // TODO(alyssawilk) As currently implemented, this will always just preconnect
-  // one connection ahead of actually needed connections.
-  //
-  // Instead we want to track the following metrics across the entire connection
-  // pool and use the same algorithm we do for per-upstream preconnect:
-  // ((pending_streams_ + num_active_streams_) * global_preconnect_ratio >
-  //  (connecting_stream_capacity_ + num_active_streams_)))
-  //  and allow multiple preconnects per pick.
-  //  Also cap preconnects such that
-  //  num_unused_preconnect < num hosts
-  //  since if we have more preconnects than hosts, we should consider kicking into
-  //  per-upstream preconnect.
-  //
-  //  Once we do this, this should loop capped number of times while shouldPreconnect is true.
-  if (cluster_entry.cluster_info_->peekaheadRatio() > 1.0) {
+  auto peekahead_ratio = cluster_entry.cluster_info_->peekaheadRatio();
+  if (peekahead_ratio <= 1.0) {
+    return;
+  }
+
+  // 3 here is arbitrary. Just as in ConnPoolImplBase::tryCreateNewConnections
+  // we want to limit the work which can be done on any given preconnect attempt.
+  for (int i = 0; i < 3; ++i) {
+    // See if adding this one new connection
+    // would put the cluster over desired capacity. If so, stop preconnecting.
+    //
+    // We anticipate the incoming stream here, because maybePreconnect is called
+    // before a new stream is established.
+    if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
+            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
+            peekahead_ratio, true)) {
+      return;
+    }
     ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
-    if (preconnect_pool) {
-      preconnect_pool->maybePreconnect(cluster_entry.cluster_info_->peekaheadRatio());
+    if (!preconnect_pool || !preconnect_pool->maybePreconnect(peekahead_ratio)) {
+      // Given that the next preconnect pick may be entirely different, we could
+      // opt to try again even if the first preconnect fails. Err on the side of
+      // caution and wait for the next attempt.
+      return;
     }
   }
 }
@@ -882,10 +889,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePreconnect(*this, [this, &priority, &protocol, &context]() {
+  maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
     return connPool(priority, protocol, context, true);
   });
-
   return ret;
 }
 
@@ -901,7 +907,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
   // Now see if another host should be preconnected.
-  maybePreconnect(*this,
+  maybePreconnect(*this, parent_.cluster_manager_state_,
                   [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
 
   return ret;
@@ -1246,7 +1252,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    // Close non connection pool TCP connections obtained from tcpConn()
     //
     // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
     // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
@@ -1357,8 +1363,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
@@ -1426,8 +1434,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for TCP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
@@ -1437,16 +1447,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
-  bool have_options = false;
-  if (context != nullptr && context->downstreamConnection()) {
-    const Network::ConnectionSocket::OptionsSharedPtr& options =
-        context->downstreamConnection()->socketOptions();
-    if (options) {
-      for (const auto& option : *options) {
-        have_options = true;
-        option->hashKey(hash_key);
-      }
+  Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
+  if (context) {
+    if (context->downstreamConnection()) {
+      addOptionsIfNotNull(upstream_options, context->downstreamConnection()->socketOptions());
     }
+    addOptionsIfNotNull(upstream_options, context->upstreamSocketOptions());
+  }
+
+  for (const auto& option : *upstream_options) {
+    option->hashKey(hash_key);
   }
 
   bool have_transport_socket_options = false;
@@ -1459,7 +1469,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   if (!container.pools_[hash_key]) {
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr,
+        !upstream_options->empty() ? upstream_options : nullptr,
         have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
         parent_.cluster_manager_state_);
   }
@@ -1480,9 +1490,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
-  if (protocols.size() == 2 &&
-      ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
-       (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
+  if (protocols.size() == 2) {
+    ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
+           (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11));
     return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
                                                          priority, options,
                                                          transport_socket_options, state);
@@ -1521,7 +1531,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
       outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_);
+      api_, options_);
 }
 
 CdsApiPtr

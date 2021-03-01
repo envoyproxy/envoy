@@ -7,14 +7,17 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/libevent_scheduler.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
@@ -39,16 +42,33 @@ namespace Event {
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
+    : DispatcherImpl(name, api, time_system, {}) {}
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
-                               Api::Api& api, Event::TimeSystem& time_system)
-    : name_(name), api_(api), buffer_factory_(std::move(factory)),
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+    : DispatcherImpl(
+          name, api, time_system,
+          [](Dispatcher& dispatcher) {
+            return std::make_unique<ScaledRangeTimerManagerImpl>(dispatcher);
+          },
+          watermark_factory) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system,
+                               const ScaledRangeTimerManagerFactory& scaled_timer_factory,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+    : name_(name), api_(api),
+      buffer_factory_(watermark_factory != nullptr
+                          ? watermark_factory
+                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      thread_local_delete_cb_(
+          base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {
+      current_to_delete_(&to_delete_1_), scaled_timer_manager_(scaled_timer_factory(*this)) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
@@ -56,7 +76,12 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
+DispatcherImpl::~DispatcherImpl() {
+  ENVOY_LOG(debug, "destroying dispatcher {}", name_);
+  FatalErrorHandler::removeFatalErrorHandler(*this);
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and enable
+  // ASSERT(deletable_in_dispatcher_thread_.empty())
+}
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                       std::chrono::milliseconds min_touch_interval) {
@@ -191,6 +216,16 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   return createTimerInternal(cb);
 }
 
+TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerType timer_type, TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scaled_timer_manager_->createTimer(timer_type, std::move(cb));
+}
+
+TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scaled_timer_manager_->createTimer(minimum, std::move(cb));
+}
+
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
   return base_scheduler_.createSchedulableCallback([this, cb]() {
@@ -237,9 +272,23 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 }
 
+void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) {
+  bool need_schedule;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    need_schedule = deletables_in_dispatcher_thread_.empty();
+    deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
+    // TODO(lambdai): Enable below after https://github.com/envoyproxy/envoy/issues/15072
+    // ASSERT(!shutdown_called_, "inserted after shutdown");
+  }
+
+  if (need_schedule) {
+    thread_local_delete_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
 void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
-
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
@@ -252,12 +301,56 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
   return approximate_monotonic_time_;
 }
 
+void DispatcherImpl::shutdown() {
+  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete below
+  // below 3 lists until all lists are empty. The 3 lists are list of deferred delete objects, post
+  // callbacks and dispatcher thread deletable objects.
+  ASSERT(isThreadSafe());
+  auto deferred_deletables_size = current_to_delete_->size();
+  std::list<std::function<void()>>::size_type post_callbacks_size;
+  {
+    Thread::LockGuard lock(post_lock_);
+    post_callbacks_size = post_callbacks_.size();
+  }
+
+  std::list<DispatcherThreadDeletableConstPtr> local_deletables;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    local_deletables = std::move(deletables_in_dispatcher_thread_);
+  }
+  auto thread_local_deletables_size = local_deletables.size();
+  while (!local_deletables.empty()) {
+    local_deletables.pop_front();
+  }
+  ASSERT(!shutdown_called_);
+  shutdown_called_ = true;
+  ENVOY_LOG(
+      trace,
+      "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",
+      __FUNCTION__, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size);
+}
+
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
 
 void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
   approximate_monotonic_time_ = api_.timeSource().monotonicTime();
 }
 
+void DispatcherImpl::runThreadLocalDelete() {
+  std::list<DispatcherThreadDeletableConstPtr> to_be_delete;
+  {
+    Thread::LockGuard lock(thread_local_deletable_lock_);
+    to_be_delete = std::move(deletables_in_dispatcher_thread_);
+    ASSERT(deletables_in_dispatcher_thread_.empty());
+  }
+  while (!to_be_delete.empty()) {
+    // Touch the watchdog before deleting the objects to avoid spurious watchdog miss events when
+    // executing complicated destruction.
+    touchWatchdog();
+    // Delete in FIFO order.
+    to_be_delete.pop_front();
+  }
+}
 void DispatcherImpl::runPostCallbacks() {
   // Clear the deferred delete list before running post callbacks to reduce non-determinism in
   // callback processing, and more easily detect if a scheduled post callback refers to one of the
@@ -288,6 +381,16 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+void DispatcherImpl::onFatalError(std::ostream& os) const {
+  // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
+  // results in dumping the active state only for the thread which caused the fatal error.
+  if (isThreadSafe()) {
+    for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
+      (*iter)->dumpState(os);
+    }
+  }
+}
+
 void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
   // Only run if this is the dispatcher of the current thread and
@@ -297,7 +400,7 @@ void DispatcherImpl::runFatalActionsOnTrackedObject(
   }
 
   for (const auto& action : actions) {
-    action->run(current_object_);
+    action->run(tracked_object_stack_);
   }
 }
 
@@ -305,6 +408,24 @@ void DispatcherImpl::touchWatchdog() {
   if (watchdog_registration_) {
     watchdog_registration_->touchWatchdog();
   }
+}
+
+void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
+  ASSERT(isThreadSafe());
+  ASSERT(object != nullptr);
+  tracked_object_stack_.push_back(object);
+  ASSERT(tracked_object_stack_.size() <= ExpectedMaxTrackedObjectStackDepth);
+}
+
+void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
+  ASSERT(isThreadSafe());
+  ASSERT(expected_object != nullptr);
+  RELEASE_ASSERT(!tracked_object_stack_.empty(), "Tracked Object Stack is empty, nothing to pop!");
+
+  const ScopeTrackedObject* top = tracked_object_stack_.back();
+  tracked_object_stack_.pop_back();
+  ASSERT(top == expected_object,
+         "Popped the top of the tracked object stack, but it wasn't the expected object!");
 }
 
 } // namespace Event

@@ -152,6 +152,8 @@ public:
     return empty_network_filter_factory_;
   }
 
+  absl::string_view name() const override { return "EmptyFilterChain"; }
+
 private:
   const TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
@@ -193,7 +195,9 @@ public:
   void recv(Network::UdpRecvData& datagram);
 
   // Return the local peer's socket address.
-  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+  const Network::Address::InstanceConstSharedPtr& localAddress() {
+    return socket_->addressProvider().localAddress();
+  }
 
 private:
   const Network::SocketPtr socket_;

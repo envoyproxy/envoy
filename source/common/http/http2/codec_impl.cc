@@ -1,7 +1,9 @@
 #include "common/http/http2/codec_impl.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
@@ -11,8 +13,10 @@
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
@@ -641,12 +645,17 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
+  ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
   // ConnectionImpl::dispatch returns early or throws an exception (consider removing if there is a
   // single return after exception removal (#10878)).
-  Cleanup cleanup([this]() { dispatching_ = false; });
+  Cleanup cleanup([this]() {
+    dispatching_ = false;
+    current_slice_ = nullptr;
+  });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    current_slice_ = &slice;
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
@@ -665,6 +674,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
       return codecProtocolError(nghttp2_strerror(rc));
     }
 
+    current_slice_ = nullptr;
     dispatching_ = false;
   }
 
@@ -714,6 +724,15 @@ void ConnectionImpl::shutdownNotice() {
     // Intended to check through coverage that this error case is tested
     return;
   }
+}
+
+Status ConnectionImpl::protocolErrorForTest() {
+  int rc = nghttp2_submit_goaway(session_, NGHTTP2_FLAG_NONE,
+                                 nghttp2_session_get_last_proc_stream_id(session_),
+                                 NGHTTP2_PROTOCOL_ERROR, nullptr, 0);
+  ASSERT(rc == 0);
+
+  return sendPendingFrames();
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
@@ -1377,6 +1396,79 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
       options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 }
 
+void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Http2::ConnectionImpl " << this << DUMP_MEMBER(max_headers_kb_)
+     << DUMP_MEMBER(max_headers_count_) << DUMP_MEMBER(per_stream_buffer_limit_)
+     << DUMP_MEMBER(allow_metadata_) << DUMP_MEMBER(stream_error_on_invalid_http_messaging_)
+     << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_)
+     << DUMP_MEMBER(skip_encoding_empty_trailers_) << DUMP_MEMBER(dispatching_)
+     << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(pending_deferred_reset_) << '\n';
+
+  // Dump the protocol constraints
+  DUMP_DETAILS(&protocol_constraints_);
+
+  os << spaces << "Number of active streams: " << active_streams_.size() << " Active Streams:\n";
+  size_t count = 0;
+  for (auto& stream : active_streams_) {
+    DUMP_DETAILS(stream);
+    if (++count >= 100) {
+      break;
+    }
+  }
+
+  // Dump the active slice
+  if (current_slice_ == nullptr) {
+    // No current slice, use macro for consistent formatting.
+    os << spaces << "current_slice_: null\n";
+  } else {
+    auto slice_view =
+        absl::string_view(static_cast<const char*>(current_slice_->mem_), current_slice_->len_);
+
+    os << spaces << "current slice length: " << slice_view.length() << " contents: \"";
+    StringUtil::escapeToOstream(os, slice_view);
+    os << "\"\n";
+  }
+}
+
+void ConnectionImpl::StreamImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
+     << DUMP_MEMBER(unconsumed_bytes_) << DUMP_MEMBER(read_disable_count_)
+     << DUMP_MEMBER(local_end_stream_sent_) << DUMP_MEMBER(remote_end_stream_)
+     << DUMP_MEMBER(data_deferred_) << DUMP_MEMBER(received_noninformational_headers_)
+     << DUMP_MEMBER(pending_receive_buffer_high_watermark_called_)
+     << DUMP_MEMBER(pending_send_buffer_high_watermark_called_)
+     << DUMP_MEMBER(reset_due_to_messaging_error_)
+     << DUMP_MEMBER_AS(cookies_, cookies_.getStringView());
+
+  DUMP_DETAILS(pending_trailers_to_encode_);
+}
+
+void ConnectionImpl::ClientStreamImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  StreamImpl::dumpState(os, indent_level);
+
+  // Dump header map
+  if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_));
+  }
+}
+
+void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  StreamImpl::dumpState(os, indent_level);
+
+  // Dump header map
+  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
     Random::RandomGenerator& random_generator,
@@ -1403,6 +1495,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
   }
   ClientStreamImpl& stream_ref = *stream;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
+  protocol_constraints_.incrementOpenedStreamCount();
   return stream_ref;
 }
 
@@ -1504,6 +1597,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,
                                        active_streams_.front().get());
+  protocol_constraints_.incrementOpenedStreamCount();
   return okStatus();
 }
 

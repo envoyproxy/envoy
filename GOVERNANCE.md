@@ -38,7 +38,7 @@
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
 * Triage build issues - file issues for known flaky builds or bugs, and either fix or find someone
-  to fix any master build breakages.
+  to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -77,7 +77,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   "is:open is:issue milestone:[current milestone]" and either hold off until
   they are fixed or bump them to the next milestone.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we aim for master to be
+  particularly risky PRs until after the release is tagged. This is because we aim for main to be
   at release candidate quality at all times.
 * Do a final check of the [release notes](docs/root/version_history/current.rst):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
@@ -91,7 +91,7 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
     release, please also make sure there's a stable maintainer signed up for next quarter,
     and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Wait for tests to pass on [master](https://dev.azure.com/cncf/envoy/_build).
+* Wait for tests to pass on [main](https://dev.azure.com/cncf/envoy/_build).
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
@@ -100,13 +100,13 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
   [stable releases](RELEASES.md#stable-releases).
 * Monitor the AZP tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
-  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
 * Do a new PR to setup the next version
-  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
+  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
     release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
     Add an entry for the new file in the `toctree` in
@@ -169,7 +169,7 @@ take on API shepherd review load and participate in meetings. They should be act
 and responsive to GitHub issues and PRs on which they are tagged.
 
 The API shepherds are distinct to the [UDPA working
-group](https://github.com/cncf/udpa/blob/master/README.md), which aims to evolve xDS directionally
+group](https://github.com/cncf/udpa/blob/main/README.md), which aims to evolve xDS directionally
 towards a universal dataplane API. API shepherds are responsible for the execution of the xDS
 day-to-day and guiding xDS implementation changes. Proposals from UDPA-WG will be aligned with the
 xDS API shepherds to ensure that xDS is heading towards the UDPA goal. xDS API shepherds operate

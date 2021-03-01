@@ -55,7 +55,7 @@ public:
         rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
-        dispatcher_, init_fetch_timeout, false);
+        dispatcher_, init_fetch_timeout, false, false);
   }
 
   ~GrpcSubscriptionTestHarness() override {
@@ -98,7 +98,7 @@ public:
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "", true);
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -154,17 +154,12 @@ public:
     }
     expectSendMessage(both, version_);
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResourceInterest(cluster_names);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     last_cluster_names_ = cluster_names;
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr))
-        .WillOnce([this](ConfigUpdateFailureReason reason, const EnvoyException*) {
-          if (reason == ConfigUpdateFailureReason::FetchTimedout) {
-            stats_.init_fetch_timeout_.inc();
-          }
-        });
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
@@ -190,12 +185,12 @@ public:
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{"cluster_name"};
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   GrpcMuxImplSharedPtr mux_;
   GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
 };

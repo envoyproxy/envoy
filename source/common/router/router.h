@@ -173,9 +173,8 @@ public:
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
-        stat_name_pool_(scope_.symbolTable()),
-        zone_name_(stat_name_pool_.add(local_info_.zoneName())),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
+        zone_name_(local_info_.zoneStatName()), shadow_writer_(std::move(shadow_writer)),
+        time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -217,8 +216,6 @@ public:
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
-  Stats::StatNamePool
-      stat_name_pool_; // TODO(#14242): use dynamic name for zone_name and drop pool.
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
 
@@ -306,7 +303,8 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->streamInfo().downstreamRemoteAddress().get(), *downstream_headers_,
+            callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
+            *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
             },
@@ -378,7 +376,8 @@ public:
   }
 
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
-    return callbacks_->getUpstreamSocketOptions();
+    return (upstream_options_ != nullptr) ? upstream_options_
+                                          : callbacks_->getUpstreamSocketOptions();
   }
 
   Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
@@ -401,7 +400,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->remoteAddress()->asString() + conn->localAddress()->asString();
+    value = conn->addressProvider().remoteAddress()->asString() +
+            conn->addressProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
@@ -539,6 +539,7 @@ private:
   uint32_t pending_retries_{0};
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
 };
 
 class ProdFilter : public Filter {

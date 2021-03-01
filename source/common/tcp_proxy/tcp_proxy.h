@@ -266,8 +266,9 @@ public:
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(downstreamConnection()->remoteAddress().get(),
-                                       downstreamConnection()->localAddress().get());
+      return hash_policy->generateHash(
+          downstreamConnection()->addressProvider().remoteAddress().get(),
+          downstreamConnection()->addressProvider().localAddress().get());
     }
 
     return {};
@@ -279,6 +280,10 @@ public:
 
   Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
+  }
+
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return upstream_options_;
   }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
@@ -376,6 +381,7 @@ protected:
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

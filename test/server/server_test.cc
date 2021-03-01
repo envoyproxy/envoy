@@ -362,6 +362,23 @@ TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   server_thread->join();
 }
 
+// Validates that the "server.fips_mode" stat indicates the FIPS compliance from the Envoy Build
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
+  auto server_thread =
+      startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
+
+  if (VersionInfo::sslFipsCompliant()) {
+    EXPECT_EQ(
+        1L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  } else {
+    EXPECT_EQ(
+        0L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  }
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -372,6 +389,31 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
                                        Stats::Histogram::Unit::Milliseconds)
                   .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+}
+
+// Catch exceptions in secondary cluster initialization callbacks. These are not caught in the main
+// initialization try/catch.
+TEST_P(ServerInstanceImplTest, SecondaryClusterExceptions) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of secondary cluster: API configs must have either "
+                      "a gRPC service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/health_check_nullptr.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
+}
+
+// Catch exceptions in HDS cluster initialization callbacks.
+TEST_P(ServerInstanceImplTest, HdsClusterException) {
+  // Error in reading illegal file path for channel credentials in secondary cluster.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: API configs must have either a gRPC "
+                      "service or a cluster name defined",
+                      {
+                        initialize("test/server/test_data/server/hds_exception.yaml");
+                        server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+                      });
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
@@ -758,6 +800,21 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
+// Validate server localInfo().zoneStatName() is set from bootstrap config
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromBootstrap) {
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
+// Validate server localInfo().zoneStatName() can by overridden by option
+TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
+  options_.service_zone_name_ = "bootstrap_zone_override";
+  initialize("test/server/test_data/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone_override",
+            stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
 // set.
 TEST_P(ServerInstanceImplTest,
@@ -780,9 +837,12 @@ TEST_P(ServerInstanceImplTest,
 // set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
+  // are caught and will result in server shutdown.
+  EXPECT_LOG_CONTAINS("warn",
+                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
+                      "protocol versions are deprecated",
+                      initialize("test/server/test_data/server/hds_v2.yaml"));
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
@@ -1143,7 +1203,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().localAddress();
+  const auto address = server_->admin().socket().addressProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
@@ -1320,13 +1380,20 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
     return std::make_unique<test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
-        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
-        EXPECT_NE(nullptr, proto);
-        EXPECT_EQ(proto->a(), "foo");
-        return std::make_unique<FooBootstrapExtension>();
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            EXPECT_NE(nullptr, proto);
+            EXPECT_EQ(proto->a(), "foo");
+            auto mock_extension = std::make_unique<MockBootstrapExtension>();
+            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+              // call to cluster manager, to make sure it is not nullptr.
+              ctx.clusterManager().clusters();
+            }));
+            return mock_extension;
+          }));
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -1363,7 +1430,7 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
 #ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
@@ -1372,7 +1439,7 @@ public:
 
 class UnsafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called UnsafeFatalAction" << std::endl;
   }
 

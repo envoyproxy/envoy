@@ -2,8 +2,8 @@
 
 set -e
 
-LLVM_VERSION="10.0.0"
-CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ /\1/')
+LLVM_VERSION="11.0.1"
+CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
@@ -93,6 +93,7 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   fi
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
+      echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
       echo "Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}"
       exit 1
   else
@@ -109,6 +110,8 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; 
   if [ $? -eq 1 ]; then
     echo Per-extension coverage failed:
     echo "$output"
+    COVERAGE_FAILED=1
+    echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
     exit 1
   fi
   echo Per-extension coverage passed.

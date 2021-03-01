@@ -26,8 +26,21 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
       first_stream_request_(true), transport_api_version_(transport_api_version),
       dispatcher_(dispatcher),
       enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {
+          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")),
+      dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
+          [this](absl::string_view resource_type_url) {
+            onDynamicContextUpdate(resource_type_url);
+          })) {
   Config::Utility::checkLocalInfo("ads", local_info);
+}
+
+void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
+  auto api_state = api_state_.find(resource_type_url);
+  if (api_state == api_state_.end()) {
+    return;
+  }
+  api_state->second->must_send_node_ = true;
+  queueDiscoveryRequest(resource_type_url);
 }
 
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
@@ -48,13 +61,12 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     }
   }
 
-  if (skip_subsequent_node_) {
-    if (first_stream_request_) {
-      // Node may have been cleared during a previous request.
-      request.mutable_node()->MergeFrom(local_info_.node());
-    } else {
-      request.clear_node();
-    }
+  if (api_state.must_send_node_ || !skip_subsequent_node_ || first_stream_request_) {
+    // Node may have been cleared during a previous request.
+    request.mutable_node()->CopyFrom(local_info_.node());
+    api_state.must_send_node_ = false;
+  } else {
+    request.clear_node();
   }
   VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
@@ -68,7 +80,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
-                                      const std::set<std::string>& resources,
+                                      const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
                                       OpaqueResourceDecoder& resource_decoder, const bool) {
   auto watch =
@@ -285,7 +297,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
   }
 }
 
-void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
+void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
   if (!grpc_stream_.grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
     return; // Drop this request; the reconnect will enqueue a new one.
@@ -296,11 +308,11 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
     api_state.pending_ = true;
     return; // Drop this request; the unpause will enqueue a new one.
   }
-  request_queue_->push(queue_item);
+  request_queue_->emplace(std::string(queue_item));
   drainRequests();
 }
 
-void GrpcMuxImpl::expiryCallback(const std::string& type_url,
+void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
                                  const std::vector<std::string>& expired) {
   // The TtlManager triggers a callback with a list of all the expired elements, which we need
   // to compare against the various watched resources to return the subset that each watch is
@@ -326,7 +338,7 @@ void GrpcMuxImpl::expiryCallback(const std::string& type_url,
   }
 }
 
-GrpcMuxImpl::ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
+GrpcMuxImpl::ApiState& GrpcMuxImpl::apiStateFor(absl::string_view type_url) {
   auto itr = api_state_.find(type_url);
   if (itr == api_state_.end()) {
     api_state_.emplace(

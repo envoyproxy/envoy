@@ -39,7 +39,6 @@ public:
               envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
-  ~GrpcMuxImpl() override = default;
 
   void start() override;
 
@@ -47,12 +46,13 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
-  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                           const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
                            const bool use_namespace_matching = false) override;
 
-  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -80,11 +80,12 @@ private:
   void sendDiscoveryRequest(const std::string& type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
-    GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                     OpaqueResourceDecoder& resource_decoder, const std::string& type_url,
-                     GrpcMuxImpl& parent)
-        : resources_(resources), callbacks_(callbacks), resource_decoder_(resource_decoder),
-          type_url_(type_url), parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
+    GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
+                     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                     const std::string& type_url, GrpcMuxImpl& parent)
+        : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
+          parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
+      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       watches_.emplace(watches_.begin(), this);
     }
 
@@ -95,17 +96,19 @@ private:
       }
     }
 
-    void update(const std::set<std::string>& resources) override {
+    void update(const absl::flat_hash_set<std::string>& resources) override {
       watches_.remove(this);
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
       }
-      resources_ = resources;
+      resources_.clear();
+      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       // move this watch to the beginning of the list
       watches_.emplace(watches_.begin(), this);
       parent_.queueDiscoveryRequest(type_url_);
     }
 
+    // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
     OpaqueResourceDecoder& resource_decoder_;
@@ -134,6 +137,8 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
+    // This resource type must have a Node sent at next request.
+    bool must_send_node_{};
     TtlManager ttl_;
   };
 
@@ -141,9 +146,11 @@ private:
     return !resource.hasResource() &&
            resource.version() == apiStateFor(type_url).request_.version_info();
   }
-  void expiryCallback(const std::string& type_url, const std::vector<std::string>& expired);
+  void expiryCallback(absl::string_view type_url, const std::vector<std::string>& expired);
   // Request queue management logic.
-  void queueDiscoveryRequest(const std::string& queue_item);
+  void queueDiscoveryRequest(absl::string_view queue_item);
+  // Invoked when dynamic context parameters change for a resource type.
+  void onDynamicContextUpdate(absl::string_view resource_type_url);
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>
@@ -153,7 +160,7 @@ private:
   bool first_stream_request_;
 
   // Helper function for looking up and potentially allocating a new ApiState.
-  ApiState& apiStateFor(const std::string& type_url);
+  ApiState& apiStateFor(absl::string_view type_url);
 
   absl::node_hash_map<std::string, std::unique_ptr<ApiState>> api_state_;
 
@@ -168,6 +175,7 @@ private:
 
   Event::Dispatcher& dispatcher_;
   bool enable_type_url_downgrade_and_upgrade_;
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
@@ -184,12 +192,12 @@ public:
     return std::make_unique<Cleanup>([] {});
   }
 
-  GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                           OpaqueResourceDecoder&, const bool) override {
+  GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                           SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
-  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 

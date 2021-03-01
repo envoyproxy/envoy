@@ -38,6 +38,7 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":listener_interface",
         "//include/envoy/ssl:context_interface",
+        "//source/common/common:interval_value",
     ],
 )
 
@@ -78,6 +79,7 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/protobuf",
     ],
@@ -130,6 +132,7 @@ envoy_cc_library(
     deps = [
         ":io_handle_interface",
         ":socket_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -172,6 +175,7 @@ envoy_cc_library(
         "//include/envoy/common:resource_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:interval_value",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
