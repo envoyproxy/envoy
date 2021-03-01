@@ -44,7 +44,7 @@ public:
 
   Ssl::SslCtxCb getSslCtxCb() { return cb_; }
 
-  static CustomProcessObjectForTest* Get(const ProcessContextOptRef& process_context_opt_ref) {
+  static CustomProcessObjectForTest* get(const ProcessContextOptRef& process_context_opt_ref) {
     auto& process_context = process_context_opt_ref.value().get();
     auto& process_object = dynamic_cast<CustomProcessObjectForTest&>(process_context.get());
     return &process_object;
@@ -63,7 +63,7 @@ class HandshakerFactoryImplForTest
   Ssl::SslCtxCb sslctxCb(Ssl::HandshakerFactoryContext& handshaker_factory_context) const override {
     // Get process object, cast to custom process object, and return custom
     // callback.
-    return CustomProcessObjectForTest::Get(handshaker_factory_context.api().processContext())
+    return CustomProcessObjectForTest::get(handshaker_factory_context.api().processContext())
         ->getSslCtxCb();
   }
 };
