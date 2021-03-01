@@ -1,11 +1,10 @@
 load("@rules_python//python:repositories.bzl", "py_repositories")
-load("@rules_python//python:pip.bzl", "pip_install", "pip_repositories")
+load("@rules_python//python:pip.bzl", "pip_install")
 load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_remote_crates")
 
 # Python dependencies.
 def _python_deps():
     py_repositories()
-    pip_repositories()
 
     pip_install(
         name = "config_validation_pip3",
