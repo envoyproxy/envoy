@@ -33,8 +33,8 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
   if (skip_cluster_check) {
     return;
   }
-  ENVOY_BUG(Thread::MainThread::isMainThread(),
-            "async client factory cluster checks should only be performed on the main thread");
+  ASSERT(Thread::MainThread::isMainThread(),
+         "async client factory cluster checks should only be performed on the main thread");
 
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
   auto all_clusters = cm_.clusters();
