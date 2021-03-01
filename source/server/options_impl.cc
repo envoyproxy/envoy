@@ -158,13 +158,13 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                            "600", "string", cmd);
 
   cmd.setExceptionHandling(false);
-  TRY {
+  TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
     count_ = cmd.getArgList().size();
   }
   END_TRY
   catch (TCLAP::ArgException& e) {
-    TRY { cmd.getOutput()->failure(cmd, e); }
+    TRY_ASSERT_MAIN_THREAD { cmd.getOutput()->failure(cmd, e); }
     END_TRY
     catch (const TCLAP::ExitException&) {
       // failure() has already written an informative message to stderr, so all that's left to do

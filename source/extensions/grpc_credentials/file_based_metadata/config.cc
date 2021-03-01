@@ -69,7 +69,7 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
   if (!config_.header_key().empty()) {
     header_key = config_.header_key();
   }
-  TRY {
+  TRY_ASSERT_MAIN_THREAD {
     std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true, api_);
     metadata->insert(std::make_pair(header_key, header_prefix + header_value));
   }

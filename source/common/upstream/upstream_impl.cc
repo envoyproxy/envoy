@@ -1131,7 +1131,7 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
 const Network::Address::InstanceConstSharedPtr
 ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& address) {
-  TRY { return Network::Address::resolveProtoAddress(address); }
+  TRY_ASSERT_MAIN_THREAD { return Network::Address::resolveProtoAddress(address); }
   END_TRY
   catch (EnvoyException& e) {
     if (info_->type() == envoy::config::cluster::v3::Cluster::STATIC ||

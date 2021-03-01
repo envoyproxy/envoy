@@ -26,7 +26,7 @@ void InjectedResourceMonitor::onFileChanged() { file_changed_ = true; }
 void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
   if (file_changed_) {
     file_changed_ = false;
-    TRY {
+    TRY_ASSERT_MAIN_THREAD {
       const std::string contents = api_.fileSystem().fileReadToEnd(filename_);
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {

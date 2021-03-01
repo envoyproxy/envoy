@@ -61,7 +61,7 @@ void FilesystemSubscriptionImpl::refresh() {
   ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
   stats_.update_attempt_.inc();
   ProtobufTypes::MessagePtr config_update;
-  TRY {
+  TRY_ASSERT_MAIN_THREAD {
     const std::string version = refreshInternal(&config_update);
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(version));

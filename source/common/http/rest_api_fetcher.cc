@@ -39,7 +39,7 @@ void RestApiFetcher::onSuccess(const Http::AsyncClient::Request& request,
     return;
   }
 
-  TRY { parseResponse(*response); }
+  TRY_ASSERT_MAIN_THREAD { parseResponse(*response); }
   END_TRY
   catch (EnvoyException& e) {
     onFetchFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);

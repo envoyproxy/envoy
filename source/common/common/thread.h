@@ -190,7 +190,7 @@ private:
   std::thread::id main_thread_id_{std::this_thread::get_id()};
 };
 
-#define TRY                                                                                        \
+#define TRY_ASSERT_MAIN_THREAD                                                                                        \
   try {                                                                                            \
     ASSERT(Thread::MainThread::isMainThread());
 

@@ -82,13 +82,13 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {
   disableInitFetchTimeoutTimer();
   envoy::service::discovery::v3::DiscoveryResponse message;
-  TRY { MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_); }
+  TRY_ASSERT_MAIN_THREAD { MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_); }
   END_TRY
   catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     return;
   }
-  TRY {
+  TRY_ASSERT_MAIN_THREAD {
     const auto decoded_resources =
         DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
     callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
