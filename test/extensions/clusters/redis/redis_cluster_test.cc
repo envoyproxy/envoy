@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
@@ -121,7 +122,7 @@ protected:
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
-    cluster_->prioritySet().addPriorityUpdateCb(
+    priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -576,6 +577,7 @@ protected:
   std::shared_ptr<RedisCluster> cluster_;
   std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
   Network::MockActiveDnsQuery active_dns_query_;
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
 };
 
 using RedisDnsConfigTuple = std::tuple<std::string, Network::DnsLookupFamily,
@@ -917,7 +919,7 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
                 address:
                   socket_address:
                     address: foo.bar.com
-                    port_value: 22120               
+                    port_value: 22120
             - endpoint:
                 address:
                   socket_address:

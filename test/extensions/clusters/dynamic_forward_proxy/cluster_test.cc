@@ -60,7 +60,7 @@ public:
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
 
-    cluster_->prioritySet().addMemberUpdateCb(
+    member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added,
                const Upstream::HostVector& hosts_removed) -> void {
           onMemberUpdateCb(hosts_added, hosts_removed);
@@ -137,6 +137,7 @@ public:
   absl::flat_hash_map<std::string,
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
 
   const std::string default_yaml_config_ = R"EOF(
 name: name

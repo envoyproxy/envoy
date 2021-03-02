@@ -302,7 +302,7 @@ void DetectorImpl::initialize(const Cluster& cluster) {
       addHostMonitor(host);
     }
   }
-  cluster.prioritySet().addMemberUpdateCb(
+  member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);

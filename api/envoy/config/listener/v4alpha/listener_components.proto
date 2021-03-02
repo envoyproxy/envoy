@@ -35,10 +35,10 @@ message Filter {
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // [#extension-category: envoy.filters.network]
   oneof config_type {
     // Filter specific configuration which depends on the filter being
     // instantiated. See the supported filters for further documentation.
+    // [#extension-category: envoy.filters.network]
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery
@@ -232,6 +232,7 @@ message FilterChain {
   // :ref:`DownstreamTlsContext <envoy_api_msg_extensions.transport_sockets.tls.v4alpha.DownstreamTlsContext>` in the `typed_config`.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
+  // [#extension-category: envoy.transport_sockets.downstream]
   core.v4alpha.TransportSocket transport_socket = 6;
 
   // If present and nonzero, the amount of time to allow incoming connections to complete any
@@ -324,13 +325,12 @@ message ListenerFilter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
-  // [#extension-category: envoy.transport_sockets.downstream]
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being instantiated.
-  // See the supported filters for further documentation.
-  // [#extension-category: envoy.filters.listener]
   oneof config_type {
+    // Filter specific configuration which depends on the filter being
+    // instantiated. See the supported filters for further documentation.
+    // [#extension-category: envoy.filters.listener]
     google.protobuf.Any typed_config = 3;
   }
 
