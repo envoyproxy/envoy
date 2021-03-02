@@ -22,4 +22,4 @@ Platform Specific Features:
 [Optional Runtime guard:]
 [Optional Fixes #Issue]
 [Optional Deprecated:]
-[Optional [API Considerations](https://github.com/envoyproxy/envoy/blob/master/api/review_checklist.md):]
+[Optional [API Considerations](https://github.com/envoyproxy/envoy/blob/main/api/review_checklist.md):]

@@ -14,7 +14,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -76,9 +75,8 @@ public:
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
-    if (legacy_nodelay_) {
-      EXPECT_CALL(*upstream_connection_, noDelay(true));
-    }
+    EXPECT_CALL(*upstream_connection_, noDelay(true));
+
     redis_command_stats_ =
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
 
@@ -147,7 +145,6 @@ public:
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_username_;
   std::string auth_password_;
-  bool legacy_nodelay_{};
 };
 
 TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
@@ -290,62 +287,6 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
 }
 
 TEST_F(RedisClientImplTest, Basic) {
-  InSequence s;
-
-  setup();
-
-  client_->initialize(auth_username_, auth_password_);
-
-  Common::Redis::RespValue request1;
-  MockClientCallbacks callbacks1;
-  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
-  EXPECT_NE(nullptr, handle1);
-
-  onConnected();
-
-  Common::Redis::RespValue request2;
-  MockClientCallbacks callbacks2;
-  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
-  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
-  EXPECT_NE(nullptr, handle2);
-
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
-  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
-  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
-
-  Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    InSequence s;
-    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
-    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
-    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
-    EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
-    callbacks_->onRespValue(std::move(response1));
-
-    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
-    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
-    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-    EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
-    callbacks_->onRespValue(std::move(response2));
-  }));
-  upstream_read_filter_->onData(fake_data, false);
-
-  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  client_->close();
-}
-
-TEST_F(RedisClientImplTest, BasicLegacyNodelay) {
-  legacy_nodelay_ = true;
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.always_nodelay", "false"}});
   InSequence s;
 
   setup();

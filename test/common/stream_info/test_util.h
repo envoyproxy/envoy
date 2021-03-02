@@ -219,6 +219,12 @@ public:
 
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
 
+  void setFilterChainName(absl::string_view filter_chain_name) override {
+    filter_chain_name_ = filter_chain_name;
+  }
+
+  const std::string& filterChainName() const override { return filter_chain_name_; }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -259,6 +265,7 @@ public:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   absl::optional<uint64_t> connection_id_;
+  std::string filter_chain_name_;
 };
 
 } // namespace Envoy

@@ -48,6 +48,7 @@ using GrpcService = envoy::config::core::v3::GrpcService;
 
 class Wasm;
 
+using PluginBaseSharedPtr = std::shared_ptr<PluginBase>;
 using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 
@@ -451,6 +452,7 @@ protected:
   Http::RequestHeaderMapPtr grpc_initial_metadata_;
 
   // Access log state.
+  bool access_log_phase_ = false;
   const StreamInfo::StreamInfo* access_log_stream_info_{};
   const Http::RequestHeaderMap* access_log_request_headers_{};
   const Http::ResponseHeaderMap* access_log_response_headers_{};
