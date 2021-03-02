@@ -108,7 +108,6 @@ go_proto_library(
 
 OPENTELEMETRY_LOGS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
     name = "logs",
@@ -118,12 +117,6 @@ api_cc_py_proto_library(
         "opentelemetry/proto/logs/v1/logs.proto",
         "opentelemetry/proto/resource/v1/resource.proto",
     ],
-    visibility = ["//visibility:public"],
-)
-
-go_proto_library(
-    name = "logs_go_proto",
-    proto = ":logs",
     visibility = ["//visibility:public"],
 )
 """
