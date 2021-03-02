@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -138,10 +139,11 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       absl::string_view local_reply_body) const {
-  const auto output_struct = struct_formatter_.format(
+  const ProtobufWkt::Struct output_struct = struct_formatter_.format(
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
-  const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
+  const std::string log_line =
+      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
@@ -360,6 +362,7 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
 
 FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token) {
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
+  static constexpr absl::string_view CLUSTER_META_TOKEN{"CLUSTER_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
@@ -395,6 +398,14 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
 
     parseCommand(token, start, ":", filter_namespace, path, max_length);
     return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
+  } else if (absl::StartsWith(token, CLUSTER_META_TOKEN)) {
+    std::string filter_namespace;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = CLUSTER_META_TOKEN.size();
+
+    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
     std::string key;
     absl::optional<size_t> max_length;
@@ -493,7 +504,9 @@ SubstitutionFormatParser::parse(const std::string& format,
     pos = command_end_position;
   }
 
-  if (!current_token.empty()) {
+  if (!current_token.empty() || format.empty()) {
+    // Create a PlainStringFormatter with the final string literal. If the format string was empty,
+    // this creates a PlainStringFormatter with an empty string.
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
   }
 
@@ -741,8 +754,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-          if (nullptr != stream_info.upstreamHost()) {
-            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+          if (stream_info.upstreamClusterInfo().has_value() &&
+              stream_info.upstreamClusterInfo().value() != nullptr) {
+            upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
           }
 
           return upstream_cluster_name.empty()
@@ -882,6 +896,14 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [hostname](const StreamInfo::StreamInfo&) { return hostname; });
+  } else if (field_name == "FILTER_CHAIN_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          if (!stream_info.filterChainName().empty()) {
+            return stream_info.filterChainName();
+          }
+          return absl::nullopt;
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
@@ -1116,7 +1138,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     return absl::nullopt;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
   truncate(json, max_length_);
   return json;
 }
@@ -1160,6 +1182,34 @@ ProtobufWkt::Value DynamicMetadataFormatter::formatValue(const Http::RequestHead
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          absl::string_view) const {
   return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
+}
+
+ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_namespace,
+                                                   const std::vector<std::string>& path,
+                                                   absl::optional<size_t> max_length)
+    : MetadataFormatter(filter_namespace, path, max_length) {}
+
+absl::optional<std::string> ClusterMetadataFormatter::format(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    return absl::nullopt;
+  }
+  return MetadataFormatter::formatMetadata(cluster_info.value()->metadata());
+}
+
+ProtobufWkt::Value ClusterMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo& stream_info,
+                                                         absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    // Let the formatter do its thing with empty metadata.
+    return MetadataFormatter::formatMetadataValue(envoy::config::core::v3::Metadata());
+  }
+  return MetadataFormatter::formatMetadataValue(cluster_info.value()->metadata());
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,

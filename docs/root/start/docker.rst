@@ -59,13 +59,16 @@ with:
 Permissions for running Docker Envoy containers as a non-root user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Envoy Docker image should be started as ``root``, but switches when run to the ``envoy`` user
-created at build time.
+By default, the Envoy Docker image will start as the root user but will switch to the ``envoy``
+user created at build time, in the Docker ``ENTRYPOINT``.
 
-The user is switched in the Docker ``ENTRYPOINT``.
+Alternatively, you can start the container specifying the Docker ``user``.
 
-Changing the ``uid`` and/or ``gid`` of the ``envoy`` user
-*********************************************************
+In this case the container will not attempt to drop privileges, but you will still need to ensure
+that the user running inside the container has any required permissions, as described below.
+
+Changing the ``uid`` and/or ``gid`` of the ``envoy`` user inside the container
+******************************************************************************
 
 The default ``uid`` and ``gid`` for the ``envoy`` user are ``101``.
 

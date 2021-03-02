@@ -45,14 +45,20 @@ OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
                                               src.localAddressIpVersion());
 }
 
+static std::vector<absl::string_view> unsuported_win32_configs = {
+#if defined(WIN32) && !defined(SO_ORIGINAL_DST)
+    "configs_original-dst-cluster_proxy_config.yaml"
+#endif
+};
+
 class ScopedRuntimeInjector {
 public:
   ScopedRuntimeInjector(Runtime::Loader& runtime) {
     Runtime::LoaderSingleton::initialize(&runtime);
-  }
+  } // namespace
 
   ~ScopedRuntimeInjector() { Runtime::LoaderSingleton::clear(); }
-};
+}; // namespace ConfigTest
 
 } // namespace
 
@@ -94,7 +100,7 @@ public:
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
         server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
         server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager());
+        server_.singletonManager(), server_.options());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -173,14 +179,19 @@ uint32_t run(const std::string& directory) {
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
-    OptionsImpl options(
-        Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
-    ConfigTest test1(options);
-    envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
-                                              ProtobufMessage::getStrictValidationVisitor(), *api);
-    ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-    ConfigTest test2(asConfigYaml(options, *api));
+    if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
+                     [filename](const absl::string_view& s) {
+                       return filename.find(s) != std::string::npos;
+                     }) == unsuported_win32_configs.end()) {
+      OptionsImpl options(
+          Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
+      ConfigTest test1(options);
+      envoy::config::bootstrap::v3::Bootstrap bootstrap;
+      Server::InstanceUtil::loadBootstrapConfig(
+          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+      ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
+      ConfigTest test2(asConfigYaml(options, *api));
+    }
     num_tested++;
   }
   return num_tested;

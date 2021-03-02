@@ -67,6 +67,7 @@ envoy_extension_cc_test(
     ],
     data = [
         "postgres_test_config.yaml",
+        "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.network.postgres_proxy",
     deps = [
@@ -74,6 +75,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/postgres_proxy:config",
         "//source/extensions/filters/network/postgres_proxy:filter",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
+        "@envoy_api//envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
     ],
 )

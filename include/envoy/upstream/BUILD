@@ -30,6 +30,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
+        "//include/envoy/server:options_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -101,7 +102,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
-        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
 

@@ -98,36 +98,42 @@ For an example of terminating connect, please see :repo:`configs/terminate_conne
 
 Tunneling TCP over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^
-Envoy also has support for tunneling raw TCP over HTTP CONNECT requests. Find
+Envoy also has support for tunneling raw TCP over HTTP CONNECT or HTTP POST requests. Find
 below some usage scenarios.
 
-HTTP/2 CONNECT can be used to proxy multiplexed TCP over pre-warmed secure connections and amortize the cost of any TLS
-handshake.
+HTTP/2 CONNECT can be used to proxy multiplexed TCP over pre-warmed secure connections and amortize
+the cost of any TLS handshake.
 An example set up proxying SMTP would look something like this:
 
-[SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
+[SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2 CONNECT --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
 HTTP/1.1 CONNECT can be used to have TCP client connecting to its own
 destination passing through an HTTP proxy server (e.g. corporate proxy not
 supporting HTTP/2):
 
-[HTTP Server] --- raw HTTP --- [L2 Envoy]  --- HTTP tunneled over HTTP/1.1  --- [L1 Envoy]  --- raw HTTP  --- [HTTP Client]
+[HTTP Server] --- raw HTTP --- [L2 Envoy]  --- HTTP tunneled over HTTP/1.1 CONNECT --- [L1 Envoy]  --- raw HTTP  --- [HTTP Client]
 
 Note that when using HTTP/1 CONNECT you will end up having a TCP connection
 between L1 and L2 Envoy for each TCP client connection, it is preferable to use
 HTTP/2 when you have the choice.
 
-Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`.
+HTTP POST can also be used to proxy multiplexed TCP when intermediate proxies that don't support
+CONNECT. An example set up proxying HTTP would look something like this:
 
-For HTTP/1.1 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
+[TCP Server] --- raw TCP --- [L2 Envoy]  --- TCP tunneled over HTTP/2 or HTTP/1.1 POST --- [Intermidate Proxies] --- HTTP/2 or HTTP/1.1 POST --- [L1 Envoy]  --- raw TCP  --- [TCP Client]
+
+Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
+For HTTP/1.1 CONNECT run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
 and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http1_connect.yaml`.
-
-For HTTP/2 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
+For HTTP/2 CONNECT run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
 and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_connect.yaml`.
+For HTTP/2 POST run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_post.yaml --base-id 1`
+and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_post.yaml`.
 
-In both cases you will be running a first Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP
-CONNECT request, and a second one listening on 10001, stripping the CONNECT headers, and forwarding the 
-original TCP upstream, in this case to google.com.
+In all cases you will be running a first Envoy listening for TCP traffic on port 10000 and
+encapsulating it in an HTTP CONNECT or HTTP POST request, and a second one listening on 10001,
+stripping the CONNECT headers (not needed for POST request), and forwarding the original TCP
+upstream, in this case to google.com.
 
 Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the  CONNECT request is received),
 before start streaming the downstream TCP data to the upstream.

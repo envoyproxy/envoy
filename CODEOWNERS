@@ -6,6 +6,7 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov @htuch
 # compression extensions
 /*/extensions/compression/common/compressor @rojkov @junr03
 /*/extensions/compression/gzip/compressor @rojkov @junr03
@@ -39,7 +40,7 @@ extensions/filters/common/original_src @snowp @klarose
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @PiotrSikora @lizan @asraa @ggreenway
+/*/extensions/transport_sockets/tls @lizan @asraa @ggreenway
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
@@ -55,7 +56,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.xray extension
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # tracers.skywalking extension
-/*/extensions/tracers/skywalking @wbpcode @dio @lizan
+/*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
 # postgres_proxy extension
@@ -83,7 +84,7 @@ extensions/filters/common/original_src @snowp @klarose
 # admission control extension.
 /*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
-/*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
+/*/extensions/filters/listener/http_inspector @yxue @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly access logger extensions
@@ -101,7 +102,7 @@ extensions/filters/common/original_src @snowp @klarose
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
-/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste @asraa
+/*/extensions/common/crypto @lizan @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
@@ -147,6 +148,7 @@ extensions/filters/common/original_src @snowp @klarose
 # Compression
 /*/extensions/compression/common @junr03 @rojkov
 /*/extensions/compression/gzip @junr03 @rojkov
+/*/extensions/compression/brotli @junr03 @rojkov
 /*/extensions/filters/http/decompressor @rojkov @dio
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @antoniovicente
@@ -162,3 +164,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
+# user space socket pair and event
+/*/extensions/io_socket/user_space @lambdai @antoniovicente

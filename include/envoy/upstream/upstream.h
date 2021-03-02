@@ -59,7 +59,13 @@ public:
   /* active HC. */                                                               \
   m(PENDING_DYNAMIC_REMOVAL, 0x20)                                               \
   /* The host is pending its initial active health check. */                     \
-  m(PENDING_ACTIVE_HC, 0x40)
+  m(PENDING_ACTIVE_HC, 0x40)                                                     \
+  /* The host should be excluded from panic, spillover, etc. calculations */     \
+  /* because it was explicitly taken out of rotation via protocol signal and */  \
+  /* is not meant to be routed to. */                                            \
+  m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
+  /* The host failed active HC due to timeout. */                                \
+  m(ACTIVE_HC_TIMEOUT, 0x100)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -67,15 +73,6 @@ public:
   enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
 
 #undef DECLARE_ENUM
-
-  enum class ActiveHealthFailureType {
-    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
-    UNKNOWN,
-    // The host is actively responding it's unhealthy
-    UNHEALTHY,
-    // The host is timing out
-    TIMEOUT,
-  };
 
   /**
    * @return host specific counters.
@@ -155,17 +152,6 @@ public:
    * @return the health of the host.
    */
   virtual Health health() const PURE;
-
-  /**
-   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
-   */
-  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
-
-  /**
-   * Set the most recent health failure type for a host. Types are specified in
-   * ActiveHealthFailureType.
-   */
-  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
@@ -418,9 +404,10 @@ public:
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * Install a callback that will be invoked when a host set changes. Triggers when any change
@@ -428,9 +415,10 @@ public:
    * added/removed hosts will be passed to the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
@@ -711,15 +699,17 @@ class ClusterInfo {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
-    static const uint64_t HTTP2 = 0x1;
+    static constexpr uint64_t HTTP2 = 0x1;
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
-    static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
+    static constexpr uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
-    static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    static constexpr uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
     // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
     // If ALPN is attempted but not supported by the upstream HTTP/1.1 is used.
-    static const uint64_t USE_ALPN = 0x8;
+    static constexpr uint64_t USE_ALPN = 0x8;
+    // Whether the upstream supports HTTP3. This is used when creating connection pools.
+    static constexpr uint64_t HTTP3 = 0x10;
   };
 
   virtual ~ClusterInfo() = default;
