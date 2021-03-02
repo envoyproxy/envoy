@@ -10,10 +10,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
     : tls_slot_(
           ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal())) {
   plugin_ = std::make_shared<Common::Wasm::Plugin>(
-      config.config().name(), config.config().root_id(), config.config().vm_config().vm_id(),
-      config.config().vm_config().runtime(),
-      Common::Wasm::anyToBytes(config.config().configuration()), config.config().fail_open(),
-      context.direction(), context.localInfo(), &context.listenerMetadata());
+      config.config(), context.direction(), context.localInfo(), &context.listenerMetadata());
 
   auto plugin = plugin_;
   auto callback = [plugin, this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
@@ -23,11 +20,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
     });
   };
 
-  if (!Common::Wasm::createWasm(
-          config.config().vm_config(), config.config().capability_restriction_config(), plugin_,
-          context.scope().createScope(""), context.clusterManager(), context.initManager(),
-          context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
-          std::move(callback))) {
+  if (!Common::Wasm::createWasm(plugin_, context.scope().createScope(""), context.clusterManager(),
+                                context.initManager(), context.dispatcher(), context.api(),
+                                context.lifecycleNotifier(), remote_data_provider_,
+                                std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm HTTP filter {}", plugin->name_));
   }

@@ -47,7 +47,7 @@ public:
   ~WasmNetworkFilterTest() override = default;
 
   void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
-                   AllowedCapabilitiesMap allowed_capabilities = {}) {
+                   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities = {}) {
     if (code.empty()) {
       setupWasmCode(vm_configuration);
     } else {

@@ -21,6 +21,7 @@
 #include "common/version/version.h"
 
 #include "extensions/common/wasm/context.h"
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm_extension.h"
 #include "extensions/common/wasm/wasm_vm.h"
 #include "extensions/common/wasm/well_known_names.h"
@@ -46,10 +47,8 @@ struct WasmStats {
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
 public:
-  Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-       absl::string_view vm_key, proxy_wasm::AllowedCapabilitiesMap allowed_capabilities,
-       const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-       Event::Dispatcher& dispatcher);
+  Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
+       Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher);
   Wasm(std::shared_ptr<WasmHandle> other, Event::Dispatcher& dispatcher);
   ~Wasm() override;
 
@@ -165,9 +164,7 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // all failures synchronously as it has no facility to report configuration update failures
 // asynchronously. Callers should throw an exception if they are part of a synchronous xDS update
 // because that is the mechanism for reporting configuration errors.
-bool createWasm(const VmConfig& vm_config,
-                const CapabilityRestrictionConfig& capability_restriction_config,
-                const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Event::Dispatcher& dispatcher, Api::Api& api,
                 Envoy::Server::ServerLifecycleNotifier& lifecycle_notifier,
@@ -181,7 +178,6 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
                              CreateContextFn create_root_context_for_testing = nullptr);
 
 void clearCodeCacheForTesting();
-std::string anyToBytes(const ProtobufWkt::Any& any);
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
 EnvoyWasm::WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 
