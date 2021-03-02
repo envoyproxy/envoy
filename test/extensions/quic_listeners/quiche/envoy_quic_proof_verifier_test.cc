@@ -40,7 +40,6 @@ public:
     ON_CALL(client_context_config_, signingAlgorithmsForTest()).WillByDefault(ReturnRef(sig_algs_));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
-    ON_CALL(client_context_config_, sslctxCb()).WillByDefault(Return([](SSL_CTX*) {}));
   }
 
   // Since this cert chain contains an expired cert, we can flip allow_expired_cert to test the code
