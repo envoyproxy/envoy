@@ -98,8 +98,7 @@ def GetExtensionMetadata(target):
 
 if __name__ == '__main__':
   try:
-    output_path = (os.environ["EXTENSION_DB_PATH"]
-                   if os.getenv("EXTENSION_DB_PATH") else sys.argv[1])
+    output_path = os.getenv("EXTENSION_DB_PATH") or sys.argv[1]
   except IndexError:
     raise SystemExit(
         "Output path must be either specified as arg or with EXTENSION_DB_PATH env var")
