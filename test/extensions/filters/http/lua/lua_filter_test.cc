@@ -1778,6 +1778,26 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Get the requested server name.
+TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:streamInfo():requestedServerName())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  std::string server_name = "foo.example.com";
+  EXPECT_CALL(stream_info_, requestedServerName()).WillOnce(ReturnRef(server_name));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
 // Set and get stream info dynamic metadata.
 TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   const std::string SCRIPT{R"EOF(

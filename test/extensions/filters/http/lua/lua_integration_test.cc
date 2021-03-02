@@ -291,6 +291,8 @@ typed_config:
         request_handle:streamInfo():downstreamLocalAddress())
       request_handle:headers():add("request_downstream_directremote_address_value", 
         request_handle:streamInfo():downstreamDirectRemoteAddress())
+      request_handle:headers():add("request_requested_server_name",
+        request_handle:streamInfo():requestedServerName())
     end
 
     function envoy_on_response(response_handle)
@@ -363,6 +365,11 @@ typed_config:
           ->value()
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+
+  EXPECT_EQ("", upstream_request_->headers()
+                    .get(Http::LowerCaseString("request_requested_server_name"))[0]
+                    ->value()
+                    .getStringView());
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
