@@ -153,6 +153,9 @@ public:
   std::string category() const override { return "envoy.filters.upstream_network"; }
 };
 
+using FilterDependenciesPtr =
+    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::FilterDependencies>;
+
 /**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
@@ -205,11 +208,12 @@ public:
 
   /**
    * @return FilterDependencies specification of dependencies required or
-   * provided on the decode and encode paths.
+   * provided on the decode and encode paths. This function returns an empty
+   * filter dependencies specification by default, and can be overriden.
    */
-  virtual envoy::extensions::filters::common::dependency::v3::FilterDependencies dependencies() {
-    envoy::extensions::filters::common::dependency::v3::FilterDependencies dependency;
-    return dependency;
+  virtual FilterDependenciesPtr dependencies() {
+    return std::make_unique<
+        envoy::extensions::filters::common::dependency::v3::FilterDependencies>();
   }
 };
 

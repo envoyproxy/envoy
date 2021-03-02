@@ -8,6 +8,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Server {
+namespace Configuration {
 namespace {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
@@ -28,12 +30,12 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
-  FilterDependencies dependencies() override {
+  FilterDependenciesPtr dependencies() override {
     FilterDependencies dependencies;
     Dependency* d = dependencies.add_decode_required();
     d->set_name("foobar");
     d->set_type(Dependency::FILTER_STATE_KEY);
-    return dependencies;
+    return std::make_unique<FilterDependencies>(dependencies);
   }
 
   std::string name() const override { return "envoy.test.http_filter"; }
@@ -57,8 +59,10 @@ TEST(NamedHttpFilterConfigFactoryTest, Dependencies) {
 
   factory.createFilterFactoryFromProto(*message, stats_prefix, context);
 
-  EXPECT_EQ(factory.dependencies().decode_required().size(), 1);
+  EXPECT_EQ(factory.dependencies()->decode_required().size(), 1);
 }
 
 } // namespace
+} // namespace Configuration
+} // namespace Server
 } // namespace Envoy
