@@ -126,7 +126,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
-                                                              uint16_t port, bool v6only) {
+                                                                     uint16_t port, bool v6only) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
