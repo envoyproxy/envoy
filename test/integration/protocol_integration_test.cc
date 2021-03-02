@@ -128,7 +128,7 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   name: set-route-filter
   )EOF");
 
-  // Fake upstreams: integration, cluster_0, cluster_override
+  // Fake upstream clusters: integration, cluster_0, cluster_override
   setUpstreamCount(3);
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* co_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -145,8 +145,7 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   host_foo.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host_foo);
 
-  auto host_co =
-      config_helper_.createVirtualHost("cluster_override vhost", "/", "cluster_override");
+  auto host_co = config_helper_.createVirtualHost("cluster_override", "/", "cluster_override");
   host_co.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host_co);
 
@@ -160,21 +159,18 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
       {":authority", "cluster_0"},
   };
 
-  // auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_,
-  // 0);
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   response->waitForEndStream();
 
   // Even though headers specify cluster_0, set_route_filter modifies cached route to
   // cluster_override
+  // TODO: DEBUG These aren't working, changing values doesn't affect anything?
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_200")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
-  // DEBUG: These aren't working, changing values doesn't affect anything?
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
 
-  ASSERT_TRUE(response->complete());
+  EXPECT_TRUE(response->complete());
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
