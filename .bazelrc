@@ -321,7 +321,6 @@ build:windows --action_env=TMPDIR
 build:windows --define signal_trace=disabled
 build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
-build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
 build:windows --cxxopt="/std:c++17"
 
