@@ -88,6 +88,13 @@ public:
 
   int usesTransferEncoding() const { return parser_.uses_transfer_encoding; }
 
+  bool seenContentLength() const {
+    // An unset content length will be have all bits set.
+    // See
+    // https://github.com/nodejs/http-parser/blob/ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d/http_parser.h#L311
+    return (parser_.content_length & (parser_.content_length & 1)) == 0;
+  }
+
 private:
   http_parser parser_;
   http_parser_settings settings_;
@@ -146,6 +153,8 @@ const char* LegacyHttpParserImpl::errnoName(int rc) const {
 }
 
 int LegacyHttpParserImpl::usesTransferEncoding() const { return impl_->usesTransferEncoding(); }
+
+bool LegacyHttpParserImpl::seenContentLength() const { return impl_->seenContentLength(); }
 
 int LegacyHttpParserImpl::statusToInt(const ParserStatus code) const {
   // See

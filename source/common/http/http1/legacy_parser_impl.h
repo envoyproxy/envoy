@@ -28,7 +28,7 @@ public:
   const char* errnoName() override;
   const char* errnoName(int rc) const override;
   int usesTransferEncoding() const override;
-  bool seenContentLength() const override { return true; }
+  bool seenContentLength() const override;
   void setSeenContentLength(bool) override{};
   int statusToInt(const ParserStatus code) const override;
   int flagsChunked() const override { return 1; }
