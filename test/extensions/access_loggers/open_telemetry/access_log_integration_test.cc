@@ -12,7 +12,6 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
-#include "external/opentelemetry_proto/opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "gtest/gtest.h"
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 

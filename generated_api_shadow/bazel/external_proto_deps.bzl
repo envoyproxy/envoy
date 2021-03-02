@@ -23,6 +23,7 @@ EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_go_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
+    "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_go_proto",
 }
 
 # This maps from the Bazel proto_library target to the C++ language binding target for external dependencies.
