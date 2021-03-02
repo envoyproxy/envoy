@@ -26,6 +26,8 @@ BAZEL_BUILD_OPTIONS=(
     "--action_env=PATH=/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
     "--test_output=all"
     "--flaky_test_attempts=integration@2"
+    #TODO: re-enable wasm when it doesn't cause build/test timeouts.
+    "--define" "wasm=disabled"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
