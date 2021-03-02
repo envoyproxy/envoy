@@ -509,39 +509,49 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
 
 TEST_P(IntegrationTest, TestSmuggling) {
   initialize();
-  const std::string smuggled_request = "GET / HTTP/1.1\r\nHost: disallowed\r\n\r\n";
-  ASSERT_EQ(smuggled_request.length(), 36);
+
   // Make sure the http parser rejects having content-length and transfer-encoding: chunked
   // on the same request, regardless of order and spacing.
   {
     std::string response;
-    const std::string full_request =
-        "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
-        smuggled_request;
+    const std::string full_request = "GET / HTTP/1.1\r\n"
+                                     "Host: host\r\ncontent-length: 0\r\n"
+                                     "transfer-encoding: chunked\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
+
+  // Check with a non-zero content length as well.
   {
     std::string response;
-    const std::string full_request = "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: "
-                                     "36\r\n\ttransfer-encoding: chunked\r\n\r\n" +
-                                     smuggled_request;
+    const std::string full_request = "GET / HTTP/1.1\r\n"
+                                     "Host: host\r\ncontent-length: 36\r\n"
+                                     "transfer-encoding: chunked\r\n\r\n";
+    sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+    EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+  }
+
+  // Make sure transfer encoding is still treated as such with leading whitespace.
+  {
+    std::string response;
+    const std::string full_request = "GET / HTTP/1.1\r\n"
+                                     "Host: host\r\ncontent-length: 0\r\n"
+                                     "\ttransfer-encoding: chunked\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
     EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
+
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked "
-                                "\r\ncontent-length: 36\r\n\r\n" +
-                                smuggled_request;
+                                "\r\ncontent-length: 36\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
     const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
-                                "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
-                                smuggled_request;
+                                "identity,chunked \r\ncontent-length: 36\r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
@@ -551,8 +561,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
     std::string response;
     const std::string request =
         "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
-        "identity\r\ncontent-length: 36\r\ntransfer-encoding: chunked \r\n\r\n" +
-        smuggled_request;
+        "identity\r\ncontent-length: 36\r\ntransfer-encoding: chunked \r\n\r\n";
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
   }
