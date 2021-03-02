@@ -29,50 +29,8 @@ value (`skip_filter`) to match against. As a result, this config means that if w
 as a header, the :ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>` action will be resolved (causing
 the associated HTTP filter to be skipped). If no such header is present, no action will be resolved and the filter will be applied as usual.
 
-.. code-block:: yaml
-
-    "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
-    extension_config:
-        name: response-filter-config
-        typed_config:
-            "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-            code: 403
-    matcher:
-        matcher_tree:
-            input:
-                name: request-headers
-                typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                    header_name: some-header
-            exact_match_map:
-                # Note this additional indirection; this is a workaround for Protobuf oneof limitations.
-                map:
-                    skip_filter: # This is the header value we're trying to match against.
-                        matcher_list:
-                        matchers:
-                        - predicate:
-                            or_matcher:
-                                predicate:
-                                - single_predicate:
-                                input:
-                                        name: request-headers
-                                        typed_config:
-                                            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                                            header_name: second-header
-                                    value_match:
-                                        exact_match: foo
-                                - single_predicate:
-                                input:
-                                        name: request-headers
-                                        typed_config:
-                                            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                                            header_name: second-header
-                                    value_match:
-                                        exact_match: bar
-                            action:
-                                name: skip
-                                typed_config:
-                                    "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+.. literalinclude:: _include/complicated.yaml
+    :language: yaml
 
 Above is a slightly more complicated example which combines a top level tree matcher with a linear matcher. While the tree matchers provide
 very efficient matching, they are not very expressive. The list matcher can be used to provide a much richer matching API, and can be combined
