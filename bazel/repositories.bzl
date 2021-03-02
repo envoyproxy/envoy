@@ -592,9 +592,10 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    # patch is applied to update setuptools version (0.5.4), and can be removed once this
-    # has been updated in rules_python
-    # see https://github.com/envoyproxy/envoy/pull/15236#issuecomment-788650946 for discussion
+    # TODO(phlax): remove patch
+    #    patch is applied to update setuptools to version (0.5.4),
+    #    and can be removed once this has been updated in rules_python
+    #    see https://github.com/envoyproxy/envoy/pull/15236#issuecomment-788650946 for discussion
     external_http_archive(
         name = "rules_python",
         patches = ["@envoy//bazel:rules_python.patch"],
