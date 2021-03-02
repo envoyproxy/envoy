@@ -12,6 +12,13 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* dns: both the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and
+  :ref:`logical DNS <arch_overview_service_discovery_types_logical_dns>` cluster types now honor the
+  :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` field if not empty.
+  Previously resolved hosts would have their hostname set to the configured DNS address for use with
+  logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
+  Setting the hostname manually allows overriding the internal hostname used for such features while
+  still allowing the original DNS resolution name to be used.
 * hds: support custom health check port via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 * healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
   :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
@@ -51,6 +58,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * active http health checks: properly handles HTTP/2 GOAWAY frames from the upstream. Previously a GOAWAY frame due to a graceful listener drain could cause improper failed health checks due to streams being refused by the upstream on a connection that is going away. To revert to old GOAWAY handling behavior, set the runtime feature `envoy.reloadable_features.health_check.graceful_goaway_handling` to false.
+* adaptive concurrency: fixed a bug where concurrent requests on different worker threads could update minRTT back-to-back.
 * buffer: tighten network connection read and write buffer high watermarks in preparation to more careful enforcement of read limits. Buffer high-watermark is now set to the exact configured value; previously it was set to value + 1.
 * fault injection: stop counting as active fault after delay elapsed. Previously fault injection filter continues to count the injected delay as an active fault even after it has elapsed. This produces incorrect output statistics and impacts the max number of consecutive faults allowed (e.g., for long-lived streams). This change decreases the active fault count when the delay fault is the only active and has gone finished.
 * filter_chain: fix filter chain matching with the server name as the case-insensitive way.
@@ -64,6 +72,7 @@ Bug Fixes
 * sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.
 * tls: fix the subject alternative name of the presented certificate matches the specified matchers as the case-insensitive way when it uses DNS name.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
+* upstream: retry budgets will now set default values for xDS configurations.
 
 Removed Config or Runtime
 -------------------------
