@@ -40,7 +40,7 @@ extensions/filters/common/original_src @snowp @klarose
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension
-/*/extensions/transport_sockets/tls @PiotrSikora @lizan @asraa @ggreenway
+/*/extensions/transport_sockets/tls @lizan @asraa @ggreenway
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
@@ -84,7 +84,7 @@ extensions/filters/common/original_src @snowp @klarose
 # admission control extension.
 /*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
-/*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
+/*/extensions/filters/listener/http_inspector @yxue @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly access logger extensions
@@ -102,7 +102,7 @@ extensions/filters/common/original_src @snowp @klarose
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
-/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste @asraa
+/*/extensions/common/crypto @lizan @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
