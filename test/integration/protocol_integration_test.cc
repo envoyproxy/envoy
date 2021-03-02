@@ -178,6 +178,8 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -185,6 +187,8 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "600"}};
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
 
+  // Regression test https://github.com/envoyproxy/envoy/issues/14890 - no content-length added.
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
