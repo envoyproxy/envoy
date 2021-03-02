@@ -182,6 +182,9 @@ AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseco
   }
 
   if (wait_timer_triggered && !disconnected_) {
+    if (time_to_wait == TestUtility::DefaultTimeout) {
+      ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
+    }
     return AssertionFailure() << "Timed out waiting for disconnect";
   }
   EXPECT_TRUE(disconnected_);
