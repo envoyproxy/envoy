@@ -106,6 +106,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
  "cluster_statuses": [
   {
    "name": "fake_cluster",
+   "observability_name": "observability_name",
    "success_rate_ejection_threshold": {
     "value": 6
    },
@@ -203,7 +204,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   // Ensure that the normal text format is used by default.
   Buffer::OwnedImpl response2;
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response2));
-  const std::string expected_text = R"EOF(fake_cluster::outlier::success_rate_average::0
+  const std::string expected_text = R"EOF(fake_cluster::observability_name::observability_name
+fake_cluster::outlier::success_rate_average::0
 fake_cluster::outlier::success_rate_ejection_threshold::6
 fake_cluster::outlier::local_origin_success_rate_average::0
 fake_cluster::outlier::local_origin_success_rate_ejection_threshold::9
