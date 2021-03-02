@@ -122,6 +122,7 @@ public:
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
+  MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(ClusterStats&, stats, (), (const));
@@ -149,6 +150,7 @@ public:
   Http::Http2::CodecStats& http2CodecStats() const override;
 
   std::string name_{"fake_cluster"};
+  std::string observability_name_{"observability_name"};
   absl::optional<std::string> eds_service_name_;
   Http::Http1Settings http1_settings_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;

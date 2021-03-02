@@ -235,6 +235,8 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
 
   if (nullptr != stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName,
+                stream_info.upstreamHost()->cluster().observabilityName());
   }
 
   // Post response data.

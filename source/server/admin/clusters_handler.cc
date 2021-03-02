@@ -117,6 +117,7 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
 
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
+    cluster_status.set_observability_name(cluster_info->observabilityName());
 
     addCircuitBreakerSettingsAsJson(
         envoy::config::core::v3::RoutingPriority::DEFAULT,
@@ -201,6 +202,8 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
     UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     const std::string& cluster_name = cluster.info()->name();
+    response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
+                             cluster.info()->observabilityName()));
     addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
 
     addCircuitBreakerSettingsAsText(

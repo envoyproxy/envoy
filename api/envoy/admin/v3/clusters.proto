@@ -29,7 +29,7 @@ message Clusters {
 }
 
 // Details an individual cluster's current status.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ClusterStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ClusterStatus";
 
@@ -80,6 +80,9 @@ message ClusterStatus {
 
   // :ref:`Circuit breaking <arch_overview_circuit_break>` settings of the cluster.
   config.cluster.v3.CircuitBreakers circuit_breakers = 6;
+
+  // Observability name of the cluster.
+  string observability_name = 7;
 }
 
 // Current state of a particular host.
