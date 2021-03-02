@@ -27,6 +27,6 @@ package_group(
     packages = [
         "//source/extensions/...",
         "//test/extensions/...",
-        "//tools/extensions",
+        "//tools/extensions/...",
     ],
 )
