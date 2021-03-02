@@ -23,6 +23,9 @@ public:
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(), random);
   }
 
+  bool packTraceReason() { return pack_trace_reason_; }
+
+  // Http::RequestIDExtension
   void set(Http::RequestHeaderMap& request_headers, bool force) override;
   void setInResponse(Http::ResponseHeaderMap& response_headers,
                      const Http::RequestHeaderMap& request_headers) override;

@@ -87,6 +87,7 @@ class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest()
       : request_id_extension_(std::make_shared<NiceMock<MockRequestIDExtension>>(random_)),
+        request_id_extension_to_return_(request_id_extension_),
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
@@ -101,7 +102,8 @@ public:
     ON_CALL(config_, localReply()).WillByDefault(ReturnRef(*local_reply_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
-    ON_CALL(config_, requestIDExtension()).WillByDefault(ReturnPointee(&request_id_extension_));
+    ON_CALL(config_, requestIDExtension())
+        .WillByDefault(ReturnRef(request_id_extension_to_return_));
   }
 
   struct MutateRequestRet {
@@ -131,7 +133,8 @@ public:
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Random::MockRandomGenerator> random_;
-  std::shared_ptr<NiceMock<MockRequestIDExtension>> request_id_extension_;
+  const std::shared_ptr<MockRequestIDExtension> request_id_extension_;
+  const std::shared_ptr<RequestIDExtension> request_id_extension_to_return_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;

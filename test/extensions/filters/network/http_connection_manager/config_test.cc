@@ -1710,6 +1710,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
+  EXPECT_TRUE(request_id_extension->packTraceReason());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
@@ -1732,6 +1733,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
   auto request_id_extension = dynamic_cast<Extensions::RequestId::UUIDRequestIDExtension*>(
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
+  EXPECT_FALSE(request_id_extension->packTraceReason());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {

@@ -81,7 +81,7 @@ public:
    * Mutate request headers if request needs to be traced.
    * @return the trace reason selected after header mutation to be stored in stream info.
    */
-  static ABSL_MUST_USE_RESULT Tracing::Reason
+  ABSL_MUST_USE_RESULT static Tracing::Reason
   mutateTracingRequestHeader(RequestHeaderMap& request_headers, Runtime::Loader& runtime,
                              ConnectionManagerConfig& config, const Router::Route* route);
 

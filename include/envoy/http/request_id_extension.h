@@ -36,8 +36,6 @@ using RequestIdStreamInfoProviderSharedPtr = std::shared_ptr<RequestIdStreamInfo
  */
 class RequestIDExtension : public RequestIdStreamInfoProvider {
 public:
-  virtual ~RequestIDExtension() = default;
-
   /**
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.
