@@ -2,12 +2,20 @@
 
 set -e
 
-# This works only on Linux-{x86_64,s390x,aarch64,ppc64le} and macOS-x86_64.
-case "$$(uname -s)-$$(uname -m)" in
-Linux-x86_64|Linux-s390x|Linux-aarch64|Linux-ppc64le|Darwin-x86_64)
+# Works on Linux-{x86_64,s390x,aarch64,ppc64le}, macOS-{x86_64,arm64} and Windows-x86_64.
+ARCH="$$(uname -m)"
+SYSTEM="$$(uname -s)"
+PLATFORM="$${SYSTEM}-$${ARCH}"
+
+case "$${PLATFORM}" in
+Linux-x86_64|Linux-s390x|Linux-aarch64|Linux-ppc64le)
+  ;;
+Darwin-x86_64|Darwin-arm64)
+  ;;
+MSYS_NT-*-x86_64)
   ;;
 *)
-  echo "ERROR: wee8 is currently supported only on Linux-{x86_64,s390x,aarch64,ppc64le} and macOS-x86_64." >&2
+  echo "ERROR: wee8 is currently not supported on $${PLATFORM}." >&2
   exit 1
 esac
 
@@ -20,7 +28,7 @@ rm -rf out/wee8
 
 # Export compiler configuration.
 export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
-if [[ ( `uname` == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *"clang"* ]]; then
+if [[ ( "$${SYSTEM}" == "Darwin" && "$${CXX-}" == "" ) || "$${CXX-}" == *clang* ]]; then
   export IS_CLANG=true
   export CC=$${CC:-clang}
   export CXX=$${CXX:-clang++}
@@ -85,39 +93,49 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 # Disable read-only heap, since it's leaky and HEAPCHECK complains about it.
 # TODO(PiotrSikora): remove when fixed upstream.
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
-# Support Arm64
-if [[ `uname -m` == "aarch64" ]]; then
+
+# Support arm64.
+if [[ "$${ARCH}" == "aarch64" || "$${ARCH}" == "arm64" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"arm64\""
 fi
-# Support ppc64
-# Only tests with gn 5da62d5
-if [[ `uname -m` == "ppc64le" ]]; then
+
+# Support ppc64le.
+if [[ "$${ARCH}" == "ppc64le" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"ppc64\""
 fi
 
-# Build wee8.
+# Select gn tool for the current platform.
 if [[ -f /etc/centos-release ]] && [[ $$(cat /etc/centos-release) =~ "CentOS Linux release 7" ]] && [[ -x "$$(command -v gn)" ]]; then
-  # Using system default gn tools
-  # This is done only for CentOS 7, as it has an old version of GLIBC which is otherwise incompatible
+  # Use system default on CentOS 7, as it has an old version of GLIBC which is otherwise incompatible with the prebuilt binary.
   gn=$$(command -v gn)
-elif [[ "$$(uname -s)" == "Darwin" ]]; then
+elif [[ "$${PLATFORM}" == "Darwin-x86_64" ]]; then
   gn=buildtools/mac/gn
-elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
+elif [[ "$${PLATFORM}" == "Darwin-arm64" ]]; then
+  gn=buildtools/mac-arm64/gn
+elif [[ "$${PLATFORM}" == "Linux-x86_64" ]]; then
   gn=buildtools/linux64/gn
+elif [[ "$${PLATFORM}" == "Linux-aarch64" ]]; then
+  gn=buildtools/linux-arm64/gn
+elif [[ "$${PLATFORM}" == MSYS_NT-*-x86_64 ]]; then
+  gn=buildtools/win/gn.exe
 else
-  # Using system default gn tools
+  # Fallback to system default.
   gn=$$(command -v gn)
 fi
 
-if [[ "$$(uname -s)" == "Darwin" ]]; then
-  ninja=third_party/depot_tools/ninja
-elif [[ "$$(uname -s)-$$(uname -m)" == "Linux-x86_64" ]]; then
-  ninja=third_party/depot_tools/ninja
+# Select ninja tool for the current platform.
+if [[ "$${PLATFORM}" == "Darwin-x86_64" ]]; then
+  ninja=third_party/depot_tools/ninja-mac
+elif [[ "$${PLATFORM}" == "Linux-x86_64" ]]; then
+  ninja=third_party/depot_tools/ninja-linux64
+elif [[ "$${PLATFORM}" == MSYS_NT-*-x86_64 ]]; then
+  ninja=third_party/depot_tools/ninja.exe
 else
-  # Using system default ninja tools
+  # Fallback to system default.
   ninja=$$(command -v ninja)
 fi
 
+# Build wee8.
 "$$gn" gen out/wee8 --args="$$WEE8_BUILD_ARGS"
 "$$ninja" -C out/wee8 wee8
 
