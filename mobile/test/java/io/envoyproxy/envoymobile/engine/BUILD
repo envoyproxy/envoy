@@ -8,7 +8,7 @@ envoy_mobile_kt_test(
         "EnvoyConfigurationTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -18,7 +18,7 @@ envoy_mobile_kt_test(
         "EnvoyNativeResourceRegistryTest.kt",
     ],
     deps = [
-        "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
     ],
 )
 
@@ -28,6 +28,6 @@ envoy_mobile_kt_test(
         "JvmBridgeUtilityTest.kt",
     ],
     deps = [
-        "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
     ],
 )

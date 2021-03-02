@@ -18,7 +18,7 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
       - name: 'Run tests'
-        run: bazelisk test --test_output=all //test/...
+        run: bazelisk test --test_output=all //test/common/...
   tsan:
     name: tsan
     runs-on: ubuntu-18.04
@@ -34,7 +34,7 @@ jobs:
           submodules: true
       - run: echo $PATH
       - name: 'Run tests'
-        run: bazel test --config=clang-tsan --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only //test/...
+        run: bazel test --config=clang-tsan --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only //test/common/...
   asan:
     name: asan
     runs-on: ubuntu-18.04
@@ -49,4 +49,4 @@ jobs:
         with:
           submodules: true
       - name: 'Run tests'
-        run: bazel test --config=clang-asan --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only //test/...
+        run: bazel test --config=clang-asan --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only //test/common/...

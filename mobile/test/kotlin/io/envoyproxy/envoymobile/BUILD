@@ -8,7 +8,7 @@ envoy_mobile_kt_test(
         "ElementTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -18,7 +18,7 @@ envoy_mobile_kt_test(
         "EngineBuilderTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -28,7 +28,7 @@ envoy_mobile_kt_test(
         "GRPCRequestHeadersBuilderTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -38,7 +38,7 @@ envoy_mobile_kt_test(
         "GRPCStreamTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -48,7 +48,7 @@ envoy_mobile_kt_test(
         "HeadersBuilderTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -58,7 +58,7 @@ envoy_mobile_kt_test(
         "PulseClientImplTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -68,7 +68,7 @@ envoy_mobile_kt_test(
         "RequestHeadersBuilderTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -78,7 +78,7 @@ envoy_mobile_kt_test(
         "ResponseHeadersTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
 
@@ -88,6 +88,6 @@ envoy_mobile_kt_test(
         "RetryPolicyMapperTest.kt",
     ],
     deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
