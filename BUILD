@@ -19,7 +19,6 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
-        "//tools/extensions/...",
     ],
 )
 
@@ -28,5 +27,6 @@ package_group(
     packages = [
         "//source/extensions/...",
         "//test/extensions/...",
+        "//tools/extensions:generate_extension_db",
     ],
 )
