@@ -47,17 +47,17 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
 }
 
 // Request crash Envoy controlled via response.
-TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnOutbound) {
-  const std::string filter_config_outbound =
+TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResponse) {
+  const std::string filter_config_response =
       R"EOF(
       name: envoy.filters.http.kill_request
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest
         probability:
           numerator: 100
-        direction: OUTBOUND
+        direction: RESPONSE
       )EOF";
-  initializeFilter(filter_config_outbound);
+  initializeFilter(filter_config_response);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};

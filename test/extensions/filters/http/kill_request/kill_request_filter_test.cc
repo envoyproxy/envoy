@@ -174,11 +174,11 @@ TEST_F(KillRequestFilterTest, EncodeMetadataReturnsContinue) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 }
 
-TEST_F(KillRequestFilterTest, CanKillOnOutbound) {
+TEST_F(KillRequestFilterTest, CanKillOnResponse) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   kill_request.set_direction(
-      envoy::extensions::filters::http::kill_request::v3::KillRequest::OUTBOUND);
+      envoy::extensions::filters::http::kill_request::v3::KillRequest::RESPONSE);
   setUpTest(kill_request);
 
   // We should crash on the OUTBOUND request
@@ -191,14 +191,14 @@ TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   kill_request.set_direction(
-      envoy::extensions::filters::http::kill_request::v3::KillRequest::OUTBOUND);
+      envoy::extensions::filters::http::kill_request::v3::KillRequest::RESPONSE);
   setUpTest(kill_request);
 
-  // We shouldn't crash on the INBOUND kill request
+  // We shouldn't crash on the REQUEST direction kill request
   request_headers_.addCopy("x-envoy-kill-request", "true");
   ASSERT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
 
-  // We should crash on the OUTBOUND kill request
+  // We should crash on the RESPONSE kill request
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   response_headers_.addCopy("x-envoy-kill-request", "true");
   EXPECT_DEATH(filter_->encodeHeaders(response_headers_, false), "");

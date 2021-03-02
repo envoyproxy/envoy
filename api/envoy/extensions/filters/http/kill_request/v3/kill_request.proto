@@ -20,10 +20,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for KillRequest filter.
 message KillRequest {
   // On which direction should the filter check for the `kill_request_header`.
-  // Default to `INBOUND` if unspecified.
+  // Default to `REQUEST` if unspecified.
   enum Direction {
-    INBOUND = 0;
-    OUTBOUND = 1;
+    REQUEST = 0;
+    RESPONSE = 1;
   }
 
   // The probability that a Kill request will be triggered.

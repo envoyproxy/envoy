@@ -45,8 +45,8 @@ bool KillRequestFilter::isKillRequest(Http::HeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  bool is_correct_direction = kill_request_.direction() == KillRequest::INBOUND;
-  bool is_kill_request = isKillRequest(headers);
+  bool is_correct_direction = kill_request_.direction() == KillRequest::REQUEST;
+  const bool is_kill_request = isKillRequest(headers);
   if (!is_kill_request) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -60,7 +60,7 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
         route_entry->mostSpecificPerFilterConfigTyped<KillSettings>(name);
 
     if (per_route_kill_settings) {
-      is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::INBOUND;
+      is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;
       envoy::type::v3::FractionalPercent probability = per_route_kill_settings->getProbability();
       kill_request_.set_allocated_probability(&probability);
     }
@@ -75,13 +75,11 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
 }
 
 Http::FilterHeadersStatus KillRequestFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  if (kill_request_.direction() == KillRequest::INBOUND) {
+  if (kill_request_.direction() == KillRequest::REQUEST) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  bool is_kill_request = isKillRequest(headers);
-
-  if (is_kill_request && isKillRequestEnabled()) {
+  if (isKillRequest(headers) && isKillRequestEnabled()) {
     // Crash Envoy.
     raise(SIGABRT);
   }
