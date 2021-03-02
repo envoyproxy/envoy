@@ -98,11 +98,7 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
   std::string result = "";
   for (const auto& resource : resources_protos) {
-    if (absl::StartsWith(resource, "http://") || absl::StartsWith(resource, "https://")) {
-      result += "&resource=" + Http::Utility::PercentEncoding::encode(resource, ":/=&? ");
-    } else {
-      result += "&resource=" + resource;
-    }
+    result += "&resource=" + Http::Utility::PercentEncoding::encode(resource, ":/=&? ");
   }
   return result;
 }
