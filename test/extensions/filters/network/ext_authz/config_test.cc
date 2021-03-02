@@ -44,9 +44,9 @@ void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
-              factoryForGrpcService(_, _, AsyncClientFactoryClusterChecks::Skip))
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                          AsyncClientFactoryClusterChecks) {
+                          Grpc::AsyncClientFactoryClusterChecks) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);

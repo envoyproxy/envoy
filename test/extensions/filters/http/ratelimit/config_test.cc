@@ -45,7 +45,7 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                          AsyncClientFactoryClusterChecks) {
+                          Grpc::AsyncClientFactoryClusterChecks) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 
