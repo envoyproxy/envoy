@@ -209,7 +209,7 @@ public:
   /**
    * @return FilterDependencies specification of dependencies required or
    * provided on the decode and encode paths. This function returns an empty
-   * filter dependencies specification by default, and can be overriden.
+   * filter dependencies specification by default, and can be overridden.
    */
   virtual FilterDependenciesPtr dependencies() {
     return std::make_unique<
