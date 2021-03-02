@@ -166,7 +166,8 @@ bool MainCommonBase::run() {
   case Server::Mode::Load: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     return Server::validateConfig(options_, local_address, component_factory_, thread_factory_,
-                                  file_system_);
+                                  file_system_)
+        .ok();
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();

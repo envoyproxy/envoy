@@ -109,9 +109,10 @@ public:
 };
 
 TEST_P(ValidationServerTest, Validate) {
-  EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
-                             component_factory_, Thread::threadFactoryForTest(),
-                             Filesystem::fileSystemForTest()));
+  auto status =
+      validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_,
+                     Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+  EXPECT_TRUE(status.ok()) << status.ToString();
 }
 
 TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
@@ -150,7 +151,8 @@ INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest, testing_values);
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
   auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
   validateConfig(options_, local_address, component_factory_, Thread::threadFactoryForTest(),
-                 Filesystem::fileSystemForTest());
+                 Filesystem::fileSystemForTest())
+      .IgnoreError();
   SUCCEED();
 }
 
@@ -165,8 +167,9 @@ TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
 
   // If this fails, it's likely because TestConfigFactory threw an exception related to the
   // runtime loader.
-  ASSERT_TRUE(validateConfig(options_, local_address, component_factory_,
-                             Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
+  auto status = validateConfig(options_, local_address, component_factory_,
+                               Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+  ASSERT_TRUE(status.ok()) << status.ToString();
 }
 
 INSTANTIATE_TEST_SUITE_P(

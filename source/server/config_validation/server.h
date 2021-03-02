@@ -36,13 +36,14 @@ namespace Envoy {
 namespace Server {
 
 /**
- * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
- * the config is valid, false if invalid.
+ * validateConfig() takes over from main() for a config-validation run of Envoy. It returns Ok if
+ * the config is valid, otherwise an error.
  */
-bool validateConfig(const Options& options,
-                    const Network::Address::InstanceConstSharedPtr& local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
-                    Filesystem::Instance& file_system);
+absl::Status validateConfig(const Options& options,
+                            const Network::Address::InstanceConstSharedPtr& local_address,
+                            ComponentFactory& component_factory,
+                            Thread::ThreadFactory& thread_factory,
+                            Filesystem::Instance& file_system);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements

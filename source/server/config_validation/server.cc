@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Server {
 
-bool validateConfig(const Options& options,
+absl::Status validateConfig(const Options& options,
                     const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                     Filesystem::Instance& file_system) {
@@ -30,9 +30,9 @@ bool validateConfig(const Options& options,
                               component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
-    return true;
+    return absl::OkStatus();
   } catch (const EnvoyException& e) {
-    return false;
+    return absl::InvalidArgumentError(e.what());
   }
 }
 
