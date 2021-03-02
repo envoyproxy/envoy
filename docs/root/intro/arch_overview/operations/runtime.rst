@@ -3,14 +3,19 @@
 Runtime configuration
 =====================
 
-Envoy supports “runtime” configuration (also known as "feature flags" and "decider"). Configuration
-settings can be altered that will affect operation without needing to restart Envoy or change the
-primary configuration. The currently supported implementation uses a tree of file system files.
-Envoy watches for a symbolic link swap in a configured directory and reloads the tree when that
-happens. This type of system is very commonly deployed in large distributed systems. Other
-implementations would not be difficult to implement. Supported runtime configuration settings are
-documented in the relevant sections of the operations guide. Envoy will operate correctly with
-default runtime values and a “null” provider so it is not required that such a system exists to run
-Envoy.
+Envoy supports “runtime” configuration (also known as "feature flags"). :ref:`Runtime configuration
+<config_runtime>` can be used to modify various server settings without restarting Envoy. The
+runtime settings that are available depend on how the server is configured. They are documented in
+the relevant sections of the :ref:`configuration guide <config>`.
 
-Runtime :ref:`configuration <config_runtime>`.
+Runtime guards are also used as a mechanism to disable new behavior or risky changes not otherwise
+guarded by configuration. Such changes will tend to introduce a runtime guard that can be used to
+disable the new behavior/code path. The names of these runtime guards will be included in the
+release notes alongside an explanation of the change that warranted the runtime guard.
+
+Due to this usage of runtime guards, some deployments might find it useful to set up
+dynamic runtime configuration as a safety measure to be able to quickly disable the new behavior
+without having to revert to an older version of Envoy or redeploy it with a new set of static
+runtime flags.
+
+See Runtime :ref:`configuration <config_runtime>` for more information.
