@@ -66,7 +66,7 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
-  std::unique_ptr<TokenCache>& getTokenCache() override {
+  TokenCache& getTokenCache() override {
     if (token_cache_ == nullptr) {
       if (jwt_provider_.token_cache_size() > 0) {
         token_cache_ = std::make_unique<TokenCache>(jwt_provider_.token_cache_size());
@@ -74,7 +74,7 @@ public:
         token_cache_ = std::make_unique<TokenCache>(kJwtCacheSize);
       }
     }
-    return token_cache_;
+    return *token_cache_;
   }
 
 private:

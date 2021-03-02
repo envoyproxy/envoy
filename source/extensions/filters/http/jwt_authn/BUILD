@@ -128,7 +128,6 @@ envoy_cc_library(
     name = "token_cache_lib",
     srcs = ["token_cache.cc"],
     hdrs = ["token_cache.h"],
-    copts = ["-Wno-unused-parameter"],
     external_deps = [
         "jwt_verify_lib",
         "simple_lru_cache_lib",

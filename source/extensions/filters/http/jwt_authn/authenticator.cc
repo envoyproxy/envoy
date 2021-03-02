@@ -98,7 +98,7 @@ private:
   const bool is_allow_failed_;
   const bool is_allow_missing_;
   TimeSource& time_source_;
-  bool jwt_cache_hited_;
+  ::google::jwt_verify::Jwt* cache_jwt_;
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -141,8 +141,19 @@ void AuthenticatorImpl::startVerify() {
   tokens_.pop_back();
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-  ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  Status status = jwt_->parseFromString(curr_token_->token());
+  if (provider_) {
+    jwks_data_ = jwks_cache_.findByProvider(provider_.value());
+    cache_jwt_ = jwks_data_->getTokenCache().find(curr_token_->token());
+  }
+  Status status;
+  if (cache_jwt_) {
+    ENVOY_LOG(debug, "{}: Skip parsing, Jwt {} is in Cache.", name(), curr_token_->token());
+    status = Status::Ok;
+    *jwt_ = *cache_jwt_;
+  } else {
+    ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
+    status = jwt_->parseFromString(curr_token_->token());
+  }
 
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -158,9 +169,10 @@ void AuthenticatorImpl::startVerify() {
     }
   }
 
-  // Check the issuer is configured or not.
-  jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
-                         : jwks_cache_.findByIssuer(jwt_->iss_);
+  // Issuer is configured
+  if (!provider_) {
+    jwks_data_ = jwks_cache_.findByIssuer(jwt_->iss_);
+  }
   // When `provider` is valid, findByProvider should never return nullptr.
   // Only when `allow_missing` or `allow_failed` is used, `provider` is invalid,
   // and this authenticator is checking tokens from all providers. In this case,
@@ -170,12 +182,6 @@ void AuthenticatorImpl::startVerify() {
   if (!jwks_data_) {
     doneWithStatus(Status::JwtUnknownIssuer);
     return;
-  }
-
-  auto cache_jwt = jwks_data_->getTokenCache()->find(curr_token_->token(), jwt_cache_hited_);
-  if (jwt_cache_hited_) {
-    ENVOY_LOG(debug, "{}: verified token with cache hit: tokens size {}", name(), tokens_.size());
-    jwt_.reset(cache_jwt);
   }
 
   // Default is 60 seconds
@@ -247,8 +253,12 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  const Status status =
-      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
+  Status status;
+  if (cache_jwt_) {
+    status = Status::Ok;
+  } else {
+    status = ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
+  }
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -272,18 +282,16 @@ void AuthenticatorImpl::verifyKey() {
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
-
+  if (!cache_jwt_) {
+    ENVOY_LOG(debug, "JWT {} added in cache", curr_token_->token());
+    jwks_data_->getTokenCache().insert(curr_token_->token(), jwt_.release(), 1);
+  }
   doneWithStatus(Status::Ok);
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
-
-  if (status == Status::Ok && !jwt_cache_hited_) {
-    ENVOY_LOG(debug, "JWT token: {} added in cache", curr_token_->token());
-    jwks_data_->getTokenCache()->insert(curr_token_->token(), jwt_.release(), 1);
-  }
 
   // If a request has multiple tokens, all of them must be valid. Otherwise it may have
   // following security hole: a request has a good token and a bad one, it will pass
