@@ -452,6 +452,7 @@ protected:
   Http::RequestHeaderMapPtr grpc_initial_metadata_;
 
   // Access log state.
+  bool access_log_phase_ = false;
   const StreamInfo::StreamInfo* access_log_stream_info_{};
   const Http::RequestHeaderMap* access_log_request_headers_{};
   const Http::ResponseHeaderMap* access_log_response_headers_{};
