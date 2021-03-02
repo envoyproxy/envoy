@@ -176,6 +176,11 @@ FilterConfigSubscription::~FilterConfigSubscription() {
   init_target_.ready();
 }
 
+FilterConfigProviderManagerImpl::~FilterConfigProviderManagerImpl() {
+  // assert that all providers have been destroyed.
+  ASSERT(dynamic_filter_config_providers_.empty());
+}
+
 FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
@@ -204,8 +209,6 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     return provider;
   } else {
     auto existing_provider = it->second.lock();
-    ASSERT(existing_provider != nullptr,
-           absl::StrCat("Cannot find dynamic filter config provider ", filter_config_name));
     if (!apply_without_warming) {
       factory_context.initManager().add(existing_provider->subscription_->initTarget());
     }

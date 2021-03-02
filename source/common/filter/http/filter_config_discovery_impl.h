@@ -167,6 +167,8 @@ private:
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManager,
                                         public Singleton::Instance {
 public:
+  ~FilterConfigProviderManagerImpl();
+
   FilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ConfigSource& config_source,
       const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
