@@ -22,7 +22,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     std::shared_ptr<const ExampleDelegatingRouteDerived> route_override =
         std::make_shared<ExampleDelegatingRouteDerived>(decoder_callbacks_->route(),
-                                                        "cluster-override");
+                                                        "cluster_override");
 
     decoder_callbacks_->setRoute(route_override);
     return Http::FilterHeadersStatus::Continue;

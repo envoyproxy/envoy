@@ -128,30 +128,45 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   name: set-route-filter
   )EOF");
 
-  auto host_a = config_helper_.createVirtualHost("foo.com", "/", "cluster_0");
-  host_a.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
-  config_helper_.addVirtualHost(host_a);
+  // Fake upstreams: integration, cluster_0, cluster_override
+  setUpstreamCount(3);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* co_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    co_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    co_cluster->set_name("cluster_override");
+    co_cluster->set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    // Necessary for ORIGINAL_DST clusters
+    co_cluster->clear_load_assignment();
+    co_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    ConfigHelper::setHttp2(*co_cluster);
+  });
 
-  auto host_b = config_helper_.createVirtualHost("foo.com", "/", "cluster_override");
-  host_b.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
-  config_helper_.addVirtualHost(host_b);
+  auto host_foo = config_helper_.createVirtualHost("foo.com", "/", "cluster_0");
+  host_foo.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host_foo);
+
+  auto host_co =
+      config_helper_.createVirtualHost("cluster_override vhost", "/", "cluster_override");
+  host_co.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host_co);
 
   initialize();
 
   // BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-  //   lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "foo.com");
-
-  // Instead of IntegrationUtil::makeSingleRequest?
+  //   lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "cluster_override
+  //   vhost");
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(512, true);
-  response->waitForEndStream();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "cluster_0"},
+  };
+
+  // Even though headers specify cluster_0, set_route_filter modifies route to cluster_override
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response->complete());
-
   // TODO: how do I check req was sent to the right (overridden) upstream cluster? response->body()?
   // stat counters?
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
