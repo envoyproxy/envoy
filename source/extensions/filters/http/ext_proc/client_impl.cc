@@ -11,7 +11,8 @@ static constexpr char kExternalMethod[] =
 ExternalProcessorClientImpl::ExternalProcessorClientImpl(
     Grpc::AsyncClientManager& client_manager,
     const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope) {
-  factory_ = client_manager.factoryForGrpcService(grpc_service, scope, true);
+  factory_ = client_manager.factoryForGrpcService(grpc_service, scope,
+                                                  AsyncClientFactoryClusterChecks::Skip);
 }
 
 ExternalProcessorStreamPtr

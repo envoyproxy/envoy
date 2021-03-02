@@ -45,7 +45,8 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   EXPECT_CALL(*cluster, info());
   EXPECT_CALL(*cluster->cluster_.info_, addedViaApi());
 
-  async_client_manager_.factoryForGrpcService(grpc_service, scope_, false);
+  async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                              AsyncClientFactoryClusterChecks::ValidateStatic);
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
@@ -54,8 +55,9 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
 
   EXPECT_CALL(cm_, getThreadLocalCluster("foo"));
   EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Unknown gRPC client cluster 'foo'");
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                                  AsyncClientFactoryClusterChecks::ValidateStatic),
+      EnvoyException, "Unknown gRPC client cluster 'foo'");
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
@@ -68,8 +70,9 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   EXPECT_CALL(*cluster, info());
   EXPECT_CALL(*cluster->cluster_.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "gRPC client cluster 'foo' is not static");
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                                  AsyncClientFactoryClusterChecks::ValidateStatic),
+      EnvoyException, "gRPC client cluster 'foo' is not static");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
@@ -78,11 +81,13 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
 #ifdef ENVOY_GOOGLE_GRPC
-  EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(grpc_service, scope_, false));
+  EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(
+                         grpc_service, scope_, AsyncClientFactoryClusterChecks::ValidateStatic));
 #else
   EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Google C++ gRPC client is not linked");
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                                  AsyncClientFactoryClusterChecks::ValidateStatic),
+      EnvoyException, "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -97,12 +102,14 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalChars) {
 
 #ifdef ENVOY_GOOGLE_GRPC
   EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Illegal characters in gRPC initial metadata.");
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                                  AsyncClientFactoryClusterChecks::ValidateStatic),
+      EnvoyException, "Illegal characters in gRPC initial metadata.");
 #else
   EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Google C++ gRPC client is not linked");
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                                  AsyncClientFactoryClusterChecks::ValidateStatic),
+      EnvoyException, "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -116,11 +123,13 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
   metadata.set_value("value");
 
 #ifdef ENVOY_GOOGLE_GRPC
-  EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(grpc_service, scope_, false));
+  EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(
+                         grpc_service, scope_, AsyncClientFactoryClusterChecks::ValidateStatic));
 #else
   EXPECT_THROW_WITH_MESSAGE(
-      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Google C++ gRPC client is not linked");
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_,
+                                                  AsyncClientFactoryClusterChecks::ValidateStatic),
+      EnvoyException, "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -129,7 +138,8 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownOk) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   EXPECT_CALL(cm_, getThreadLocalCluster(Eq("foo"))).Times(0);
-  ASSERT_NO_THROW(async_client_manager_.factoryForGrpcService(grpc_service, scope_, true));
+  ASSERT_NO_THROW(async_client_manager_.factoryForGrpcService(
+      grpc_service, scope_, AsyncClientFactoryClusterChecks::Skip));
 }
 
 } // namespace
