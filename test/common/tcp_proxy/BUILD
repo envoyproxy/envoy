@@ -11,7 +11,7 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "tcp_proxy_test_base",
-    srcs = [
+    hdrs = [
         "tcp_proxy_test_base.h",
     ],
     deps = [
