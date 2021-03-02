@@ -571,5 +571,38 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   EXPECT_FALSE(response->complete());
 }
 
+TEST_P(QuicHttpIntegrationTest, MultipleSetCookieAndCookieHeaders) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"cookie", "a=b"},
+                                                                 {"cookie", "c=d"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 0, true);
+  waitForNextUpstreamRequest();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
+    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(),
+              "a=b; c=d");
+  }
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                   {"set-cookie", "foo"},
+                                                                   {"set-cookie", "bar"}},
+                                   true);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  const auto out = response->headers().get(Http::LowerCaseString("set-cookie"));
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
+}
+
 } // namespace Quic
 } // namespace Envoy

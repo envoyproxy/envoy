@@ -54,7 +54,8 @@ spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& heade
   spdy::SpdyHeaderBlock header_block;
   headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // The key-value pairs are copied.
-    header_block.insert({header.key().getStringView(), header.value().getStringView()});
+    header_block.AppendValueOrAddHeader(header.key().getStringView(),
+                                        header.value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
   return header_block;
