@@ -721,7 +721,6 @@ testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& 
 }
 
 void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
-  std::cerr << "Got datagrams. Need to dispatch\n";
   absl::MutexLock lock(&lock_);
   received_datagrams_.emplace_back(std::move(data));
 }
