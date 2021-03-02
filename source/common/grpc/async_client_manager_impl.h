@@ -54,6 +54,10 @@ public:
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
                                               bool skip_cluster_check) override;
+  
+  RawAsyncClientPtr getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config,
+                                              Stats::Scope& scope,
+                                              bool skip_cluster_check) override;
 
 private:
   Upstream::ClusterManager& cm_;
