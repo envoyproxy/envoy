@@ -152,9 +152,6 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
 
   initialize();
 
-  // BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-  //   lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "cluster_override
-  //   vhost");
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
@@ -163,20 +160,21 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
       {":authority", "cluster_0"},
   };
 
-  // Even though headers specify cluster_0, set_route_filter modifies route to cluster_override
-  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  // auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_,
+  // 0);
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  response->waitForEndStream();
 
-  EXPECT_TRUE(upstream_request_->complete());
-  // TODO: how do I check req was sent to the right (overridden) upstream cluster? response->body()?
-  // stat counters?
+  // Even though headers specify cluster_0, set_route_filter modifies cached route to
+  // cluster_override
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_200")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
-  // DEBUG: This isn't testing anything, changing values doesn't affect anything??
+  // DEBUG: These EXPECT_EQs aren't working, changing values doesn't affect anything?
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+  ASSERT_TRUE(response->complete());
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
