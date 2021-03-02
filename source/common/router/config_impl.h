@@ -59,7 +59,7 @@ public:
   virtual bool supportsPathlessHeaders() const { return false; }
 };
 
-class PerFilterConfigs {
+class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
                    const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
