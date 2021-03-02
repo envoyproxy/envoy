@@ -73,6 +73,12 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFactoryTest,
                          Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   auto factory = std::make_unique<Bootstrap::Wasm::WasmFactory>();
   auto empty_config = factory->createEmptyConfigProto();
 
@@ -82,6 +88,12 @@ TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
 }
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   config_.set_singleton(false);
   initializeWithConfig(config_);
 
@@ -91,6 +103,12 @@ TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {
 }
 
 TEST_P(WasmFactoryTest, MissingImport) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -102,6 +120,12 @@ TEST_P(WasmFactoryTest, MissingImport) {
 }
 
 TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
   EXPECT_THROW_WITH_REGEX(
@@ -110,6 +134,12 @@ TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
 }
 
 TEST_P(WasmFactoryTest, UnknownRuntime) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   config_.mutable_config()->mutable_vm_config()->set_runtime("envoy.wasm.runtime.invalid");
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
@@ -117,6 +147,12 @@ TEST_P(WasmFactoryTest, UnknownRuntime) {
 }
 
 TEST_P(WasmFactoryTest, StartFailed) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
@@ -127,6 +163,12 @@ TEST_P(WasmFactoryTest, StartFailed) {
 }
 
 TEST_P(WasmFactoryTest, StartFailedOpen) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
@@ -138,6 +180,12 @@ TEST_P(WasmFactoryTest, StartFailedOpen) {
 }
 
 TEST_P(WasmFactoryTest, ConfigureFailed) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);

@@ -69,6 +69,12 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmIntegrationTest);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   initialize();
   ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, wasm_connection_));
 

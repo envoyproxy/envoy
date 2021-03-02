@@ -83,6 +83,12 @@ TEST_P(WasmStatSinkConfigTest, CreateWasmFailOpen) {
 }
 
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   initializeWithConfig(config_);
 
   EXPECT_NE(sink_, nullptr);

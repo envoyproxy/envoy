@@ -28,7 +28,10 @@ std::vector<std::string> sandboxRuntimes() {
 std::vector<std::tuple<std::string, std::string>> runtimesAndLanguages() {
   std::vector<std::tuple<std::string, std::string>> values;
   for (const auto& runtime : sandboxRuntimes()) {
+#if !defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
     values.push_back(std::make_tuple(runtime, "cpp"));
+#endif
     values.push_back(std::make_tuple(runtime, "rust"));
   }
   values.push_back(std::make_tuple("null", "cpp"));

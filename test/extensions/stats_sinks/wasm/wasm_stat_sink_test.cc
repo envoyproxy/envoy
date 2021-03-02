@@ -62,6 +62,10 @@ TEST_P(WasmCommonContextTest, OnStat) {
   std::string code;
   NiceMock<Stats::MockMetricSnapshot> snapshot_;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/stats_sinks/wasm/test_data/test_context_cpp.wasm")));
   } else {

@@ -4,7 +4,8 @@ load(
 )
 load(
     "//bazel:envoy_select.bzl",
-    "envoy_select_wasm",
+    "envoy_select_wasm_cpp_tests",
+    "envoy_select_wasm_rust_tests",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -19,7 +20,9 @@ envoy_extension_cc_test(
     name = "wasm_filter_test",
     size = "enormous",  # For WAVM without precompilation. TODO: add precompilation.
     srcs = ["wasm_filter_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
+        "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
+    ]) + envoy_select_wasm_rust_tests([
         "//test/extensions/filters/http/wasm/test_data:async_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
@@ -27,7 +30,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
-        "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.http.wasm",
     shard_count = 50,
@@ -46,7 +48,7 @@ envoy_extension_cc_test(
     name = "config_test",
     size = "enormous",  # For WAVM without precompilation. TODO: add precompilation.
     srcs = ["config_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.http.wasm",

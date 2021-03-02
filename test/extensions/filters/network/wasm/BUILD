@@ -4,7 +4,8 @@ load(
 )
 load(
     "//bazel:envoy_select.bzl",
-    "envoy_select_wasm",
+    "envoy_select_wasm_cpp_tests",
+    "envoy_select_wasm_rust_tests",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -18,7 +19,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.filters.network.wasm",
@@ -41,9 +42,10 @@ envoy_extension_cc_test(
     name = "wasm_filter_test",
     size = "large",
     srcs = ["wasm_filter_test.cc"],
-    data = envoy_select_wasm([
-        "//test/extensions/filters/network/wasm/test_data:logging_rust.wasm",
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
+    ]) + envoy_select_wasm_rust_tests([
+        "//test/extensions/filters/network/wasm/test_data:logging_rust.wasm",
     ]),
     extension_name = "envoy.filters.network.wasm",
     deps = [
