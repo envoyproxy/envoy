@@ -414,7 +414,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
 
   {
     // Set up expectations to be triggered by sendLocalReply at the bottom of
-    // thi block.
+    // this block.
     InSequence s;
 
     // Make sure all 3 filters get onLocalReply
