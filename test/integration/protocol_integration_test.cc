@@ -171,7 +171,7 @@ TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_200")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
-  // DEBUG: These EXPECT_EQs aren't working, changing values doesn't affect anything?
+  // DEBUG: These aren't working, changing values doesn't affect anything?
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
 
   ASSERT_TRUE(response->complete());
