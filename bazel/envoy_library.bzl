@@ -218,6 +218,38 @@ def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
         **kargs
     )
 
+# Used to specify a library that only builds on POSIX excluding Linux
+def envoy_cc_posix_without_linux_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_posix",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "@envoy//bazel:linux": [],
+            "//conditions:default": srcs,
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "@envoy//bazel:linux": [],
+            "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on Linux
+def envoy_cc_linux_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_linux",
+        srcs = select({
+            "@envoy//bazel:linux": srcs,
+            "//conditions:default": [],
+        }),
+        hdrs = select({
+            "@envoy//bazel:linux": hdrs,
+            "//conditions:default": [],
+        }),
+        **kargs
+    )
+
 # Used to specify a library that only builds on Windows
 def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(

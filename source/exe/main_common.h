@@ -39,7 +39,6 @@ public:
   MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                  std::unique_ptr<ProcessContext> process_context);
 
   bool run();
@@ -66,6 +65,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
+  PlatformImpl platform_impl_;
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
   // an ifdef in a header file exposed in a C++ library. It is too easy to have
@@ -73,8 +73,6 @@ protected:
   Grpc::GoogleGrpcContext google_grpc_context_;
   const Envoy::Server::Options& options_;
   Server::ComponentFactory& component_factory_;
-  Thread::ThreadFactory& thread_factory_;
-  Filesystem::Instance& file_system_;
   Stats::SymbolTableImpl symbol_table_;
   Stats::AllocatorImpl stats_allocator_;
 
@@ -144,7 +142,6 @@ private:
   Envoy::TerminateHandler log_on_terminate_;
 #endif
 
-  PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
   DefaultListenerHooks default_listener_hooks_;

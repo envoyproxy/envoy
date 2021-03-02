@@ -11,6 +11,7 @@ public:
   ~PlatformImpl();
   Thread::ThreadFactory& threadFactory() { return *thread_factory_; }
   Filesystem::Instance& fileSystem() { return *file_system_; }
+  bool enableCoreDump();
 
 private:
   Thread::ThreadFactoryPtr thread_factory_;

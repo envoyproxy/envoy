@@ -1,9 +1,5 @@
 #include "server/server.h"
 
-#if !defined(WIN32) && !defined(__APPLE__)
-#include <sys/prctl.h>
-#endif
-
 #include <csignal>
 #include <cstdint>
 #include <ctime>
@@ -94,15 +90,6 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), server_contexts_(*this) {
-
-#ifdef PR_SET_DUMPABLE
-  if (options.coreDumpEnabled()) {
-    if (prctl(PR_SET_DUMPABLE, 1) == -1) {
-      ENVOY_LOG(error, "prctl call to enable core dumps failed");
-    }
-  }
-#endif
-
   try {
     if (!options.logPath().empty()) {
       try {
