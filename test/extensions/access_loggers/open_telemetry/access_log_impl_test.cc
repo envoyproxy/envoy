@@ -111,7 +111,7 @@ values:
   Stats::IsolatedStoreImpl scope_;
   MockFilter* filter_{new NiceMock<MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config_;
+  envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
   AccessLogPtr access_log_;
