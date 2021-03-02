@@ -2,7 +2,9 @@
 
 #include <string>
 
-// Declares the ApiVersion struct and defines Envoy::api_version.
+#include "common/version/api_version_struct.h"
+
+// Defines the ApiVersion version (Envoy::api_version).
 #include "common/version/api_version_number.h"
 
 namespace Envoy {
