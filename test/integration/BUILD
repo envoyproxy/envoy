@@ -418,6 +418,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_typed_per_filter_config_test",
+    srcs = [
+        "http_typed_per_filter_config_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/http/health_check:config",
+        "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http_timeout_integration_test",
     srcs = [
         "http_timeout_integration_test.cc",
@@ -1534,6 +1546,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/filters/http/health_check:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
