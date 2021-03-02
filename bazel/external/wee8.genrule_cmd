@@ -135,6 +135,10 @@ else
   ninja=$$(command -v ninja)
 fi
 
+if [[ "$${PLATFORM}" == MSYS_NT-*-x86_64 ]]; then
+  export DEPOT_TOOLS_WIN_TOOLCHAIN=0
+fi
+
 # Build wee8.
 "$$gn" gen out/wee8 --args="$$WEE8_BUILD_ARGS"
 "$$ninja" -C out/wee8 wee8
