@@ -362,7 +362,7 @@ TEST_F(FileSystemImplTest, StdErr) {
   FilePathAndType file_info{Filesystem::DestinationType::Stderr, ""};
   FilePtr file = file_system_.createFile(file_info);
   const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
-  EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_);
+  EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_->getErrorDetails());
   EXPECT_TRUE(file->isOpen());
   std::string data(" new data\n");
   const Api::IoCallSizeResult result = file->write(data);
@@ -383,7 +383,6 @@ TEST_F(FileSystemImplTest, Console) {
 }
 
 TEST_F(FileSystemImplTest, Win32InvalidHandleThrows) {
-  ENVOY_LOG_MISC(debug, "123");
   FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
   FilePtr file = file_system_.createFile(file_info);
   // We need to flush just to make sure that the write has been completed.
