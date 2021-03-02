@@ -167,7 +167,7 @@ private:
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManager,
                                         public Singleton::Instance {
 public:
-  ~FilterConfigProviderManagerImpl();
+  ~FilterConfigProviderManagerImpl() override;
 
   FilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ConfigSource& config_source,
