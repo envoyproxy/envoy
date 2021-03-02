@@ -212,11 +212,12 @@ def _create_classes_jar(name, manifest, android_library):
     """
     android_binary_name = name + "_bin"
 
-    # This creates bazel-bin/library/kotlin/src/io/envoyproxy/envoymobile/{name}_bin_deploy.jar
+    # This creates bazel-bin/library/kotlin/io/envoyproxy/envoymobile/{name}_bin_deploy.jar
     # This jar has all the classes needed for our aar and will be our `classes.jar`
     android_binary(
         name = android_binary_name,
         manifest = manifest,
+        custom_package = "does.not.matter",
         srcs = [],
         deps = [android_library],
     )
@@ -255,6 +256,7 @@ def _create_sources_javadocs(name, android_library):
     java_binary(
         name = _sources_name,
         runtime_deps = [android_library],
+        main_class = "EngineImpl",
     )
 
     # This takes all the source files from the source jar and creates a javadoc.jar from it

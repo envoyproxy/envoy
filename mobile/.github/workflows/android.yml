@@ -107,7 +107,7 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: bazel test --test_output=all --build_tests_only //library/kotlin/test/...
+      - run: bazel test --test_output=all --build_tests_only //test/kotlin/...
         name: 'Run Kotlin library tests'
   javatests:
     name: java_tests
@@ -122,5 +122,5 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: bazel test --test_output=all --build_tests_only //library/java/test/...
+      - run: bazel test --test_output=all --build_tests_only //test/java/...
         name: 'Run Java library tests'

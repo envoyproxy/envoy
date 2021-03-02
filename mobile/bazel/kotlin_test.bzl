@@ -23,10 +23,10 @@ def envoy_mobile_kt_test(name, srcs, deps = []):
     # we want to avoid consumers to use but we want to unit test
     dep_srcs = []
     for dep in deps:
-        # We'll resolve only the targets in `//library/kotlin/src/io/envoyproxy/envoymobile`
-        if dep.startswith("//library/kotlin/src/io/envoyproxy/envoymobile"):
+        # We'll resolve only the targets in `//library/kotlin/io/envoyproxy/envoymobile`
+        if dep.startswith("//library/kotlin/io/envoyproxy/envoymobile"):
             dep_srcs.append(dep + "_srcs")
-        elif dep.startswith("//library/java/src/io/envoyproxy/envoymobile"):
+        elif dep.startswith("//library/java/io/envoyproxy/envoymobile"):
             dep_srcs.append(dep + "_srcs")
 
     kt_jvm_test(

@@ -1,30 +1,30 @@
 {
   "additionalFilePaths" : [
-    "library/swift/src/BUILD",
-    "library/swift/test/BUILD"
+    "library/swift/BUILD",
+    "test/swift/BUILD"
   ],
   "buildTargets" : [
     "//examples/objective-c/hello_world:app",
     "//examples/objective-c/hello_world:appmain",
     "//examples/swift/hello_world:app",
     "//examples/swift/hello_world:appmain",
-    "//library/swift/src:ios_framework_archive",
-    "//library/swift/test:grpc_request_headers_builder_tests",
-    "//library/swift/test:grpc_request_headers_builder_tests_lib",
-    "//library/swift/test:grpc_stream_tests",
-    "//library/swift/test:grpc_stream_tests_lib",
-    "//library/swift/test:headers_builder_tests",
-    "//library/swift/test:headers_builder_tests_lib",
-    "//library/swift/test:request_headers_builder_tests",
-    "//library/swift/test:request_headers_builder_tests_lib",
-    "//library/swift/test:response_headers_tests",
-    "//library/swift/test:response_headers_tests_lib",
-    "//library/swift/test:retry_policy_mapper_tests",
-    "//library/swift/test:retry_policy_mapper_tests_lib",
-    "//library/swift/test:retry_policy_tests",
-    "//library/swift/test:retry_policy_tests_lib",
-    "//library/swift/test:engine_builder_tests",
-    "//library/swift/test:engine_builder_tests_lib"
+    "//library/swift:ios_framework_archive",
+    "//test/swift:grpc_request_headers_builder_tests",
+    "//test/swift:grpc_request_headers_builder_tests_lib",
+    "//test/swift:grpc_stream_tests",
+    "//test/swift:grpc_stream_tests_lib",
+    "//test/swift:headers_builder_tests",
+    "//test/swift:headers_builder_tests_lib",
+    "//test/swift:request_headers_builder_tests",
+    "//test/swift:request_headers_builder_tests_lib",
+    "//test/swift:response_headers_tests",
+    "//test/swift:response_headers_tests_lib",
+    "//test/swift:retry_policy_mapper_tests",
+    "//test/swift:retry_policy_mapper_tests_lib",
+    "//test/swift:retry_policy_tests",
+    "//test/swift:retry_policy_tests_lib",
+    "//test/swift:engine_builder_tests",
+    "//test/swift:engine_builder_tests_lib"
   ],
   "optionSet" : {
     "BazelBuildOptionsDebug" : {
@@ -76,6 +76,6 @@
     "library",
     "library/objective-c/...",
     "library/swift/...",
-    "library/swift/src"
+    "library/swift"
   ]
 }

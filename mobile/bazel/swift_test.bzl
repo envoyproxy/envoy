@@ -23,7 +23,7 @@ def envoy_mobile_swift_test(name, srcs, deps = []):
         name = test_lib_name,
         srcs = srcs,
         deps = [
-            "//library/swift/src:ios_framework_archive",
+            "//library/swift:ios_framework_archive",
         ] + deps,
         linkopts = ["-lresolv.9"],
         visibility = ["//visibility:private"],

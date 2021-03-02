@@ -27,7 +27,7 @@ jobs:
           submodules: true
       - name: 'Run coverage'
         continue-on-error: true
-        run: "PATH=/opt/llvm/bin:${PATH} ./envoy/test/run_envoy_bazel_coverage.sh //test/..."
+        run: "PATH=/opt/llvm/bin:${PATH} ./envoy/test/run_envoy_bazel_coverage.sh //test/common/..."
       - name: 'package coverage'
         run: |
           tar -czvf coverage.tar.gz generated/coverage
