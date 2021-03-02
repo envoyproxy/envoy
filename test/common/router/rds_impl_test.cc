@@ -187,8 +187,10 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
+  // ConfigConstSharedPtr is shared between: RouteConfigUpdateReceiverImpl, rds_ (via tls_), and
+  // config local var below.
   ConfigConstSharedPtr config = rds_->config();
-  EXPECT_EQ(2, config.use_count());
+  EXPECT_EQ(3, config.use_count());
 
   // Third request.
   const std::string response2_json = R"EOF(
