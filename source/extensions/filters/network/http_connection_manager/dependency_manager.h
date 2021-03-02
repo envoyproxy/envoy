@@ -35,7 +35,7 @@ public:
   bool validDecodeDependencies();
 
 private:
-  std::vector<std::pair<const std::string&,
+  std::vector<std::pair<std::string,
                         envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
       filter_chain_;
 };
