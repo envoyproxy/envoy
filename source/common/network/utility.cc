@@ -125,7 +125,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
   return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
+Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                               uint16_t port, bool v6only) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
@@ -140,8 +140,17 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
     sa6.sin6_port = htons(port);
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
-  throwWithMalformedIp(ip_address);
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr;
+}
+
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
+                                                              uint16_t port, bool v6only) {
+  const Address::InstanceConstSharedPtr address =
+      parseInternetAddressNoThrow(ip_address, port, v6only);
+  if (address == nullptr) {
+    throwWithMalformedIp(ip_address);
+  }
+  return address;
 }
 
 Address::InstanceConstSharedPtr
