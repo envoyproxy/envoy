@@ -19,7 +19,7 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
-        "//tools/extensions:generate_extension_db",
+        "//tools/extensions/...",
     ],
 )
 
