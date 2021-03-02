@@ -635,7 +635,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "0.1.0",
         sha256 = "b6d46438523a3ec0f3cead544190ee13223a52f6a6765a29eae7b7cc24cc83a0",
         release_date = "2020-10-15",
-        strip_prefix = "",
         urls = ["https://github.com/bazelbuild/rules_python/releases/download/{version}/rules_python-{version}.tar.gz"],
         use_category = ["build"],
     ),
