@@ -317,7 +317,6 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
 }
 
 TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
-  quic::SetVerbosityLogThreshold(1);
   installReadFilter();
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;

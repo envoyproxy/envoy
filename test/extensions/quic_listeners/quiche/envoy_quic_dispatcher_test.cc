@@ -236,7 +236,6 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherTests, EnvoyQuicDispatcherTest,
                          testing::ValuesIn(generateTestParam()), testParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  quic::SetVerbosityLogThreshold(1);
   if (quicVersionUsesTls()) {
     // QUICHE doesn't support 0-RTT TLS1.3 handshake yet.
     processValidChloPacketAndCheckStatus(false);
