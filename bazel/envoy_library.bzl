@@ -240,11 +240,17 @@ def envoy_cc_linux_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
         name = name + "_linux",
         srcs = select({
-            "@envoy//bazel:linux": srcs,
+            "@envoy//bazel:linux_x86_64": srcs,
+            "@envoy//bazel:linux_aarch64": srcs,
+            "@envoy//bazel:linux_ppc": srcs,
+            "@envoy//bazel:linux_mips64": srcs,
             "//conditions:default": [],
         }),
         hdrs = select({
-            "@envoy//bazel:linux": hdrs,
+            "@envoy//bazel:linux_x86_64": hdrs,
+            "@envoy//bazel:linux_aarch64": hdrs,
+            "@envoy//bazel:linux_ppc": hdrs,
+            "@envoy//bazel:linux_mips64": hdrs,
             "//conditions:default": [],
         }),
         **kargs
