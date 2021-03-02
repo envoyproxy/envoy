@@ -224,12 +224,18 @@ def envoy_cc_posix_without_linux_library(name, srcs = [], hdrs = [], **kargs):
         name = name + "_posix",
         srcs = select({
             "@envoy//bazel:windows_x86_64": [],
-            "@envoy//bazel:linux": [],
+            "@envoy//bazel:linux_x86_64": [],
+            "@envoy//bazel:linux_aarch64": [],
+            "@envoy//bazel:linux_ppc": [],
+            "@envoy//bazel:linux_mips64": [],
             "//conditions:default": srcs,
         }),
         hdrs = select({
             "@envoy//bazel:windows_x86_64": [],
-            "@envoy//bazel:linux": [],
+            "@envoy//bazel:linux_x86_64": [],
+            "@envoy//bazel:linux_aarch64": [],
+            "@envoy//bazel:linux_ppc": [],
+            "@envoy//bazel:linux_mips64": [],
             "//conditions:default": hdrs,
         }),
         **kargs
