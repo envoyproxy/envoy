@@ -40,6 +40,7 @@ public:
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
+  virtual uint64_t maxRequestsPerConnection() const PURE;
 };
 
 /**
@@ -272,6 +273,10 @@ private:
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;
+
+  // The number of requests accumulated on the current connection.
+  uint64_t accumulated_requests_{};
+  bool requests_overflow_{false};
 };
 
 } // namespace ThriftProxy

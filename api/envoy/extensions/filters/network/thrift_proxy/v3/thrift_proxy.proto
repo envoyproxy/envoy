@@ -5,6 +5,7 @@ package envoy.extensions.filters.network.thrift_proxy.v3;
 import "envoy/extensions/filters/network/thrift_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -57,7 +58,7 @@ enum ProtocolType {
   TWITTER = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy";
@@ -88,6 +89,9 @@ message ThriftProxy {
   // is the same, the transport type is framed and the protocol is not Twitter. Otherwise Envoy will
   // fallback to decode the data.
   bool payload_passthrough = 6;
+
+  // Optional maximum requests for a single downstream connection. If not specified, there is no limit.
+  google.protobuf.UInt32Value max_requests_per_connection = 7;
 }
 
 // ThriftFilter configures a Thrift filter.
