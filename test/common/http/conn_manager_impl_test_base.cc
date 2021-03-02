@@ -1,6 +1,5 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
