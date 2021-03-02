@@ -287,7 +287,6 @@ TEST_P(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
 }
 
 TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
-  quic::SetVerbosityLogThreshold(1);
   receiveRequest(request_body_, false, request_body_.size() * 2);
   // Write response headers with FIN before finish receiving request.
   quic_stream_->encodeHeaders(response_headers_, true);
