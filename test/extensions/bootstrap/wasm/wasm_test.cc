@@ -120,13 +120,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                          testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
-                                          testing::Values(
-#if !defined(__aarch64__)
-                                              // TODO(PiotrSikora): There are no Emscripten releases
-                                              // for arm64.
-                                              "cpp",
-#endif
-                                              "rust")));
+                                          Envoy::Extensions::Common::Wasm::language_values));
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, Logging) {
