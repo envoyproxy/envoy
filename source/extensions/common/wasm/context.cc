@@ -666,19 +666,22 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
 const Http::HeaderMap* Context::getConstMap(WasmHeaderMapType type) {
   switch (type) {
   case WasmHeaderMapType::RequestHeaders:
-    if (access_log_request_headers_) {
+    if (access_log_phase_) {
       return access_log_request_headers_;
     }
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
+    if (access_log_phase_) {
+      return nullptr;
+    }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
-    if (access_log_response_headers_) {
+    if (access_log_phase_) {
       return access_log_response_headers_;
     }
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
-    if (access_log_response_trailers_) {
+    if (access_log_phase_) {
       return access_log_response_trailers_;
     }
     return response_trailers_;
@@ -722,6 +725,16 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
                                       absl::string_view* value) {
   auto map = getConstMap(type);
   if (!map) {
+    if (access_log_phase_) {
+      // Maps might point to nullptr in the access log phase.
+      if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
+        *value = "";
+        return WasmResult::Ok;
+      } else {
+        return WasmResult::NotFound;
+      }
+    }
+    // Requested map type is not currently available.
     return WasmResult::BadArgument;
   }
   const Http::LowerCaseString lower_key{std::string(key)};
@@ -1479,6 +1492,7 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
     onCreate();
   }
 
+  access_log_phase_ = true;
   access_log_request_headers_ = request_headers;
   // ? request_trailers  ?
   access_log_response_headers_ = response_headers;
@@ -1487,6 +1501,7 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
 
   onLog();
 
+  access_log_phase_ = false;
   access_log_request_headers_ = nullptr;
   // ? request_trailers  ?
   access_log_response_headers_ = nullptr;
