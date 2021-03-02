@@ -71,8 +71,9 @@ public:
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
 
+  SSL* rawSslForTest() const { return rawSsl(); }
+
 protected:
-  friend class SslSocketFriend;
   SSL* rawSsl() const { return info_->ssl_.get(); }
 
 private:

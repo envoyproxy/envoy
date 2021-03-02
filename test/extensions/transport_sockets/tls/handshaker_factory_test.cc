@@ -26,14 +26,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-// Friend class to SslSocket to allow inspection of SSL*.
-// Must be in the same namespace.
-class SslSocketFriend {
-public:
-  static SSL* getRawSsl(SslSocket& ssl_socket) { return ssl_socket.rawSsl(); }
-};
-
 namespace {
 
 // Test-only custom process object which accepts an `SslCtxCb` for in-test SSL_CTX
@@ -84,7 +76,7 @@ protected:
   // SSL_CTX.
   SSL_CTX* extractSslCtx(Network::TransportSocket* socket) {
     SslSocket* ssl_socket = dynamic_cast<SslSocket*>(socket);
-    SSL* ssl = SslSocketFriend::getRawSsl(*ssl_socket);
+    SSL* ssl = ssl_socket->rawSslForTest();
     return SSL_get_SSL_CTX(ssl);
   }
 
