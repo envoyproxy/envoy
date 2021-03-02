@@ -62,6 +62,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
+    "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
@@ -86,10 +87,12 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
+    "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
+    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 };
 
 // This is a section for officially sanctioned runtime features which are too

@@ -183,6 +183,9 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   request_headers.OnHeader(":authority", host_);
   request_headers.OnHeader(":method", "GET");
   request_headers.OnHeader(":path", "/");
+  // QUICHE stack doesn't coalesce Cookie headers for header compression optimization.
+  request_headers.OnHeader("cookie", "a=b");
+  request_headers.OnHeader("cookie", "c=d");
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
                                    /*compressed_header_bytes=*/0);
 
@@ -192,6 +195,13 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
+          // Verify that the duplicated headers are handled correctly before passing to stream
+          // decoder.
+          EXPECT_EQ("a=b; c=d",
+                    headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
+        }
       }));
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
@@ -199,6 +209,8 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
     spdy_headers[":authority"] = host_;
     spdy_headers[":method"] = "GET";
     spdy_headers[":path"] = "/";
+    spdy_headers.AppendValueOrAddHeader("cookie", "a=b");
+    spdy_headers.AppendValueOrAddHeader("cookie", "c=d");
     std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);
     quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
     quic_stream_->OnStreamFrame(frame);
