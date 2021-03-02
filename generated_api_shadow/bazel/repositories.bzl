@@ -23,6 +23,9 @@ def api_dependencies():
         name = "com_google_googleapis",
     )
     external_http_archive(
+        name = "com_github_bazelbuild_buildtools",
+    )
+    external_http_archive(
         name = "com_github_cncf_udpa",
     )
 
