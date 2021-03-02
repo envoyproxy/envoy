@@ -89,8 +89,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
           resource_decoder_, false);
   local_init_manager_.add(local_init_target_);
-  config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource());
+  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -123,7 +122,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
-    if (config_update_info_->routeConfiguration().has_vhds() &&
+    if (config_update_info_->protobufConfiguration().has_vhds() &&
         config_update_info_->vhdsConfigurationChanged()) {
       ENVOY_LOG(
           debug,
@@ -132,7 +131,10 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       maybeCreateInitManager(version_info, noop_init_manager, resume_rds);
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_,
-          config_update_info_->routeConfiguration().vhds().config_source().resource_api_version());
+          config_update_info_->protobufConfiguration()
+              .vhds()
+              .config_source()
+              .resource_api_version());
       vhds_subscription_->registerInitTargetWithInitManager(
           noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
     }
@@ -144,7 +146,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       route_config_provider_opt_.value()->onConfigUpdate();
     }
     // RDS update removed VHDS configuration
-    if (!config_update_info_->routeConfiguration().has_vhds()) {
+    if (!config_update_info_->protobufConfiguration().has_vhds()) {
       vhds_subscription_.release();
     }
 
@@ -229,7 +231,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       tls_(factory_context.threadLocal()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
-    initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
+    initial_config = std::make_shared<ConfigImpl>(config_update_info_->protobufConfiguration(),
                                                   factory_context_, validator_, false);
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
@@ -250,9 +252,8 @@ RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() { return tls_->config_; }
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
-  ConfigConstSharedPtr new_config(new ConfigImpl(config_update_info_->routeConfiguration(),
-                                                 factory_context_, validator_, false));
-  tls_.runOnAllThreads([new_config](OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
+  tls_.runOnAllThreads([new_config = config_update_info_->parsedConfiguration()](
+                           OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
@@ -260,7 +261,8 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
     return;
   }
 
-  const auto config = std::static_pointer_cast<const ConfigImpl>(new_config);
+  const auto config =
+      std::static_pointer_cast<const ConfigImpl>(config_update_info_->parsedConfiguration());
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
@@ -377,7 +379,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
       dynamic_config->mutable_route_config()->PackFrom(
-          API_RECOVER_ORIGINAL(subscription->routeConfigUpdate()->routeConfiguration()));
+          API_RECOVER_ORIGINAL(subscription->routeConfigUpdate()->protobufConfiguration()));
       TimestampUtil::systemClockToTimestamp(subscription->routeConfigUpdate()->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
