@@ -65,6 +65,7 @@ public:
   const std::string Status = "status";
   const std::string UpstreamAddress = "upstream_address";
   const std::string UpstreamCluster = "upstream_cluster";
+  const std::string UpstreamClusterName = "upstream_cluster.name";
   const std::string UserAgent = "user_agent";
   const std::string Zone = "zone";
 
