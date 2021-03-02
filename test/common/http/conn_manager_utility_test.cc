@@ -101,7 +101,7 @@ public:
     ON_CALL(config_, localReply()).WillByDefault(ReturnRef(*local_reply_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
-    ON_CALL(config_, requestIDExtension()).WillByDefault(ReturnRef(request_id_extension_));
+    ON_CALL(config_, requestIDExtension()).WillByDefault(ReturnPointee(&request_id_extension_));
   }
 
   struct MutateRequestRet {
