@@ -1810,7 +1810,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIs
       {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
@@ -1829,7 +1829,7 @@ TEST_P(IntegrationTest, ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNot
       {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
   auto response = std::move(encoder_decoder.second);
 
-  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
