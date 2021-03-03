@@ -73,7 +73,8 @@ protected:
       return;
     }
     SERVICE_STATUS status;
-    EXPECT_TRUE(ControlService(service_handle_, SERVICE_CONTROL_STOP, &status));
+    EXPECT_TRUE(ControlService(service_handle_, SERVICE_CONTROL_STOP, &status))
+        << fmt::format("Could not stop service, error {}", ::GetLastError());
     waitForServiceStatus(SERVICE_STOPPED);
   }
 
