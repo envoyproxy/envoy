@@ -73,11 +73,6 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=ENVOY_BLOB_SHA"
     "--action_env=EXTENSION_DB_PATH")
 
-
-# Generate extension database. This maps from extension name to extension
-# metadata, based on the envoy_cc_extension() Bazel target attributes.
-bazel run //tools/extensions:generate_extension_db
-
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
 mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
@@ -98,7 +93,7 @@ function generate_api_rst() {
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
   # config.
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-    "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+    "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
