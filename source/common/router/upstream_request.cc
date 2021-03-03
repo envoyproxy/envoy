@@ -32,6 +32,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -325,7 +326,12 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::LocalReset;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
+      reset_reason = Http::StreamResetReason::ConnectionFailure;
+    } else {
+      reset_reason = Http::StreamResetReason::LocalReset;
+    }
   }
 
   // Mimic an upstream reset.
