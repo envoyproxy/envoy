@@ -166,11 +166,65 @@ Pre-built Envoy Docker images
 
 The following table shows the available Docker images
 
-.. csv-table::
-   :widths: 30 38 8 8 8 8
+.. list-table::
+   :widths: auto
    :header-rows: 2
    :stub-columns: 1
-   :file: _include/dockerhub-images.csv
+
+   * -
+     -
+     - stable
+     - stable
+     - main
+     - main
+   * - Docker image
+     - Description
+     - amd64
+     - arm64
+     - amd64
+     - arm64
+   * - `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
+   * - `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     -
+     -
+     - latest
+     -
+   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
+     - Build image which includes tools for building multi-arch Envoy and containers.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
 
 .. note::
 
