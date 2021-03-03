@@ -100,10 +100,6 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
           POOL_GAUGE_PREFIX(*scope_,
                             absl::StrCat("wasm.", config.config().vm_config().runtime(), ".")))}) {
   initializeStats();
-
-  for (auto& env : config.envs()) {
-    std::cout << "Key: " << env.first << ", Value: " << env.second << "\n";
-  }
   ENVOY_LOG(debug, "Base Wasm created {} now active", active_wasms);
 }
 
