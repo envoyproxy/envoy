@@ -115,3 +115,12 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "platform_impl_test",
+    srcs = ["platform_impl_test.cc"],
+    deps = [
+        "//source/exe:platform_impl_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
