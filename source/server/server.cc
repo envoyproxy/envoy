@@ -695,10 +695,10 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // On Windows we use it internally for all the console events that indicate that we should
   // terminate the process.
   if (options.signalHandlingEnabled()) {
-    sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
-      instance.shutdown();
-    });
+    // sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
+    //   ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
+    //   instance.shutdown();
+    // });
 #ifndef WIN32
     sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");

@@ -98,7 +98,7 @@ public:
   using PostServerHook = std::function<void(Server::Instance& server)>;
 
   MainCommon(int argc, const char* const* argv);
-  MainCommon(std::vector<std::string> args);
+  MainCommon(const std::vector<std::string>& args);
 
   bool run() { return base_.run(); }
   // Only tests have a legitimate need for this today.

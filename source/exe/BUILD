@@ -179,9 +179,16 @@ envoy_cc_win32_library(
 
 envoy_cc_library(
     name = "scm_impl_lib",
+    srcs = select({
+        "//bazel:windows_x86_64": [
+            "win32/service_base.cc",
+        ],
+        "//conditions:default": [],
+    }),
     hdrs = select({
         "//bazel:windows_x86_64": [
             "win32/service_base.h",
+            "win32/service_status.h",
         ],
         "//conditions:default": [],
     }),
@@ -189,31 +196,16 @@ envoy_cc_library(
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "",
     }),
-    deps = envoy_cc_platform_dep("scm_impl_lib"),
-)
-
-envoy_cc_posix_library(
-    name = "scm_impl_lib",
-    srcs = [],
-    hdrs = [],
-    deps = [],
-)
-
-envoy_cc_win32_library(
-    name = "scm_impl_lib",
-    srcs = ["win32/service_base.cc"],
-    hdrs = [
-        "win32/service_base.h",
-        "win32/service_status.h",
-    ],
-    strip_include_prefix = "win32",
-    deps = [
+    deps = select({
+        "//bazel:windows_x86_64": [
         ":main_common_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:signal_lib",
-    ],
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(

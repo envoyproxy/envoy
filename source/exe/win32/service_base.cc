@@ -30,7 +30,6 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
   // `main_common` starts because the loggers have not been initialized
   //  so we do not have a good way to know what is happening if the program fails.
   service_static = &service;
-  RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
 
   // The `SERVICE_TABLE_ENTRY` struct requires a volatile `LPSTR`
   char nullstr[1] = "";
