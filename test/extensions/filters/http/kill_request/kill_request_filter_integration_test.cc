@@ -46,6 +46,33 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
                "");
 }
 
+// Request crash Envoy controlled via response.
+TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResponse) {
+  const std::string filter_config_response =
+      R"EOF(
+      name: envoy.filters.http.kill_request
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest
+        probability:
+          numerator: 100
+        direction: RESPONSE
+      )EOF";
+  initializeFilter(filter_config_response);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(0, 1024, response.get());
+
+  // Try with kill request header in response.
+  Http::TestResponseHeaderMapImpl kill_response_headers = default_response_headers_;
+  kill_response_headers.addCopy("x-envoy-kill-request", "true");
+
+  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024), "");
+}
+
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
   const std::string filter_config_with_custom_kill_header =
       R"EOF(

@@ -17,7 +17,10 @@ Configuration
 Enable Kill Request via HTTP header
 --------------------------------------------
 
-The KillRequest filter requires a kill header in the request. If *kill_request_header* is not empty in *KillRequest* proto, the name of the kill header must match *KillRequest.kill_request_header*, otherwise it must match the default kill header below:
+The KillRequest filter requires a kill header in the request or response. If
+*kill_request_header* is not empty in *KillRequest* proto, the name of the kill
+header must match *KillRequest.kill_request_header*, otherwise it must match
+the default kill header below:
 
 x-envoy-kill-request
   whether the request is a Kill request.
