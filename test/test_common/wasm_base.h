@@ -1,6 +1,5 @@
 #include <cstdio>
 
-#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
 
