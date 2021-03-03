@@ -32,6 +32,7 @@ EXTERNAL_PROTO_CC_BAZEL_DEP_MAP = {
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_cc",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_cc",
+    "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_cc_proto",
 }
 
 # This maps from the Bazel proto_library target to the Python language binding target for external dependencies.
@@ -40,4 +41,5 @@ EXTERNAL_PROTO_PY_BAZEL_DEP_MAP = {
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_py",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_py",
+    "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_py_proto",
 }
