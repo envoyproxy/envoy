@@ -49,10 +49,9 @@ public:
   /**
    * Detect the final remote address.
    *
-   * Note that, when an extension is configured, this method will be called
-   * ahead of the attempt to extract the downstream remote address from the
-   * x-forwarded-for header. If the call fails to detect the original IP address,
-   * the HCM will then fallback to the standard IP detection mechanisms.
+   * If the call to this method succeeds in detecting the remote IP address or
+   * fails and is configured to reject the request in that case, no other
+   * configured extensions will be called (if any).
    *
    * @param param supplies the OriginalIPDetectionParams params for detection.
    * @return OriginalIPDetectionResult the result of the extension's attempt to detect
