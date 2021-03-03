@@ -1409,8 +1409,13 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   DUMP_DETAILS(&protocol_constraints_);
 
   os << spaces << "Number of active streams: " << active_streams_.size() << " Active Streams:\n";
-  std::for_each_n(active_streams_.begin(), std::min<size_t>(active_streams_.size(), 100),
-                  [&](auto& stream) { DUMP_DETAILS(stream); });
+  size_t count = 0;
+  for (auto& stream : active_streams_) {
+    DUMP_DETAILS(stream);
+    if (++count >= 100) {
+      break;
+    }
+  }
 
   // Dump the active slice
   if (current_slice_ == nullptr) {
@@ -1472,7 +1477,8 @@ ClientConnectionImpl::ClientConnectionImpl(
     Nghttp2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_response_headers_kb,
                      max_response_headers_count),
-      callbacks_(callbacks) {
+      callbacks_(callbacks), enable_upstream_http2_flood_checks_(Runtime::runtimeFeatureEnabled(
+                                 "envoy.reloadable_features.upstream_http2_flood_checks")) {
   ClientHttp2Options client_http2_options(http2_options);
   session_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
                                           client_http2_options.options());
@@ -1521,7 +1527,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
                                                 uint32_t padding_length) {
   Status result;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.upstream_http2_flood_checks")) {
+  if (enable_upstream_http2_flood_checks_) {
     ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
                    connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
                    static_cast<uint64_t>(hd->length), padding_length);
@@ -1544,7 +1550,7 @@ Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
 // TODO(yanavlasov): move to the base class once the runtime flag is removed.
 ProtocolConstraints::ReleasorProc
 ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.upstream_http2_flood_checks")) {
+  if (enable_upstream_http2_flood_checks_) {
     return protocol_constraints_.incrementOutboundFrameCount(
         is_outbound_flood_monitored_control_frame);
   }

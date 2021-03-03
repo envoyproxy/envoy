@@ -490,8 +490,9 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
 
 Http1Settings
 Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            const Protobuf::BoolValue& hcm_stream_error) {
+                            const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme) {
   Http1Settings ret = parseHttp1Settings(config);
+  ret.validate_scheme_ = validate_scheme;
 
   if (config.has_override_stream_error_on_invalid_http_message()) {
     // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM

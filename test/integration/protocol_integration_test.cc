@@ -53,6 +53,12 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
+// TODO(#14829) categorize or fix all failures.
+#define EXCLUDE_UPSTREAM_HTTP3                                                                     \
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {                                     \
+    return;                                                                                        \
+  }
+
 TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -123,6 +129,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -130,6 +138,8 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "600"}};
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
 
+  // Regression test https://github.com/envoyproxy/envoy/issues/14890 - no content-length added.
+  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
@@ -202,6 +212,7 @@ TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
 }
 
 TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
+  EXCLUDE_UPSTREAM_HTTP3;
   // filters are prepended, so add them in reverse order
   config_helper_.addFilter(R"EOF(
   name: add-body-filter
@@ -224,6 +235,7 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
 }
 
 TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
+  EXCLUDE_UPSTREAM_HTTP3;
   config_helper_.addFilter(R"EOF(
   name: continue-headers-only-inject-body-filter
   typed_config:
@@ -292,7 +304,7 @@ typed_config:
   upstream_request_->encodeData(128, true);
   response->waitForEndStream();
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() >= FakeHttpConnection::Type::HTTP2) {
     EXPECT_EQ("decode", upstream_request_->trailers()
                             ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
@@ -325,7 +337,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
 }
 
 // Tests missing headers needed for H/1 codec first line.
-TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
+TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
@@ -357,7 +369,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
 }
 
-TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
+TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -413,6 +425,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
 TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
+  EXCLUDE_UPSTREAM_HTTP3;
   // Header with at least 20kb of spaces surrounded by non-whitespace characters to ensure that
   // dispatching is split across 2 dispatch calls. This threshold comes from Envoy preferring 16KB
   // reads, which the buffer rounds up to about 20KB when allocating slices in
@@ -450,6 +463,7 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
+  EXCLUDE_UPSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -465,7 +479,8 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                          std::chrono::milliseconds(500)));
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
@@ -494,6 +509,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
+  EXCLUDE_UPSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -551,6 +567,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreaming) {
 // sure that Envoy cleans up stream state correctly when doing a retry with
 // complete response but incomplete request.
 TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
+  EXCLUDE_UPSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -992,6 +1009,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 // connection error is not detected under these circumstances.
 #if !defined(__APPLE__)
 TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
+  EXCLUDE_UPSTREAM_HTTP3; // TODO(#14829) 503
   testEnvoyHandling100Continue(false, "", true);
 }
 #endif
@@ -1020,7 +1038,10 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
-TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
+TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) {
+  EXCLUDE_UPSTREAM_HTTP3;
+  testTwoRequests(true);
+}
 
 TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) { testMaxStreamDuration(); }
 
@@ -1174,12 +1195,13 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
   // can differentiate between 304-with-advertised-but-absent-body and
   // 304-with-body, is there a protocol error on the active stream.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2 &&
-      upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+      upstreamProtocol() >= FakeHttpConnection::Type::HTTP2) {
     response->waitForReset();
   }
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
+  EXCLUDE_UPSTREAM_HTTP3; // Protocol-specific framing.
   initialize();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -1215,6 +1237,7 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
+  EXCLUDE_UPSTREAM_HTTP3; // Protocol-specific framing.
   initialize();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -1601,6 +1624,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
   // There will be no upstream connections for HTTP/1 downstream, we need to
   // test the full mesh regardless.
   testing_upstream_intentionally_ = true;
+  EXCLUDE_UPSTREAM_HTTP3; // TODO(#14829) Rejected with QUIC_STREAM_EXCESSIVE_LOAD
   const std::string long_method = std::string(48 * 1024, 'a');
   const Http::TestRequestHeaderMapImpl request_headers{{":method", long_method},
                                                        {":path", "/test/long/url"},
@@ -1627,7 +1651,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("400", response->headers().getStatusValue());
     } else {
-      ASSERT(upstreamProtocol() == FakeHttpConnection::Type::HTTP2);
+      ASSERT(upstreamProtocol() >= FakeHttpConnection::Type::HTTP2);
       auto response =
           sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
       EXPECT_TRUE(response->complete());
@@ -1868,6 +1892,7 @@ name: encode-headers-return-stop-all-filter
 // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
 // combine set-cookie headers
 TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
+  EXCLUDE_UPSTREAM_HTTP3; // Multiple cookies not yet supported.
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
