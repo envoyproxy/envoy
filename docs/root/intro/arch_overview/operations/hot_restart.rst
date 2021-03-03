@@ -32,3 +32,7 @@ a given host: an active Envoy server process and, potentially, a draining Envoy 
 will exit as described above. The :option:`--base-id` or :option:`--use-dynamic-base-id` options
 may be used to allow multiple, distinctly configured Envoys to run on the same host and hot restart
 independently.
+
+.. note::
+
+ This feature is not supported on Windows.
