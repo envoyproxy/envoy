@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/http/codec.h"
 #include "envoy/registry/registry.h"
 
