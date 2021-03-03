@@ -747,7 +747,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-01-18",
+        release_date = "2021-02-25",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
