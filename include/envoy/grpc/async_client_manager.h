@@ -43,11 +43,9 @@ public:
   factoryForGrpcService(const envoy::config::core::v3::GrpcService& grpc_service,
                         Stats::Scope& scope, bool skip_cluster_check) PURE;
 
-  virtual RawAsyncClientPtr getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config,
-                                              Stats::Scope& scope,
-                                              bool skip_cluster_check) {
-                                                return factoryForGrpcService(config, scope, skip_cluster_check)->create();
-                                              }
+  virtual RawAsyncClientSharedPtr
+  getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
+                            bool skip_cluster_check) PURE;
 };
 
 using AsyncClientManagerPtr = std::unique_ptr<AsyncClientManager>;
