@@ -731,6 +731,9 @@ public:
    * Returns the URL path as it will be calculated by finalizeRequestHeaders
    * using current values of headers. Note that final path may be different if
    * headers change before finalization.
+   * @param headers supplies the request headers.
+   * @return absl::optional<std::string> the value of the URL path after rewrite or an empty
+   *         value if rewrite is not configured.
    */
   virtual absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;

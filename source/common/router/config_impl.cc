@@ -666,28 +666,25 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     const Http::RequestHeaderMap& headers, absl::string_view matched_path) const {
   absl::optional<std::string> container;
   const auto& rewrite = getPathRewrite(headers, container);
-  if (rewrite.empty() && regex_rewrite_ == nullptr) {
-    // There are no rewrites configured.
-    return absl::optional<std::string>();
+  if (!rewrite.empty() || regex_rewrite_ != nullptr) {
+    // TODO(perf): can we avoid the string copy for the common case?
+    std::string path(headers.getPathValue());
+
+    if (!rewrite.empty()) {
+      ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                             : absl::StartsWithIgnoreCase(path, matched_path));
+      return path.replace(0, matched_path.size(), rewrite);
+    }
+
+    if (regex_rewrite_ != nullptr) {
+      // Replace the entire path, but preserve the query parameters
+      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+      return path.replace(0, just_path.size(),
+                          regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
+    }
   }
 
-  // TODO(perf): can we avoid the string copy for the common case?
-  std::string path(headers.getPathValue());
-
-  if (!rewrite.empty()) {
-    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                           : absl::StartsWithIgnoreCase(path, matched_path));
-    return path.replace(0, matched_path.size(), rewrite);
-  }
-
-  if (regex_rewrite_ != nullptr) {
-    // Replace the entire path, but preserve the query parameters
-    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
-    return path.replace(0, just_path.size(),
-                        regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
-  }
-
-  // This shouldn't happen.
+  // There are no rewrites configured.
   return absl::optional<std::string>();
 }
 
