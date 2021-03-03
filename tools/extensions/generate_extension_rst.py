@@ -21,8 +21,16 @@ def FormatItem(extension, metadata):
 
 
 if __name__ == '__main__':
-  extension_db_path = os.getenv("EXTENSION_DB_PATH")
-  generated_rst_dir = os.getenv("GENERATED_RST_DIR")
+  try:
+    extension_db_path = os.environ["EXTENSION_DB_PATH"]
+  except KeyError:
+    raise SystemExit(
+        "Path to a json extension db must be specified with EXTENSION_DB_PATH env var")
+  try:
+    generated_rst_dir = os.environ["GENERATED_RST_DIR"]
+  except KeyError:
+    raise SystemExit(
+        "Path to an output directory must be specified with GENERATED_RST_DIR env var")
   security_rst_root = os.path.join(
     generated_rst_dir, "intro/arch_overview/security")
 
