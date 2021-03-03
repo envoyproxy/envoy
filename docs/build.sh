@@ -73,6 +73,7 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=ENVOY_BLOB_SHA"
     "--action_env=EXTENSION_DB_PATH")
 
+mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.

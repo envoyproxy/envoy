@@ -26,7 +26,6 @@ if __name__ == '__main__':
   security_rst_root = os.path.join(
     generated_rst_dir, "intro/arch_overview/security")
 
-
   if not os.path.exists(extension_db_path):
       subprocess.run("tools/extensions/generate_extension_db".split())
 
