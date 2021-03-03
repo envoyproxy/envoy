@@ -56,7 +56,7 @@ public:
         nullptr);
     auto config = plugin_->wasmConfig();
     config.allowedCapabilities() = allowed_capabilities_;
-    // TODO: envs_
+    config.envs() = envs_;
     wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
                                                              cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
@@ -80,7 +80,7 @@ public:
   std::string vm_configuration_;
   std::string vm_key_;
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
-  Extensions::Common::Wasm::EnvironmentVariableMap envs_;
+  Extensions::Common::Wasm::EnvironmentVariableMap envs_{};
   std::string plugin_configuration_;
   std::shared_ptr<Extensions::Common::Wasm::Plugin> plugin_;
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
@@ -134,18 +134,16 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                                           testing::Values("cpp", "rust")));
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
-TEST_P(WasmTestMatrix,  ) {
+TEST_P(WasmTestMatrix, ) {
   plugin_configuration_ = "configure-test";
   envs_ = {{"ON_TICK", "TICK_VALUE"}, {"ON_CONFIGURE", "CONFIGURE_VALUE"}};
   createWasm();
   setWasmCode("logging");
-
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm_);
   auto wasm_handler = std::make_unique<Extensions::Common::Wasm::WasmHandle>(std::move(wasm_));
 
   EXPECT_TRUE(wasm_weak.lock()->initialize(code_, false));
   auto context = static_cast<TestContext*>(wasm_weak.lock()->start(plugin_));
-
   if (std::get<1>(GetParam()) == "cpp") {
     EXPECT_CALL(*context, log_(spdlog::level::info, Eq("printf stdout test")));
     EXPECT_CALL(*context, log_(spdlog::level::err, Eq("printf stderr test")));
@@ -158,8 +156,8 @@ TEST_P(WasmTestMatrix,  ) {
       .Times(testing::AtLeast(1));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("onDone logging")));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("onDelete logging")));
-  EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_TICK: TICK_VALUE")));
   EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_CONFIGURE: CONFIGURE_VALUE")));
+  EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_TICK: TICK_VALUE")));
 
   EXPECT_TRUE(wasm_weak.lock()->configure(context, plugin_));
   wasm_handler.reset();

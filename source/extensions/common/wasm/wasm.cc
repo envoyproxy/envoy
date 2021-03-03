@@ -91,7 +91,7 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
     : WasmBase(createWasmVm(config.config().vm_config().runtime()),
                config.config().vm_config().vm_id(),
                MessageUtil::anyToBytes(config.config().vm_config().configuration()), vm_key,
-               config.allowedCapabilities()),
+               config.envs(), config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{ALL_WASM_STATS(
@@ -100,6 +100,10 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
           POOL_GAUGE_PREFIX(*scope_,
                             absl::StrCat("wasm.", config.config().vm_config().runtime(), ".")))}) {
   initializeStats();
+
+  for (auto& env : config.envs()) {
+    std::cout << "Key: " << env.first << ", Value: " << env.second << "\n";
+  }
   ENVOY_LOG(debug, "Base Wasm created {} now active", active_wasms);
 }
 

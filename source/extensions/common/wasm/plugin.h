@@ -15,15 +15,21 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+// clang-format off
+using EnvironmentVariableMap = std::unordered_map<std::string, std::string>;
+// clang-format on
+
 class WasmConfig {
 public:
   WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config);
   const envoy::extensions::wasm::v3::PluginConfig& config() { return config_; }
   proxy_wasm::AllowedCapabilitiesMap& allowedCapabilities() { return allowed_capabilities_; }
+  EnvironmentVariableMap& envs() { return envs_; }
 
 private:
   const envoy::extensions::wasm::v3::PluginConfig& config_;
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_{};
+  EnvironmentVariableMap envs_;
 };
 
 using WasmConfigPtr = std::unique_ptr<WasmConfig>;

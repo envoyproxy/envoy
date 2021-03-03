@@ -11,7 +11,6 @@
 
 #include "extensions/common/wasm/wasm.h"
 
-#include "source/extensions/common/wasm/_virtual_includes/wasm_hdr/extensions/common/wasm/wasm.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -63,25 +62,25 @@ public:
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
 
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
-    *plugin_config.mutable_root_id() = root_id;
+    *plugin_config.mutable_root_id() = root_id_;
     *plugin_config.mutable_name() = "plugin_name";
-    plugin_config.set_fail_open(fail_open);
-    plugin_config.mutable_configuration()->set_value(plugin_configuration);
+    plugin_config.set_fail_open(fail_open_);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration_);
+    *plugin_config.mutable_vm_config()->mutable_environment_variables() = envs_;
 
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_vm_id("vm_id");
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
     ProtobufWkt::StringValue vm_configuration_string;
-    vm_configuration_string.set_value(vm_configuration);
+    vm_configuration_string.set_value(vm_configuration_);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
         plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
         &listener_metadata_);
+    plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
-    plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities;
-    // TODO: env
     Extensions::Common::Wasm::createWasm(
         plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
         remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);

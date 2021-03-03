@@ -1,3 +1,5 @@
+#include <string>
+
 #include "common/http/message_impl.h"
 
 #include "extensions/filters/http/wasm/wasm_filter.h"
@@ -6,7 +8,6 @@
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/wasm_base.h"
-#include <string>
 
 using testing::Eq;
 using testing::InSequence;
@@ -111,22 +112,27 @@ TEST_P(WasmHttpFilterTest, BadCode) {
 
 // Script touching headers only, request that is headers only.
 TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
-  // Setup env vars.
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): This hand off is not currently possible in the Rust SDK.
+    return;
+  }
+
   envoy::extensions::wasm::v3::EnvironmentVariables envs;
+  // Setup env vars.
   std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
   std::string host_env_value = "foo";
-  std::string env_key = "KEY";
+  std::string env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV";
   std::string env_value = "bar";
   TestEnvironment::setEnvVar(host_env_key, host_env_value, 0);
-  envs.mutable_host_env_keys()->AddAllocated(&host_env_key);
+  envs.mutable_host_env_keys()->Add(host_env_key.c_str());
   (*envs.mutable_key_values())[env_key] = env_value;
 
   setupTest("", "headers", envs);
   setupFilter();
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
-  EXPECT_CALL(filter(),
-              log_(spdlog::level::trace, Eq(absl::StrCat(host_env_key, ": ", host_env_value, "\n",
-                                                         env_key, ": ", env_value))));
+  EXPECT_CALL(filter(), log_(spdlog::level::trace,
+                             Eq("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV: "
+                                "foo\nENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV: bar")));
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));

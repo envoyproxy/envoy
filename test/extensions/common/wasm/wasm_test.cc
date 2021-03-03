@@ -660,7 +660,6 @@ TEST_P(WasmCommonTest, VmCache) {
           }));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
@@ -754,7 +753,6 @@ TEST_P(WasmCommonTest, RemoteCode) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::BytesValue vm_configuration_bytes;
   vm_configuration_bytes.set_value(vm_configuration);
@@ -862,7 +860,6 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);

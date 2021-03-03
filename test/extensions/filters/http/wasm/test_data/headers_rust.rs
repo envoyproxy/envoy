@@ -1,4 +1,4 @@
-use log::{debug, error, info, warn};
+use log::{trace, debug, error, info, warn};
 use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::*;
 
@@ -24,15 +24,17 @@ struct TestStream {
 
 impl HttpContext for TestStream {
     fn on_http_request_headers(&mut self, _: usize) -> Action {
-        let mut msg;
+        let mut msg = String::new();
         if let Ok(value) = std::env::var("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV") {
-            msg += "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV" + value;
+            msg.push_str("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV: ");
+            msg.push_str(&value);
         }
         if let Ok(value) = std::env::var("ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV") {
-            msg += "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV" + value;
+            msg.push_str("\nENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV: ");
+            msg.push_str(&value);
         }
         if !msg.is_empty() {
-            trace!(msg);
+            trace!("{}", msg);
         }
         debug!("onRequestHeaders {} headers", self.context_id);
         if let Some(path) = self.get_http_request_header(":path") {

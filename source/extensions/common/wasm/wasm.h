@@ -2,9 +2,9 @@
 
 #include <atomic>
 #include <chrono>
-#include <unordered_map>
 #include <map>
 #include <memory>
+#include <unordered_map>
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
@@ -44,10 +44,6 @@ class WasmHandle;
 struct WasmStats {
   ALL_WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
-
-// clang-format off
-using EnvironmentVariableMap = std::unordered_map<std::string, std::string>;
-// clang-format on
 
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
