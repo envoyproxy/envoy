@@ -4,7 +4,9 @@
 
 from collections import defaultdict
 import json
+import os
 import pathlib
+import subprocess
 import sys
 
 
@@ -19,8 +21,14 @@ def FormatItem(extension, metadata):
 
 
 if __name__ == '__main__':
-  extension_db_path = sys.argv[1]
-  security_rst_root = sys.argv[2]
+  extension_db_path = os.getenv("EXTENSION_DB_PATH")
+  generated_rst_dir = os.getenv("GENERATED_RST_DIR")
+  security_rst_root = os.path.join(
+    generated_rst_dir, "intro/arch_overview/security")
+
+
+  if not os.path.exists(extension_db_path):
+      subprocess.run("tools/extensions/generate_extension_db".split())
 
   extension_db = json.loads(pathlib.Path(extension_db_path).read_text())
   security_postures = defaultdict(list)
