@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {

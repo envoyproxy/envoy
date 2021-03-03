@@ -130,6 +130,7 @@ following are the command line options that Envoy supports.
 
    :%v:	The actual message to log ("some user text")
    :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
+   :%j:	The actual message to log as JSON escaped string (https://tools.ietf.org/html/rfc7159#page-8).
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")

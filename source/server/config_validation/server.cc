@@ -134,6 +134,7 @@ void ValidationInstance::shutdown() {
     config_.clusterManager()->shutdown();
   }
   thread_local_.shutdownThread();
+  dispatcher_->shutdown();
 }
 
 } // namespace Server

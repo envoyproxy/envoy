@@ -550,10 +550,11 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
       HostSetImplPtr host_set = createHostSet(i, overprovisioning_factor);
-      host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
-                                           const HostVector& hosts_removed) {
-        runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
-      });
+      host_sets_priority_update_cbs_.push_back(
+          host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                               const HostVector& hosts_removed) {
+            runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
+          }));
       host_sets_.push_back(std::move(host_set));
     }
   }
@@ -702,7 +703,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : runtime_(runtime), name_(config.name()), type_(config.type()),
+    : runtime_(runtime), name_(config.name()),
+      observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
+      type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
@@ -926,9 +929,16 @@ ClusterImplBase::ClusterImplBase(
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
-                                            runtime, std::move(socket_matcher),
-                                            std::move(stats_scope), added_via_api, factory_context);
+  auto& dispatcher = factory_context.dispatcher();
+  info_ = std::shared_ptr<const ClusterInfoImpl>(
+      new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
+                          std::move(socket_matcher), std::move(stats_scope), added_via_api,
+                          factory_context),
+      [&dispatcher](const ClusterInfoImpl* self) {
+        ENVOY_LOG(trace, "Schedule destroy cluster info {}", self->name());
+        dispatcher.deleteInDispatcherThread(
+            std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
+      });
 
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
       !raw_factory_pointer->supportsAlpn()) {
@@ -936,15 +946,11 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
-    throw EnvoyException(
-        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
-  }
 
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
-  priority_set_.addPriorityUpdateCb(
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
         if (!hosts_added.empty() || !hosts_removed.empty()) {
           info_->stats().membership_change_.inc();
@@ -1120,7 +1126,7 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
-    HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+    HostVectorConstSharedPtr hosts_copy = std::make_shared<HostVector>(host_set->hosts());
 
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     prioritySet().updateHosts(priority,
@@ -1213,6 +1219,24 @@ Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
 }
 
+std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
+    const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
+  constexpr double default_budget_percent = 20.0;
+  constexpr uint32_t default_retry_concurrency = 3;
+
+  absl::optional<double> budget_percent;
+  absl::optional<uint32_t> min_retry_concurrency;
+  if (thresholds.has_retry_budget()) {
+    // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
+    // message set in the cluster config.
+    budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(thresholds.retry_budget(), budget_percent,
+                                                     default_budget_percent);
+    min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
+  }
+  return std::make_pair(budget_percent, min_retry_concurrency);
+}
+
 ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
@@ -1262,19 +1286,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     track_remaining = it->track_remaining();
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
-    if (it->has_retry_budget()) {
-      // The budget_percent and min_retry_concurrency values do not set defaults like the other
-      // members of the 'threshold' message, because the behavior of the retry circuit breaker
-      // changes depending on whether it has been configured. Therefore, it's necessary to manually
-      // check if the threshold message has a retry budget configured and only set the values if so.
-      budget_percent = it->retry_budget().has_budget_percent()
-                           ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), budget_percent)
-                           : budget_percent;
-      min_retry_concurrency =
-          it->retry_budget().has_min_retry_concurrency()
-              ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), min_retry_concurrency)
-              : min_retry_concurrency;
-    }
+    std::tie(budget_percent, min_retry_concurrency) = ClusterInfoImpl::getRetryBudgetParams(*it);
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
@@ -1311,10 +1323,10 @@ void PriorityStateManager::registerHostForPriority(
   auto metadata = lb_endpoint.has_metadata()
                       ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
                       : nullptr;
-  const HostSharedPtr host(new HostImpl(
+  const auto host = std::make_shared<HostImpl>(
       parent_.info(), hostname, address, metadata, lb_endpoint.load_balancing_weight().value(),
       locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config(),
-      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source));
+      locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source);
   registerHostForPriority(host, locality_lb_endpoint);
 }
 
