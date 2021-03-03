@@ -24,7 +24,6 @@ void setEnvVar(const std::string& name, const std::string& value, int overwrite)
   if (!overwrite) {
     size_t requiredSize;
     ::getenv_s(&requiredSize, nullptr, 0, name.c_str());
-    ASSERT_EQ(0, rc);
     if (requiredSize != 0) {
       return;
     }
