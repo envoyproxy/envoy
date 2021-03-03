@@ -633,6 +633,26 @@ TEST(HttpUtility, SendLocalGrpcReply) {
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
+TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, streamInfo());
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.getGrpcStatusValue(),
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::InvalidArgument)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        EXPECT_EQ(headers.getGrpcMessageValue(), "large");
+      }));
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
+                              Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
+}
+
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
