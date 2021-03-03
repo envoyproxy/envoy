@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 
@@ -52,11 +53,12 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto_);
   ConfigConstSharedPtr new_config;
 
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     new_config = std::make_shared<ConfigImpl>(
         *route_config_proto_, factory_context_,
         factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
-  } catch (const Envoy::EnvoyException& e) {
+  } END_TRY
+  catch (const Envoy::EnvoyException& e) {
     // revert the changes that failed validation
     vhds_virtual_hosts_ = std::move(vhosts_before_this_update);
     route_config_proto_ = std::move(route_config_before_this_update);
