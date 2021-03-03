@@ -339,7 +339,9 @@ void TestContext::onLog() {
   auto test = root()->test_;
   if (test == "headers") {
     auto path = getRequestHeader(":path");
-    logWarn("onLog " + std::to_string(id()) + " " + std::string(path->view()));
+    auto status = getResponseHeader(":status");
+    logWarn("onLog " + std::to_string(id()) + " " + std::string(path->view()) + " " +
+            std::string(status->view()));
     auto response_header = getResponseHeader("bogus-header");
     if (response_header && response_header->view() != "") {
       logWarn("response bogus-header found");

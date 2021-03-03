@@ -404,9 +404,10 @@ public:
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * Install a callback that will be invoked when a host set changes. Triggers when any change
@@ -414,9 +415,10 @@ public:
    * added/removed hosts will be passed to the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
@@ -858,6 +860,14 @@ public:
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
+   * config dumps. The observability name is configured with :ref:`alt_stat_name
+   * <envoy_api_field_config.cluster.v3.Cluster.alt_stat_name>`. If unprovided, the default value is
+   * the cluster name.
+   */
+  virtual const std::string& observabilityName() const PURE;
 
   /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at

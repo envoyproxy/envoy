@@ -565,11 +565,11 @@ TEST_P(WasmHttpFilterTest, AccessLog) {
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
-  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 / 200"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers{};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   filter().continueStream(proxy_wasm::WasmStreamType::Response);
@@ -579,15 +579,31 @@ TEST_P(WasmHttpFilterTest, AccessLog) {
   filter().onDestroy();
 }
 
+TEST_P(WasmHttpFilterTest, AccessLogClientDisconnected) {
+  setupTest("", "headers");
+  setupFilter();
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 / "))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+  StreamInfo::MockStreamInfo log_stream_info;
+  filter().log(&request_headers, nullptr, nullptr, log_stream_info);
+  filter().onDestroy();
+}
+
 TEST_P(WasmHttpFilterTest, AccessLogCreate) {
   setupTest("", "headers");
   setupFilter();
-  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onLog 2 / 200"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
 
   StreamInfo::MockStreamInfo log_stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers{};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
   filter().log(&request_headers, &response_headers, &response_trailers, log_stream_info);
   filter().onDestroy();

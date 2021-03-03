@@ -64,9 +64,13 @@ impl HttpContext for TestStream {
     }
 
     fn on_log(&mut self) {
-        if let Some(path) = self.get_http_request_header(":path") {
-            warn!("onLog {} {}", self.context_id, path);
-        }
+        let path = self
+            .get_http_request_header(":path")
+            .unwrap_or(String::from(""));
+        let status = self
+            .get_http_response_header(":status")
+            .unwrap_or(String::from(""));
+        warn!("onLog {} {} {}", self.context_id, path, status);
     }
 }
 

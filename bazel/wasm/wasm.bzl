@@ -8,7 +8,7 @@ def _wasm_rust_transition_impl(settings, attr):
 
 def _wasi_rust_transition_impl(settings, attr):
     return {
-        "//command_line_option:platforms": "@io_bazel_rules_rust//rust/platform:wasi",
+        "//command_line_option:platforms": "@rules_rust//rust/platform:wasi",
     }
 
 wasm_rust_transition = transition(

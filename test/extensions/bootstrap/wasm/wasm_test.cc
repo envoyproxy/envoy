@@ -43,12 +43,22 @@ public:
         base_scope_(stats_store_.createScope("")), scope_(base_scope_->createScope("")) {}
 
   void createWasm(absl::string_view runtime) {
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    *plugin_config.mutable_name() = name_;
+    *plugin_config.mutable_root_id() = root_id_;
+    *plugin_config.mutable_vm_config()->mutable_runtime() =
+        absl::StrCat("envoy.wasm.runtime.", runtime);
+    *plugin_config.mutable_vm_config()->mutable_vm_id() = vm_id_;
+    plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration_);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        name_, root_id_, vm_id_, runtime, plugin_configuration_, false,
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(
-        absl::StrCat("envoy.wasm.runtime.", runtime), vm_id_, vm_configuration_, vm_key_, envs_,
-        allowed_capabilities_, scope_, cluster_manager, *dispatcher_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_,
+        nullptr);
+    auto config = plugin_->wasmConfig();
+    config.allowedCapabilities() = allowed_capabilities_;
+    // TODO: envs_
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
+                                                             cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(
         nullptr,

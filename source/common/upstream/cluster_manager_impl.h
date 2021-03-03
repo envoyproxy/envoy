@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -187,8 +188,8 @@ private:
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
-  std::list<ClusterManagerCluster*> primary_init_clusters_;
-  std::list<ClusterManagerCluster*> secondary_init_clusters_;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*> primary_init_clusters_;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*> secondary_init_clusters_;
   State state_{State::Loading};
   bool started_secondary_initialize_{};
 };
@@ -467,9 +468,9 @@ private:
 
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
-                const std::string& version_info, bool added_via_api, ClusterSharedPtr&& cluster,
-                TimeSource& time_source)
-        : cluster_config_(cluster_config), config_hash_(MessageUtil::hash(cluster_config)),
+                const uint64_t cluster_config_hash, const std::string& version_info,
+                bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
+        : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()) {}
 
@@ -499,6 +500,8 @@ private:
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
     bool added_or_updated_{};
+    Common::CallbackHandlePtr member_update_cb_;
+    Common::CallbackHandlePtr priority_update_cb_;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -560,8 +563,8 @@ private:
    * nullptr if cluster_map did not contain the same cluster.
    */
   ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                             const std::string& version_info, bool added_via_api,
-                             ClusterMap& cluster_map);
+                             const uint64_t cluster_hash, const std::string& version_info,
+                             bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();

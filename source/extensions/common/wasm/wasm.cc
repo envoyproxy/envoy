@@ -7,6 +7,7 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm_extension.h"
 
 #include "absl/strings/str_cat.h"
@@ -68,20 +69,6 @@ inline Wasm* getWasm(WasmHandleSharedPtr& base_wasm_handle) {
 
 } // namespace
 
-std::string anyToBytes(const ProtobufWkt::Any& any) {
-  if (any.Is<ProtobufWkt::StringValue>()) {
-    ProtobufWkt::StringValue s;
-    MessageUtil::unpackTo(any, s);
-    return s.value();
-  }
-  if (any.Is<ProtobufWkt::BytesValue>()) {
-    Protobuf::BytesValue b;
-    MessageUtil::unpackTo(any, b);
-    return b.value();
-  }
-  return any.value();
-}
-
 void Wasm::initializeStats() {
   active_wasms++;
   wasm_stats_.active_.set(active_wasms);
@@ -99,17 +86,19 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
                                       });
 }
 
-Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-           absl::string_view vm_key, EnvironmentVariableMap envs,
-           proxy_wasm::AllowedCapabilitiesMap allowed_capabilities,
-           const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-           Event::Dispatcher& dispatcher)
-    : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key, envs, allowed_capabilities),
+Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
+           Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
+    : WasmBase(createWasmVm(config.config().vm_config().runtime()),
+               config.config().vm_config().vm_id(),
+               MessageUtil::anyToBytes(config.config().vm_config().configuration()), vm_key,
+               config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
-      wasm_stats_(WasmStats{
-          ALL_WASM_STATS(POOL_COUNTER_PREFIX(*scope_, absl::StrCat("wasm.", runtime, ".")),
-                         POOL_GAUGE_PREFIX(*scope_, absl::StrCat("wasm.", runtime, ".")))}) {
+      wasm_stats_(WasmStats{ALL_WASM_STATS(
+          POOL_COUNTER_PREFIX(*scope_,
+                              absl::StrCat("wasm.", config.config().vm_config().runtime(), ".")),
+          POOL_GAUGE_PREFIX(*scope_,
+                            absl::StrCat("wasm.", config.config().vm_config().runtime(), ".")))}) {
   initializeStats();
   ENVOY_LOG(debug, "Base Wasm created {} now active", active_wasms);
 }
@@ -316,17 +305,16 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-static bool createWasmInternal(const VmConfig& vm_config,
-                               const CapabilityRestrictionConfig& capability_restriction_config,
-                               const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
-                               Upstream::ClusterManager& cluster_manager,
-                               Init::Manager& init_manager, Event::Dispatcher& dispatcher,
-                               Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
-                               Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
-                               CreateWasmCallback&& cb,
-                               CreateContextFn create_root_context_for_testing = nullptr) {
+bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
+                Server::ServerLifecycleNotifier& lifecycle_notifier,
+                Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
+                CreateWasmCallback&& cb, CreateContextFn create_root_context_for_testing) {
   auto wasm_extension = getWasmExtension();
   std::string source, code;
+  auto config = plugin->wasmConfig();
+  auto vm_config = config.config().vm_config();
   bool fetch = false;
   if (vm_config.code().has_remote()) {
     auto now = dispatcher.timeSource().monotonicTime() + cache_time_offset_for_testing;
@@ -385,26 +373,26 @@ static bool createWasmInternal(const VmConfig& vm_config,
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
-  auto complete_cb = [cb, vm_config, capability_restriction_config, plugin, scope, &cluster_manager,
-                      &dispatcher, &lifecycle_notifier, create_root_context_for_testing,
-                      wasm_extension](std::string code) -> bool {
+  auto vm_key = proxy_wasm::makeVmKey(vm_config.vm_id(),
+                                      MessageUtil::anyToBytes(vm_config.configuration()), code);
+  auto complete_cb = [cb, vm_key, plugin, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
+                      create_root_context_for_testing, wasm_extension](std::string code) -> bool {
     if (code.empty()) {
       cb(nullptr);
       return false;
     }
-    auto vm_key =
-        proxy_wasm::makeVmKey(vm_config.vm_id(), anyToBytes(vm_config.configuration()), code);
+
     auto wasm_factory = wasm_extension->wasmFactory();
+    auto config = plugin->wasmConfig();
     proxy_wasm::WasmHandleFactory proxy_wasm_factory =
-        [&vm_config, &capability_restriction_config, scope, &cluster_manager, &dispatcher,
-         &lifecycle_notifier, wasm_factory](absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
-      return wasm_factory(vm_config, capability_restriction_config, scope, cluster_manager,
-                          dispatcher, lifecycle_notifier, vm_key);
+        [&config, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
+         wasm_factory](absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
+      return wasm_factory(config, scope, cluster_manager, dispatcher, lifecycle_notifier, vm_key);
     };
     auto wasm = proxy_wasm::createWasm(
         vm_key, code, plugin, proxy_wasm_factory,
         getCloneFactory(wasm_extension, dispatcher, create_root_context_for_testing),
-        vm_config.allow_precompiled());
+        config.config().vm_config().allow_precompiled());
     Stats::ScopeSharedPtr create_wasm_stats_scope =
         wasm_extension->lockAndCreateStats(scope, plugin);
     wasm_extension->onEvent(toWasmEvent(wasm), plugin);
@@ -472,19 +460,6 @@ static bool createWasmInternal(const VmConfig& vm_config,
     return complete_cb(code);
   }
   return true;
-}
-
-bool createWasm(const VmConfig& vm_config,
-                const CapabilityRestrictionConfig& capability_restriction_config,
-                const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
-                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                Event::Dispatcher& dispatcher, Api::Api& api,
-                Envoy::Server::ServerLifecycleNotifier& lifecycle_notifier,
-                Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
-                CreateWasmCallback&& cb, CreateContextFn create_root_context_for_testing) {
-  return createWasmInternal(vm_config, capability_restriction_config, plugin, scope,
-                            cluster_manager, init_manager, dispatcher, api, lifecycle_notifier,
-                            remote_data_provider, std::move(cb), create_root_context_for_testing);
 }
 
 PluginHandleSharedPtr
