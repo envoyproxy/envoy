@@ -67,7 +67,7 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
-  Runtime::FeatureFlag enabled_;
+  absl::optional<Runtime::FeatureFlag> enabled_{};
   Network::UdpPacketWriter* udp_packet_writer_;
 
   // The number of runs of the event loop in which at least one CHLO was buffered.

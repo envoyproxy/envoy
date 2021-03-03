@@ -946,10 +946,6 @@ ClusterImplBase::ClusterImplBase(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
   }
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
-    throw EnvoyException(
-        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
-  }
 
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.

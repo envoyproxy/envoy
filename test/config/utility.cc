@@ -9,6 +9,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codec.h"
@@ -666,8 +667,8 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn) {
-  addConfigModifier([use_alpn](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
+  addConfigModifier([use_alpn, http3](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -702,8 +703,17 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    // The test certs are for *.lyft.com, so make sure SNI matches.
+    tls_context.set_sni("foo.lyft.com");
+    if (http3) {
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
+      envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
+      quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
+      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(quic_context);
+    } else {
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    }
   });
 }
 
