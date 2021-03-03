@@ -80,7 +80,7 @@ public:
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
+  AccessLog::AccessLogManager& accessLogManager() override { return *access_log_manager_; }
   void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
@@ -191,6 +191,7 @@ private:
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
+  Filesystem::InstancePtr validation_file_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Server::ValidationAdmin admin_;
@@ -200,7 +201,7 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
-  AccessLog::AccessLogManagerImpl access_log_manager_;
+  std::unique_ptr<AccessLog::AccessLogManager> access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;

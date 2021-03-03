@@ -5,6 +5,13 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "access_log_manager_lib",
+    srcs = ["access_log_manager.cc"],
+    hdrs = ["access_log_manager.h"],
+    deps = ["//source/common/access_log:access_log_manager_lib"],
+)
+
+envoy_cc_library(
     name = "admin_lib",
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
@@ -68,15 +75,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filesystem_lib",
+    srcs = [":filesystem.cc"],
+    hdrs = [":filesystem.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/server:options_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":access_log_manager_lib",
         ":admin_lib",
         ":api_lib",
         ":cluster_manager_lib",
         ":dns_lib",
+        ":filesystem_lib",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",

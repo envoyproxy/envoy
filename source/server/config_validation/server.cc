@@ -12,15 +12,31 @@
 #include "common/singleton/manager_impl.h"
 #include "common/version/version.h"
 
+#include "server/config_validation/access_log_manager.h"
+#include "server/config_validation/filesystem.h"
 #include "server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
+namespace {
+AccessLog::AccessLogManagerPtr makeAccessLogManager(const Options& options, Api::Api& api,
+                                                    Event::Dispatcher& dispatcher,
+                                                    Thread::BasicLockable& lock,
+                                                    Stats::Store& stats_store) {
+  if (options.mode() == Mode::Load) {
+    return std::make_unique<AccessLog::NullAccessLogManager>(options.fileFlushIntervalMsec(), api,
+                                                             dispatcher, lock, stats_store);
+  }
+  return std::make_unique<AccessLog::AccessLogManagerImpl>(options.fileFlushIntervalMsec(), api,
+                                                           dispatcher, lock, stats_store);
+}
+} // namespace
 
 absl::Status validateConfig(const Options& options,
-                    const Network::Address::InstanceConstSharedPtr& local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
-                    Filesystem::Instance& file_system) {
+                            const Network::Address::InstanceConstSharedPtr& local_address,
+                            ComponentFactory& component_factory,
+                            Thread::ThreadFactory& thread_factory,
+                            Filesystem::Instance& file_system) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
@@ -40,16 +56,18 @@ ValidationInstance::ValidationInstance(
     const Options& options, Event::TimeSystem& time_system,
     const Network::Address::InstanceConstSharedPtr& local_address, Stats::IsolatedStoreImpl& store,
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-    Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
+    Thread::ThreadFactory& thread_factory, Filesystem::Instance& real_file_system)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
                                              !options.ignoreUnknownDynamicFields()),
-      stats_store_(store), api_(new Api::ValidationImpl(thread_factory, store, time_system,
-                                                        file_system, random_generator_)),
+      stats_store_(store),
+      validation_file_system_(Filesystem::makeValidationFilesystem(options, real_file_system)),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system, *validation_file_system_,
+                                   random_generator_)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
-                          store),
+      access_log_manager_(
+          makeAccessLogManager(options, *api_, *dispatcher_, access_log_lock, store)),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this) {
