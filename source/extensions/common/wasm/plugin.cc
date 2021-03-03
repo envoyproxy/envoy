@@ -19,6 +19,22 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+void setEnvVar(const std::string& name, const std::string& value, int overwrite) {
+#ifdef WIN32
+  if (!overwrite) {
+    size_t requiredSize;
+    ::getenv_s(&requiredSize, nullptr, 0, name.c_str());
+    ASSERT_EQ(0, rc);
+    if (requiredSize != 0) {
+      return;
+    }
+  }
+  ::_putenv_s(name.c_str(), value.c_str());
+#else
+  ::setenv(name.c_str(), value.c_str(), overwrite);
+#endif
+}
+
 WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) : config_(config) {
   for (auto& capability : config_.capability_restriction_config().allowed_capabilities()) {
     // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
@@ -30,7 +46,7 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
     // On NullVm, std::getenv directly accesses to the Envoy's env vars, so we need to set here to
     // be consistent with actual Wasm VMs.
     for (auto& env : config_.vm_config().environment_variables().key_values()) {
-      setenv(env.first.c_str(), env.second.c_str(), true);
+      setEnvVar(env.first, env.second, true);
     }
   } else if (has_env_config) {
 #define DUPLICATED_ENV_KEY_EXCEPTION(key, name)                                                    \
