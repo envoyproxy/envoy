@@ -78,7 +78,7 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    Grpc::RawAsyncClientPtr&& client, std::chrono::milliseconds buffer_flush_interval_msec,
+    Grpc::RawAsyncClientSharedPtr&& client, std::chrono::milliseconds buffer_flush_interval_msec,
     uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher, Stats::Scope& scope) {
   return std::make_shared<GrpcAccessLoggerImpl>(
       std::move(client), config.log_name(), buffer_flush_interval_msec, max_buffer_size_bytes,

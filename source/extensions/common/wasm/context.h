@@ -361,7 +361,7 @@ protected:
 
     Context* context_;
     uint32_t token_;
-    Grpc::RawAsyncClientPtr client_;
+    Grpc::RawAsyncClientSharedPtr client_;
     Grpc::AsyncRequest* request_;
   };
 

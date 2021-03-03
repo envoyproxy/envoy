@@ -53,7 +53,7 @@ private:
   // Common::GrpcAccessLoggerCache
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Grpc::RawAsyncClientPtr&& client,
+               Grpc::RawAsyncClientSharedPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
 
