@@ -68,6 +68,13 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setCustomValidatorConfig(
+        envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
+      custom_validator_config_ = custom_validator_config;
+      return *this;
+    }
+
+    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
@@ -259,7 +266,7 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false);
+  void configureUpstreamTls(bool use_alpn = false, bool http3 = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.

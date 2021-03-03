@@ -1499,6 +1499,18 @@ PerFilterConfigs::PerFilterConfigs(
         name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 
@@ -1511,6 +1523,18 @@ PerFilterConfigs::PerFilterConfigs(
                                                   it.second, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 }
