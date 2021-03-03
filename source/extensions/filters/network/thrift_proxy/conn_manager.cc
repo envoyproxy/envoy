@@ -55,6 +55,11 @@ void ConnectionManager::dispatch() {
     return;
   }
 
+  if (requests_overflow_) {
+    ENVOY_CONN_LOG(debug, "thrift filter requests overflow", read_callbacks_->connection());
+    return;
+  }
+
   try {
     bool underflow = false;
     while (!underflow) {
@@ -139,6 +144,9 @@ void ConnectionManager::continueDecoding() {
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
+  if (requests_overflow_ && rpcs_.empty()) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 }
 
 void ConnectionManager::resetAllRpcs(bool local_reset) {
@@ -403,6 +411,14 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   pending_transport_end_ = false;
 
   parent_.stats_.request_.inc();
+
+  parent_.accumulated_requests_++;
+  if (parent_.config_.maxRequestsPerConnection() > 0 &&
+      parent_.accumulated_requests_ >= parent_.config_.maxRequestsPerConnection()) {
+    parent_.read_callbacks_->connection().readDisable(true);
+    parent_.requests_overflow_ = true;
+    parent_.stats_.downstream_cx_max_requests_.inc();
+  }
 
   bool destroy_rpc = false;
   switch (original_msg_type_) {

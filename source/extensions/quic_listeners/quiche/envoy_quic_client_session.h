@@ -62,7 +62,7 @@ public:
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
-  using quic::QuicSpdyClientSession::stream_map;
+  using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
   // quic::QuicSpdyClientSession
@@ -78,6 +78,7 @@ private:
   // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
+  const absl::string_view host_name_;
 };
 
 } // namespace Quic

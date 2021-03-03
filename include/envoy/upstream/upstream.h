@@ -541,6 +541,7 @@ public:
   COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
   COUNTER(upstream_cx_http2_total)                                                                 \
+  COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
@@ -860,6 +861,14 @@ public:
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
+   * config dumps. The observability name is configured with :ref:`alt_stat_name
+   * <envoy_api_field_config.cluster.v3.Cluster.alt_stat_name>`. If unprovided, the default value is
+   * the cluster name.
+   */
+  virtual const std::string& observabilityName() const PURE;
 
   /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at
