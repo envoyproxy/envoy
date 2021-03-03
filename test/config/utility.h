@@ -68,6 +68,13 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setCustomValidatorConfig(
+        envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
+      custom_validator_config_ = custom_validator_config;
+      return *this;
+    }
+
+    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};

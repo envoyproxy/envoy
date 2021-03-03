@@ -29,6 +29,7 @@ public:
   void checkStats();
 
 protected:
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
   bool server_tlsv1_3_{false};
   bool server_rsa_cert_{true};
   bool server_rsa_cert_ocsp_staple_{false};

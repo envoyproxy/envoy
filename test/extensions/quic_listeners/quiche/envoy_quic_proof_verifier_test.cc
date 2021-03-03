@@ -65,6 +65,8 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, verifyCertificateSpkiList())
         .WillRepeatedly(ReturnRef(empty_string_list_));
+    EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
+        .WillRepeatedly(ReturnRef(custom_validator_config_));
     verifier_ =
         std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
   }
@@ -79,6 +81,8 @@ protected:
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   const std::string root_ca_cert_;
   const std::string leaf_cert_;
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
+      absl::nullopt};
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;

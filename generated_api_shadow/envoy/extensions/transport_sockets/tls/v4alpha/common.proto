@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.transport_sockets.tls.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 
 import "google/protobuf/any.proto";
@@ -213,7 +214,7 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext";
@@ -373,4 +374,16 @@ message CertificateValidationContext {
   // Certificate trust chain verification mode.
   TrustChainVerification trust_chain_verification = 10
       [(validate.rules).enum = {defined_only: true}];
+
+  // The configuration of an extension specific certificate validator.
+  // If specified, all validation is done by the specified validator,
+  // and the behavior of all other validation settings is defined by the specified validator (and may be entirely ignored, unused, and unvalidated).
+  // Refer to the documentation for the specified validator. If you do not want a custom validation algorithm, do not set this field.
+  // The following names are available here:
+  //
+  // .. _extension_envoy.tls.cert_validator.spiffe:
+  //
+  // **envoy.tls.cert_validator.spiffe**: `SPIFFE <https://github.com/spiffe/spiffe>`_ certificate validator.
+  // Please refer to :ref:`envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>` for more information.
+  config.core.v4alpha.TypedExtensionConfig custom_validator_config = 12;
 }

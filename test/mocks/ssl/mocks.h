@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/connection.h"
@@ -153,6 +154,9 @@ public:
   MOCK_METHOD(const std::vector<std::string>&, verifyCertificateHashList, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, verifyCertificateSpkiList, (), (const));
   MOCK_METHOD(bool, allowExpiredCertificate, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+              customValidatorConfig, (), (const));
+  MOCK_METHOD(Api::Api&, api, (), (const));
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const));
