@@ -1,3 +1,5 @@
+#pragma once
+
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier_base.h"
 
 namespace Envoy {

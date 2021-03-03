@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 
 #include "common/upstream/health_checker_impl.h"

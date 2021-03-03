@@ -1,3 +1,5 @@
+#pragma once
+
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {

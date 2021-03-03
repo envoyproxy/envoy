@@ -1,3 +1,5 @@
+#pragma once
+
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
 #if defined(__GNUC__)

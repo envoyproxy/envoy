@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/extensions/retry/host/omit_canary_hosts/v3/omit_canary_hosts.pb.validate.h"
 #include "envoy/upstream/retry.h"
 

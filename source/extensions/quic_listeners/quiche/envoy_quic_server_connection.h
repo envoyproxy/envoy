@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/network/listener.h"
 
 #include "server/connection_handler_impl.h"

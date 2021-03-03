@@ -1,3 +1,5 @@
+#pragma once
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

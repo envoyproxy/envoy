@@ -1,3 +1,5 @@
+#pragma once
+
 #include "extensions/filters/http/tap/tap_config.h"
 
 #include "gmock/gmock.h"
