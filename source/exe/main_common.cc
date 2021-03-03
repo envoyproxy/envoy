@@ -54,7 +54,8 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
 
   // Enable core dumps as early as possible.
   if (options_.coreDumpEnabled()) {
-    ENVOY_LOG_MISC(info, "core dump enabled: {}", platform_impl_.enableCoreDump());
+    auto ret = platform_impl_.enableCoreDump();
+    ENVOY_LOG_MISC(info, "core dump enabled: {}", ret);
   }
 
   switch (options_.mode()) {
