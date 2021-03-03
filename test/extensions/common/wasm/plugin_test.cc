@@ -52,7 +52,6 @@ TEST(TestWasmConfig, EnvKeyException) {
     auto key = "KEY";
     proto_envs->mutable_host_env_keys()->Add(key);
     proto_envs->mutable_host_env_keys()->Add(key);
-    TestEnvironment::setEnvVar(key, "VALUE", 0);
     EXPECT_THROW_WITH_MESSAGE(
         WasmConfig config(plugin_config), EnvoyException,
         "Key KEY is duplicated in envoy.extensions.wasm.v3.VmConfig.environment_variables for "
@@ -66,24 +65,11 @@ TEST(TestWasmConfig, EnvKeyException) {
     auto key = "KEY";
     (*proto_envs->mutable_key_values())[key] = "VALUE";
     proto_envs->mutable_host_env_keys()->Add(key);
-    TestEnvironment::setEnvVar(key, "VALUE2", 0);
     EXPECT_THROW_WITH_MESSAGE(
         WasmConfig config(plugin_config), EnvoyException,
         "Key KEY is duplicated in envoy.extensions.wasm.v3.VmConfig.environment_variables for "
         "bar-wasm. All the keys must be unique.");
   }
-}
-
-TEST(TestWasmConfig, NullVMEnv) {
-  envoy::extensions::wasm::v3::PluginConfig plugin_config;
-  plugin_config.mutable_vm_config()->set_runtime(WasmRuntimeNames::get().Null);
-  auto proto_envs = plugin_config.mutable_vm_config()->mutable_environment_variables();
-  std::string key = "TESTWASMCONFIG_NULLVM_ENV_KEY";
-  std::string value = "TESTWASMCONFIG_NULLVM_ENV_VALUE";
-  (*proto_envs->mutable_key_values())[key] = value;
-
-  auto wasm_config = WasmConfig(plugin_config);
-  EXPECT_EQ(std::getenv(key.c_str()), value);
 }
 
 } // namespace
