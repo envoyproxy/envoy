@@ -201,7 +201,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   EXPECT_EQ(test_config_->encodedAuthScopes(), TEST_DEFAULT_SCOPE);
 
   // resource is optional
-  EXPECT_EQ(test_config_->encodedResources(), "");
+  EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
 
   // Recreate the filter with current config and test if the scope was added
   // as a query parameter in response headers.
