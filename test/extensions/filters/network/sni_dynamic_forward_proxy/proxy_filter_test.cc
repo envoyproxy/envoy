@@ -82,7 +82,8 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
-  filter_->onLoadDnsCacheComplete();
+  filter_->onLoadDnsCacheComplete(
+      std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>());
 
   EXPECT_CALL(*handle, onDestroy());
 }

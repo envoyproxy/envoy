@@ -108,7 +108,7 @@ public:
   MockLoadDnsCacheEntryCallbacks();
   ~MockLoadDnsCacheEntryCallbacks() override;
 
-  MOCK_METHOD(void, onLoadDnsCacheComplete, ());
+  MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&));
 };
 
 } // namespace DynamicForwardProxy

@@ -57,7 +57,6 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
 
   auto [cache_hit, is_overflow] = [&]() {
-    // TODO(chradcliffe): Consider returning the looked-up host
     absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
     auto tls_host = primary_hosts_.find(host);
     bool cache_hit =
@@ -199,7 +198,7 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
       host_to_erase = std::move(host_it->second);
       primary_hosts_.erase(host_it);
     }
-    notifyThreads(host);
+    notifyThreads(host, primary_host->host_info_);
   } else {
     startResolve(host, *primary_host);
   }
@@ -271,7 +270,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   if (first_resolve || address_changed) {
     primary_host_info->host_info_->setFirstResolveComplete();
-    notifyThreads(host);
+    notifyThreads(host, primary_host_info->host_info_);
   }
 
   // Kick off the refresh timer.
@@ -303,10 +302,11 @@ void DnsCacheImpl::runRemoveCallbacks(const std::string& host) {
   }
 }
 
-void DnsCacheImpl::notifyThreads(const std::string& host) {
-  auto host_ptr = std::make_shared<const std::string>(host);
-  tls_slot_.runOnAllThreads([host_ptr](OptRef<ThreadLocalHostInfo> local_host_info) {
-    local_host_info->onHostMapUpdate(host_ptr);
+void DnsCacheImpl::notifyThreads(const std::string& host,
+                                 const DnsHostInfoImplSharedPtr& resolved_info) {
+  auto shared_info = std::make_shared<HostMapUpdateInfo>(host, resolved_info);
+  tls_slot_.runOnAllThreads([shared_info](OptRef<ThreadLocalHostInfo> local_host_info) {
+    local_host_info->onHostMapUpdate(shared_info);
   });
 }
 
@@ -320,13 +320,13 @@ DnsCacheImpl::ThreadLocalHostInfo::~ThreadLocalHostInfo() {
 }
 
 void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
-    std::shared_ptr<const std::string> resolved_host) {
-  auto host_it = pending_resolutions_.find(*resolved_host);
+    const HostMapUpdateInfoSharedPtr& resolved_host) {
+  auto host_it = pending_resolutions_.find(resolved_host->host_);
   if (host_it != pending_resolutions_.end()) {
     for (auto* resolution : host_it->second) {
       auto& callbacks = resolution->callbacks_;
       resolution->cancel();
-      callbacks.onLoadDnsCacheComplete();
+      callbacks.onLoadDnsCacheComplete(resolved_host->info_);
     }
     pending_resolutions_.erase(host_it);
   }
