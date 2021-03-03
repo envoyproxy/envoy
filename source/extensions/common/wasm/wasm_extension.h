@@ -11,6 +11,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/common/wasm/context.h"
+#include "extensions/common/wasm/plugin.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,10 +35,9 @@ using CreateContextFn =
 using PluginHandleExtensionFactory = std::function<PluginHandleBaseSharedPtr(
     const WasmHandleSharedPtr& wasm_handle, const PluginSharedPtr& plugin)>;
 using WasmHandleExtensionFactory = std::function<WasmHandleBaseSharedPtr(
-    const VmConfig& vm_config, const CapabilityRestrictionConfig& capability_restriction_config,
-    const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-    Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
-    absl::string_view vm_key)>;
+    WasmConfig& config, const Stats::ScopeSharedPtr& scope,
+    Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
+    Server::ServerLifecycleNotifier& lifecycle_notifier, absl::string_view vm_key)>;
 using WasmHandleExtensionCloneFactory = std::function<WasmHandleBaseSharedPtr(
     const WasmHandleSharedPtr& base_wasm, Event::Dispatcher& dispatcher,
     CreateContextFn create_root_context_for_testing)>;

@@ -243,7 +243,7 @@ EXTENSIONS = {
     #
 
     "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
-    
+
     #
     # IO socket
     #
