@@ -39,6 +39,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -3130,8 +3131,9 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
+#ifdef ENVOY_ENABLE_QUICHE
 TEST_F(ClusterInfoImplTest, Http3) {
-  const std::string yaml = R"EOF(
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3144,7 +3146,25 @@ TEST_F(ClusterInfoImplTest, Http3) {
                   socket_address:
                     address: foo.bar.com
                     port_value: 443
-  )EOF";
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              private_key:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            validation_context:
+              trusted_ca:
+                filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              match_subject_alt_names:
+              - exact: localhost
+              - exact: 127.0.0.1
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
 
   BazFactory baz_factory;
   Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
@@ -3180,6 +3200,7 @@ TEST_F(ClusterInfoImplTest, Http3) {
   EXPECT_EQ(Http::Protocol::Http3,
             downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
+#endif
 
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {

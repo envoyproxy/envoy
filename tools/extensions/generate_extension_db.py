@@ -113,8 +113,7 @@ if __name__ == '__main__':
     raise ExtensionDbError('Check that all network filters robust against untrusted'
                            'downstreams are fuzzed by adding them to filterNames() in'
                            'test/extensions/filters/network/common/uber_per_readfilter.cc')
-  # The TLS and generic upstream extensions are hard-coded into the build, so
-  # not in source/extensions/extensions_build_config.bzl
+  # The extensions below so are not in source/extensions/extensions_build_config.bzl
   # TODO(mattklein123): Read these special keys from all_extensions.bzl or a shared location to
   # avoid duplicate logic.
   extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
