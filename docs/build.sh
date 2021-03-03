@@ -73,6 +73,13 @@ BAZEL_BUILD_OPTIONS+=(
     "--action_env=ENVOY_BLOB_SHA"
     "--action_env=EXTENSION_DB_PATH")
 
+
+# Generate extension database. This maps from extension name to extension
+# metadata, based on the envoy_cc_extension() Bazel target attributes.
+bazel run //tools/extensions:generate_extension_db
+
+# Generate RST for the lists of trusted/untrusted extensions in
+# intro/arch_overview/security docs.
 mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
