@@ -57,7 +57,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     new_config = std::make_shared<ConfigImpl>(
         *route_config_proto_, factory_context_,
         factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
-  } END_TRY
+  }
+  END_TRY
   catch (const Envoy::EnvoyException& e) {
     // revert the changes that failed validation
     vhds_virtual_hosts_ = std::move(vhosts_before_this_update);
