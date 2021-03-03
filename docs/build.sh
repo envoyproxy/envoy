@@ -134,7 +134,7 @@ find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
 
 # xDS protocol spec.
-mkdir -p ${GENERATED_RST_DIR}/api-docs
+mkdir -p "${GENERATED_RST_DIR}/api-docs"
 cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
