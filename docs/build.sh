@@ -16,7 +16,8 @@ fi
 # We need to set ENVOY_DOCS_VERSION_STRING and ENVOY_DOCS_RELEASE_LEVEL for Sphinx.
 # We also validate that the tag and version match at this point if needed.
 VERSION_NUMBER=$(cat VERSION)
-export DOCKER_IMAGE_TAG_NAME=$(echo "$VERSION_NUMBER" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+.*/v\1-latest/')
+export DOCKER_IMAGE_TAG_NAME
+DOCKER_IMAGE_TAG_NAME=$(echo "$VERSION_NUMBER" | sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+.*/v\1-latest/')
 if [[ -n "${DOCS_TAG}" ]]; then
   # Check the git tag matches the version number in the VERSION file.
   if [[ "v${VERSION_NUMBER}" != "${DOCS_TAG}" ]]; then
