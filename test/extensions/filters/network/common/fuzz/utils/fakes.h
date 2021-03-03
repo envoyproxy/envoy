@@ -1,3 +1,5 @@
+#pragma once
+
 #include "test/mocks/server/factory_context.h"
 
 namespace Envoy {

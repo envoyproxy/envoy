@@ -43,7 +43,7 @@ TEST(ContextProviderTest, DynamicContextParameters) {
 
   uint32_t update_count = 0;
   std::string last_updated_resource;
-  auto* callback_handle = context_provider.addDynamicContextUpdateCallback(
+  auto callback_handle = context_provider.addDynamicContextUpdateCallback(
       [&update_count, &last_updated_resource](absl::string_view resource_type_url) {
         ++update_count;
         last_updated_resource = resource_type_url;
@@ -78,8 +78,6 @@ TEST(ContextProviderTest, DynamicContextParameters) {
   EXPECT_EQ(4, update_count);
   EXPECT_EQ("some_type", last_updated_resource);
   EXPECT_EQ(0, context_provider.dynamicContext("some_type").params().count("foo"));
-
-  callback_handle->remove();
 }
 
 } // namespace

@@ -25,6 +25,7 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
@@ -148,7 +149,7 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, absl::string_view data)
 Context::Context() = default;
 Context::Context(Wasm* wasm) : ContextBase(wasm) {}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
-  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->local_info_;
+  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin)
     : ContextBase(wasm, root_context_id, plugin) {}
@@ -493,7 +494,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->local_info_.node(), arena);
+      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
     }
     break;
   case PropertyToken::SOURCE:
@@ -510,12 +511,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::LISTENER_DIRECTION:
     if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction_);
+      return CelValue::CreateInt64(plugin()->direction());
     }
     break;
   case PropertyToken::LISTENER_METADATA:
     if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listener_metadata_, arena);
+      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
     }
     break;
   case PropertyToken::CLUSTER_NAME:
@@ -666,19 +667,22 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
 const Http::HeaderMap* Context::getConstMap(WasmHeaderMapType type) {
   switch (type) {
   case WasmHeaderMapType::RequestHeaders:
-    if (access_log_request_headers_) {
+    if (access_log_phase_) {
       return access_log_request_headers_;
     }
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
+    if (access_log_phase_) {
+      return nullptr;
+    }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
-    if (access_log_response_headers_) {
+    if (access_log_phase_) {
       return access_log_response_headers_;
     }
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
-    if (access_log_response_trailers_) {
+    if (access_log_phase_) {
       return access_log_response_trailers_;
     }
     return response_trailers_;
@@ -722,6 +726,16 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, absl::string_view 
                                       absl::string_view* value) {
   auto map = getConstMap(type);
   if (!map) {
+    if (access_log_phase_) {
+      // Maps might point to nullptr in the access log phase.
+      if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
+        *value = "";
+        return WasmResult::Ok;
+      } else {
+        return WasmResult::NotFound;
+      }
+    }
+    // Requested map type is not currently available.
     return WasmResult::BadArgument;
   }
   const Http::LowerCaseString lower_key{std::string(key)};
@@ -1479,6 +1493,7 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
     onCreate();
   }
 
+  access_log_phase_ = true;
   access_log_request_headers_ = request_headers;
   // ? request_trailers  ?
   access_log_response_headers_ = response_headers;
@@ -1487,6 +1502,7 @@ void Context::log(const Http::RequestHeaderMap* request_headers,
 
   onLog();
 
+  access_log_phase_ = false;
   access_log_request_headers_ = nullptr;
   // ? request_trailers  ?
   access_log_response_headers_ = nullptr;
