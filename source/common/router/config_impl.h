@@ -582,6 +582,10 @@ protected:
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
+  absl::optional<std::string>
+  currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
+                                            absl::string_view matched_path) const;
+
 private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
@@ -600,6 +604,10 @@ private:
       return parent_->clusterNotFoundResponseCode();
     }
 
+    absl::optional<std::string>
+    currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override {
+      return parent_->currentUrlPathAfterRewrite(headers);
+    }
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
@@ -862,6 +870,10 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
 
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
 private:
   const std::string prefix_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
@@ -888,6 +900,10 @@ public:
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
   const std::string path_;
@@ -916,6 +932,10 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
 
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
 private:
   Regex::CompiledMatcherPtr regex_;
   std::string regex_str_;
@@ -941,6 +961,10 @@ public:
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
   bool supportsPathlessHeaders() const override { return true; }
 };
