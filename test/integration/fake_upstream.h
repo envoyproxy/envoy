@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -21,10 +22,13 @@
 #include "common/common/linked_object.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
+#include "common/config/utility.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -401,7 +405,7 @@ protected:
  */
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
-  enum class Type { HTTP1, HTTP2 };
+  enum class Type { HTTP1, HTTP2, HTTP3 };
 
   FakeHttpConnection(FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection,
                      Type type, Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
@@ -416,13 +420,13 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  // Should only be called for HTTP2
+  // Should only be called for HTTP2 or above
   void onGoAway(Http::GoAwayErrorCode code) override;
 
-  // Should only be called for HTTP2, sends a GOAWAY frame with NO_ERROR.
+  // Should only be called for HTTP2 or above, sends a GOAWAY frame with NO_ERROR.
   void encodeGoAway();
 
-  // Should only be called for HTTP2, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
+  // Should only be called for HTTP2 or above, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
 
 private:
@@ -678,11 +682,20 @@ private:
 
   class FakeListener : public Network::ListenerConfig {
   public:
-    FakeListener(FakeUpstream& parent)
+    FakeListener(FakeUpstream& parent, bool is_quic = false)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>(1)),
           udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
-          udp_listener_worker_router_(1), init_manager_(nullptr) {}
+          udp_listener_worker_router_(1), init_manager_(nullptr) {
+      if (is_quic) {
+        envoy::config::listener::v3::QuicProtocolOptions config;
+        auto& config_factory =
+            Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
+                "quiche_quic_listener");
+        udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(config, 1);
+      } else {
+        udp_listener_factory_ = std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+      }
+    }
 
   private:
     // Network::ListenerConfig
@@ -727,7 +740,7 @@ private:
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
-    const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
     Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
@@ -754,6 +767,8 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
+  std::list<FakeHttpConnectionPtr> quic_connections_ ABSL_GUARDED_BY(lock_);
+
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
