@@ -17,12 +17,9 @@ START_WASM_PLUGIN(WasmSpeedCpp)
 
 int xDoNotRemove = 0;
 
-google::protobuf::Arena arena;
+google::protobuf::Struct test_proto;
 
-google::protobuf::Struct args;
-google::protobuf::Struct* args_arena =
-    google::protobuf::Arena::CreateMessage<google::protobuf::Struct>(&arena);
-std::string configuration = R"EOF(
+const std::string test_json = R"EOF(
   {
     "NAME":"test_pod",
     "NAMESPACE":"test_namespace",
@@ -42,9 +39,6 @@ std::string configuration = R"EOF(
     "MESH_ID":"test-mesh"
   }
   )EOF";
-
-// google::protobuf::Struct a;
-// google::protobuf::util::JsonStringToMessage(configuration+'hfdjfhkjhdskhjk', a);
 
 const static char encodeLookup[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -242,21 +236,15 @@ void modify_metadata1000_test() {
   }
 }
 
-void json_serialize_test() { google::protobuf::util::JsonStringToMessage(configuration, &args); }
-
-void json_serialize_arena_test() {
-  google::protobuf::util::JsonStringToMessage(configuration, args_arena);
+void json_serialize_test() {
+  google::protobuf::Struct proto;
+  google::protobuf::util::JsonStringToMessage(test_json, &proto);
 }
 
 void json_deserialize_test() {
   std::string json;
-  google::protobuf::util::MessageToJsonString(args, &json);
+  google::protobuf::util::MessageToJsonString(test_proto, &json);
   xDoNotRemove += json.size();
-}
-
-void json_deserialize_arena_test() {
-  std::string json;
-  google::protobuf::util::MessageToJsonString(*args_arena, &json);
 }
 
 void json_deserialize_empty_test() {
@@ -266,23 +254,16 @@ void json_deserialize_empty_test() {
   xDoNotRemove = json.size();
 }
 
-void json_serialize_deserialize_test() {
-  std::string json;
-  google::protobuf::Struct proto;
-  google::protobuf::util::JsonStringToMessage(configuration, &proto);
-  google::protobuf::util::MessageToJsonString(proto, &json);
-  xDoNotRemove = json.size();
-}
-
 void convert_to_filter_state_test() {
-  auto start = reinterpret_cast<uint8_t*>(&*configuration.begin());
-  auto end = start + configuration.size();
-  std::string encoded_config = base64Encode(start, end);
+  auto start = reinterpret_cast<const uint8_t*>(&*test_json.begin());
+  auto end = start + test_json.size();
+  std::string encoded_json = base64Encode(start, end);
   std::vector<uint8_t> decoded;
-  base64Decode(encoded_config, &decoded);
-  std::string decoded_config(decoded.begin(), decoded.end());
-  google::protobuf::util::JsonStringToMessage(decoded_config, &args);
-  auto bytes = args.SerializeAsString();
+  base64Decode(encoded_json, &decoded);
+  std::string decoded_json(decoded.begin(), decoded.end());
+  google::protobuf::Struct proto;
+  google::protobuf::util::JsonStringToMessage(decoded_json, &proto);
+  auto bytes = proto.SerializeAsString();
   setFilterStateStringValue("wasm_request_set_key", bytes);
 }
 
@@ -320,16 +301,11 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t, uint32_t configuration_size)
     test_fn = &modify_metadata1000_test;
   } else if (configuration == "json_serialize") {
     test_fn = &json_serialize_test;
-  } else if (configuration == "json_serialize_arena") {
-    test_fn = &json_serialize_arena_test;
   } else if (configuration == "json_deserialize") {
+    google::protobuf::util::JsonStringToMessage(test_json, &test_proto);
     test_fn = &json_deserialize_test;
   } else if (configuration == "json_deserialize_empty") {
     test_fn = &json_deserialize_empty_test;
-  } else if (configuration == "json_deserialize_arena") {
-    test_fn = &json_deserialize_arena_test;
-  } else if (configuration == "json_serialize_deserialize") {
-    test_fn = &json_serialize_deserialize_test;
   } else if (configuration == "convert_to_filter_state") {
     test_fn = &convert_to_filter_state_test;
   } else {
