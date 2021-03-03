@@ -12,8 +12,8 @@ import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
+import "envoy/type/v3/path_transformations.proto";
 import "envoy/type/v3/percent.proto";
-import "envoy/type/v3/transformations.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -252,18 +252,23 @@ message HttpConnectionManager {
     // [#not-implemented-hide] Normalization applies internally before any processing of requests by
     // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
     // to :ref:`NormalizePathRFC3986
-    // <envoy_api_msg_type.v3.TextTransformation.Operation.NormalizePathRFC3986>`. When not specified,
-    // this value may be overridden by the runtime variable
-    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`. For
-    // paths that fail this check, Envoy will respond with 400 to paths that are malformed.
-    type.v3.TextTransformation full_transformation = 1;
+    // <envoy_api_msg_type.v3.PathTransformation.Operation.NormalizePathRFC3986>`. When not
+    // specified, this value may be overridden by the runtime variable
+    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+    // Envoy will respond with 400 to paths that are malformed (e.g. for paths that fail RFC 3986
+    // normalization due to disallowed characters.)
+    type.v3.PathTransformation forwarding_transformation = 1;
 
     // [#not-implemented-hide] Normalization only applies internally before any processing of
     // requests by HTTP filters, routing, and matching. These will be applied after full
     // transformation is applied. The *:path* header before this transformation will be restored in
     // the router filter and sent upstream unless it was mutated by a filter. Defaults to no
     // transformations.
-    type.v3.TextTransformation internal_transformation = 2;
+    // Multiple actions can be applied in the same Transformation, forming a sequential
+    // pipeline. The transformations will be performed in the order that they appear. Envoy will
+    // respond with 400 to paths that are malformed (e.g. for paths that fail RFC 3986
+    // normalization due to disallowed characters.)
+    type.v3.PathTransformation http_filter_transformation = 2;
   }
 
   reserved 27, 11;

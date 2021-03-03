@@ -6,21 +6,20 @@ import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.v3";
-option java_outer_classname = "TransformationsProto";
+option java_outer_classname = "PathTransformationsProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Text Transformations API]
+// [#protodoc-title: Path Transformations API]
 
-// TextTransformations define an API to apply a sequence of operations that can
-// be used to alter text before it is used for matching or routing. Multiple
-// actions can be applied in the same Transformation, forming a sequential
-// pipeline. The transformations will be performed in the order that they
-// appear.
+// PathTransformation defines an API to apply a sequence of operations that can be used to alter
+// text before it is used for matching or routing. Multiple actions can be applied in the same
+// Transformation, forming a sequential pipeline. The transformations will be performed in the order
+// that they appear.
 //
 // This API is a work in progress.
 
-message TextTransformation {
+message PathTransformation {
   // A type of operation to alter text.
   message Operation {
     // Should text be normalized according to RFC 3986? This typically is used for path headers
@@ -42,7 +41,7 @@ message TextTransformation {
     message MergeSlashes {
     }
 
-    oneof Kind {
+    oneof operation_specifier {
       option (validate.required) = true;
 
       // Enable path normalization per RFC 3986.
