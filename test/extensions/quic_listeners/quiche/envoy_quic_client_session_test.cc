@@ -54,7 +54,9 @@ public:
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
-  MOCK_METHOD(void, SendConnectionClosePacket, (quic::QuicErrorCode, const std::string&));
+  MOCK_METHOD(void, SendConnectionClosePacket,
+              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes ietf_error,
+               const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
 
   using EnvoyQuicClientConnection::connectionStats;
@@ -98,7 +100,6 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -137,7 +138,7 @@ public:
   void TearDown() override {
     if (quic_connection_->connected()) {
       EXPECT_CALL(*quic_connection_,
-                  SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
+                  SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
@@ -229,7 +230,8 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
-  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error, error_details,
+  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error,
+                                       quic::NO_IETF_QUIC_ERROR, error_details,
                                        /* transport_close_frame_type = */ 0);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   quic_connection_->OnConnectionCloseFrame(frame);
@@ -243,7 +245,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(*quic_connection_,
-              SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);

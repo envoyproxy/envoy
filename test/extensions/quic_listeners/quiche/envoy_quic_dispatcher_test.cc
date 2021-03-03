@@ -68,7 +68,6 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -158,13 +157,13 @@ public:
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id_));
 
     // A new QUIC connection is created and its filter installed based on self and peer address.
-    EXPECT_EQ(1u, envoy_quic_dispatcher_.session_map().size());
-    quic::QuicSession* session =
-        envoy_quic_dispatcher_.session_map().find(connection_id_)->second.get();
+    EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
+    const quic::QuicSession* session =
+        quic::test::QuicDispatcherPeer::FindSession(&envoy_quic_dispatcher_, connection_id_);
     ASSERT(session != nullptr);
     EXPECT_TRUE(session->IsEncryptionEstablished());
     EXPECT_EQ(1u, connection_handler_.numConnections());
-    auto envoy_connection = static_cast<EnvoyQuicServerSession*>(session);
+    auto envoy_connection = static_cast<const EnvoyQuicServerSession*>(session);
     EXPECT_EQ("test.example.org", envoy_connection->requestedServerName());
     EXPECT_EQ(peer_addr, envoyIpAddressToQuicSocketAddress(
                              envoy_connection->addressProvider().remoteAddress()->ip()));

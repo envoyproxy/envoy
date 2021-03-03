@@ -52,6 +52,11 @@ public:
                quic::StreamSendingState state, quic::TransmissionType type,
                absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
+  MOCK_METHOD(void, MaybeSendRstStreamFrame,
+              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+               quic::QuicStreamOffset bytes_written));
+  MOCK_METHOD(void, MaybeSendStopSendingFrame,
+              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};

@@ -6,26 +6,26 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#define QUIC_RELOADABLE_FLAG_COUNT_IMPL(flag)                                                      \
+#define QUICHE_RELOADABLE_FLAG_COUNT_IMPL(flag)                                                    \
   do {                                                                                             \
   } while (0)
 
-#define QUIC_RELOADABLE_FLAG_COUNT_N_IMPL(flag, instance, total)                                   \
+#define QUICHE_RELOADABLE_FLAG_COUNT_N_IMPL(flag, instance, total)                                 \
   do {                                                                                             \
   } while (0)
 
-#define QUIC_RESTART_FLAG_COUNT_IMPL(flag)                                                         \
+#define QUICHE_RESTART_FLAG_COUNT_IMPL(flag)                                                       \
   do {                                                                                             \
   } while (0)
 
-#define QUIC_RESTART_FLAG_COUNT_N_IMPL(flag, instance, total)                                      \
+#define QUICHE_RESTART_FLAG_COUNT_N_IMPL(flag, instance, total)                                    \
   do {                                                                                             \
   } while (0)
 
-#define QUIC_CODE_COUNT_IMPL(name)                                                                 \
+#define QUICHE_CODE_COUNT_IMPL(name)                                                               \
   do {                                                                                             \
   } while (0)
 
-#define QUIC_CODE_COUNT_N_IMPL(name, instance, total)                                              \
+#define QUICHE_CODE_COUNT_N_IMPL(name, instance, total)                                            \
   do {                                                                                             \
   } while (0)

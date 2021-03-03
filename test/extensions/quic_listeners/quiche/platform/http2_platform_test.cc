@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 
-#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+#include "extensions/quic_listeners/quiche/platform/quiche_flags_impl.h"
 
 #include "test/test_common/logging.h"
 
@@ -68,8 +68,6 @@ TEST(Http2PlatformTest, Http2Log) {
 
   HTTP2_DVLOG_IF(3, true) << "DVLOG_IF(3, true)";
   HTTP2_DVLOG_IF(4, false) << "DVLOG_IF(4, false)";
-
-  HTTP2_DLOG_EVERY_N(ERROR, 2) << "DLOG_EVERY_N(ERROR, 2)";
 }
 
 TEST(Http2PlatformTest, Http2Macro) {
