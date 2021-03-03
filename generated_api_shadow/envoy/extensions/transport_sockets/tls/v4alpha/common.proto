@@ -214,6 +214,13 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
+message CaStore {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.transport_sockets.tls.v3.CaStore";
+
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+}
+
 // [#next-free-field: 14]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
@@ -281,7 +288,7 @@ message CertificateValidationContext {
   // :ref:`match_subject_alt_names
   // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
   // specified.
-  repeated string trusted_stores = 13 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+  repeated CaStore trusted_stores = 13;
 
   // If specified, updates of a file-based *trusted_ca* source will be triggered
   // by this watch. This allows explicit control over the path watched, by
