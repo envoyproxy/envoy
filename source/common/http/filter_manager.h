@@ -917,9 +917,8 @@ public:
   /**
    * Called before local reply is made by the filter manager.
    * @param data the data associated with the local reply.
-   * @param LocalErrorStatus the status from the filter chain.
    */
-  LocalErrorStatus onLocalReply(StreamFilterBase::LocalReplyData& data);
+  void onLocalReply(StreamFilterBase::LocalReplyData& data);
 
   void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -1122,7 +1121,7 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false) {}
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -1140,6 +1139,8 @@ private:
     bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
+    // True under the stack of onLocalReply, false otherwise.
+    bool under_on_local_reply_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

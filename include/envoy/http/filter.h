@@ -610,15 +610,22 @@ public:
   virtual void onMatchCallback(const Matcher::Action&) {}
 
   struct LocalReplyData {
+    // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
+    // The details of why a local reply is being sent.
     absl::string_view details_;
+    // True if a reset will occur rather than the local reply (some prior filter
+    // has returned ContinueAndResetStream)
+    bool reset_imminent_;
   };
 
   /**
    * Called after sendLocalReply is called, and before any local reply is
    * serialized either to filters, or downstream.
+   * This will be called on both encoder and decoder filters starting at the
+   * router filtre and working towards the first filter configured.
    *
-   * Note that in rare circumstances, onLocalReply may be called more than once
+   * Note that in some circumstances, onLocalReply may be called more than once
    * for a given stream, because it is possible that a filter call
    * sendLocalReply while processing the original local reply response.
    *
@@ -628,7 +635,9 @@ public:
    * @param data data associated with the sendLocalReply call.
    * @param LocalErrorStatus the action to take after onLocalError completes.
    */
-  virtual LocalErrorStatus onLocalReply(LocalReplyData&) { return LocalErrorStatus::Continue; }
+  virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
+    return LocalErrorStatus::Continue;
+  }
 };
 
 /**

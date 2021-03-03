@@ -812,22 +812,23 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
-LocalErrorStatus FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  state_.under_on_local_reply_ = true;
   filter_manager_callbacks_.onLocalReply(data.code_);
 
-  LocalErrorStatus status = LocalErrorStatus::Continue;
   for (auto entry : filters_) {
     if (entry->onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
-      status = LocalErrorStatus::ContinueAndResetStream;
+      data.reset_imminent_ = true;
     }
   }
-  return status;
+  state_.under_on_local_reply_ = false;
 }
 
 void FilterManager::sendLocalReply(
     bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   bool is_grpc_request = old_was_grpc_request;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
@@ -836,8 +837,9 @@ void FilterManager::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
 
-  StreamFilterBase::LocalReplyData data{code, details};
-  if (FilterManager::onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
+  StreamFilterBase::LocalReplyData data{code, details, false};
+  FilterManager::onLocalReply(data);
+  if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
                      details);
     filter_manager_callbacks_.resetStream();

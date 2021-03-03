@@ -21,7 +21,7 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Http::LocalErrorStatus onLocalReply(LocalReplyData&) override {
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
     if (reset_) {
       return Http::LocalErrorStatus::ContinueAndResetStream;
     }
