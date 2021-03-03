@@ -14,7 +14,9 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* grpc_json_transcoder: filter now adheres to encoder and decoder buffer limits. Requests and responses that require buffering over the limits will be directly rejected.
+* grpc_json_transcoder: filter now adheres to encoder and decoder buffer limits. Requests and responses
+  that require buffering over the limits will be directly rejected. The behavior can be reverted by
+  disabling runtime feature `envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits`.
 * healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
   :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
   for all responses when Envoy is in the health check failed state. Additionally, receiving the
