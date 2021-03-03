@@ -42,7 +42,8 @@ void SslIntegrationTestBase::initialize() {
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
                                   .setTlsV13(server_tlsv1_3_)
-                                  .setExpectClientEcdsaCert(client_ecdsa_cert_));
+                                  .setExpectClientEcdsaCert(client_ecdsa_cert_)
+                                  .setCustomValidatorConfig(custom_validator_config_));
   HttpIntegrationTest::initialize();
 
   context_manager_ =
@@ -351,6 +352,98 @@ TEST_P(SslCertficateIntegrationTest, ServerRsa) {
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
+}
+
+// Server configured on SPIFFE certificate validation for mTLS
+// clientcert.pem's san is "spiffe://lyft.com/frontend-team" so it should be accepted.
+TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorAccepted) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  )EOF"),
+                            *typed_conf);
+
+  custom_validator_config_ = typed_conf;
+  server_rsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
+  EXPECT_EQ(0, counter->value());
+  counter->reset();
+}
+// Server configured on SPIFFE certificate validation for mTLS
+// clientcert.pem's san is "spiffe://lyft.com/frontend-team" so it should be rejected.
+TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected1) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  )EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  server_rsa_cert_ = true;
+  initialize();
+  auto conn = makeSslClientConnection({});
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
+    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    EXPECT_FALSE(codec->connected());
+  } else {
+    makeHttpConnection(std::move(conn))->close();
+  }
+
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
+  EXPECT_EQ(1, counter->value());
+  counter->reset();
+}
+
+// Server configured on SPIFFE certificate validation for mTLS
+// clientcert.pem's san is "spiffe://lyft.com/frontend-team" but the corresponding trust bundle does
+// not match with the client cert. So this should also be rejected.
+TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected2) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+  )EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  server_rsa_cert_ = true;
+  initialize();
+  auto conn = makeSslClientConnection({});
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
+    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    EXPECT_FALSE(codec->connected());
+  } else {
+    makeHttpConnection(std::move(conn))->close();
+  }
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
+  EXPECT_EQ(1, counter->value());
+  counter->reset();
 }
 
 // Server with an ECDSA certificate and a client with RSA/ECDSA cipher suites works.

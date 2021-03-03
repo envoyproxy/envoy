@@ -18,7 +18,6 @@
 
 #include "extensions/transport_sockets/tls/stats.h"
 
-#include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
