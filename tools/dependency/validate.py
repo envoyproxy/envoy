@@ -60,7 +60,7 @@ def TestOnlyIgnore(dep):
   if dep.startswith('remotejdk'):
     return True
   # Python (pip3)
-  if '_pip3_' in dep:
+  if '_pip3' in dep:
     return True
   return False
 

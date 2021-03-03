@@ -61,7 +61,7 @@ class ValidateTest(unittest.TestCase):
   def test_valid_test_only_deps(self):
     validator = self.BuildValidator({'a': FakeDep('dataplane_core')}, {'//source/...': ['a']})
     validator.ValidateTestOnlyDeps()
-    validator = self.BuildValidator({'a': FakeDep('test_only')}, {'//test/...': ['a', 'b__pip3_']})
+    validator = self.BuildValidator({'a': FakeDep('test_only')}, {'//test/...': ['a', 'b__pip3']})
     validator.ValidateTestOnlyDeps()
 
   def test_invalid_test_only_deps(self):
