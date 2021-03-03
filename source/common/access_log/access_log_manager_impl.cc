@@ -147,7 +147,7 @@ void AccessLogFileImpl::flushThreadFunc() {
 
     // if we failed to open file before, then simply ignore
     if (file_->isOpen()) {
-      try {
+      TRY_NEEDS_AUDIT {
         if (reopen_file_) {
           reopen_file_ = false;
           const Api::IoCallBoolResult result = file_->close();
@@ -157,7 +157,8 @@ void AccessLogFileImpl::flushThreadFunc() {
         }
 
         doWrite(about_to_write_buffer_);
-      } catch (const EnvoyException&) {
+      }
+      catch (const EnvoyException&) {
         stats_.reopen_failed_.inc();
       }
     }

@@ -196,5 +196,9 @@ private:
 
 #define END_TRY }
 
+// TODO(chaoqinli-1123): Remove this macros after we have removed all the exceptions from data
+// plane.
+#define TRY_NEEDS_AUDIT try
+
 } // namespace Thread
 } // namespace Envoy

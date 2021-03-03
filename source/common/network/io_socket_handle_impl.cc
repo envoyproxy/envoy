@@ -277,7 +277,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
                                                             socklen_t ss_len, os_fd_t fd) {
-  try {
+  TRY_NEEDS_AUDIT {
     // Set v6only to false so that mapped-v6 address can be normalize to v4
     // address. Though dual stack may be disabled, it's still okay to assume the
     // address is from a dual stack socket. This is because mapped-v6 address
@@ -287,7 +287,8 @@ Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_stora
     // regarded as a v6 address from dual stack socket. However, this address is not going to be
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
     return Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, e.what()));
   }
 }

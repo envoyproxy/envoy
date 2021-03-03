@@ -168,15 +168,16 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (completed_) {
     if (!cancelled_) {
-      try {
-        callback_(resolution_status, std::move(address_list));
-      } catch (const EnvoyException& e) {
+      TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
+      catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (const std::exception& e) {
+      }
+      catch (const std::exception& e) {
         ENVOY_LOG(critical, "std::exception in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (...) {
+      }
+      catch (...) {
         ENVOY_LOG(critical, "Unknown exception in c-ares callback");
         dispatcher_.post([] { throw EnvoyException("unknown"); });
       }

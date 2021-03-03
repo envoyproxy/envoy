@@ -168,21 +168,21 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   Protobuf::DynamicMessageFactory dmf;
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
-  try {
+  TRY_NEEDS_AUDIT {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EarlierVersion);
     // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
     // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
     // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
-    try {
-      f(message, MessageVersion::LatestVersionValidate);
-    } catch (EnvoyException& e) {
+    TRY_NEEDS_AUDIT { f(message, MessageVersion::LatestVersionValidate); }
+    catch (EnvoyException& e) {
       MessageUtil::onVersionUpgradeDeprecation(e.what());
     }
     // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
-  } catch (ApiBoostRetryException&) {
+  }
+  catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
     f(message, MessageVersion::LatestVersion);
@@ -423,7 +423,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
-      try {
+      TRY_NEEDS_AUDIT {
         if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(
               message, message_version == MessageVersion::LatestVersionValidate
@@ -431,7 +431,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                            : validation_visitor);
         }
         return;
-      } catch (EnvoyException& ex) {
+      }
+      catch (EnvoyException& ex) {
         if (message_version == MessageVersion::LatestVersion ||
             message_version == MessageVersion::LatestVersionValidate) {
           // Failed reading the latest version - pass the same error upwards
@@ -611,13 +612,14 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     throw EnvoyException(json_or_error.status().ToString());
   }
   YAML::Node node;
-  try {
-    node = YAML::Load(json_or_error.value());
-  } catch (YAML::ParserException& e) {
+  TRY_NEEDS_AUDIT { node = YAML::Load(json_or_error.value()); }
+  catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
+  }
+  catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (std::exception& e) {
+  }
+  catch (std::exception& e) {
     // There is a potentially wide space of exceptions thrown by the YAML parser,
     // and enumerating them all may be difficult. Envoy doesn't work well with
     // unhandled exceptions, so we capture them and record the exception name in
@@ -884,13 +886,14 @@ void MessageUtil::redact(Protobuf::Message& message) {
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
-  try {
-    return parseYamlNode(YAML::Load(yaml));
-  } catch (YAML::ParserException& e) {
+  TRY_NEEDS_AUDIT { return parseYamlNode(YAML::Load(yaml)); }
+  catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
+  }
+  catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (std::exception& e) {
+  }
+  catch (std::exception& e) {
     // There is a potentially wide space of exceptions thrown by the YAML parser,
     // and enumerating them all may be difficult. Envoy doesn't work well with
     // unhandled exceptions, so we capture them and record the exception name in

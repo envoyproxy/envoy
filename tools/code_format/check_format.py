@@ -756,6 +756,9 @@ class FormatChecker:
       reportError("Don't use std::variant; use absl::variant instead")
     if self.tokenInLine("std::visit", line):
       reportError("Don't use std::visit; use absl::visit instead")
+    if " try {" in line and file_path.startswith("./source") and not file_path.startswith(
+        "./source/extensions") and not file_path == "./source/common/common/thread.h":
+      reportError("Don't use raw try, use TRY_ASSERT_MAIN_THREAD.")
     if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
       # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
       # can be used instead

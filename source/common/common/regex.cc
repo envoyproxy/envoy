@@ -21,18 +21,18 @@ public:
 
   // CompiledMatcher
   bool match(absl::string_view value) const override {
-    try {
-      return std::regex_match(value.begin(), value.end(), regex_);
-    } catch (const std::regex_error& e) {
+    TRY_NEEDS_AUDIT { return std::regex_match(value.begin(), value.end(), regex_); }
+    catch (const std::regex_error& e) {
       return false;
     }
   }
 
   // CompiledMatcher
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
-    try {
+    TRY_NEEDS_AUDIT {
       return std::regex_replace(std::string(value), regex_, std::string(substitution));
-    } catch (const std::regex_error& e) {
+    }
+    catch (const std::regex_error& e) {
       return std::string(value);
     }
   }
@@ -136,9 +136,8 @@ std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_typ
   // TODO(zuercher): In the future, PGV (https://github.com/envoyproxy/protoc-gen-validate)
   // annotations may allow us to remove this in favor of direct validation of regular
   // expressions.
-  try {
-    return std::regex(regex, flags);
-  } catch (const std::regex_error& e) {
+  TRY_NEEDS_AUDIT { return std::regex(regex, flags); }
+  catch (const std::regex_error& e) {
     throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
   }
 }

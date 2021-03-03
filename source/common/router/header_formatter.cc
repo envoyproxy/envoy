@@ -76,13 +76,14 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
   absl::string_view json = params_str.substr(1, params_str.size() - 2); // trim parens
 
   std::vector<std::string> params;
-  try {
+  TRY_NEEDS_AUDIT {
     Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(json));
 
     for (const auto& param : parsed_params->asObjectArray()) {
       params.emplace_back(param->asString());
     }
-  } catch (Json::Exception& e) {
+  }
+  catch (Json::Exception& e) {
     throw EnvoyException(formatUpstreamMetadataParseException(params_str, &e));
   }
 

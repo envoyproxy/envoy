@@ -83,11 +83,11 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
     throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
-  try {
-    return std::stoi(url.substr(colon_index + 1));
-  } catch (const std::invalid_argument& e) {
+  TRY_NEEDS_AUDIT { return std::stoi(url.substr(colon_index + 1)); }
+  catch (const std::invalid_argument& e) {
     throw EnvoyException(e.what());
-  } catch (const std::out_of_range& e) {
+  }
+  catch (const std::out_of_range& e) {
     throw EnvoyException(e.what());
   }
 }

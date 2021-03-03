@@ -39,17 +39,20 @@ namespace Utility {
 Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
                                Buffer::Instance& data) {
   Http::Status status;
-  try {
+  TRY_NEEDS_AUDIT {
     status = dispatch(data);
     // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
     // so dispatch may either return an error status or throw an exception. Soon we won't need to
     // catch these exceptions, as all codec errors will be migrated to using error statuses that are
     // returned from dispatch.
-  } catch (FrameFloodException& e) {
+  }
+  catch (FrameFloodException& e) {
     status = bufferFloodError(e.what());
-  } catch (CodecProtocolException& e) {
+  }
+  catch (CodecProtocolException& e) {
     status = codecProtocolError(e.what());
-  } catch (PrematureResponseException& e) {
+  }
+  catch (PrematureResponseException& e) {
     status = prematureResponseError(e.what(), e.responseCode());
   }
   return status;
@@ -622,7 +625,7 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   xff_string = StringUtil::ltrim(xff_string);
   xff_string = StringUtil::rtrim(xff_string);
 
-  try {
+  TRY_NEEDS_AUDIT {
     // This technically requires a copy because inet_pton takes a null terminated string. In
     // practice, we are working with a view at the end of the owning string, and could pass the
     // raw pointer.
@@ -630,7 +633,8 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
     return {
         Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
         last_comma == std::string::npos && num_to_skip == 0};
-  } catch (const EnvoyException&) {
+  }
+  catch (const EnvoyException&) {
     return {nullptr, false};
   }
 }
@@ -1031,7 +1035,7 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
   // so is not worth it since the DNS resolver should handle it for us.
   bool is_ip_address = false;
-  try {
+  TRY_NEEDS_AUDIT {
     absl::string_view potential_ip_address = host_to_resolve;
     // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
     // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
@@ -1045,7 +1049,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
     Network::Utility::parseInternetAddress(std::string(potential_ip_address));
     is_ip_address = true;
     host_to_resolve = potential_ip_address;
-  } catch (const EnvoyException&) {
+  }
+  catch (const EnvoyException&) {
   }
 
   return {is_ip_address, host_to_resolve, port};
