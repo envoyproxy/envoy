@@ -300,6 +300,25 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
   wrapper.reset();
 }
 
+TEST_F(LuaStreamInfoWrapperTest, ReturnRequestedServerName) {
+  const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(object:requestedServerName())
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.requested_server_name_ = "some.sni.io";
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("some.sni.io"));
+  start("callMe");
+  wrapper.reset();
+}
+
 // Set, get and iterate stream info dynamic metadata.
 TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
