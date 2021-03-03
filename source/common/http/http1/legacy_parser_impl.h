@@ -11,10 +11,10 @@ namespace Http1 {
 class LegacyHttpParserImpl : public Parser {
 public:
   LegacyHttpParserImpl(MessageType type, ParserCallbacks* data);
-  ~LegacyHttpParserImpl();
+  ~LegacyHttpParserImpl() override;
 
   // Http1::Parser
-  rcVal execute(const char* data, int len) override;
+  RcVal execute(const char* data, int len) override;
   void resume() override;
   ParserStatus pause() override;
   int getErrno() override;

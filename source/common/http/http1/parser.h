@@ -97,7 +97,7 @@ enum class ParserStatus {
 class Parser {
 public:
   // Struct containing the return value from parser execution.
-  struct rcVal {
+  struct RcVal {
     // Number of parsed bytes.
     size_t nread;
     // Return code indicating success or error.
@@ -106,8 +106,8 @@ public:
   virtual ~Parser() = default;
 
   // Executes the parser.
-  // @return an rcVal containing the number of parsed bytes and return code.
-  virtual rcVal execute(const char* slice, int len) PURE;
+  // @return an RcVal containing the number of parsed bytes and return code.
+  virtual RcVal execute(const char* slice, int len) PURE;
 
   // Unpauses the parser.
   virtual void resume() PURE;

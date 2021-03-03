@@ -56,7 +56,7 @@ public:
     };
   }
 
-  rcVal execute(const char* slice, int len) {
+  RcVal execute(const char* slice, int len) {
     return {http_parser_execute(&parser_, &settings_, slice, len), HTTP_PARSER_ERRNO(&parser_)};
   }
 
@@ -120,7 +120,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
 // same compilation unit so that the destructor has a complete definition of Impl.
 LegacyHttpParserImpl::~LegacyHttpParserImpl() = default;
 
-LegacyHttpParserImpl::rcVal LegacyHttpParserImpl::execute(const char* slice, int len) {
+LegacyHttpParserImpl::RcVal LegacyHttpParserImpl::execute(const char* slice, int len) {
   return impl_->execute(slice, len);
 }
 
