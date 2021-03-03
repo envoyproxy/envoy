@@ -18,7 +18,7 @@ protected:
   CustomHeaderTest() {
     envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig config;
     config.set_header_name("x-real-ip");
-    config.set_allow_trusted_address_checks(true);
+    config.set_allow_extension_to_set_address_as_trusted(true);
 
     auto* reject_options = config.mutable_reject_options();
     reject_options->set_body_on_error("detection failed");

@@ -10,7 +10,7 @@ namespace CustomHeader {
 CustomHeaderIPDetection::CustomHeaderIPDetection(
     const envoy::extensions::original_ip_detection::custom_header::v3::CustomHeaderConfig& config)
     : header_name_(config.header_name()),
-      allow_trusted_address_checks_(config.allow_trusted_address_checks()) {
+      allow_trusted_address_checks_(config.allow_extension_to_set_address_as_trusted()) {
 
   if (config.has_reject_options()) {
     Http::Code reject_code = Http::Code::Forbidden;

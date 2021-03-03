@@ -38,9 +38,10 @@ message CustomHeaderConfig {
   // The header name containing the original downstream remote address, if present.
   string header_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Is the detected address trusted (e.g.: can it be used to determine if this is an internal
-  // request).
-  bool allow_trusted_address_checks = 2;
+  // If set to true, the extension is allowed to decide if the detected address should be treated as
+  // trusted. If a detected address is considered trusted, it might be used as input to determine
+  // if the request is internal (among other things).
+  bool allow_extension_to_set_address_as_trusted = 2;
 
   // If set, requests for which either the configured header is missing or parsing an IP from its
   // value fails will be rejected with these options.
