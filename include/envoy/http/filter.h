@@ -623,7 +623,7 @@ public:
    * Called after sendLocalReply is called, and before any local reply is
    * serialized either to filters, or downstream.
    * This will be called on both encoder and decoder filters starting at the
-   * router filtre and working towards the first filter configured.
+   * router filter and working towards the first filter configured.
    *
    * Note that in some circumstances, onLocalReply may be called more than once
    * for a given stream, because it is possible that a filter call
