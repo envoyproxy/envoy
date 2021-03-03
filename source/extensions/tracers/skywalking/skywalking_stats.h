@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {

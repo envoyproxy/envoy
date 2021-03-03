@@ -320,6 +320,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
                     address: localhost1
                     port_value: 11001
             - endpoint:
+                hostname: foo
                 address:
                   socket_address:
                     address: localhost2
@@ -365,7 +366,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -416,6 +417,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
@@ -704,7 +707,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_FALSE(cluster.info()->maintenanceMode());
 
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -822,7 +825,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
   // host multiple times.
   absl::node_hash_set<HostSharedPtr> removed_hosts;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb2 = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         for (const auto& host : hosts_removed) {
           EXPECT_EQ(removed_hosts.end(), removed_hosts.find(host));
@@ -911,7 +914,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
                                std::move(scope), false);
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -1108,7 +1111,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
   StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
                                std::move(scope), false);
   ReadyWatcher membership_updated;
-  cluster.prioritySet().addPriorityUpdateCb(
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
 
   cluster.initialize([] {});
@@ -2116,12 +2119,12 @@ TEST(PrioritySet, Extend) {
   uint32_t priority_changes = 0;
   uint32_t membership_changes = 0;
   uint32_t last_priority = 0;
-  priority_set.addPriorityUpdateCb(
+  auto priority_update_cb = priority_set.addPriorityUpdateCb(
       [&](uint32_t priority, const HostVector&, const HostVector&) -> void {
         last_priority = priority;
         ++priority_changes;
       });
-  priority_set.addMemberUpdateCb(
+  auto member_update_cb = priority_set.addMemberUpdateCb(
       [&](const HostVector&, const HostVector&) -> void { ++membership_changes; });
 
   // The initial priority set starts with priority level 0..
@@ -2174,9 +2177,10 @@ TEST(PrioritySet, Extend) {
 
   // We're going to do a noop host change, so add a callback to assert that we're not announcing
   // any host changes.
-  priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) -> void {
-    EXPECT_TRUE(added.empty() && removed.empty());
-  });
+  auto member_update_cb2 = priority_set.addMemberUpdateCb(
+      [&](const HostVector& added, const HostVector& removed) -> void {
+        EXPECT_TRUE(added.empty() && removed.empty());
+      });
 
   TestBatchUpdateCb batch_update(hosts, hosts_per_locality);
   priority_set.batchHostUpdate(batch_update);
@@ -2203,6 +2207,14 @@ public:
     return std::make_unique<StrictDnsClusterImpl>(cluster_config_, runtime_, dns_resolver_,
                                                   *factory_context_, std::move(scope_), false);
   }
+
+  class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
+  public:
+    static std::pair<absl::optional<double>, absl::optional<uint32_t>> getRetryBudgetParams(
+        const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
+      return ClusterInfoImpl::getRetryBudgetParams(thresholds);
+    }
+  };
 
   Stats::TestUtil::TestStore stats_;
   Ssl::MockContextManager ssl_context_manager_;
@@ -2277,6 +2289,70 @@ TEST_F(ClusterInfoImplTest, Metadata) {
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+}
+
+// Verify retry budget default values are honored.
+TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
+    circuit_breakers:
+      thresholds:
+      # 0 - No budget config.
+      - priority: DEFAULT
+        max_retries: 123
+      # 1 - Empty budget config, should have defaults.
+      - priority: DEFAULT
+        retry_budget: {}
+      # 2 - Empty budget config with max retries, should have budget defaults.
+      - priority: DEFAULT
+        max_retries: 123
+        retry_budget: {}
+      # 3 - Budget percent set, expect retry concurrency default.
+      - priority: DEFAULT
+        retry_budget:
+          budget_percent:
+            value: 42.0
+      # 4 - Retry concurrency set, expect budget default.
+      - priority: DEFAULT
+        retry_budget:
+          min_retry_concurrency: 123
+  )EOF";
+
+  makeCluster(yaml);
+  absl::optional<double> budget_percent;
+  absl::optional<uint32_t> min_retry_concurrency;
+  auto threshold = cluster_config_.circuit_breakers().thresholds();
+
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
+  EXPECT_EQ(budget_percent, absl::nullopt);
+  EXPECT_EQ(min_retry_concurrency, absl::nullopt);
+
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(min_retry_concurrency, 3);
+
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(min_retry_concurrency, 3);
+
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
+  EXPECT_EQ(budget_percent, 42.0);
+  EXPECT_EQ(min_retry_concurrency, 3);
+
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(min_retry_concurrency, 123);
 }
 
 // Eds service_name is populated.
@@ -3082,24 +3158,27 @@ TEST_F(ClusterInfoImplTest, Http3) {
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
   )EOF";
 
   const std::string downstream_http3 = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
 
-  {
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_http3), EnvoyException,
-                            "HTTP3 not yet supported: name.*");
-  }
-  {
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_http3), EnvoyException,
-                            "HTTP3 not yet supported: name.*");
-  }
+  auto explicit_h3 = makeCluster(yaml + explicit_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+
+  auto downstream_h3 = makeCluster(yaml + downstream_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

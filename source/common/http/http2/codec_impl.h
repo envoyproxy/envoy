@@ -591,6 +591,8 @@ private:
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
 
   Http::ConnectionCallbacks& callbacks_;
+  // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
+  bool enable_upstream_http2_flood_checks_;
 };
 
 /**

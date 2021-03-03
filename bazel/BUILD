@@ -325,6 +325,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_log_fast_debug_assert_in_release",
+    values = {"define": "log_fast_debug_assert_in_release=enabled"},
+)
+
+config_setting(
     name = "disable_known_issue_asserts",
     values = {"define": "disable_known_issue_asserts=true"},
 )

@@ -11,6 +11,7 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
     : table_size_(table_size), stats_(stats) {
   // We can't do anything sensible with no hosts.
   if (normalized_host_weights.empty()) {
+    ENVOY_LOG(debug, "maglev: normalized hosts weights is empty, skipping building table");
     return;
   }
 

@@ -1,7 +1,7 @@
 #include <functional>
 #include <string>
 
-#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+#include "extensions/quic_listeners/quiche/platform/quiche_flags_impl.h"
 
 #include "test/test_common/logging.h"
 

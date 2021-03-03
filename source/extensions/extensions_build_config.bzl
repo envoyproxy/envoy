@@ -243,12 +243,18 @@ EXTENSIONS = {
     #
 
     "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
-    
+
     #
     # IO socket
     #
 
     "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+
+    #
+    # TLS peer certification validators
+    #
+
+    "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
     # Original IP detection
