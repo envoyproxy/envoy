@@ -214,7 +214,7 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext";
@@ -262,6 +262,26 @@ message CertificateValidationContext {
   // applies to dynamic secrets, when the *CertificateValidationContext* is
   // delivered via SDS.
   config.core.v4alpha.DataSource trusted_ca = 1;
+
+  // On Windows, the operating system stores a  certificate locally on the computer in a storage location
+  // called the certificate store. A certificate store often has numerous certificates,
+  // possibly issued from a number of different certification authorities.
+  // It adds all the certificates and all the CRLs from that particular store to use in verifying
+  // a presented peer certificate (e.g. server certificate for clusters or client certificate
+  // for listeners).
+  // See :ref:`Certificate Stores <https://docs.microsoft.com/en-us/windows-hardware/drivers/install/certificate-stores>`
+  //
+  // By default, a client certificate is optional, unless one of the additional
+  // options (:ref:`require_client_certificate
+  // <envoy_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`,
+  // :ref:`verify_certificate_spki
+  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
+  // :ref:`verify_certificate_hash
+  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
+  // :ref:`match_subject_alt_names
+  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
+  // specified.
+  repeated string trusted_stores = 13 [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
   // If specified, updates of a file-based *trusted_ca* source will be triggered
   // by this watch. This allows explicit control over the path watched, by
