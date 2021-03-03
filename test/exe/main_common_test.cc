@@ -117,6 +117,12 @@ TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 #endif
 }
 
+// Exercise enabling core dump.
+TEST_P(MainCommonTest, EnableCoreDump) {
+  addArg("--enable-core-dump");
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+}
+
 // Test that an in-use base id triggers a retry and that we eventually give up.
 TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 #ifdef ENVOY_HOT_RESTART
