@@ -67,9 +67,9 @@ typed_config:
   EXPECT_CALL(log_manager_,
               createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
       .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info_.path_, "/dev/null");
-            EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::File);
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "/dev/null");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::File);
             return file_;
           }));
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -102,9 +102,9 @@ typed_config:
   EXPECT_CALL(log_manager_,
               createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
       .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info_.path_, "");
-            EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::Stdout);
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
 
             return file_;
           }));
@@ -124,9 +124,9 @@ typed_config:
   EXPECT_CALL(log_manager_,
               createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
       .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info_.path_, "");
-            EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::Stderr);
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
             return file_;
           }));
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -145,9 +145,9 @@ typed_config:
   EXPECT_CALL(log_manager_,
               createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
       .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info_) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info_.path_, "");
-            EXPECT_EQ(file_info_.file_type_, Filesystem::DestinationType::Console);
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Console);
             return file_;
           }));
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
