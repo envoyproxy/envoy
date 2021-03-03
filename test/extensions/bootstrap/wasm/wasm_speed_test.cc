@@ -108,11 +108,8 @@ B(grpc_service1000)
 B(modify_metadata)
 B(modify_metadata1000)
 B(json_serialize)
-B(json_serialize_arena)
 B(json_deserialize)
-B(json_deserialize_arena)
 B(json_deserialize_empty)
-B(json_serialize_deserialize)
 B(convert_to_filter_state)
 
 } // namespace Wasm
