@@ -134,7 +134,7 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                                           testing::Values("cpp", "rust")));
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
-TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
+TEST_P(WasmTestMatrix, LoggingWithEnvVars ) {
   plugin_configuration_ = "configure-test";
   envs_ = {{"ON_TICK", "TICK_VALUE"}, {"ON_CONFIGURE", "CONFIGURE_VALUE"}};
   createWasm();

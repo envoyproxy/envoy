@@ -112,13 +112,8 @@ TEST_P(WasmHttpFilterTest, BadCode) {
 
 // Script touching headers only, request that is headers only.
 TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): This hand off is not currently possible in the Rust SDK.
-    return;
-  }
-
-  envoy::extensions::wasm::v3::EnvironmentVariables envs;
   // Setup env vars.
+  envoy::extensions::wasm::v3::EnvironmentVariables envs;
   std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
   std::string host_env_value = "foo";
   std::string env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV";
