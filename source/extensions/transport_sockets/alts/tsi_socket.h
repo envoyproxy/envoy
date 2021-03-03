@@ -79,6 +79,7 @@ private:
   bool handshaker_next_calling_{};
 
   TsiFrameProtectorPtr frame_protector_;
+  size_t default_max_frame_size_ = 16384;
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
   NoOpTransportSocketCallbacksPtr noop_callbacks_;
