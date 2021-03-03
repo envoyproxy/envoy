@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 
 namespace Envoy {

@@ -62,9 +62,7 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::Continue;
-  }
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
@@ -84,6 +82,7 @@ private:
   // Return a random boolean value, with probability configured in KillRequest
   // equaling true.
   bool isKillRequestEnabled();
+  bool isKillRequest(Http::HeaderMap& map);
 
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request_;
   Random::RandomGenerator& random_generator_;
@@ -97,15 +96,14 @@ class KillSettings : public Router::RouteSpecificFilterConfig {
 public:
   KillSettings(const envoy::extensions::filters::http::kill_request::v3::KillRequest& kill_request);
 
-  const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
-    return kill_request_filter_headers_;
-  }
-
   const envoy::type::v3::FractionalPercent& getProbability() const { return kill_probability_; }
+  envoy::extensions::filters::http::kill_request::v3::KillRequest::Direction getDirection() const {
+    return direction_;
+  }
 
 private:
   envoy::type::v3::FractionalPercent kill_probability_;
-  const std::vector<Http::HeaderUtility::HeaderDataPtr> kill_request_filter_headers_;
+  envoy::extensions::filters::http::kill_request::v3::KillRequest::Direction direction_;
 };
 
 } // namespace KillRequest
