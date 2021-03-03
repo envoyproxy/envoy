@@ -886,7 +886,7 @@ urlEncodedPemEncodedPeerCertificateChain()
 
   downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
 
-Returnns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
+Returns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
 leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
 
 dnsSansPeerCertificate()
@@ -967,6 +967,6 @@ tlsVersion()
 
 .. code-block:: lua
 
-  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+  downstreamSslConnection:tlsVersion()
 
 Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.
