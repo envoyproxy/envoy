@@ -234,6 +234,7 @@ ContextConfigImpl::ContextConfigImpl(
         factory_context.messageValidationVisitor());
   }
   capabilities_ = handshaker_factory->capabilities();
+  sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
