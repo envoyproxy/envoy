@@ -52,6 +52,11 @@ public:
 protected:
   Network::Connection::ConnectionStats& connectionStats() const { return *connection_stats_; }
 
+  Network::Connection& envoyConnection() const {
+    ASSERT(envoy_connection_ != nullptr);
+    return *envoy_connection_;
+  }
+
   void setConnectionSocket(Network::ConnectionSocketPtr&& connection_socket) {
     connection_socket_ = std::move(connection_socket);
   }

@@ -10,15 +10,6 @@
 
 namespace epoll_server {
 
-#define CHECK(expression) QUICHE_CHECK_IMPL(expression)
-#define CHECK_EQ(a, b) QUICHE_CHECK_EQ_IMPL(a, b)
-#define CHECK_NE(a, b) QUICHE_CHECK_NE_IMPL(a, b)
-#define DCHECK(expression) QUICHE_DCHECK_IMPL(expression)
-#define DCHECK_GE(a, b) QUICHE_DCHECK_GE_IMPL(a, b)
-#define DCHECK_GT(a, b) QUICHE_DCHECK_GT_IMPL(a, b)
-#define DCHECK_NE(a, b) QUICHE_DCHECK_NE_IMPL(a, b)
-#define DCHECK_EQ(a, b) QUICHE_DCHECK_EQ_IMPL(a, b)
-
 #define EPOLL_LOG_IMPL(severity) QUICHE_LOG_IMPL(severity)
 #define EPOLL_VLOG_IMPL(verbosity) QUICHE_VLOG_IMPL(verbosity)
 

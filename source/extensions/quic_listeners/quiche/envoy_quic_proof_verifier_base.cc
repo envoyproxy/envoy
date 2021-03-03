@@ -26,7 +26,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifierBase::VerifyProof(
   }
 
   return VerifyCertChain(hostname, port, certs, "", cert_sct, context, error_details, details,
-                         nullptr, std::move(callback));
+                         std::move(callback));
 }
 
 bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_config,

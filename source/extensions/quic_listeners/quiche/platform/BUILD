@@ -34,9 +34,9 @@ envoy_extension_package()
 # TODO: add build target for quic_platform_impl_lib
 
 envoy_cc_library(
-    name = "quiche_flags_impl_lib",
-    srcs = ["quiche_flags_impl.cc"],
-    hdrs = ["quiche_flags_impl.h"],
+    name = "flags_impl_lib",
+    srcs = ["flags_impl.cc"],
+    hdrs = ["flags_impl.h"],
     external_deps = [
         "abseil_base",
         "abseil_synchronization",
@@ -66,6 +66,8 @@ envoy_cc_library(
         "http2_bug_tracker_impl.h",
         "http2_containers_impl.h",
         "http2_estimate_memory_usage_impl.h",
+        "http2_flag_utils_impl.h",
+        "http2_flags_impl.h",
         "http2_logging_impl.h",
         "http2_macros_impl.h",
         "http2_string_utils_impl.h",
@@ -76,8 +78,8 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":flags_impl_lib",
         ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
         ":string_utils_lib",
     ],
 )
@@ -115,6 +117,7 @@ envoy_cc_library(
         "quic_containers_impl.h",
         "quic_error_code_wrappers_impl.h",
         "quic_estimate_memory_usage_impl.h",
+        "quic_flag_utils_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
         "quic_map_util_impl.h",
@@ -139,13 +142,12 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quiche_flags_impl_lib",
+        ":flags_impl_lib",
         ":string_utils_lib",
         "//include/envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
-        "@com_google_absl//absl/container:btree",
         "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
         "@com_googlesource_quiche//:quic_platform_export",
         "@com_googlesource_quiche//:quic_platform_ip_address_family",
@@ -156,14 +158,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = [
+        "quic_cert_utils_impl.cc",
         "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
     ],
     hdrs = [
+        "quic_cert_utils_impl.h",
         "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_pcc_sender_impl.h",
+        "quic_string_utils_impl.h",
     ],
     external_deps = [
         "quiche_quic_platform_base",
@@ -244,12 +249,15 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
+    srcs = ["quiche_time_utils_impl.cc"],
     hdrs = [
-        "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
         "quiche_map_util_impl.h",
+        "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
+        "quiche_time_utils_impl.h",
+        "quiche_unordered_containers_impl.h",
     ],
     external_deps = [
         "abseil_hash",
@@ -258,7 +266,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
         ":string_utils_lib",
     ],
 )
@@ -269,7 +276,9 @@ envoy_cc_library(
         "spdy_bug_tracker_impl.h",
         "spdy_containers_impl.h",
         "spdy_estimate_memory_usage_impl.h",
+        "spdy_flags_impl.h",
         "spdy_logging_impl.h",
+        "spdy_macros_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
@@ -284,8 +293,8 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":flags_impl_lib",
         ":quic_platform_logging_impl_lib",
-        ":quiche_flags_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
         "@com_googlesource_quiche//:quiche_common_lib",

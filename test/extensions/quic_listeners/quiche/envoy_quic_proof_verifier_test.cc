@@ -100,7 +100,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
   EXPECT_EQ(quic::QUIC_SUCCESS,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
                                        {leaf_cert_}, ocsp_response, cert_sct, nullptr,
-                                       &error_details, nullptr, nullptr, nullptr))
+                                       &error_details, nullptr, nullptr))
       << error_details;
 }
 
@@ -114,7 +114,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
                                        {leaf_cert_}, ocsp_response, cert_sct, nullptr,
-                                       &error_details, nullptr, nullptr, nullptr))
+                                       &error_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("X509_verify_cert: certificate verification error at depth 1: certificate has expired",
             error_details);
@@ -128,7 +128,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   const std::vector<std::string> certs{"invalid leaf cert"};
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("www.google.com", 54321, certs, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr));
+                                       nullptr, &error_details, nullptr, nullptr));
   EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
 }
 
@@ -143,7 +143,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
                                        {cert_with_trailing_garbage}, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr))
+                                       nullptr, &error_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("There is trailing garbage in DER.", error_details);
 }
@@ -157,7 +157,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   std::string error_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
-                                       nullptr, &error_details, nullptr, nullptr, nullptr))
+                                       nullptr, &error_details, nullptr, nullptr))
       << error_details;
   EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
 }

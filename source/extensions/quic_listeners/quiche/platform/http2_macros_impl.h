@@ -14,12 +14,12 @@
 
 #define HTTP2_FALLTHROUGH_IMPL ABSL_FALLTHROUGH_INTENDED
 #define HTTP2_DIE_IF_NULL_IMPL(ptr) dieIfNull(ptr)
-#define HTTP2_UNREACHABLE_IMPL() QUICHE_DCHECK(false)
+#define HTTP2_UNREACHABLE_IMPL() DCHECK(false)
 
 namespace http2 {
 
 template <typename T> inline T dieIfNull(T&& ptr) {
-  QUICHE_CHECK((ptr) != nullptr);
+  CHECK((ptr) != nullptr);
   return std::forward<T>(ptr);
 }
 

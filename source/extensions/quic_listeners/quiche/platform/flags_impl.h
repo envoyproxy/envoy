@@ -121,20 +121,4 @@ QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
 
-// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
-#define GetQuicheFlagImpl(flag) (quiche::flag)->value()
-
-// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
-#define SetQuicheFlagImpl(flag, value) (quiche::flag)->setValue(value)
-
-#define GetQuicheReloadableFlagImpl(module, flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
-
-#define SetQuicheReloadableFlagImpl(module, flag, value)                                           \
-  quiche::FLAGS_quic_reloadable_flag_##flag->setValue(value)
-
-#define GetQuicheRestartFlagImpl(module, flag) quiche::FLAGS_quic_restart_flag_##flag->value()
-
-#define SetQuicheRestartFlagImpl(module, flag, value)                                              \
-  quiche::FLAGS_quic_restart_flag_##flag->setValue(value)
-
 } // namespace quiche

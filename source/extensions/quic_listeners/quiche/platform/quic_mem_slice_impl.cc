@@ -14,16 +14,10 @@ namespace quic {
 
 QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
     : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
-          buffer.get(), length,
-          // TODO(danzh) change the buffer fragment constructor to take the lambda by move instead
-          // of copy, so that the ownership of |buffer| can be transferred to lambda via capture
-          // here and below to unify and simplify the constructor implementations.
-          [allocator = buffer.get_deleter().allocator()](const void* p, size_t,
-                                                         const Envoy::Buffer::BufferFragmentImpl*) {
-            quic::QuicBufferDeleter deleter(allocator);
-            deleter(const_cast<char*>(static_cast<const char*>(p)));
+          buffer.release(), length,
+          [](const void* p, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+            delete[] static_cast<const char*>(p);
           })) {
-  buffer.release();
   single_slice_buffer_.addBufferFragment(*fragment_);
   ASSERT(this->length() == length);
 }
@@ -32,16 +26,6 @@ QuicMemSliceImpl::QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t lengt
   ASSERT(firstSliceLength(buffer) == length);
   single_slice_buffer_.move(buffer, length);
   ASSERT(single_slice_buffer_.getRawSlices().size() == 1);
-}
-
-QuicMemSliceImpl::QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length)
-    : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
-          buffer.release(), length,
-          [](const void* p, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-            delete[] static_cast<const char*>(p);
-          })) {
-  single_slice_buffer_.addBufferFragment(*fragment_);
-  ASSERT(this->length() == length);
 }
 
 const char* QuicMemSliceImpl::data() const {

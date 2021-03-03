@@ -4,7 +4,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "extensions/quic_listeners/quiche/platform/quiche_flags_impl.h"
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
 #include <set>
 
