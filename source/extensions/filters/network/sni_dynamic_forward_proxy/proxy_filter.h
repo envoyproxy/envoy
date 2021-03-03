@@ -51,7 +51,8 @@ public:
   }
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
-  void onLoadDnsCacheComplete() override;
+  void onLoadDnsCacheComplete(
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
 
 private:
   const ProxyFilterConfigSharedPtr config_;
