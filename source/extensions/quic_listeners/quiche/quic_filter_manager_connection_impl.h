@@ -42,8 +42,10 @@ public:
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
-  void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  // TODO(#14829) both readDisable and detectEarlyCloseWhenReadDisabled are used for upstream QUIC
+  // and needs to be hooked up before it is production-safe.
+  void readDisable(bool /*disable*/) override {}
+  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {}
   bool readEnabled() const override { return true; }
   const Network::SocketAddressSetter& addressProvider() const override {
     return quic_connection_->connectionSocket()->addressProvider();

@@ -86,8 +86,10 @@ public:
 
     /**
      * Called when the DNS cache load is complete (or failed).
+     *
+     * @param host_info the DnsHostInfo for the resolved host.
      */
-    virtual void onLoadDnsCacheComplete() PURE;
+    virtual void onLoadDnsCacheComplete(const DnsHostInfoSharedPtr& host_info) PURE;
   };
 
   /**
