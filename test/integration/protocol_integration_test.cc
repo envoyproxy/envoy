@@ -951,6 +951,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 // Test hitting the encoder buffer filter with too many response bytes to buffer. Given the request
 // headers are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
+  EXCLUDE_UPSTREAM_HTTP3; // TODO(#14829) 503
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
