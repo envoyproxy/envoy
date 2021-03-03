@@ -64,3 +64,21 @@ genrule(
         ":configgen",
     ],
 )
+
+py_binary(
+    name = "example_configs_validation",
+    srcs = ["example_configs_validation.py"],
+    args = (
+        "$(locations :configs) ",
+        "$(locations //examples:configs) ",
+        "$(locations //docs:configs) ",
+    ),
+    data = [
+        ":configs",
+        "//docs:configs",
+        "//examples:configs",
+    ],
+    deps = [
+        "//tools/config_validation:validate_fragment",
+    ],
+)

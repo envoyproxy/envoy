@@ -404,6 +404,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
+
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
@@ -414,6 +415,8 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation || exit 1
+
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
