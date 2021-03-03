@@ -14,10 +14,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dispatcher_thread_deletable",
+    hdrs = ["dispatcher_thread_deletable.h"],
+)
+
+envoy_cc_library(
     name = "dispatcher_interface",
     hdrs = ["dispatcher.h"],
     deps = [
         ":deferred_deletable",
+        ":dispatcher_thread_deletable",
         ":file_event_interface",
         ":schedulable_cb_interface",
         ":signal_interface",

@@ -21,6 +21,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* dispatcher: supports a stack of `Envoy::ScopeTrackedObject` instead of a single tracked object. This will allow Envoy to dump more debug information on crash.
 
 Deprecated
 ----------

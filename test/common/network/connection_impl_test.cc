@@ -1958,6 +1958,7 @@ private:
 class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource(), nullptr) {
+    EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -1978,7 +1979,8 @@ public:
         TransportSocketPtr(transport_socket_), stream_info_, true);
     connection_->addConnectionCallbacks(callbacks_);
     // File events will trigger setTrackedObject on the dispatcher.
-    EXPECT_CALL(dispatcher_, setTrackedObject(_)).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
   ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }
