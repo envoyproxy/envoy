@@ -80,7 +80,7 @@ private:
   std::vector<JwtLocationConstPtr> tokens_;
   JwtLocationConstPtr curr_token_;
   // The JWT object.
-  std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
+  std::unique_ptr<::google::jwt_verify::Jwt> owned_jwt_;
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
@@ -98,7 +98,8 @@ private:
   const bool is_allow_failed_;
   const bool is_allow_missing_;
   TimeSource& time_source_;
-  ::google::jwt_verify::Jwt* cache_jwt_;
+  ::google::jwt_verify::Jwt* jwt_{};
+  bool use_cache_jwt_{};
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -140,19 +141,25 @@ void AuthenticatorImpl::startVerify() {
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
 
-  jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
   if (provider_) {
     jwks_data_ = jwks_cache_.findByProvider(provider_.value());
-    cache_jwt_ = jwks_data_->getTokenCache().find(curr_token_->token());
+    if (jwks_data_->getJwtProvider().enable_token_cache()) {
+      jwt_ = jwks_data_->getTokenCache().find(curr_token_->token());
+      if (jwt_) {
+        use_cache_jwt_ = true;
+        jwks_data_->getTokenCache().release(curr_token_->token(), jwt_);
+      }
+    }
   }
   Status status;
-  if (cache_jwt_) {
+  if (use_cache_jwt_ && provider_) {
     ENVOY_LOG(debug, "{}: Skip parsing, Jwt {} is in Cache.", name(), curr_token_->token());
     status = Status::Ok;
-    *jwt_ = *cache_jwt_;
   } else {
     ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-    status = jwt_->parseFromString(curr_token_->token());
+    owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+    status = owned_jwt_->parseFromString(curr_token_->token());
+    jwt_ = owned_jwt_.get();
   }
 
   if (status != Status::Ok) {
@@ -254,7 +261,7 @@ void AuthenticatorImpl::onDestroy() {
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
   Status status;
-  if (cache_jwt_) {
+  if (use_cache_jwt_) {
     status = Status::Ok;
   } else {
     status = ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
@@ -282,9 +289,9 @@ void AuthenticatorImpl::verifyKey() {
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
-  if (!cache_jwt_) {
+  if (provider_ && jwks_data_->getJwtProvider().enable_token_cache() && !use_cache_jwt_) {
     ENVOY_LOG(debug, "JWT {} added in cache", curr_token_->token());
-    jwks_data_->getTokenCache().insert(curr_token_->token(), jwt_.release(), 1);
+    jwks_data_->getTokenCache().insert(curr_token_->token(), jwt_, 1);
   }
   doneWithStatus(Status::Ok);
 }
@@ -312,6 +319,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     callback_ = nullptr;
     return;
   }
+  use_cache_jwt_ = false;
   startVerify();
 }
 
