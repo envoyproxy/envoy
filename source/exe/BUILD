@@ -198,11 +198,11 @@ envoy_cc_library(
     }),
     deps = select({
         "//bazel:windows_x86_64": [
-        ":main_common_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:thread_lib",
-        "//source/common/event:signal_lib",
+            ":main_common_lib",
+            "//source/common/buffer:buffer_lib",
+            "//source/common/common:assert_lib",
+            "//source/common/common:thread_lib",
+            "//source/common/event:signal_lib",
         ],
         "//conditions:default": [],
     }),
