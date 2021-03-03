@@ -287,6 +287,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_http3",
+    values = {"define": "http3=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
 )
@@ -367,6 +372,7 @@ config_setting(
     values = {"define": "zlib=ng"},
 )
 
+# TODO(alyssawilk) what is this used for?
 config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},

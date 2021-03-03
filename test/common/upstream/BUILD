@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -591,6 +592,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -623,7 +625,9 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+    ]),
 )
 
 envoy_cc_test_library(
