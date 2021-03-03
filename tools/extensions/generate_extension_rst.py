@@ -35,7 +35,7 @@ if __name__ == '__main__':
     generated_rst_dir, "intro/arch_overview/security")
 
   if not os.path.exists(extension_db_path):
-      subprocess.run("tools/extensions/generate_extension_db".split())
+    subprocess.run("tools/extensions/generate_extension_db".split())
 
   extension_db = json.loads(pathlib.Path(extension_db_path).read_text())
   security_postures = defaultdict(list)
