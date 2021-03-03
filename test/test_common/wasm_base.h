@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdio>
 
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"

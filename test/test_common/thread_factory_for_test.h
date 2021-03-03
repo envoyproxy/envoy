@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
