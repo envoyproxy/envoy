@@ -1,5 +1,3 @@
-#include <string>
-
 #include "common/http/message_impl.h"
 
 #include "extensions/filters/http/wasm/wasm_filter.h"
