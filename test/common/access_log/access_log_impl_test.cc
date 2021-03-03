@@ -1022,7 +1022,7 @@ typed_config:
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
       StreamInfo::ResponseFlag::NoFilterConfigFound,
       StreamInfo::ResponseFlag::DurationTimeout,
-      StreamInfo::ResponseFlag::DownstreamProtocolError};
+      StreamInfo::ResponseFlag::UpstreamProtocolError};
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 

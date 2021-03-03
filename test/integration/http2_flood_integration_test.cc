@@ -198,7 +198,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 }
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
-// receives 503.
+// receives 502.
 void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num_frames,
                                            const std::string& flood_stat) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1305,7 +1305,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   // Make sure upstream and downstream got RST_STREAM from the server.
   ASSERT_TRUE(upstream_request_->waitForReset());
   response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ("502", response->headers().getStatusValue());
 
   // Send another request from downstream on the same connection, and make sure
   // a new request reaches upstream on its previous connection.
@@ -1325,7 +1325,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   // Expect a local reset due to upstream reset before a response.
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               HasSubstr("upstream_reset_before_response_started"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("LR"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("UPE"));
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {

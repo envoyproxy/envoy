@@ -138,7 +138,6 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
-  protocol_error_ = false;
   const Status status = codec_->dispatch(data);
 
   if (!status.ok()) {

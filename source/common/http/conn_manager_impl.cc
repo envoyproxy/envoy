@@ -202,7 +202,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
              StreamInfo::ResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
-      stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+      // responseDetails are filled when codec encountered parsing error.
+      if (!stream.response_encoder_->getStream().responseDetails().empty()) {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+      }
     }
     reset_stream = true;
   }
@@ -1506,7 +1511,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   // If the codec sets its responseDetails() for a reason other than peer reset, set a
   // DownstreamProtocolError. Either way, propagate details.
   const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
-  if (!encoder_details.empty() && reset_reason == StreamResetReason::LocalReset) {
+  if (!encoder_details.empty() && reset_reason == StreamResetReason::ProtocolError) {
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
   }
   if (!encoder_details.empty()) {
