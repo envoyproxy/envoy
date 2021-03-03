@@ -111,7 +111,7 @@ TEST_P(WasmHttpFilterTest, BadCode) {
 }
 
 // Script touching headers only, request that is headers only.
-TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
+TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
   // Setup env vars.
   envoy::extensions::wasm::v3::EnvironmentVariables envs;
   std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
@@ -121,7 +121,6 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
   TestEnvironment::setEnvVar(host_env_key, host_env_value, 0);
   envs.mutable_host_env_keys()->Add(host_env_key.c_str());
   (*envs.mutable_key_values())[env_key] = env_value;
-
   setupTest("", "headers", envs);
   setupFilter();
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
