@@ -3158,24 +3158,27 @@ TEST_F(ClusterInfoImplTest, Http3) {
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
   )EOF";
 
   const std::string downstream_http3 = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
 
-  {
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_http3), EnvoyException,
-                            "HTTP3 not yet supported: name.*");
-  }
-  {
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_http3), EnvoyException,
-                            "HTTP3 not yet supported: name.*");
-  }
+  auto explicit_h3 = makeCluster(yaml + explicit_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+
+  auto downstream_h3 = makeCluster(yaml + downstream_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

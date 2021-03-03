@@ -25,6 +25,7 @@ public:
 
   // Constructs a QuicMemSliceImpl by taking ownership of the memory in |buffer|.
   QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length);
+  QuicMemSliceImpl(std::unique_ptr<char[]> buffer, size_t length);
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
   // Data will be moved from |buffer| to this mem slice.

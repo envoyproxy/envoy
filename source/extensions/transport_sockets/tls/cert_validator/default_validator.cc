@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -25,6 +26,8 @@
 #include "common/stats/utility.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -472,6 +475,18 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
 size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
 }
+
+class DefaultCertValidatorFactory : public CertValidatorFactory {
+public:
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats& stats, TimeSource& time_source) override {
+    return std::make_unique<DefaultCertValidator>(config, stats, time_source);
+  }
+
+  absl::string_view name() override { return CertValidatorNames::get().Default; }
+};
+
+REGISTER_FACTORY(DefaultCertValidatorFactory, CertValidatorFactory);
 
 } // namespace Tls
 } // namespace TransportSockets
