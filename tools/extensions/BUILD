@@ -17,7 +17,6 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
-
 py_binary(
     name = "generate_extension_rst",
     srcs = ["generate_extension_rst.py"],
