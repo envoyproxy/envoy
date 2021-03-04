@@ -2137,12 +2137,20 @@ virtual_hosts:
       url_template: "/foo/**"
     route:
       cluster: foo_11
+  - match:
+      url_template: "/foo/baz"
+    route:
+      cluster: never_reached_foo_baz
+  - match:
+      url_template: "/foo/baz/bar"
+    route:
+      cluster: never_reached_foo_baz_bar
   )EOF";
 
-  factory_context_.cluster_manager_.initializeClusters({"foo_bar", "foo_bar_with_header", "foo_1",
-                                                        "foo_1_with_header", "foo_11",
-                                                        "foo_11_with_header"},
-                                                       {});
+  factory_context_.cluster_manager_.initializeClusters(
+      {"foo_bar", "foo_bar_with_header", "foo_1", "foo_1_with_header", "foo_11",
+       "foo_11_with_header", "never_reached_foo_baz", "never_reached_foo_baz_bar"},
+      {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
@@ -2158,25 +2166,25 @@ virtual_hosts:
   }
 
   {
-    EXPECT_EQ("foo_1", config.route(genHeaders("www.lyft.com", "/foo/foo", "GET"), 0)
+    EXPECT_EQ("foo_1", config.route(genHeaders("www.lyft.com", "/foo/baz", "GET"), 0)
                            ->routeEntry()
                            ->clusterName());
   }
 
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/foo", "GET");
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/baz", "GET");
     headers.addCopy("test_header", "test");
     EXPECT_EQ("foo_1_with_header", config.route(headers, 0)->routeEntry()->clusterName());
   }
 
   {
-    EXPECT_EQ("foo_11", config.route(genHeaders("www.lyft.com", "/foo/foo/bar", "GET"), 0)
+    EXPECT_EQ("foo_11", config.route(genHeaders("www.lyft.com", "/foo/baz/bar", "GET"), 0)
                             ->routeEntry()
                             ->clusterName());
   }
 
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/foo/bar", "GET");
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/baz/bar", "GET");
     headers.addCopy("test_header", "test");
     EXPECT_EQ("foo_11_with_header", config.route(headers, 0)->routeEntry()->clusterName());
   }

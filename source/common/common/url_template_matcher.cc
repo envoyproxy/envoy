@@ -10,7 +10,7 @@ namespace {
 
 // Http method for all url_template matches.
 // This could be anything.
-static constexpr absl::string_view HTTP_METHOD{"GET"};
+constexpr absl::string_view HTTP_METHOD{"GET"};
 
 } // namespace
 
