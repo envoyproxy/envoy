@@ -52,6 +52,21 @@ enum RequestMethod {
   PATCH = 9;
 }
 
+// Different destination types for writing log entries.
+enum DestinationType {
+  // Write the log entries to a file.
+  FILE = 0;
+
+  // Write the log entries to the console.
+  CONSOLE = 1;
+
+  // Write the log files to the standard error of the process.
+  STDERR = 2;
+
+  // Write the log files to the standard output of the process.
+  STDOUT = 3;
+}
+
 // Identifies the direction of the traffic relative to the local Envoy.
 enum TrafficDirection {
   // Default option is unspecified.

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.file.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "google/protobuf/struct.proto";
@@ -26,22 +27,9 @@ message FileAccessLog {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.FileAccessLog";
 
-  enum DestinationType {
-    // Write the log entries to a file.
-    FILE = 0;
-
-    // Write the log entries to the console.
-    CONSOLE = 1;
-
-    // Write the log files to the standard error of the process.
-    STDERR = 2;
-
-    // Write the log files to the standard output of the process.
-    STDOUT = 3;
-  }
-
   // The destination type where the logs are written. Used for cross platform writing to stdout/stderr.
-  DestinationType access_log_destination = 6 [(validate.rules).enum = {defined_only: true}];
+  config.core.v3.DestinationType access_log_destination = 6
+      [(validate.rules).enum = {defined_only: true}];
 
   // A path to a local file to which to write the access log entries. If the destination type is `FILE`
   // then this property is required.

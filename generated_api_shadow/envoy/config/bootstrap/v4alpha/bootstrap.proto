@@ -295,22 +295,9 @@ message Bootstrap {
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Admin";
 
-  enum DestinationType {
-    // Write the log entries to a file.
-    FILE = 0;
-
-    // Write the log entries to the console.
-    CONSOLE = 1;
-
-    // Write the log files to the standard error of the process.
-    STDERR = 2;
-
-    // Write the log files to the standard output of the process.
-    STDOUT = 3;
-  }
-
   // The destination type where the logs are written. Used for cross platform writing to stdout/stderr.
-  DestinationType access_log_destination = 6 [(validate.rules).enum = {defined_only: true}];
+  core.v4alpha.DestinationType access_log_destination = 6
+      [(validate.rules).enum = {defined_only: true}];
 
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
