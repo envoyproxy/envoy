@@ -9,7 +9,7 @@ void H1FuzzIntegrationTest::initialize() {
   const std::string prefix("/");
   const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&file_path, &prefix](
+      [&body, &prefix](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
