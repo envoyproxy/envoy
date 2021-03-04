@@ -26,7 +26,8 @@ MockAsyncClientFactory::~MockAsyncClientFactory() = default;
 
 MockAsyncClientManager::MockAsyncClientManager() {
   ON_CALL(*this, factoryForGrpcService(_, _, _))
-      .WillByDefault(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillByDefault(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                               AsyncClientFactoryClusterChecks) {
         return std::make_unique<testing::NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 }
