@@ -1201,12 +1201,14 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
 
   // Craft multiple response messages. IF combined together, they exceed the buffer limit.
   std::vector<std::string> grpc_response_messages;
+  grpc_response_messages.reserve(num_messages);
   for (int i = 0; i < num_messages; i++) {
     grpc_response_messages.push_back(R"(id: 1 author: "Neal Stephenson" title: "Readme")");
   }
 
   // Craft expected response.
   std::vector<std::string> expected_json_messages;
+  expected_json_messages.reserve(num_messages);
   for (int i = 0; i < num_messages; i++) {
     expected_json_messages.push_back(R"({"id":"1","author":"Neal Stephenson","title":"Readme"})");
   }

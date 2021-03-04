@@ -18,7 +18,7 @@ public:
 
   // Returns the total number of bytes stored in the underlying buffer.
   // Useful for flow control.
-  int64_t BytesStored() const;
+  int64_t bytesStored() const;
 };
 
 } // namespace GrpcJsonTranscoder

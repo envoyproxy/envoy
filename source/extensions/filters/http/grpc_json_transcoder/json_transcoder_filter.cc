@@ -553,7 +553,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     }
   } else {
     request_in_.move(data);
-    if (checkIfDecoderBufferLimitReached(request_in_.BytesStored())) {
+    if (checkIfDecoderBufferLimitReached(request_in_.bytesStored())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -653,7 +653,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   response_in_.move(data);
-  if (checkIfEncoderBufferLimitReached(response_in_.BytesStored())) {
+  if (checkIfEncoderBufferLimitReached(response_in_.bytesStored())) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
