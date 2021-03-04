@@ -129,7 +129,7 @@ TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 }
 
 // Exercise enabling core dump and succeeding.
-// Note: this test will call the real prctl(), which is what we want.
+// Note: this test will call the real system call, which is what we want.
 TEST_P(MainCommonTest, EnableCoreDump) {
   addArg("--enable-core-dump");
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
