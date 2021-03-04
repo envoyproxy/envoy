@@ -581,8 +581,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 // tests a scenario when:
 //  - an RDS exchange contains a non-empty virtual_hosts array
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
-//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-//  - Upstream makes a request to an (now) unknown domain
+//  - Upstream makes a request to an unknown domain
 //  - A VHDS DiscoveryResponse received but contains no update for the domain (the management server
 //  couldn't resolve it)
 //  - Upstream receives a 404 response
@@ -621,11 +620,9 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
 // tests a scenario when:
 //  - an RDS exchange contains a non-empty virtual_hosts array
-//  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
-//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-//  - Upstream makes a request to an (now) unknown domain
-//  - A VHDS DiscoveryResponse received that contains update for vhost.first host, but vhost.third
-//  couldn't be resolved
+//  - Upstream makes a request to vhost.third that cannot be resolved by the management server
+//  - Management server sends a spontaneous update for vhost.first and an empty response for
+//  vhost.third
 //  - Upstream receives a 404 response
 TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral) {
   // RDS exchange with a non-empty virtual_hosts field
@@ -789,6 +786,40 @@ TEST_P(VhdsIntegrationTest, MultipleUpdates) {
     cleanupUpstreamAndDownstream();
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
+}
+
+// Verifies that invalid VHDS updates get rejected and do not affect subsequent updates
+// see https://github.com/envoyproxy/envoy/issues/14918
+TEST_P(VhdsIntegrationTest, AttemptAddingDuplicateDomainNames) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // A spontaneous VHDS DiscoveryResponse with duplicate domains that results in an error in the
+  // ack.
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+           virtualHostYaml("my_route/vhost_1", "vhost.duplicate")),
+       TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+           virtualHostYaml("my_route/vhost_2", "vhost.duplicate"))},
+      {}, "2", vhds_stream_);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_,
+                                           13, "Only unique values for domains are permitted"));
+
+  // Another update, this time valid, should result in no errors
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          virtualHostYaml("my_route/vhost_3", "vhost.third"))},
+      {}, "2", vhds_stream_);
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

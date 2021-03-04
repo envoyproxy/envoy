@@ -70,6 +70,8 @@ public:
         .WillByDefault(ReturnRef(empty_string_list));
     ON_CALL(cert_validation_ctx_config_, verifyCertificateSpkiList())
         .WillByDefault(ReturnRef(empty_string_list));
+    const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
+    ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
     verifier_ =
         std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
   }
@@ -204,6 +206,35 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoFilterChain) {
   EXPECT_CALL(listen_socket_, ioHandle());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
+                         chlo_hash_, std::move(callback));
+  EXPECT_TRUE(called);
+}
+
+TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoCertConfig) {
+  bool called = false;
+  auto callback = std::make_unique<TestGetProofCallback>(called, false, server_config_, version_,
+                                                         chlo_hash_, filter_chain_);
+  EXPECT_CALL(listen_socket_, ioHandle()).Times(1u);
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
+        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
+                  *connection_socket.addressProvider().localAddress());
+        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
+                  *connection_socket.addressProvider().remoteAddress());
+        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
+                  connection_socket.detectedTransportProtocol());
+        EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+        return &filter_chain_;
+      }));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillRepeatedly(ReturnRef(transport_socket_factory_));
+
+  EXPECT_CALL(dynamic_cast<const Ssl::MockServerContextConfig&>(
+                  transport_socket_factory_.serverContextConfig()),
+              tlsCertificates())
+      .WillRepeatedly(
+          Return(std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>{}));
   proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
                          chlo_hash_, std::move(callback));
   EXPECT_TRUE(called);

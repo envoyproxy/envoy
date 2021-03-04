@@ -20,6 +20,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -454,7 +455,7 @@ SubstitutionFormatParser::parse(const std::string& format,
                                 const std::vector<CommandParserPtr>& commands) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
-  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
+  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] != '%') {
@@ -504,7 +505,9 @@ SubstitutionFormatParser::parse(const std::string& format,
     pos = command_end_position;
   }
 
-  if (!current_token.empty()) {
+  if (!current_token.empty() || format.empty()) {
+    // Create a PlainStringFormatter with the final string literal. If the format string was empty,
+    // this creates a PlainStringFormatter with an empty string.
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
   }
 
@@ -752,8 +755,15 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-          if (stream_info.upstreamClusterInfo().has_value()) {
-            upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
+          if (stream_info.upstreamClusterInfo().has_value() &&
+              stream_info.upstreamClusterInfo().value() != nullptr) {
+            if (Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.use_observable_cluster_name")) {
+              upstream_cluster_name =
+                  stream_info.upstreamClusterInfo().value()->observabilityName();
+            } else {
+              upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
+            }
           }
 
           return upstream_cluster_name.empty()

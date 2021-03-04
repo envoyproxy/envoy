@@ -96,7 +96,7 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
-    external_http_archive("io_bazel_rules_rust")
+    external_http_archive("rules_rust")
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
@@ -592,7 +592,16 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    external_http_archive("rules_python")
+    # TODO(phlax): remove patch
+    #    patch is applied to update setuptools to version (0.5.4),
+    #    and can be removed once this has been updated in rules_python
+    #    see https://github.com/envoyproxy/envoy/pull/15236#issuecomment-788650946 for discussion
+    external_http_archive(
+        name = "rules_python",
+        patches = ["@envoy//bazel:rules_python.patch"],
+        patch_args = ["-p1"],
+    )
+
     external_http_archive(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],

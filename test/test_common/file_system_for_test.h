@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/filesystem/filesystem.h"
 
 namespace Envoy {

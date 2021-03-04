@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -25,6 +26,8 @@
 #include "common/stats/utility.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -293,16 +296,19 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
 
 bool DefaultCertValidator::dnsNameMatch(const absl::string_view dns_name,
                                         const absl::string_view pattern) {
-  if (dns_name == pattern) {
+  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
+  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
+  if (lower_case_dns_name == lower_case_pattern) {
     return true;
   }
 
-  size_t pattern_len = pattern.length();
-  if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (dns_name.length() > pattern_len - 1) {
-      const size_t off = dns_name.length() - pattern_len + 1;
-      return dns_name.substr(0, off).find('.') == std::string::npos &&
-             dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
+  size_t pattern_len = lower_case_pattern.length();
+  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
+    if (lower_case_dns_name.length() > pattern_len - 1) {
+      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
+      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
+             lower_case_dns_name.substr(off, pattern_len - 1) ==
+                 lower_case_pattern.substr(1, pattern_len - 1);
     }
   }
 
@@ -469,6 +475,18 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
 size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
 }
+
+class DefaultCertValidatorFactory : public CertValidatorFactory {
+public:
+  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats& stats, TimeSource& time_source) override {
+    return std::make_unique<DefaultCertValidator>(config, stats, time_source);
+  }
+
+  absl::string_view name() override { return CertValidatorNames::get().Default; }
+};
+
+REGISTER_FACTORY(DefaultCertValidatorFactory, CertValidatorFactory);
 
 } // namespace Tls
 } // namespace TransportSockets
