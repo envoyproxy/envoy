@@ -38,7 +38,7 @@ public:
   // destructed.
   MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
-                 std::shared_ptr<PlatformImpl> platform_impl,
+                 std::unique_ptr<PlatformImpl> platform_impl,
                  std::unique_ptr<Random::RandomGenerator>&& random_generator,
                  std::unique_ptr<ProcessContext> process_context);
 
