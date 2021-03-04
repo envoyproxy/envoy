@@ -5,7 +5,6 @@
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"

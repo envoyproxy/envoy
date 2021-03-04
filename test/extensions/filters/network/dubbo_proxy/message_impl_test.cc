@@ -1,11 +1,10 @@
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
-#include "hessian2/object.hpp"
-
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "hessian2/object.hpp"
 
 namespace Envoy {
 namespace Extensions {

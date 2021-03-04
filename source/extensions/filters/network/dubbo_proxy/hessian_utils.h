@@ -6,8 +6,8 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "hessian2/codec.hpp"
 #include "hessian2/basic_codec/object_codec.hpp"
+#include "hessian2/codec.hpp"
 #include "hessian2/object.hpp"
 #include "hessian2/reader.hpp"
 #include "hessian2/writer.hpp"

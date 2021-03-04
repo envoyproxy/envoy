@@ -1,9 +1,9 @@
 #pragma once
 
+#include "envoy/http/header_map.h"
+
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
 #include "extensions/filters/network/dubbo_proxy/message.h"
-
-#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,7 +73,7 @@ public:
     // Http::HeaderMap wrapper to attachment.
     const Http::HeaderMap& headers() const { return *headers_; }
 
-    // Whether the attachment should be reserialized.
+    // Whether the attachment should be re-serialized.
     bool attachmentUpdated() const { return attachment_updated_; }
 
   private:

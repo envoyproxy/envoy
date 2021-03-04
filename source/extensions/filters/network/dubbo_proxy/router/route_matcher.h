@@ -13,10 +13,10 @@
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 #include "extensions/filters/network/dubbo_proxy/router/route.h"
 #include "extensions/filters/network/dubbo_proxy/router/router.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 
 #include "absl/types/optional.h"
 
