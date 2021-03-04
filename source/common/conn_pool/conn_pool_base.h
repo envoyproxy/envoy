@@ -197,7 +197,8 @@ public:
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
-       << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_);
+       << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
+       << DUMP_MEMBER(pending_streams_.size());
   }
 
   friend std::ostream& operator<<(std::ostream& os, const ConnPoolImplBase& s) {
@@ -206,7 +207,6 @@ public:
   }
 
 protected:
-  // Creates up to 3 connections, based on the preconnect ratio.
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {

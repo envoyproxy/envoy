@@ -53,12 +53,13 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   EXPECT_CALL(context, runtime());
   EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                          Grpc::AsyncClientFactoryClusterChecks) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -125,7 +126,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   EXPECT_CALL(context, scope());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

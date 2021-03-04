@@ -52,6 +52,9 @@ public:
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
+  void doResponseTrailers(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void updateGrpcStatusAndMessage(const Http::ResponseHeaderOrTrailerMap& trailers);
+  void updateHttpStatusAndContentLength(const Http::ResponseHeaderOrTrailerMap& trailers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

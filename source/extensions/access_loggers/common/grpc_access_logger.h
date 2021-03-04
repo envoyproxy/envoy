@@ -219,6 +219,7 @@ private:
   virtual void initMessage() PURE;
   virtual void addEntry(HttpLogProto&& entry) PURE;
   virtual void addEntry(TcpLogProto&& entry) PURE;
+  virtual void clearMessage() { message_.Clear(); }
 
   void flush() {
     if (isEmpty()) {
@@ -233,7 +234,7 @@ private:
     if (client_.log(message_)) {
       // Clear the message regardless of the success.
       approximate_message_size_bytes_ = 0;
-      message_.Clear();
+      clearMessage();
     }
   }
 
@@ -286,8 +287,8 @@ public:
     if (it != cache.access_loggers_.end()) {
       return it->second;
     }
-    const Grpc::AsyncClientFactoryPtr factory =
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
+    const Grpc::AsyncClientFactoryPtr factory = async_client_manager_.factoryForGrpcService(
+        config.grpc_service(), scope_, Grpc::AsyncClientFactoryClusterChecks::ValidateStatic);
     const auto logger = createLogger(
         config, factory->create(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),

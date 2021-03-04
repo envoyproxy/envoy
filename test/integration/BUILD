@@ -179,6 +179,8 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -416,6 +418,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_typed_per_filter_config_test",
+    srcs = [
+        "http_typed_per_filter_config_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/http/health_check:config",
+        "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http_timeout_integration_test",
     srcs = [
         "http_timeout_integration_test.cc",
@@ -428,14 +442,12 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "protocol_integration_test",
+envoy_cc_test_library(
+    name = "protocol_integration_test_lib",
     srcs = [
         "protocol_integration_test.cc",
+        "protocol_integration_test.h",
     ],
-    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
-    # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 5,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -453,6 +465,19 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "protocol_integration_test",
+    srcs = [
+        "instantiate_protocol_integration_test.cc",
+    ],
+    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
+    shard_count = 5,
+    deps = [
+        ":protocol_integration_test_lib",
     ],
 )
 
@@ -590,6 +615,7 @@ envoy_cc_test_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:metadata_interface",
+        "//source/common/common:dump_state_utils",
     ],
 )
 
@@ -669,6 +695,8 @@ envoy_cc_test_library(
         "//source/common/grpc:common_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/http3:quic_codec_factory_lib",
+        "//source/common/http/http3:well_known_names",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
@@ -682,6 +710,7 @@ envoy_cc_test_library(
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -717,6 +746,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -1520,6 +1550,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/filters/http/health_check:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",

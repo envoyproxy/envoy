@@ -24,6 +24,7 @@ public:
   MOCK_METHOD(void, incNotices, (NoticeType), (override));
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
   MOCK_METHOD(void, processQuery, (const std::string&), (override));
+  MOCK_METHOD(bool, onSSLRequest, (), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -482,6 +483,9 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // Initial state is no-encryption.
   ASSERT_FALSE(decoder_->encrypted());
 
+  // Indicate that decoder should continue with processing the message.
+  ON_CALL(callbacks_, onSSLRequest).WillByDefault(testing::Return(true));
+
   // Create SSLRequest.
   EXPECT_CALL(callbacks_, incSessionsEncrypted());
   // Add length.
@@ -489,7 +493,7 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
   // Add 4 bytes long code
   data_.writeBEInt<uint32_t>(GetParam());
-  decoder_->onData(data_, false);
+  decoder_->onData(data_, true);
   ASSERT_TRUE(decoder_->encrypted());
   // Decoder should drain data.
   ASSERT_THAT(data_.length(), 0);
@@ -509,6 +513,26 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
 // 80877104 is GSS code
 INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEncrDecoderTest,
                          ::testing::Values(80877103, 80877104));
+
+// Test onSSLRequest callback.
+TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
+  // Set decoder to wait for initial message.
+  decoder_->setStartup(true);
+
+  // Indicate that decoder should not continue with processing the message
+  // because filter will try to terminate SSL session.
+  EXPECT_CALL(callbacks_, onSSLRequest).WillOnce(testing::Return(false));
+
+  // Send initial message requesting SSL.
+  data_.writeBEInt<uint32_t>(8);
+  // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
+  // Add 4 bytes long code
+  data_.writeBEInt<uint32_t>(80877103);
+  decoder_->onData(data_, true);
+
+  // Decoder should interpret the session as encrypted stream.
+  ASSERT_FALSE(decoder_->encrypted());
+}
 
 class FakeBuffer : public Buffer::Instance {
 public:

@@ -8,6 +8,10 @@
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -258,9 +262,9 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
   ProtobufWkt::Any source_any;
   source_any.set_type_url("type.googleapis.com/bad.type.url");
   source_any.set_value("asdf");
-  EXPECT_THAT(MessageUtil::getJsonStringFromMessage(source_any, true).status(),
-              AllOf(Property(&ProtobufUtil::Status::ok, false),
-                    Property(&ProtobufUtil::Status::ToString, testing::HasSubstr("bad.type.url"))));
+  auto status = MessageUtil::getJsonStringFromMessage(source_any, true).status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.ToString(), testing::HasSubstr("bad.type.url"));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
@@ -1310,6 +1314,19 @@ TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersion) {
   MessageUtil::unpackTo(source_any, dst);
   EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
+}
+
+// MessageUtility::unpackTo() with API message works across version and doesn't register
+// deprecations for allowlisted v2 protos.
+TEST_F(ProtobufV2ApiUtilityTest, UnpackToNextVersionV2Allowed) {
+  API_NO_BOOST(envoy::config::health_checker::redis::v2::Redis) source;
+  source.set_key("foo");
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source);
+  API_NO_BOOST(envoy::extensions::health_checkers::redis::v3::Redis) dst;
+  MessageUtil::unpackTo(source_any, dst);
+  EXPECT_EQ(runtime_deprecated_feature_use_.value(), 0);
+  EXPECT_EQ(dst.key(), "foo");
 }
 
 // Validate warning messages on v2 upgrades.

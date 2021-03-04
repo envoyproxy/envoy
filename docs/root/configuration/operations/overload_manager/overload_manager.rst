@@ -19,7 +19,7 @@ requests when heap memory usage reaches 99%.
    resource_monitors:
      - name: "envoy.resource_monitors.fixed_heap"
        typed_config:
-         "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
          max_heap_size_bytes: 2147483648
    actions:
      - name: "envoy.overload_actions.disable_http_keepalive"

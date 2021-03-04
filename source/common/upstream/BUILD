@@ -61,6 +61,7 @@ envoy_cc_library(
         "//source/common/http:mixed_conn_pool",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/http/http3:conn_pool_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -316,7 +317,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
 

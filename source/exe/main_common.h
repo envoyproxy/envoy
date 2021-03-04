@@ -36,7 +36,7 @@ class MainCommonBase {
 public:
   // Consumer must guarantee that all passed references are alive until this object is
   // destructed.
-  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
+  MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Random::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
@@ -71,7 +71,7 @@ protected:
   // an ifdef in a header file exposed in a C++ library. It is too easy to have
   // the ifdef be inconsistent across build-system boundaries.
   Grpc::GoogleGrpcContext google_grpc_context_;
-  const Envoy::OptionsImpl& options_;
+  const Envoy::Server::Options& options_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
   Filesystem::Instance& file_system_;

@@ -98,11 +98,15 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   }
   const Network::TransportSocketFactory& transport_socket_factory =
       filter_chain->transportSocketFactory();
+
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs =
       dynamic_cast<const QuicServerTransportSocketFactory&>(transport_socket_factory)
           .serverContextConfig()
           .tlsCertificates();
 
+  if (tls_cert_configs.empty()) {
+    return {absl::nullopt, absl::nullopt};
+  }
   // Only return the first TLS cert config.
   // TODO(danzh) Choose based on supported cipher suites in TLS1.3 CHLO and prefer EC
   // certs if supported.
