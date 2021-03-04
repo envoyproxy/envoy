@@ -25,7 +25,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.router
             typed_config: {}
-          codec_type: auto
+          codec_type: AUTO
     listener_filters:
     - name: envoy.filters.listener.original_dst
       typed_config: {}
