@@ -430,6 +430,7 @@ envoy_cc_test(
     srcs = ["upstream_request_test.cc"],
     deps = [
         "//source/common/router:router_lib",
+        "//test/common/http:common_lib",
         "//test/mocks/router:router_filter_interface",
     ],
 )
