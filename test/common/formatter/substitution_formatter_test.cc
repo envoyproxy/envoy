@@ -2771,7 +2771,8 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
 TEST(SubstitutionFormatterTest, ParserSuccesses) {
   SubstitutionFormatParser parser;
 
-  std::vector<std::string> test_cases = {"%START_TIME(%E4n%)%", "%START_TIME(%O4n%)%"};
+  std::vector<std::string> test_cases = {"%START_TIME(%E4n%)%", "%START_TIME(%O4n%)%",
+                                         "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_NO_THROW(parser.parse(test_case));

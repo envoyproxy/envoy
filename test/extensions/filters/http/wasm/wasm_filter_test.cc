@@ -844,10 +844,10 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
   }));
   EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
       .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
-  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
-        return std::move(client_factory);
-      }));
+  EXPECT_CALL(client_manager,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, Grpc::AsyncClientFactoryClusterChecks)
+                           -> Grpc::AsyncClientFactoryPtr { return std::move(client_factory); }));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("response")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -887,10 +887,10 @@ TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
   }));
   EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
       .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
-  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
-        return std::move(client_factory);
-      }));
+  EXPECT_CALL(client_manager,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, Grpc::AsyncClientFactoryClusterChecks)
+                           -> Grpc::AsyncClientFactoryPtr { return std::move(client_factory); }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
 }
@@ -928,10 +928,10 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
   }));
   EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
       .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
-  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
-        return std::move(client_factory);
-      }));
+  EXPECT_CALL(client_manager,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, Grpc::AsyncClientFactoryClusterChecks)
+                           -> Grpc::AsyncClientFactoryPtr { return std::move(client_factory); }));
   EXPECT_CALL(rootContext(), log_(spdlog::level::debug, Eq("failure bad")));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -990,10 +990,10 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
   }));
   EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
       .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
-  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
-        return std::move(client_factory);
-      }));
+  EXPECT_CALL(client_manager,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, Grpc::AsyncClientFactoryClusterChecks)
+                           -> Grpc::AsyncClientFactoryPtr { return std::move(client_factory); }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
@@ -1034,10 +1034,10 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
   }));
   EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
       .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
-  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
-        return std::move(client_factory);
-      }));
+  EXPECT_CALL(client_manager,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, Grpc::AsyncClientFactoryClusterChecks)
+                           -> Grpc::AsyncClientFactoryPtr { return std::move(client_factory); }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, false));
@@ -1078,10 +1078,10 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
   }));
   EXPECT_CALL(cluster_manager_, grpcAsyncClientManager())
       .WillOnce(Invoke([&]() -> Grpc::AsyncClientManager& { return client_manager; }));
-  EXPECT_CALL(client_manager, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
-        return std::move(client_factory);
-      }));
+  EXPECT_CALL(client_manager,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
+      .WillOnce(Invoke([&](const GrpcService&, Stats::Scope&, Grpc::AsyncClientFactoryClusterChecks)
+                           -> Grpc::AsyncClientFactoryPtr { return std::move(client_factory); }));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
@@ -1111,9 +1111,11 @@ void WasmHttpFilterTest::setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& cal
   setupTest("grpc_stream");
   setupFilter();
 
-  EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, _))
+  EXPECT_CALL(async_client_manager_,
+              factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::Skip))
       .WillRepeatedly(
-          Invoke([&](const GrpcService&, Stats::Scope&, bool) -> Grpc::AsyncClientFactoryPtr {
+          Invoke([&](const GrpcService&, Stats::Scope&,
+                     Grpc::AsyncClientFactoryClusterChecks) -> Grpc::AsyncClientFactoryPtr {
             auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
             EXPECT_CALL(*client_factory, create)
                 .WillRepeatedly(Invoke([&]() -> Grpc::RawAsyncClientPtr {
