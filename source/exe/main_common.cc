@@ -48,8 +48,8 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<PlatformImpl> platform_impl,
                                std::unique_ptr<Random::RandomGenerator>&& random_generator,
                                std::unique_ptr<ProcessContext> process_context)
-    : platform_impl_(platform_impl), options_(options), component_factory_(component_factory),
-      stats_allocator_(symbol_table_) {
+    : platform_impl_(std::move(platform_impl)), options_(options),
+      component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
   OptionsImpl::disableExtensions(options.disabledExtensions());

@@ -145,7 +145,7 @@ public:
 
 private:
   bool called_{};
-}
+};
 
 // Exercise enabling core dump and failing.
 // Note: this simulates a failed prctl() call.
