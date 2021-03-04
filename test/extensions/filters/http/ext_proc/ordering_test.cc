@@ -151,8 +151,6 @@ protected:
 
   void closeGrpcStream() { stream_callbacks_->onGrpcClose(); }
 
-  // Make it easier to handle buffering
-
   void expectBufferedRequest(Buffer::Instance& buf) {
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
@@ -208,7 +206,6 @@ TEST_F(OrderingTest, DefaultOrderingGet) {
 
 // A normal call with all supported callbacks turned on
 TEST_F(OrderingTest, DefaultOrderingAllCallbacks) {
-  // Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_body_mode(ProcessingMode::BUFFERED);

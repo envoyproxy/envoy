@@ -53,7 +53,6 @@ protected:
   }
 
   void initializeConfig() {
-    Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // This is the cluster for our gRPC server, starting by copying an existing cluster
       auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -473,7 +472,6 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
 // Test the filter with both body callbacks enabled and have the
 // ext_proc server change both of them.
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
-  // Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
@@ -535,8 +533,6 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
 // by sending back an immediate_response message, which should be
 // returned directly to the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
-  // Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
-
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -605,7 +601,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnRequestBody) {
 // happens after the response headers have been sent, as a result
 // Envoy should just reset the stream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
-  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
   HttpIntegrationTest::initialize();
