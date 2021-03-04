@@ -1914,6 +1914,7 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  EXCLUDE_UPSTREAM_HTTP3;
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
 
