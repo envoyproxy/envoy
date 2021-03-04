@@ -257,6 +257,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    bool usingNewTimeouts() const override { return false; }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
     absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
       return absl::nullopt;
