@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/protobuf/protobuf.h"
@@ -291,6 +292,11 @@ public:
    */
   virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
   virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
+
+  /**
+   * @return Object on which filters can share data on a per-request basis.
+   */
+  virtual StreamInfo::FilterState& filterState() PURE;
 };
 
 /**
@@ -373,6 +379,11 @@ public:
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

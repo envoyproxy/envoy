@@ -286,7 +286,7 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                                 const Protobuf::BoolValue& hcm_stream_error);
+                                 const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.

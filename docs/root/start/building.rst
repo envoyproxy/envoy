@@ -22,6 +22,7 @@ recent Linux including Ubuntu 18.04 LTS.
 Building Envoy has the following requirements:
 
 * GCC 7+ or Clang/LLVM 7+ (for C++14 support). Clang/LLVM 9+ preferred where Clang is used (see below).
+* About 2GB of RAM per core (so 32GB of RAM for 8 cores with hyperthreading)
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
 Please see the linked :repo:`CI <ci/README.md>` and :repo:`Bazel <bazel/README.md>` documentation

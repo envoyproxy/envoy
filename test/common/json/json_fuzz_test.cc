@@ -3,16 +3,20 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Fuzz {
 
-// We have multiple third party JSON parsers in Envoy, both RapidJSON and Protobuf.
-// We only fuzz protobuf today, since RapidJSON is deprecated and has known
-// limitations when we have deeply nested structures. Do not use RapidJSON for
-// anything new in Envoy! See https://github.com/envoyproxy/envoy/issues/4705.
+// We have multiple third party JSON parsers in Envoy, nlohmann/JSON, RapidJSON and Protobuf.
+// We fuzz nlohmann/JSON and protobuf and compare their results, since RapidJSON is deprecated and
+// has known limitations. See https://github.com/envoyproxy/envoy/issues/4705.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+  TestScopedRuntime runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.remove_legacy_json", "true"}});
+
   std::string json_string{reinterpret_cast<const char*>(buf), len};
 
   // Load via Protobuf JSON parsing, if we can.

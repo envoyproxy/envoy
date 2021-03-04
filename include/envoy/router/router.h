@@ -174,20 +174,20 @@ using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 class RetryPolicy {
 public:
   // clang-format off
-  static const uint32_t RETRY_ON_5XX                     = 0x1;
-  static const uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
-  static const uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
-  static const uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
-  static const uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
-  static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
-  static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
-  static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
-  static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
-  static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
-  static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
-  static const uint32_t RETRY_ON_RESET                   = 0x800;
-  static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
-  static const uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
+  static constexpr uint32_t RETRY_ON_5XX                     = 0x1;
+  static constexpr uint32_t RETRY_ON_GATEWAY_ERROR           = 0x2;
+  static constexpr uint32_t RETRY_ON_CONNECT_FAILURE         = 0x4;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_4XX           = 0x8;
+  static constexpr uint32_t RETRY_ON_REFUSED_STREAM          = 0x10;
+  static constexpr uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
+  static constexpr uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
+  static constexpr uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
+  static constexpr uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
+  static constexpr uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
+  static constexpr uint32_t RETRY_ON_RESET                   = 0x800;
+  static constexpr uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
+  static constexpr uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;

@@ -25,16 +25,13 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ClientSslAuth,
-        NetworkFilterNames::get().ExtAuthorization,
+        NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager,
-        NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RateLimit,
-        NetworkFilterNames::get().Rbac,
-        NetworkFilterNames::get().TcpProxy,
-
+        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
+        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
+        // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
+        // NetworkFilterNames::get().TcpProxy,
     };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
@@ -80,7 +77,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
     EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                             Grpc::AsyncClientFactoryClusterChecks) {
           return std::move(async_client_factory_);
         }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
@@ -113,7 +111,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
     EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                             Grpc::AsyncClientFactoryClusterChecks) {
           return std::move(async_client_factory_);
         }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(

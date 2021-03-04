@@ -23,6 +23,7 @@
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -714,6 +715,16 @@ public:
   }
   const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
+  }
+
+  void dumpState(std::ostream& os, int indent_level) const override {
+    StreamInfoImpl::dumpState(os, indent_level);
+
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
+       << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
+       << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
+       << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
   }
 
 private:

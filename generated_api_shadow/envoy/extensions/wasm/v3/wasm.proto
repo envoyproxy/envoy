@@ -81,6 +81,7 @@ message VmConfig {
   // (proxy_on_start). `google.protobuf.Struct` is serialized as JSON before
   // passing it to the plugin. `google.protobuf.BytesValue` and
   // `google.protobuf.StringValue` are passed directly without the wrapper.
+  // [#extension-category: envoy.wasm.runtime]
   google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
