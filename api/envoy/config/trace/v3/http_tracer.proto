@@ -45,12 +45,7 @@ message Tracing {
     // The name of the HTTP trace driver to instantiate. The name must match a
     // supported HTTP trace driver. Built-in trace drivers:
     //
-    // - *envoy.tracers.lightstep*
-    // - *envoy.tracers.zipkin*
-    // - *envoy.tracers.dynamic_ot*
-    // - *envoy.tracers.datadog*
-    // - *envoy.tracers.opencensus*
-    // - *envoy.tracers.xray*
+    // See below for list of names in the :ref:`typed_config<envoy_v3_api_field_config.trace.v3.Tracing.Http.typed_config>`.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // Trace driver specific configuration which depends on the driver being instantiated.

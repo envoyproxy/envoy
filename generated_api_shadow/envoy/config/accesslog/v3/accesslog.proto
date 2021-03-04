@@ -29,9 +29,7 @@ message AccessLog {
   // The name of the access log implementation to instantiate. The name must
   // match a statically registered access log. Current built-in loggers include:
   //
-  // #. "envoy.access_loggers.file"
-  // #. "envoy.access_loggers.http_grpc"
-  // #. "envoy.access_loggers.tcp_grpc"
+  // See below for list of names in the :ref:`typed_config<envoy_v3_api_field_config.accesslog.v3.AccessLog.typed_config>`.
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.
