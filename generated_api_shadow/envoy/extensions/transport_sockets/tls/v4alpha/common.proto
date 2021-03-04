@@ -218,6 +218,7 @@ message CaStore {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CaStore";
 
+  // Name of the store. E.g. ROOT
   string name = 1 [(validate.rules).string = {min_len: 1}];
 }
 
@@ -276,18 +277,18 @@ message CertificateValidationContext {
   // It adds all the certificates and all the CRLs from that particular store to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
   // for listeners).
-  // See `Certificate Stores <https://docs.microsoft.com/en-us/windows-hardware/drivers/install/certificate-stores>`
+  // See `Certificate Stores <https://docs.microsoft.com/en-us/windows-hardware/drivers/install/certificate-stores>`_.
   //
   // By default, a client certificate is optional, unless one of the additional
   // options (:ref:`require_client_certificate
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`,
+  // <envoy_api_field_extensions.transport_sockets.tls.v4alpha.DownstreamTlsContext.require_client_certificate>`,
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
+  // <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
+  // <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.verify_certificate_hash>`, or
   // :ref:`match_subject_alt_names
-  // <envoy_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
-  // specified.
+  // <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.match_subject_alt_names>`)
+  // is also specified.
   repeated CaStore trusted_stores = 13;
 
   // If specified, updates of a file-based *trusted_ca* source will be triggered
