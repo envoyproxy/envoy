@@ -17,7 +17,7 @@ namespace MySQLProxy {
 DecodeStatus AuthSwitchMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
   int origin_len = buffer.length();
   if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    ENVOY_LOG(info, "error parsing resp code of auth switch msg");
     return DecodeStatus::Failure;
   }
   ASSERT(resp_code_ == MYSQL_RESP_AUTH_SWITCH);
@@ -27,13 +27,13 @@ DecodeStatus AuthSwitchMessage::parseMessage(Buffer::Instance& buffer, uint32_t 
     return DecodeStatus::Success;
   }
   if (BufferHelper::readString(buffer, auth_plugin_name_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing auth plugin name mysql Login response msg");
+    ENVOY_LOG(info, "error parsing auth plugin name auth switch msg");
     return DecodeStatus::Failure;
   }
   int consumed_len = origin_len - buffer.length();
   if (BufferHelper::readStringBySize(buffer, remain_len - consumed_len, auth_plugin_data_) !=
       DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing auth plugin data code in mysql Login Ok msg");
+    ENVOY_LOG(info, "error parsing auth plugin data code of auth switch msg");
     return DecodeStatus::Failure;
   }
   setIsOldAuthSwitch(false);
@@ -44,34 +44,34 @@ DecodeStatus AuthSwitchMessage::parseMessage(Buffer::Instance& buffer, uint32_t 
 DecodeStatus OkMessage::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   uint32_t init_len = buffer.length();
   if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    ENVOY_LOG(info, "error parsing resp code of ok msg");
     return DecodeStatus::Failure;
   }
   ASSERT(resp_code_ == MYSQL_RESP_OK);
   if (BufferHelper::readLengthEncodedInteger(buffer, affected_rows_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing affected_rows in mysql Login Ok msg");
+    ENVOY_LOG(info, "error parsing affected_rows of  ok msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readLengthEncodedInteger(buffer, last_insert_id_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing last_insert_id in mysql Login Ok msg");
+    ENVOY_LOG(info, "error parsing last_insert_id of ok msg");
     return DecodeStatus::Failure;
   }
 
   if (BufferHelper::readUint16(buffer, status_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing status in mysql Login Ok msg");
+    ENVOY_LOG(info, "error parsing status of ok msg");
     return DecodeStatus::Failure;
   }
   // the exist of warning field is determined by server cap flag, but a decoder can not know the
   // cap flag, so just assume the CLIENT_PROTOCOL_41 is always set. ref
   // https://github.com/mysql/mysql-connector-j/blob/release/8.0/src/main/protocol-impl/java/com/mysql/cj/protocol/a/result/OkPacket.java#L48
   if (BufferHelper::readUint16(buffer, warnings_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing warnings in mysql Login Ok msg");
+    ENVOY_LOG(info, "error parsing warnings of ok msg");
     return DecodeStatus::Failure;
   }
   uint32_t consumed_len = init_len - buffer.length();
   // The tail might contain info base on cap flag and status flag, but just consume all
   if (BufferHelper::readStringBySize(buffer, len - consumed_len, info_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing info in mysql Login Ok msg");
+    ENVOY_LOG(info, "error parsing info of ok msg");
     return DecodeStatus::Failure;
   }
   return DecodeStatus::Success;
@@ -81,27 +81,27 @@ DecodeStatus OkMessage::parseMessage(Buffer::Instance& buffer, uint32_t len) {
 DecodeStatus ErrMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
   int origin_len = buffer.length();
   if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    ENVOY_LOG(info, "error parsing resp code of error msg");
     return DecodeStatus::Failure;
   }
   ASSERT(resp_code_ == MYSQL_RESP_ERR);
   if (BufferHelper::readUint16(buffer, error_code_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing error code in mysql Login error msg");
+    ENVOY_LOG(info, "error parsing error code of error msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readUint8(buffer, marker_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing sql state marker in mysql Login error msg");
+    ENVOY_LOG(info, "error parsing sql state marker of error msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readStringBySize(buffer, MYSQL_SQL_STATE_LEN, sql_state_) !=
       DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing sql state in mysql Login error msg");
+    ENVOY_LOG(info, "error parsing sql state of error msg");
     return DecodeStatus::Failure;
   }
   int consumed_len = origin_len - buffer.length();
   if (BufferHelper::readStringBySize(buffer, remain_len - consumed_len, error_message_) !=
       DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing error message in mysql Login error msg");
+    ENVOY_LOG(info, "error parsing error message of error msg");
     return DecodeStatus::Failure;
   }
   return DecodeStatus::Success;
@@ -110,13 +110,13 @@ DecodeStatus ErrMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_
 // https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::AuthMoreData
 DecodeStatus AuthMoreMessage::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
   if (BufferHelper::readUint8(buffer, resp_code_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    ENVOY_LOG(info, "error parsing resp code of auth more msg");
     return DecodeStatus::Failure;
   }
   ASSERT(resp_code_ == MYSQL_RESP_MORE);
   if (BufferHelper::readStringBySize(buffer, remain_len - sizeof(uint8_t), more_plugin_data_) !=
       DecodeStatus::Success) {
-    ENVOY_LOG(info, "error parsing more plugin data in mysql Login auth more msg");
+    ENVOY_LOG(info, "error parsing more plugin data of auth more msg");
     return DecodeStatus::Failure;
   }
   return DecodeStatus::Success;

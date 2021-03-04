@@ -15,7 +15,7 @@ namespace MySQLProxy {
 DecodeStatus ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32_t remain_len) {
   if (BufferHelper::readStringBySize(buffer, remain_len, auth_plugin_resp_) !=
       DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing auth plugin data in client switch response");
+    ENVOY_LOG(info, "error when parsing auth plugin data of client switch response");
     return DecodeStatus::Failure;
   }
   return DecodeStatus::Success;

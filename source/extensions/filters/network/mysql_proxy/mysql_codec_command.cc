@@ -65,7 +65,7 @@ void Command::encode(Buffer::Instance& out) const {
 
 DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   if (BufferHelper::readStringBySize(buffer, len, data_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "read command response error");
+    ENVOY_LOG(info, "error when parsing command response");
     return DecodeStatus::Failure;
   }
   return DecodeStatus::Success;

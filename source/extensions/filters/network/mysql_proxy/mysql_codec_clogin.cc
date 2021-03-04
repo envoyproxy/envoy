@@ -60,7 +60,7 @@ DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t len) {
    * bytes */
   uint16_t base_cap;
   if (BufferHelper::readUint16(buffer, base_cap) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing cap client login message");
+    ENVOY_LOG(info, "error when parsing cap flag[lower 2 byte] of client login message");
     return DecodeStatus::Failure;
   }
   setBaseClientCap(base_cap);
@@ -76,20 +76,20 @@ DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t len) {
 DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
   uint16_t ext_cap;
   if (BufferHelper::readUint16(buffer, ext_cap) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing cap client ssl message");
+    ENVOY_LOG(info, "error when parsing cap flag of client ssl message");
     return DecodeStatus::Failure;
   }
   setExtendedClientCap(ext_cap);
   if (BufferHelper::readUint32(buffer, max_packet_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing max packet client ssl message");
+    ENVOY_LOG(info, "error when parsing max packet length of client ssl message");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readUint8(buffer, charset_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing character client ssl message");
+    ENVOY_LOG(info, "error when parsing character of client ssl message");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readBytes(buffer, UNSET_BYTES) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing reserved data of client ssl message");
+    ENVOY_LOG(info, "error when parsing reserved bytes of client ssl message");
     return DecodeStatus::Failure;
   }
   return DecodeStatus::Success;
@@ -98,12 +98,12 @@ DecodeStatus ClientLogin::parseResponseSsl(Buffer::Instance& buffer) {
 DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
   uint16_t ext_cap;
   if (BufferHelper::readUint16(buffer, ext_cap) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing client cap of client login message");
+    ENVOY_LOG(info, "error when parsing client cap flag of client login message");
     return DecodeStatus::Failure;
   }
   setExtendedClientCap(ext_cap);
   if (BufferHelper::readUint32(buffer, max_packet_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing max packet of client login message");
+    ENVOY_LOG(info, "error when parsing max packet length of client login message");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readUint8(buffer, charset_) != DecodeStatus::Success) {
@@ -121,33 +121,33 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
   if (client_cap_ & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
     uint64_t auth_len;
     if (BufferHelper::readLengthEncodedInteger(buffer, auth_len) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing username of client login message");
+      ENVOY_LOG(info, "error when parsing length of auth response of client login message");
       return DecodeStatus::Failure;
     }
     if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth resp of client login message");
+      ENVOY_LOG(info, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
   } else if (client_cap_ & CLIENT_SECURE_CONNECTION) {
     uint8_t auth_len;
     if (BufferHelper::readUint8(buffer, auth_len) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth resp length of client login message");
+      ENVOY_LOG(info, "error when parsing length of auth response of client login message");
       return DecodeStatus::Failure;
     }
     if (BufferHelper::readStringBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth resp data of client login message");
+      ENVOY_LOG(info, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
   } else {
     if (BufferHelper::readString(buffer, auth_resp_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth resp data of client login message");
+      ENVOY_LOG(info, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
   }
 
   if ((client_cap_ & CLIENT_CONNECT_WITH_DB) &&
       (BufferHelper::readString(buffer, db_) != DecodeStatus::Success)) {
-    ENVOY_LOG(info, "error when parsing db name client login message");
+    ENVOY_LOG(info, "error when parsing db name of client login message");
     return DecodeStatus::Failure;
   }
   if ((client_cap_ & CLIENT_PLUGIN_AUTH) &&
@@ -161,7 +161,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
 DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t remain_len) {
   int origin_len = buffer.length();
   if (BufferHelper::readUint24(buffer, max_packet_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing max packet of client login message");
+    ENVOY_LOG(info, "error when parsing max packet length of client login message");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readString(buffer, username_) != DecodeStatus::Success) {
@@ -170,18 +170,18 @@ DecodeStatus ClientLogin::parseResponse320(Buffer::Instance& buffer, uint32_t re
   }
   if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
     if (BufferHelper::readString(buffer, auth_resp_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth resp of client login message");
+      ENVOY_LOG(info, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
     if (BufferHelper::readString(buffer, db_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing db of client login message");
+      ENVOY_LOG(info, "error when parsing db name of client login message");
       return DecodeStatus::Failure;
     }
   } else {
     int consumed_len = origin_len - buffer.length();
     if (BufferHelper::readStringBySize(buffer, remain_len - consumed_len, auth_resp_) !=
         DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth resp of client login message");
+      ENVOY_LOG(info, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
   }

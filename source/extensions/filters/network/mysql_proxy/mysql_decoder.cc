@@ -50,44 +50,37 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
       session_.setState(MySQLSession::State::NotHandled);
       break;
     }
+    std::unique_ptr<ClientLoginResponse> msg;
+    MySQLSession::State state = MySQLSession::State::NotHandled;
     switch (resp_code) {
     case MYSQL_RESP_OK: {
-      OkMessage ok{};
-      ok.decode(message, seq, len);
-      callbacks_.onClientLoginResponse(ok);
-      session_.setState(MySQLSession::State::Req);
+      msg = std::make_unique<OkMessage>();
+      state = MySQLSession::State::Req;
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
     case MYSQL_RESP_AUTH_SWITCH: {
-      AuthSwitchMessage auth_switch{};
-      auth_switch.decode(message, seq, len);
-      callbacks_.onClientLoginResponse(auth_switch);
-      session_.setState(MySQLSession::State::Req);
-      session_.setState(MySQLSession::State::AuthSwitchResp);
+      msg = std::make_unique<AuthSwitchMessage>();
+      state = MySQLSession::State::AuthSwitchResp;
       break;
     }
     case MYSQL_RESP_ERR: {
-      ErrMessage err{};
-      err.decode(message, seq, len);
-      callbacks_.onClientLoginResponse(err);
-      // client/server should close the connection:
-      // https://dev.mysql.com/doc/internals/en/connection-phase.html
-      session_.setState(MySQLSession::State::Error);
+      msg = std::make_unique<ErrMessage>();
+      state = MySQLSession::State::Error;
       break;
     }
     case MYSQL_RESP_MORE: {
-      AuthMoreMessage more{};
-      more.decode(message, seq, len);
-      callbacks_.onClientLoginResponse(more);
-      session_.setState(MySQLSession::State::NotHandled);
+      msg = std::make_unique<AuthMoreMessage>();
       break;
     }
     default:
-      session_.setState(MySQLSession::State::NotHandled);
-      break;
+      session_.setState(state);
+      return;
     }
+    msg->decode(message, seq, len);
+    session_.setState(state);
+    callbacks_.onClientLoginResponse(*msg);
     break;
   }
 
@@ -95,7 +88,6 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.decode(message, seq, len);
     callbacks_.onClientSwitchResponse(client_switch_resp);
-
     session_.setState(MySQLSession::State::AuthSwitchMore);
     break;
   }
@@ -106,41 +98,37 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
       session_.setState(MySQLSession::State::NotHandled);
       break;
     }
+    std::unique_ptr<ClientLoginResponse> msg;
+    MySQLSession::State state = MySQLSession::State::NotHandled;
     switch (resp_code) {
     case MYSQL_RESP_OK: {
-      OkMessage ok{};
-      ok.decode(message, seq, len);
-      callbacks_.onMoreClientLoginResponse(ok);
-      session_.setState(MySQLSession::State::Req);
+      msg = std::make_unique<OkMessage>();
+      state = MySQLSession::State::Req;
       break;
     }
     case MYSQL_RESP_MORE: {
-      AuthMoreMessage more{};
-      more.decode(message, seq, len);
-      callbacks_.onMoreClientLoginResponse(more);
-      session_.setState(MySQLSession::State::AuthSwitchResp);
+      msg = std::make_unique<AuthMoreMessage>();
+      state = MySQLSession::State::AuthSwitchResp;
       break;
     }
     case MYSQL_RESP_ERR: {
-      ErrMessage err{};
-      err.decode(message, seq, len);
-      callbacks_.onMoreClientLoginResponse(err);
+      msg = std::make_unique<ErrMessage>();
       // stop parsing auth req/response, attempt to resync in command state
-      session_.setState(MySQLSession::State::Resync);
+      state = MySQLSession::State::Resync;
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       break;
     }
     case MYSQL_RESP_AUTH_SWITCH: {
-      AuthSwitchMessage auth_switch{};
-      auth_switch.decode(message, seq, len);
-      callbacks_.onMoreClientLoginResponse(auth_switch);
-      session_.setState(MySQLSession::State::NotHandled);
+      msg = std::make_unique<AuthSwitchMessage>();
       break;
     }
     default:
-      session_.setState(MySQLSession::State::NotHandled);
-      break;
+      session_.setState(state);
+      return;
     }
+    msg->decode(message, seq, len);
+    session_.setState(state);
+    callbacks_.onMoreClientLoginResponse(*msg);
     break;
   }
 
