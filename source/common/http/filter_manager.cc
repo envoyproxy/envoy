@@ -240,7 +240,7 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCal
   return parent_.filter_manager_callbacks_.route(cb);
 }
 
-void ActiveStreamFilterBase::setRoute(const Router::RouteConstSharedPtr route) {
+void ActiveStreamFilterBase::setRoute(const Router::RouteConstSharedPtr& route) {
   parent_.filter_manager_callbacks_.setRoute(route);
 }
 

@@ -220,7 +220,7 @@ public:
    * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
    * of the filter chain.
    */
-  virtual void setRoute(const Router::RouteConstSharedPtr route) PURE;
+  virtual void setRoute(const Router::RouteConstSharedPtr& route) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.

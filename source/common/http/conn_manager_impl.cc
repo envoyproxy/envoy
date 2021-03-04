@@ -1578,7 +1578,7 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
-void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+void ConnectionManagerImpl::ActiveStream::setRoute(const Router::RouteConstSharedPtr& route) {
   filter_manager_.streamInfo().route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == filter_manager_.streamInfo().route_entry_) {

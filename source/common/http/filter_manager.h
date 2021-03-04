@@ -250,7 +250,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void resetStream() override;
   Router::RouteConstSharedPtr route() override;
   Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
-  void setRoute(const Router::RouteConstSharedPtr route) override;
+  void setRoute(const Router::RouteConstSharedPtr& route) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
   void clearRouteCache() override;
   uint64_t streamId() const override;
@@ -626,7 +626,7 @@ public:
   /**
    * Sets the current route.
    */
-  virtual void setRoute(const Router::RouteConstSharedPtr route) PURE;
+  virtual void setRoute(const Router::RouteConstSharedPtr& route) PURE;
 
   /**
    * Clears the cached route.
