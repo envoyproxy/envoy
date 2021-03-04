@@ -476,7 +476,14 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   } else {
     // If active_socket is about to be destructed, emit logs if a connection is not created.
     if (!active_socket->connected_) {
-      emitLogs(*config_, *active_socket->stream_info_);
+      if (active_socket->stream_info_ != nullptr) {
+        emitLogs(*config_, *active_socket->stream_info_);
+      } else {
+        // If the active_socket is not connected, this socket is not promoted to active connection.
+        // Thus the stream_info_ is owned by this active socket.
+        ENVOY_BUG(active_socket->stream_info_ != nullptr,
+                  "the unconnected active socket must have stream info.");
+      }
     }
   }
 }
