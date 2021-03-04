@@ -615,6 +615,7 @@ envoy_cc_test_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:metadata_interface",
+        "//source/common/common:dump_state_utils",
     ],
 )
 
