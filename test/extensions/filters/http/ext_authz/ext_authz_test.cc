@@ -2069,7 +2069,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   EXPECT_EQ("ext_authz_denied", filter_callbacks_.details());
 }
 
-// Verify that the filter mits metadata if the ext_authz client responds with an error and provides
+// Verify that the filter emits metadata if the ext_authz client responds with an error and provides
 // metadata.
 TEST_F(HttpFilterTest, EmittingMetadataWhenError) {
   InSequence s;
