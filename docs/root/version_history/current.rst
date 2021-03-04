@@ -136,6 +136,7 @@ New Features
 * rbac: added :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>` to allow adding custom prefix to the stats emitted by shadow rules.
 * route config: added :ref:`allow_post field <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.ConnectConfig.allow_post>` for allowing POST payload as raw TCP.
 * route config: added :ref:`max_direct_response_body_size_bytes <envoy_v3_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes>` to set maximum :ref:`direct response body <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` size in bytes. If not specified the default remains 4096 bytes.
+* route config: added :ref:`url_template field <envoy_v3_api_field_config.route.v3.RouteMatch.url_template>` to support `url template match <https://github.com/googleapis/googleapis/blob/f829b1334cce86aa3738f3c0698d814b56664445/google/api/http.proto#L208>`_.
 * server: added *fips_mode* to :ref:`server compilation settings <server_compilation_settings_statistics>` related statistic.
 * server: added :option:`--enable-core-dump` flag to enable core dumps via prctl (Linux-based systems only).
 * tcp_proxy: add support for converting raw TCP streams into HTTP/1.1 CONNECT requests. See :ref:`upgrade documentation <tunneling-tcp-over-http>` for details.
