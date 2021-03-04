@@ -24,7 +24,7 @@ public:
   WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config);
   const envoy::extensions::wasm::v3::PluginConfig& config() { return config_; }
   proxy_wasm::AllowedCapabilitiesMap& allowedCapabilities() { return allowed_capabilities_; }
-  EnvironmentVariableMap& envs() { return envs_; }
+  EnvironmentVariableMap& environmentVariables() { return envs_; }
 
 private:
   const envoy::extensions::wasm::v3::PluginConfig& config_;

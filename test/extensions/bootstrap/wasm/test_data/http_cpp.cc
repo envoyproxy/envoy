@@ -11,6 +11,14 @@ START_WASM_PLUGIN(WasmHttpCpp)
 WASM_EXPORT(void, proxy_abi_version_0_1_0, ()) {}
 
 WASM_EXPORT(uint32_t, proxy_on_configure, (uint32_t, uint32_t)) {
+  if (std::getenv("NON_EXIST")) {
+    logError("NON_EXIST should not exist in the environment variable key space");
+    return 0;
+  }
+  if (std::string(std::getenv("KEY")) != "VALUE") {
+    logError("Environment variable KEY=VALUE must exist");
+    return 0;
+  }
   proxy_set_tick_period_milliseconds(100);
   return 1;
 }

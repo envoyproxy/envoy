@@ -91,7 +91,7 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
     : WasmBase(createWasmVm(config.config().vm_config().runtime()),
                config.config().vm_config().vm_id(),
                MessageUtil::anyToBytes(config.config().vm_config().configuration()), vm_key,
-               config.envs(), config.allowedCapabilities()),
+               config.environmentVariables(), config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{ALL_WASM_STATS(

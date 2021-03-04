@@ -38,7 +38,7 @@ TEST(TestWasmConfig, Basic) {
   EXPECT_EQ(name, wasm_config.config().name());
   auto allowed_capabilities = wasm_config.allowedCapabilities();
   EXPECT_NE(allowed_capabilities.find(function), allowed_capabilities.end());
-  auto envs = wasm_config.envs();
+  auto envs = wasm_config.environmentVariables();
   EXPECT_EQ(envs[host_env_key], host_env_value);
   EXPECT_EQ(envs[key], value);
 }
