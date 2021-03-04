@@ -17,7 +17,8 @@ public:
   virtual ~ExternalProcessorStream() = default;
   virtual void send(envoy::service::ext_proc::v3alpha::ProcessingRequest&& request,
                     bool end_stream) PURE;
-  virtual void close() PURE;
+  // Idempotent close. Return true if it actually closed.
+  virtual bool close() PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
