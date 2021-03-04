@@ -35,40 +35,41 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
 };
 
-struct StdStreamFileImplWin32 : public FileImplWin32 {
-  StdOutFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
-  ~StdOutFileImplWin32() { fd_ = INVALID_HANDLE; }
+template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin32 {
+  static_assert(std_handle_ == STD_OUTPUT_HANDLE || std_handle_ == STD_ERROR_HANDLE);
+  StdStreamFileImplWin32() : FileImplWin32(StdStreamFileImplWin32::fromStdHandle()) {}
+  ~StdStreamFileImplWin32() { fd_ = INVALID_HANDLE; }
 
-protected:
-  Api::IoCallBoolResult open(FlagSet) override;
-  Api::IoCallBoolResult close() override;
+  Api::IoCallBoolResult open(FlagSet) {
+    fd_ = GetStdHandle(std_handle_);
+    if (fd_ == NULL) {
+      // If an application does not have associated standard handles,
+      // such as a service running on an interactive desktop
+      // and has not redirected them, the return value is NULL.
+      // In that case we throw an exception instead of failing since there is no last error.
+      throw EnvoyException(
+          fmt::format("The process does not have an associated handle for `stdout`"));
+    }
+    if (fd_ == INVALID_HANDLE) {
+      return resultFailure(false, ::GetLastError());
+    }
+    return resultSuccess(true);
+  }
 
-private:
-  static constexpr DWORD std_handle_ = STD_OUTPUT_HANDLE;
-};
+  Api::IoCallBoolResult close() {
+    // If we are writing to the standard output of the process we are
+    // not the owners of the handle, we are just using it.
+    fd_ = INVALID_HANDLE;
+    return resultSuccess(true);
+  }
 
-struct StdOutFileImplWin32 : public FileImplWin32 {
-  StdOutFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
-  ~StdOutFileImplWin32() { fd_ = INVALID_HANDLE; }
-
-protected:
-  Api::IoCallBoolResult open(FlagSet) override;
-  Api::IoCallBoolResult close() override;
-
-private:
-  static constexpr DWORD std_handle_ = STD_OUTPUT_HANDLE;
-};
-
-struct StdErrFileImplWin32 : public FileImplWin32 {
-  StdErrFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stderr, "/dev/stderr"}) {}
-  ~StdErrFileImplWin32() { fd_ = INVALID_HANDLE; }
-
-protected:
-  Api::IoCallBoolResult open(FlagSet) override;
-  Api::IoCallBoolResult close() override;
-
-private:
-  static constexpr DWORD std_handle_ = STD_ERROR_HANDLE;
+  static constexpr FilePathAndType fromStdHandle() {
+    if constexpr (std_handle_ == STD_OUTPUT_HANDLE) {
+      return FilePathAndType{DestinationType::Stdout, "/dev/stdout"};
+    } else {
+      return FilePathAndType{DestinationType::Stderr, "/dev/stderr"};
+    }
+  }
 };
 
 class InstanceImplWin32 : public Instance {
