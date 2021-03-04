@@ -183,12 +183,11 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
     } else if (complete() && !hasTrailers() && !bufferedData()) {
-      if (end_stream_) {
-        // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
-        // byte data frame, we need to create an empty buffer to make sure that when commonContinue
-        // is called, the pipeline resumes with an empty data frame with end_stream = true
-        bufferedData() = createBuffer();
-      }
+      // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
+      // byte data frame, we need to create an empty buffer to make sure that when commonContinue
+      // is called, the pipeline resumes with an empty data frame with end_stream = true
+      ASSERT(end_stream_);
+      bufferedData() = createBuffer();
     }
 
     return false;
@@ -844,6 +843,7 @@ void FilterManager::sendLocalReply(
   } else {
     // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
+    state_.local_reply_stream_reset_ = true;
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. Prior headers have already been sent",
                      *this, details);
     // TODO(snowp): This means we increment the tx_reset stat which we weren't doing previously.
@@ -1173,6 +1173,12 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     if (!trailers_exists_at_start && filter_manager_callbacks_.responseTrailers() &&
         trailers_added_entry == encoder_filters_.end()) {
       trailers_added_entry = entry;
+    }
+
+    if (state_.local_reply_stream_reset_) {
+      // If the stream is reset by a call to sendLocalReply, we ship out the reply directly.
+      // No need to handle the data buffer or trailers.
+      return;
     }
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
