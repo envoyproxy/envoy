@@ -10,9 +10,10 @@
 
 namespace quic {
 
+// clang-format off
 template <typename... Args>
 inline void QuicStrAppendImpl(std::string* output, const Args&... args) {
   absl::StrAppend(output, args...);
 }
-
+// clang-format on
 } // namespace quic
