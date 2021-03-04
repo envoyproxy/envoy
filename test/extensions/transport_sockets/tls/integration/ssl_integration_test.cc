@@ -380,6 +380,7 @@ typed_config:
   EXPECT_EQ(0, counter->value());
   counter->reset();
 }
+
 // Server configured on SPIFFE certificate validation for mTLS
 // clientcert.pem's san is "spiffe://lyft.com/frontend-team" so it should be rejected.
 TEST_P(SslCertficateIntegrationTest, ServerRsaSPIFFEValidatorRejected1) {
@@ -402,9 +403,10 @@ typed_config:
     auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
-    makeHttpConnection(std::move(conn))->close();
+    auto codec = makeHttpConnection(std::move(conn));
+    ASSERT_TRUE(codec->waitForDisconnect());
+    codec->close();
   }
-
   Stats::CounterSharedPtr counter =
       test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
   EXPECT_EQ(1, counter->value());
@@ -437,7 +439,9 @@ typed_config:
     auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
     EXPECT_FALSE(codec->connected());
   } else {
-    makeHttpConnection(std::move(conn))->close();
+    auto codec = makeHttpConnection(std::move(conn));
+    ASSERT_TRUE(codec->waitForDisconnect());
+    codec->close();
   }
   Stats::CounterSharedPtr counter =
       test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
