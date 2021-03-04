@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Implementation of DelegatingRoute that delegates all method calls to the RouteConstSharedPtr
+ * Wrapper class around Router::Route that delegates all method calls to the RouteConstSharedPtr
  * base route it wraps around.
  *
  * Intended to be used as a route mutability mechanism, where a filter can create a derived class of
@@ -15,7 +15,7 @@ namespace Router {
  */
 class DelegatingRoute : public Router::Route {
 public:
-  DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(route) {}
+  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(route) {}
 
   const Router::DirectResponseEntry* directResponseEntry() const override;
   const Router::RouteEntry* routeEntry() const override;
@@ -27,15 +27,24 @@ private:
   Router::RouteConstSharedPtr base_route_;
 };
 
+/**
+ * Wrapper class around Router::RouteEntry that delegates all method calls to the const
+ * Router::RouteEntry* base route entry it wraps around.
+ *
+ * Intended to be used with DelegatingRoute when a filter wants to override the routeEntry() method
+ * while preserving the rest of the properties/behavior of the base route. See example with
+ * SetRouteFilter in test/integration/filters.
+ */
 class DelegatingRouteEntry : public Router::RouteEntry {
 public:
-  DelegatingRouteEntry(const Router::RouteEntry* route_entry) : base_route_entry_(route_entry) {}
+  explicit DelegatingRouteEntry(const Router::RouteEntry* route_entry)
+      : base_route_entry_(route_entry) {}
 
-  // ResponseEntry virtual method
+  // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
 
-  // RouteEntry virtual methods
+  // Router::RouteEntry
   const std::string& clusterName() const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
