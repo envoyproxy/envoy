@@ -18,10 +18,8 @@ void WasmServiceExtension::onServerInitialized() { createWasm(context_); }
 
 void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
   auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config_.config().name(), config_.config().root_id(), config_.config().vm_config().vm_id(),
-      config_.config().vm_config().runtime(),
-      Common::Wasm::anyToBytes(config_.config().configuration()), config_.config().fail_open(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(), nullptr);
+      config_.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
+      nullptr);
 
   auto callback = [this, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     if (!base_wasm) {
@@ -49,11 +47,10 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));
   };
 
-  if (!Common::Wasm::createWasm(
-          config_.config().vm_config(), config_.config().capability_restriction_config(), plugin,
-          context.scope().createScope(""), context.clusterManager(), context.initManager(),
-          context.dispatcher(), context.api(), context.lifecycleNotifier(), remote_data_provider_,
-          std::move(callback))) {
+  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
+                                context.initManager(), context.dispatcher(), context.api(),
+                                context.lifecycleNotifier(), remote_data_provider_,
+                                std::move(callback))) {
     // NB: throw if we get a synchronous configuration failures as this is how such failures are
     // reported to xDS.
     throw Common::Wasm::WasmException(

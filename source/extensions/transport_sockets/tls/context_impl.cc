@@ -22,7 +22,7 @@
 #include "common/runtime/runtime_features.h"
 #include "common/stats/utility.h"
 
-#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -78,8 +78,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")), capabilities_(config.capabilities()) {
 
-  cert_validator_ = std::make_unique<DefaultCertValidator>(config.certificateValidationContext(),
-                                                           stats_, time_source_);
+  auto cert_validator_name = getCertValidatorName(config.certificateValidationContext());
+  auto cert_validator_factory =
+      Registry::FactoryRegistry<CertValidatorFactory>::getFactory(cert_validator_name);
+
+  if (!cert_validator_factory) {
+    throw EnvoyException(
+        absl::StrCat("Failed to get certificate validator factory for ", cert_validator_name));
+  }
+
+  cert_validator_ = cert_validator_factory->createCertValidator(
+      config.certificateValidationContext(), stats_, time_source_);
+
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -332,6 +342,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   for (TlsContext& tls_context : tls_contexts_) {
     for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
+    }
+  }
+
+  // As late as possible, run the custom SSL_CTX configuration callback on each
+  // SSL_CTX, if set.
+  if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
+    for (TlsContext& ctx : tls_contexts_) {
+      sslctx_cb(ctx.ssl_ctx_.get());
     }
   }
 

@@ -703,7 +703,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : runtime_(runtime), name_(config.name()), type_(config.type()),
+    : runtime_(runtime), name_(config.name()),
+      observability_name_(PROTOBUF_GET_STRING_OR_DEFAULT(config, alt_stat_name, name_)),
+      type_(config.type()),
       extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       http_protocol_options_(
           createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
@@ -943,10 +945,6 @@ ClusterImplBase::ClusterImplBase(
     throw EnvoyException(
         fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                     cluster.name(), cluster.DebugString()));
-  }
-  if ((info_->features() & ClusterInfoImpl::Features::HTTP3)) {
-    throw EnvoyException(
-        fmt::format("HTTP3 not yet supported: {}", cluster.name(), cluster.DebugString()));
   }
 
   // Create the default (empty) priority set before registering callbacks to
