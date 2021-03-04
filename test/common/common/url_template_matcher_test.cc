@@ -21,7 +21,7 @@ TEST(UrlTemplateMatcherTest, WildCard) {
   UrlTemplateMatcher m("/foo/*");
   EXPECT_TRUE(m.match("/foo/bar"));
   EXPECT_FALSE(m.match("/foo"));
-  EXPECT_FALSE(m.match("/foo/abc/bar"));
+  EXPECT_FALSE(m.match("/foo/zoo/bar"));
   EXPECT_FALSE(m.match("/bar"));
 }
 
@@ -30,7 +30,7 @@ TEST(UrlTemplateMatcherTest, WildCardWithVariable) {
   UrlTemplateMatcher m("/foo/{x}");
   EXPECT_TRUE(m.match("/foo/bar"));
   EXPECT_FALSE(m.match("/foo"));
-  EXPECT_FALSE(m.match("/foo/abc/bar"));
+  EXPECT_FALSE(m.match("/foo/zoo/bar"));
   EXPECT_FALSE(m.match("/bar"));
 }
 
@@ -39,7 +39,7 @@ TEST(UrlTemplateMatcherTest, DoubleWildCard) {
   UrlTemplateMatcher m("/foo/**");
   EXPECT_TRUE(m.match("/foo"));
   EXPECT_TRUE(m.match("/foo/bar"));
-  EXPECT_TRUE(m.match("/foo/abc/bar"));
+  EXPECT_TRUE(m.match("/foo/zoo/bar"));
   EXPECT_FALSE(m.match("/bar"));
 }
 
@@ -47,11 +47,11 @@ TEST(UrlTemplateMatcherTest, DoubleWildCardWithVariable) {
   // ** match zero or more segments
   UrlTemplateMatcher m("/foo/**/tail");
   EXPECT_TRUE(m.match("/foo/bar/tail"));
-  EXPECT_TRUE(m.match("/foo/abc/bar/tail"));
+  EXPECT_TRUE(m.match("/foo/zoo/bar/tail"));
 
   EXPECT_FALSE(m.match("/foo/other"));
   EXPECT_FALSE(m.match("/foo/bar/other"));
-  EXPECT_FALSE(m.match("/foo/abc/bar/other"));
+  EXPECT_FALSE(m.match("/foo/zoo/bar/other"));
 
   EXPECT_FALSE(m.match("/bar/tail"));
 }
