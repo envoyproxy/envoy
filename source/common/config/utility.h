@@ -213,6 +213,14 @@ public:
   }
 
   /**
+   * Translates the destination type from the proto enumeration to the filesystem enumeration.
+   * @param proto_destination_type Proto DestinationType
+   */
+  static Filesystem::DestinationType filesystemDestinationTypeFromProtoConfig(
+    const envoy::config::core::v3::DestinationType proto_destination_type
+  );
+
+  /**
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.

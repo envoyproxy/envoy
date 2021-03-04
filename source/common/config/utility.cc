@@ -184,6 +184,22 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
   // Otherwise, there is no cluster name to validate.
 }
 
+Filesystem::DestinationType Utility::filesystemDestinationTypeFromProtoConfig(
+    const envoy::config::core::v3::DestinationType proto_destination_type) {
+  switch (proto_destination_type) {
+  case envoy::config::core::v3::DestinationType::FILE:
+    return Filesystem::DestinationType::File;
+  case envoy::config::core::v3::DestinationType::CONSOLE:
+    return Filesystem::DestinationType::Console;
+  case envoy::config::core::v3::DestinationType::STDERR:
+    return Filesystem::DestinationType::Stderr;
+  case envoy::config::core::v3::DestinationType::STDOUT:
+    return Filesystem::DestinationType::Stdout;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   if (!api_config_source.has_refresh_delay()) {

@@ -30,19 +30,6 @@ private:
   friend class FileSystemImplTest;
 };
 
-struct ConsoleFileImplPosix : public FileImplPosix {
-  ConsoleFileImplPosix()
-      : FileImplPosix(FilePathAndType{DestinationType::Console, "/dev/console"}) {}
-};
-
-struct StdOutFileImplPosix : public FileImplPosix {
-  StdOutFileImplPosix() : FileImplPosix(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
-};
-
-struct StdErrFileImplPosix : public FileImplPosix {
-  StdErrFileImplPosix() : FileImplPosix(FilePathAndType{DestinationType::Stderr, "/dev/stderr"}) {}
-};
-
 class InstanceImplPosix : public Instance {
 public:
   // Filesystem::Instance

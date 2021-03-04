@@ -153,9 +153,8 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
     return std::make_unique<StdErrFileImplWin32>();
   case DestinationType::Stdout:
     return std::make_unique<StdOutFileImplWin32>();
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 FilePtr InstanceImplWin32::createFile(const std::string& path) {

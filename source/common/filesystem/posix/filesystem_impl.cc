@@ -80,14 +80,13 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   case DestinationType::File:
     return std::make_unique<FileImplPosix>(file_info);
   case DestinationType::Console:
-    return std::make_unique<ConsoleFileImplPosix>();
+    return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Console, "/dev/console"});
   case DestinationType::Stderr:
-    return std::make_unique<StdErrFileImplPosix>();
+    return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stderr, "/dev/stderr"});
   case DestinationType::Stdout:
-    return std::make_unique<StdOutFileImplPosix>();
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stdout, "/dev/stdout"});
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 FilePtr InstanceImplPosix::createFile(const std::string& path) {

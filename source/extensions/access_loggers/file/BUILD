@@ -36,6 +36,7 @@ envoy_cc_extension(
     deps = [
         ":file_access_log_lib",
         "//include/envoy/registry",
+        "//source/common/config:config_provider_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers:well_known_names",

@@ -8,6 +8,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/config/utility.h"
 #include "common/formatter/substitution_format_string.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
@@ -62,7 +63,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     break;
   }
   Filesystem::FilePathAndType file_info{
-      static_cast<Filesystem::DestinationType>(fal_config.access_log_destination()),
+      Config::Utility::filesystemDestinationTypeFromProtoConfig(fal_config.access_log_destination()),
       fal_config.path()};
 
   if (file_info.path_.empty() && file_info.file_type_ == Filesystem::DestinationType::File) {

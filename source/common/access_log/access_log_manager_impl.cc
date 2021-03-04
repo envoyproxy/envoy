@@ -39,13 +39,8 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
 }
 
 AccessLogFileSharedPtr AccessLogManagerImpl::createAccessLog(const std::string& file_name) {
-  if (access_logs_.count(file_name)) {
-    return access_logs_[file_name];
-  }
-  access_logs_[file_name] = std::make_shared<AccessLogFileImpl>(
-      api_.fileSystem().createFile(file_name), dispatcher_, lock_, file_stats_,
-      file_flush_interval_msec_, api_.threadFactory());
-  return access_logs_[file_name];
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, file_name};
+  return createAccessLog(file_info);
 }
 
 AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,

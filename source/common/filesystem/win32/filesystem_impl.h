@@ -35,6 +35,18 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
 };
 
+struct StdStreamFileImplWin32 : public FileImplWin32 {
+  StdOutFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
+  ~StdOutFileImplWin32() { fd_ = INVALID_HANDLE; }
+
+protected:
+  Api::IoCallBoolResult open(FlagSet) override;
+  Api::IoCallBoolResult close() override;
+
+private:
+  static constexpr DWORD std_handle_ = STD_OUTPUT_HANDLE;
+};
+
 struct StdOutFileImplWin32 : public FileImplWin32 {
   StdOutFileImplWin32() : FileImplWin32(FilePathAndType{DestinationType::Stdout, "/dev/stdout"}) {}
   ~StdOutFileImplWin32() { fd_ = INVALID_HANDLE; }

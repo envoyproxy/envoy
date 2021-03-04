@@ -195,7 +195,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
   admin_.access_log_file_info_ = Filesystem::FilePathAndType{
-      static_cast<Filesystem::DestinationType>(admin.access_log_destination()),
+      Config::Utility::filesystemDestinationTypeFromProtoConfig(admin.access_log_destination()),
       admin.access_log_path()};
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
