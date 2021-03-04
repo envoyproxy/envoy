@@ -228,8 +228,8 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
              : absl::nullopt;
 }
 
-ActiveListenerImplBase::ActiveListenerImplBase(Network::ConnectionHandler& parent,
-                                               Network::ListenerConfig* config)
+ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
+    Network::ConnectionHandler& parent, Network::ListenerConfig* config)
     : stats_({ALL_LISTENER_STATS(POOL_COUNTER(config->listenerScope()),
                                  POOL_GAUGE(config->listenerScope()),
                                  POOL_HISTOGRAM(config->listenerScope()))}),
@@ -656,7 +656,7 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
                                              Network::Socket& listen_socket,
                                              Network::UdpListenerPtr&& listener,
                                              Network::ListenerConfig* config)
-    : ActiveListenerImplBase(parent, config), worker_index_(worker_index),
+    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)) {
   ASSERT(worker_index_ < concurrency_);

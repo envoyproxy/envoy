@@ -349,17 +349,7 @@ public:
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
 
 private:
-  struct ActiveTcpListenerDetail {
-  public:
-    virtual ~ActiveTcpListenerDetail() = default;
-    virtual ActiveTcpListenerOptRef tcpListener() PURE;
-  };
-  struct ActiveUdpListenerDetail {
-  public:
-    virtual ~ActiveUdpListenerDetail() = default;
-    virtual UdpListenerCallbacksOptRef udpListener() PURE;
-  };
-  struct ActiveListenerDetails : public ActiveTcpListenerDetail, public ActiveUdpListenerDetail {
+  struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
 
@@ -368,8 +358,8 @@ private:
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
-    ActiveTcpListenerOptRef tcpListener() override;
-    UdpListenerCallbacksOptRef udpListener() override;
+    ActiveTcpListenerOptRef tcpListener();
+    UdpListenerCallbacksOptRef udpListener();
   };
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
@@ -383,9 +373,7 @@ private:
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
-
-using ActiveListenerImplBase = ConnectionHandlerImpl::ActiveListenerImplBase;
-class ActiveUdpListenerBase : public ActiveListenerImplBase,
+class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
                               public Network::ConnectionHandler::ActiveUdpListener {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
