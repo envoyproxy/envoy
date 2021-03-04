@@ -208,7 +208,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
-  // When the the response dynamic metadata is not empty, we emit dynamic metadata.
   if (!response->dynamic_metadata.fields().empty()) {
     decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
                                                         response->dynamic_metadata);
