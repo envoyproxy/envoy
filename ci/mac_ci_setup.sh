@@ -22,7 +22,6 @@ function is_installed {
 
 function install {
     echo "Installing $1"
-    brew link --overwrite "$1"
     if ! brew install "$1"; then
         echo "Failed to install $1"
         exit 1
@@ -48,7 +47,7 @@ if ! retry brew update; then
   echo "Failed to update homebrew"
 fi
 
-DEPS="automake cmake coreutils go libtool wget ninja"
+DEPS="automake cmake coreutils libtool wget ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
