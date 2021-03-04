@@ -123,6 +123,7 @@ api_cc_py_proto_library(
 
 go_proto_library(
     name = "logs_go_proto",
+    importpath = "logs",
     proto = ":logs",
     visibility = ["//visibility:public"],
 )
