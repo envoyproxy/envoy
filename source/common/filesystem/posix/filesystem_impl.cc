@@ -160,6 +160,14 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
       absl::StartsWith(canonical_path.rc_, "/proc")) {
     return true;
   }
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+  // Allow temporary files in OSS-Fuzz to prevent failures running (h1/h2)_capture_fuzz_test.
+  // Ideally this would be TestEnvironment::temporaryPath() but this avoids depending on test
+  // libraries.
+  if (absl::StartsWith(canonical_path.rc_, "/mnt")) {
+    return true;
+  }
+#endif
   return false;
 }
 
