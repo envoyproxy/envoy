@@ -28,6 +28,8 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     category = "envoy.http.original_ip_detection",
     security_posture = "robust_to_untrusted_downstream",
+    # This extensions is core code.
+    visibility = ["//visibility:public"],
     deps = [
         ":xff_lib",
         "//include/envoy/http:original_ip_detection_interface",
