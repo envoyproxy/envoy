@@ -19,6 +19,14 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
 
   if (config_.vm_config().has_environment_variables()) {
     auto envs = config_.vm_config().environment_variables();
+
+    // We reject NullVm with environment_variables configuration
+    // since it directly accesses Envoy's env vars.
+    if (config.vm_config().runtime() == WasmRuntimeNames::get().Null &&
+        (!envs.key_values().empty() || !envs.host_env_keys().empty())) {
+      throw EnvoyException("Environment variables must not be set for NullVm.");
+    }
+
     // Check key duplication.
     absl::flat_hash_set<std::string> keys;
     for (auto& env : envs.key_values()) {
@@ -34,12 +42,6 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
                         "All the keys must be unique.",
                         key, config_.name()));
       }
-    }
-
-    if (config.vm_config().runtime() == WasmRuntimeNames::get().Null && !keys.empty()) {
-      // We reject NullVm with environment_variables configuration
-      // since it directly accesses Envoy's env vars.
-      throw EnvoyException("Environment variables must not be set for NullVm.");
     }
 
     // Construct merged key-value pairs.
