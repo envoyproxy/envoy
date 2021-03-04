@@ -385,7 +385,7 @@ protected:
 
     Context* context_;
     uint32_t token_;
-    Grpc::RawAsyncClientPtr client_;
+    Grpc::RawAsyncClientSharedPtr client_;
     Grpc::RawAsyncStream* stream_;
     bool local_closed_ = false;
     bool remote_closed_ = false;
