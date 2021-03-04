@@ -71,6 +71,11 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
         "access_log_path in acess_logger cannot be empty if access_log_destination is a file");
   }
 
+  if (!file_info.path_.empty() && file_info.file_type_ != Filesystem::DestinationType::File) {
+    throw EnvoyException(
+        "access_log_path needs to be empty if access_log_destination is not file");
+  }
+
   return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
                                          context.accessLogManager());
 }

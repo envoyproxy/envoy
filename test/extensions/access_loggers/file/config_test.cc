@@ -25,9 +25,21 @@ namespace {
 
 TEST(FileAccessLogNegativeTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
-                   envoy::extensions::access_loggers::file::v3::FileAccessLog(), nullptr, context),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      FileAccessLogFactory().createAccessLogInstance(
+          envoy::extensions::access_loggers::file::v3::FileAccessLog(), nullptr, context),
+      EnvoyException,
+      "access_log_path in acess_logger cannot be empty if access_log_destination is a file");
+}
+
+TEST(FileAccessLogNegativeTestWithPathAndType, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto access_log = envoy::extensions::access_loggers::file::v3::FileAccessLog();
+  access_log.set_access_log_destination(envoy::config::core::v3::DestinationType::STDOUT);
+  access_log.set_path("path to file");
+  EXPECT_THROW_WITH_MESSAGE(
+      FileAccessLogFactory().createAccessLogInstance(access_log, nullptr, context), EnvoyException,
+      "access_log_path needs to be empty if access_log_destination is not file");
 }
 
 TEST(FileAccessLogNegativeTest, InvalidNameFail) {
