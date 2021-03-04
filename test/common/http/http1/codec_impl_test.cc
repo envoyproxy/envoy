@@ -30,6 +30,7 @@ using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -3089,7 +3090,7 @@ TEST_F(Http1ClientConnectionImplTest,
   initialize();
 
   // Send request and dispatch response without headers completed.
-  MockResponseDecoder response_decoder;
+  NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
@@ -3150,6 +3151,38 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_THAT(ostream.contents(),
               testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
                                  "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
+}
+
+TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAllocatingMemory) {
+  initialize();
+
+  // Send request
+  Router::MockUpstreamToDownstream upstream_to_downstream;
+  Http::RequestEncoder& request_encoder = codec_->newStream(upstream_to_downstream);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // Send response; dumpState while parsing response.
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Expect dumpState call
+  EXPECT_CALL(upstream_to_downstream, dumpState(_, _));
+
+  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce(InvokeWithoutArgs([&]() {
+    // dumpState here before buffers are drained. No memory should be allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 1);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+  }));
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_EQ(response.length(), 0UL);
+  EXPECT_TRUE(status.ok());
+
+  // Check contents for corresponding downstream request
+  EXPECT_THAT(ostream.contents(), testing::HasSubstr("Dumping corresponding downstream request:"));
 }
 
 } // namespace Http

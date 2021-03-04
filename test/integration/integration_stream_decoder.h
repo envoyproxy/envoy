@@ -9,6 +9,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 
+#include "common/common/dump_state_utils.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
@@ -47,6 +49,9 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override {
+    DUMP_STATE_UNIMPLEMENTED(DecoderShim);
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
