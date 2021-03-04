@@ -22,7 +22,7 @@ public:
   MockStream();
   ~MockStream() override;
   MOCK_METHOD(void, send, (envoy::service::ext_proc::v3alpha::ProcessingRequest&&, bool));
-  MOCK_METHOD(void, close, ());
+  MOCK_METHOD(bool, close, ());
 };
 
 } // namespace ExternalProcessing
