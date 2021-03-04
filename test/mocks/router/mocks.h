@@ -557,6 +557,7 @@ public:
   MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
   MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());

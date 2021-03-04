@@ -653,6 +653,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() {
     dispatching_ = false;
     current_slice_ = nullptr;
+    current_stream_id_.reset();
   });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     current_slice_ = &slice;
@@ -676,6 +677,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
     current_slice_ = nullptr;
     dispatching_ = false;
+    current_stream_id_.reset();
   }
 
   ENVOY_CONN_LOG(trace, "dispatched {} bytes", connection_, data.length());
@@ -683,6 +685,10 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
   // Decoding incoming frames can generate outbound frames so flush pending.
   return sendPendingFrames();
+}
+
+const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) const {
+  return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
@@ -738,6 +744,7 @@ Status ConnectionImpl::protocolErrorForTest() {
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
+  current_stream_id_ = hd->stream_id;
 
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -1010,6 +1017,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
     }
 
     stream->destroy();
+    current_stream_id_.reset();
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
@@ -1408,14 +1416,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   // Dump the protocol constraints
   DUMP_DETAILS(&protocol_constraints_);
 
-  os << spaces << "Number of active streams: " << active_streams_.size() << " Active Streams:\n";
-  size_t count = 0;
-  for (auto& stream : active_streams_) {
-    DUMP_DETAILS(stream);
-    if (++count >= 100) {
-      break;
-    }
-  }
+  // Dump either a targeted stream or several of the active streams.
+  dumpStreams(os, indent_level);
 
   // Dump the active slice
   if (current_slice_ == nullptr) {
@@ -1428,6 +1430,54 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
     os << spaces << "current slice length: " << slice_view.length() << " contents: \"";
     StringUtil::escapeToOstream(os, slice_view);
     os << "\"\n";
+  }
+}
+
+void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+
+  // Try to dump details for the current stream.
+  // If none, dump a subset of our active streams.
+  os << spaces << "Number of active streams: " << active_streams_.size()
+     << DUMP_OPTIONAL_MEMBER(current_stream_id_);
+
+  if (current_stream_id_.has_value()) {
+    os << " Dumping current stream:\n";
+    const ConnectionImpl::StreamImpl* stream = getStream(current_stream_id_.value());
+    DUMP_DETAILS(stream);
+  } else {
+    os << " Dumping " << std::min<size_t>(25, active_streams_.size()) << " Active Streams:\n";
+    size_t count = 0;
+    for (auto& stream : active_streams_) {
+      DUMP_DETAILS(stream);
+      if (++count >= 25) {
+        break;
+      }
+    }
+  }
+}
+
+void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
+  ConnectionImpl::dumpStreams(os, indent_level);
+
+  if (!current_stream_id_.has_value()) {
+    return;
+  }
+
+  // Try to dump the downstream request information, corresponding to the
+  // stream we were processing.
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Dumping corresponding downstream request for upstream stream "
+     << current_stream_id_.value() << ":\n";
+
+  const ClientStreamImpl* client_stream =
+      static_cast<const ClientStreamImpl*>(getStream(current_stream_id_.value()));
+  if (client_stream) {
+    client_stream->response_decoder_.dumpState(os, indent_level + 1);
+  } else {
+    os << spaces
+       << " Failed to get the upstream stream with stream id: " << current_stream_id_.value()
+       << " Unable to dump downstream request.\n";
   }
 }
 

@@ -10,6 +10,7 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "common/common/dump_state_utils.h"
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
@@ -98,6 +99,9 @@ private:
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override { onResponseComplete(); }
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(HttpActiveHealthCheckSession);
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -332,6 +336,9 @@ private:
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override;
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(GrpcActiveHealthCheckSession);
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
