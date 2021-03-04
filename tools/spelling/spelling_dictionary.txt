@@ -482,6 +482,7 @@ casted
 charset
 checkin
 checksum
+choco
 chrono
 chroot
 chunked

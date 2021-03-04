@@ -460,7 +460,7 @@ message RouteMatch {
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectMatcher connect_matcher = 12;
 
-    // Supports segment based url_template matching for *:path" header.
+    // Supports Google url_template matching for ":path" header.
     // This match is always case sensitive.
     // Its syntax is defined at `http.proto <https://github.com/googleapis/googleapis/blob/f829b1334cce86aa3738f3c0698d814b56664445/google/api/http.proto#L208>`_.
     //
