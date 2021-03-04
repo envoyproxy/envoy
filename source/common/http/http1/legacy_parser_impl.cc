@@ -2,8 +2,6 @@
 
 #include <http_parser.h>
 
-#include <iostream>
-
 #include "common/common/assert.h"
 #include "common/http/http1/parser.h"
 
@@ -27,8 +25,7 @@ public:
         [](http_parser* parser, const char* at, size_t length) -> int {
           return static_cast<ParserCallbacks*>(parser->data)->onUrl(at, length);
         },
-        // TODO(dereka) onStatus
-        nullptr,
+        nullptr, // on_status
         [](http_parser* parser, const char* at, size_t length) -> int {
           return static_cast<ParserCallbacks*>(parser->data)->onHeaderField(at, length);
         },
@@ -52,7 +49,7 @@ public:
           const bool is_final_chunk = (parser->content_length == 0);
           return static_cast<ParserCallbacks*>(parser->data)->onChunkHeader(is_final_chunk);
         },
-        nullptr // TODO(dereka) onChunkComplete
+        nullptr // on_chunk_complete
     };
   }
 
