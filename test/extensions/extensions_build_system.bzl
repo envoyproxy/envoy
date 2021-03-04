@@ -47,6 +47,7 @@ def envoy_extension_benchmark_test(
         **kwargs):
     _apply_to_extension_allow_for_test(envoy_benchmark_test, name, extension_name, **kwargs)
 
+# Similar to envoy_cc_test, all extension py_tests should use this version of envoy_py_test
 def envoy_extension_py_test(
         name,
         extension_name,

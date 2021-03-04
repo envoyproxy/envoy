@@ -269,7 +269,7 @@ def envoy_py_test_binary(
         **kargs
     )
 
-# Envoy py=tests should be specified with this function.
+# Envoy py_tests should be specified with this function.
 def envoy_py_test(
         name,
         external_deps = [],
