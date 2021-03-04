@@ -62,9 +62,9 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
     break;
   }
-  Filesystem::FilePathAndType file_info{
-      Config::Utility::filesystemDestinationTypeFromProtoConfig(fal_config.access_log_destination()),
-      fal_config.path()};
+  Filesystem::FilePathAndType file_info{Config::Utility::filesystemDestinationTypeFromProtoConfig(
+                                            fal_config.access_log_destination()),
+                                        fal_config.path()};
 
   if (file_info.path_.empty() && file_info.file_type_ == Filesystem::DestinationType::File) {
     throw EnvoyException(

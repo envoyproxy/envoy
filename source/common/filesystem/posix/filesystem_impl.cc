@@ -80,7 +80,8 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   case DestinationType::File:
     return std::make_unique<FileImplPosix>(file_info);
   case DestinationType::Console:
-    return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Console, "/dev/console"});
+    return std::make_unique<FileImplPosix>(
+        FilePathAndType{DestinationType::Console, "/dev/console"});
   case DestinationType::Stderr:
     return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stderr, "/dev/stderr"});
   case DestinationType::Stdout:

@@ -16,7 +16,7 @@ namespace Filesystem {
 
 using FlagSet = std::bitset<4>;
 
-enum class DestinationType { File, Console, Stderr, Stdout};
+enum class DestinationType { File, Console, Stderr, Stdout };
 
 /**
  * Abstraction for a basic file on disk.
