@@ -247,6 +247,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "url_template_matcher_lib",
+    srcs = ["url_template_matcher.cc"],
+    hdrs = ["url_template_matcher.h"],
+    external_deps = ["path_matcher"],
+    deps = [
+        ":empty_string",
+        ":matchers_lib",
+        ":utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "random_generator_lib",
     srcs = [
         "random_generator.cc",

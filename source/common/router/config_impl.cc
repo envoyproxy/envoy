@@ -1097,6 +1097,31 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
   return nullptr;
 }
 
+UrlTemplateRouteEntryImpl::UrlTemplateRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator)
+    : RouteEntryImplBase(vhost, route, factory_context, validator),
+      url_template_(route.match().url_template()),
+      matcher_(std::make_unique<const Matchers::UrlTemplateMatcher>(route.match().url_template())) {
+}
+
+RouteConstSharedPtr UrlTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                       const StreamInfo::StreamInfo& stream_info,
+                                                       uint64_t random_value) const {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      matcher_->match(headers.getPathValue())) {
+    return clusterEntry(headers, random_value);
+  }
+
+  return nullptr;
+}
+
+void UrlTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap&, bool) const {
+  // TODO(qiwzhang): support path rewrite for url_template with variable.
+  // For example: url_template: /foo/{x=**} and  url_template_rewrite could be: /bar/{x}
+}
+
 RegexRouteEntryImpl::RegexRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
@@ -1236,6 +1261,10 @@ VirtualHostImpl::VirtualHostImpl(
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
       routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, factory_context, validator));
+      break;
+    }
+    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kUrlTemplate: {
+      routes_.emplace_back(new UrlTemplateRouteEntryImpl(*this, route, factory_context, validator));
       break;
     }
     default:

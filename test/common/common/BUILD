@@ -189,6 +189,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "url_template_matcher_test",
+    srcs = ["url_template_matcher_test.cc"],
+    deps = [
+        "//source/common/common:url_template_matcher_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "mutex_tracer_test",
     srcs = ["mutex_tracer_test.cc"],
     deps = [

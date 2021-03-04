@@ -20,6 +20,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/matchers.h"
+#include "common/common/url_template_matcher.h"
 #include "common/config/metadata.h"
 #include "common/http/hash_policy.h"
 #include "common/http/header_utility.h"
@@ -921,6 +922,34 @@ public:
 private:
   const std::string path_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
+
+/**
+ * Route entry implementation for url_template match routing.
+ */
+class UrlTemplateRouteEntryImpl : public RouteEntryImplBase {
+public:
+  UrlTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
+                            const envoy::config::route::v3::Route& route,
+                            Server::Configuration::ServerFactoryContext& factory_context,
+                            ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return url_template_; }
+  PathMatchType matchType() const override { return PathMatchType::UrlTemplate; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap& headers,
+                         bool insert_envoy_original_path) const override;
+
+private:
+  std::string url_template_;
+  Matchers::UrlTemplateMatcherConstPtr matcher_;
 };
 
 /**

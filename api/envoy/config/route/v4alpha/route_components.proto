@@ -392,7 +392,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteMatch";
 
@@ -459,6 +459,28 @@ message RouteMatch {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectMatcher connect_matcher = 12;
+
+    // Supports segment based url_template matching for *:path" header.
+    // This match is always case sensitive.
+    // Its syntax is defined at `http.proto <https://github.com/googleapis/googleapis/blob/f829b1334cce86aa3738f3c0698d814b56664445/google/api/http.proto#L208>`_.
+    //
+    // Syntax highlights:
+    //
+    // .. code-block:: text
+    //
+    // * wildcard "*": matchs only 1 path segment.
+    // * double wildcard "**": matches 0 or more path segments.
+    // * variable /foo/{x=**}: group path segments to a variable.
+    // * variable /foo/{x}: same as /foo/{x=*}
+    //
+    // For examples:
+    //
+    // .. code-block:: text
+    //
+    // * /foo/*: "/foo/bar" should match. But "/foo" and "/foo/bar1/bar2" should not match.
+    // * /foo/**: "/foo", "/foo/bar", "/foo/bar1/bar2" all should match.
+    //
+    string url_template = 13;
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default

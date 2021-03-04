@@ -689,6 +689,7 @@ enum class PathMatchType {
   Prefix,
   Exact,
   Regex,
+  UrlTemplate,
 };
 
 /**

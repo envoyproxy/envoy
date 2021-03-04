@@ -2097,6 +2097,91 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, UrlTemplateMatchedRouting) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      url_template: "/foo/bar"
+      headers:
+      - name: test_header
+        exact_match: test
+    route:
+      cluster: foo_bar_with_header
+  - match:
+      url_template: "/foo/bar"
+    route:
+      cluster: foo_bar
+  - match:
+      url_template: "/foo/*"
+      headers:
+      - name: test_header
+        exact_match: test
+    route:
+      cluster: foo_1_with_header
+  - match:
+      url_template: "/foo/*"
+    route:
+      cluster: foo_1
+  - match:
+      url_template: "/foo/**"
+      headers:
+      - name: test_header
+        exact_match: test
+    route:
+      cluster: foo_11_with_header
+  - match:
+      url_template: "/foo/**"
+    route:
+      cluster: foo_11
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"foo_bar", "foo_bar_with_header", "foo_1",
+                                                        "foo_1_with_header", "foo_11",
+                                                        "foo_11_with_header"},
+                                                       {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    EXPECT_EQ("foo_bar", config.route(genHeaders("www.lyft.com", "/foo/bar", "GET"), 0)
+                             ->routeEntry()
+                             ->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/bar", "GET");
+    headers.addCopy("test_header", "test");
+    EXPECT_EQ("foo_bar_with_header", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    EXPECT_EQ("foo_1", config.route(genHeaders("www.lyft.com", "/foo/foo", "GET"), 0)
+                           ->routeEntry()
+                           ->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/foo", "GET");
+    headers.addCopy("test_header", "test");
+    EXPECT_EQ("foo_1_with_header", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    EXPECT_EQ("foo_11", config.route(genHeaders("www.lyft.com", "/foo/foo/bar", "GET"), 0)
+                            ->routeEntry()
+                            ->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo/foo/bar", "GET");
+    headers.addCopy("test_header", "test");
+    EXPECT_EQ("foo_11_with_header", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 // Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
 // When removing regex_match this test can be removed entirely.
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidHeaderMatchedRoutingConfigLegacy)) {

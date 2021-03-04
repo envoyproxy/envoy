@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:hash_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/common:url_template_matcher_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
