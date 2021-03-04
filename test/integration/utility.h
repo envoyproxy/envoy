@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
 #include "common/stats/isolated_store_impl.h"
@@ -40,6 +41,9 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override {
+    DUMP_STATE_UNIMPLEMENTED(BufferingStreamDecoder);
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
