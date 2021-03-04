@@ -287,8 +287,8 @@ public:
     if (it != cache.access_loggers_.end()) {
       return it->second;
     }
-    const Grpc::AsyncClientFactoryPtr factory =
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
+    const Grpc::AsyncClientFactoryPtr factory = async_client_manager_.factoryForGrpcService(
+        config.grpc_service(), scope_, Grpc::AsyncClientFactoryClusterChecks::ValidateStatic);
     const auto logger = createLogger(
         config, factory->create(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
