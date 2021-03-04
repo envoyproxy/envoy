@@ -263,11 +263,12 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   }
 
   auto rid_extension = config.requestIDExtension();
-  uint64_t result;
+  const auto rid_to_integer = rid_extension->toInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
-  if (!rid_extension->modBy(request_headers, result, 10000)) {
+  if (!rid_to_integer.has_value()) {
     return final_reason;
   }
+  const uint64_t result = rid_to_integer.value() % 10000;
 
   const envoy::type::v3::FractionalPercent* client_sampling =
       &config.tracingConfig()->client_sampling_;

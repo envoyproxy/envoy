@@ -75,49 +75,40 @@ TEST(UUIDRequestIDExtensionTest, ModRequestIDBy) {
                                     random);
   Http::TestRequestHeaderMapImpl request_headers;
 
-  uint64_t result;
-  EXPECT_FALSE(uuid_utils.modBy(request_headers, result, 10000));
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("fffffff");
-  EXPECT_FALSE(uuid_utils.modBy(request_headers, result, 10000));
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("fffffffz-0012-0110-00ff-0c00400600ff");
-  EXPECT_FALSE(uuid_utils.modBy(request_headers, result, 10000));
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("00000000-0000-0000-0000-000000000000");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 100));
-  EXPECT_EQ(0, result);
+  EXPECT_EQ(0, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("00000001-0000-0000-0000-000000000000");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 100));
-  EXPECT_EQ(1, result);
+  EXPECT_EQ(1, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("0000000f-0000-0000-0000-00000000000a");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 100));
-  EXPECT_EQ(15, result);
+  EXPECT_EQ(15, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("");
-  EXPECT_FALSE(uuid_utils.modBy(request_headers, result, 100));
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("000000ff-0000-0000-0000-000000000000");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 100));
-  EXPECT_EQ(55, result);
+  EXPECT_EQ(55, uuid_utils.toInteger(request_headers).value() % 100);
 
   request_headers.setRequestId("000000ff-0000-0000-0000-000000000000");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 10000));
-  EXPECT_EQ(255, result);
+  EXPECT_EQ(255, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("a0090100-0012-0110-00ff-0c00400600ff");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 137));
-  EXPECT_EQ(8, result);
+  EXPECT_EQ(8, uuid_utils.toInteger(request_headers).value() % 137);
 
   request_headers.setRequestId("ffffffff-0012-0110-00ff-0c00400600ff");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 100));
-  EXPECT_EQ(95, result);
+  EXPECT_EQ(95, uuid_utils.toInteger(request_headers).value() % 100);
 
   request_headers.setRequestId("ffffffff-0012-0110-00ff-0c00400600ff");
-  EXPECT_TRUE(uuid_utils.modBy(request_headers, result, 10000));
-  EXPECT_EQ(7295, result);
+  EXPECT_EQ(7295, uuid_utils.toInteger(request_headers).value() % 10000);
 }
 
 TEST(UUIDRequestIDExtensionTest, RequestIDModDistribution) {
@@ -138,9 +129,8 @@ TEST(UUIDRequestIDExtensionTest, RequestIDModDistribution) {
     ASSERT_TRUE(uuid[14] == '4');                              // UUID version 4 (random)
     ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b'); // UUID variant 1 (RFC4122)
 
-    uint64_t value;
     request_headers.setRequestId(uuid);
-    ASSERT_TRUE(uuid_utils.modBy(request_headers, value, mod));
+    const uint64_t value = uuid_utils.toInteger(request_headers).value() % mod;
 
     if (value < required_percentage) {
       interesting_samples++;
@@ -194,10 +184,13 @@ TEST(UUIDRequestIDExtensionTest, SetTraceStatusPackingDisabled) {
 
   Http::TestRequestHeaderMapImpl request_headers;
   request_headers.setRequestId(random.uuid());
+  const std::string request_id = std::string(request_headers.getRequestIdValue());
   EXPECT_EQ(Tracing::Reason::NotTraceable, uuid_utils.getTraceReason(request_headers));
+  EXPECT_EQ(request_id, request_headers.getRequestIdValue());
 
   uuid_utils.setTraceReason(request_headers, Tracing::Reason::Sampling);
   EXPECT_EQ(Tracing::Reason::NotTraceable, uuid_utils.getTraceReason(request_headers));
+  EXPECT_EQ(request_id, request_headers.getRequestIdValue());
 }
 
 } // namespace RequestId

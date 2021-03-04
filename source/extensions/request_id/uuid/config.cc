@@ -28,23 +28,22 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
-bool UUIDRequestIDExtension::modBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
-                                   uint64_t mod) const {
+absl::optional<uint64_t>
+UUIDRequestIDExtension::toInteger(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
-    return false;
+    return absl::nullopt;
   }
   const std::string uuid(request_headers.getRequestIdValue());
   if (uuid.length() < 8) {
-    return false;
+    return absl::nullopt;
   }
 
   uint64_t value;
   if (!StringUtil::atoull(uuid.substr(0, 8).c_str(), value, 16)) {
-    return false;
+    return absl::nullopt;
   }
 
-  out = value % mod;
-  return true;
+  return value;
 }
 
 Tracing::Reason

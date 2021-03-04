@@ -128,12 +128,21 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap&,
                              const Http::ResponseTrailerMap&) const {
+  // This code is verbose to avoid preallocating a random number that is not needed.
   uint64_t random_value;
-  if (use_independent_randomness_ || stream_info.getRequestIDProvider() == nullptr ||
-      !stream_info.getRequestIDProvider()->modBy(
-          request_headers, random_value,
-          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
+  if (use_independent_randomness_) {
     random_value = random_.random();
+  } else if (stream_info.getRequestIDProvider() == nullptr) {
+    random_value = random_.random();
+  } else {
+    const auto rid_to_integer = stream_info.getRequestIDProvider()->toInteger(request_headers);
+    if (!rid_to_integer.has_value()) {
+      random_value = random_.random();
+    } else {
+      random_value =
+          rid_to_integer.value() %
+          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator());
+    }
   }
 
   return runtime_.snapshot().featureEnabled(

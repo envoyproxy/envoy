@@ -18,15 +18,13 @@ public:
   virtual ~RequestIdStreamInfoProvider() = default;
 
   /**
-   * Perform a mod operation across the request id within a request and store the result in the
-   * provided output variable. This is used to perform sampling and validate the request ID.
+   * Convert the request ID to a 64-bit integer representation for using in modulo, etc.
+   * calculations.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @param out reference to a variable where we store the result of the mod operation.
-   * @param mod integer to mod the request ID by.
-   * @return true if request ID is valid and out is populated by the result.
+   * @return the integer or nullopt if the request ID is invalid.
    */
-  virtual bool modBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
-                     uint64_t mod) const PURE;
+  virtual absl::optional<uint64_t>
+  toInteger(const Http::RequestHeaderMap& request_headers) const PURE;
 };
 
 using RequestIdStreamInfoProviderSharedPtr = std::shared_ptr<RequestIdStreamInfoProvider>;

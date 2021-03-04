@@ -49,9 +49,10 @@ public:
                               const Http::RequestHeaderMap& request_headers) {
           return real_->setInResponse(response_headers, request_headers);
         });
-    ON_CALL(*this, modBy(_, _, _))
-        .WillByDefault([this](const Http::RequestHeaderMap& request_headers, uint64_t& out,
-                              uint64_t mod) { return real_->modBy(request_headers, out, mod); });
+    ON_CALL(*this, toInteger(_))
+        .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
+          return real_->toInteger(request_headers);
+        });
     ON_CALL(*this, getTraceReason(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
           return real_->getTraceReason(request_headers);
@@ -65,7 +66,7 @@ public:
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(bool, modBy, (const Http::RequestHeaderMap&, uint64_t&, uint64_t), (const));
+  MOCK_METHOD(absl::optional<uint64_t>, toInteger, (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
 

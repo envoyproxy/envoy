@@ -1618,7 +1618,9 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  bool modBy(const Http::RequestHeaderMap&, uint64_t&, uint64_t) const override { return false; }
+  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
+  }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;
   }
