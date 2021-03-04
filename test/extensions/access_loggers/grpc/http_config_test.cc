@@ -33,7 +33,8 @@ public:
     ASSERT_NE(nullptr, message_);
 
     EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                            Grpc::AsyncClientFactoryClusterChecks) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
         }));
 
