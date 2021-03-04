@@ -2,14 +2,17 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_python//python:defs.bzl", "py_test")
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_py_test",
+)
 load("@kafka_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_test(
+envoy_extension_py_test(
     name = "kafka_broker_integration_test",
     srcs = [
         "kafka_broker_integration_test.py",
@@ -24,6 +27,7 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     tags = ["manual"],
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         requirement("Jinja2"),
         requirement("MarkupSafe"),
