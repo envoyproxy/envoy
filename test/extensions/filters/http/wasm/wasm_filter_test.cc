@@ -125,9 +125,9 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
   setupFilter();
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
   if (std::get<0>(GetParam()) != "null") {
-    EXPECT_CALL(filter(), log_(spdlog::level::trace,
-                               Eq("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV: "
-                                  "foo\nENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV: bar")));
+    EXPECT_CALL(filter(),
+                log_(spdlog::level::trace, Eq("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV: foo\n"
+                                              "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV: bar")));
   }
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
