@@ -20,7 +20,7 @@ public:
       return false;
     }
 
-    // Otherwise, match if (hash(input) % modulo) > threshold.
+    // Otherwise, match if (hash(input) % modulo) >= threshold.
     return HashUtil::xxHash64(*input, seed_) % modulo_ >= threshold_;
   }
 
