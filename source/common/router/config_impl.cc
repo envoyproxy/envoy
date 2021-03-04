@@ -337,6 +337,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
+      using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),

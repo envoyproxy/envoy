@@ -800,6 +800,11 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return true if new style max_stream_duration config should be used over the old style.
+   */
+  virtual bool usingNewTimeouts() const PURE;
+
+  /**
    * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
    */
   virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
