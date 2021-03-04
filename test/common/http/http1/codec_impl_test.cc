@@ -30,6 +30,7 @@ using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -2092,10 +2093,29 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\n\r\n", output);
 }
 
 TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
+  codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
+
+  initialize();
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {"my-custom-header", "hey"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+  EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasingLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.dont_add_content_length_for_bodiless_requests", "false"}});
   codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
 
   initialize();
@@ -2122,7 +2142,7 @@ TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {
 
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\n\r\n", output);
 }
 
 TEST_F(Http1ClientConnectionImplTest, Reset) {
@@ -2155,7 +2175,7 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   // Request.
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder->encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\n\r\n", output);
   output.clear();
 
   // When the response is sent, the read disable should be unwound.
@@ -2986,7 +3006,7 @@ TEST_F(Http1ClientConnectionImplTest, LargePathRequestEncode) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET " + long_path + " HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ("GET " + long_path + " HTTP/1.1\r\nhost: host\r\n\r\n", output);
 }
 
 // As with LargeMethodEncode, but for an arbitrary header. This was not an issue
@@ -3002,9 +3022,7 @@ TEST_F(Http1ClientConnectionImplTest, LargeHeaderRequestEncode) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\nfoo: " + long_header_value +
-                "\r\ncontent-length: 0\r\n\r\n",
-            output);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\nfoo: " + long_header_value + "\r\n\r\n", output);
 }
 
 // Exception called when the number of response headers exceeds the default value of 100.
@@ -3072,7 +3090,7 @@ TEST_F(Http1ClientConnectionImplTest,
   initialize();
 
   // Send request and dispatch response without headers completed.
-  MockResponseDecoder response_decoder;
+  NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
@@ -3133,6 +3151,38 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_THAT(ostream.contents(),
               testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
                                  "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
+}
+
+TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAllocatingMemory) {
+  initialize();
+
+  // Send request
+  Router::MockUpstreamToDownstream upstream_to_downstream;
+  Http::RequestEncoder& request_encoder = codec_->newStream(upstream_to_downstream);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  // Send response; dumpState while parsing response.
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Expect dumpState call
+  EXPECT_CALL(upstream_to_downstream, dumpState(_, _));
+
+  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, _)).WillOnce(InvokeWithoutArgs([&]() {
+    // dumpState here before buffers are drained. No memory should be allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 1);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+  }));
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_EQ(response.length(), 0UL);
+  EXPECT_TRUE(status.ok());
+
+  // Check contents for corresponding downstream request
+  EXPECT_THAT(ostream.contents(), testing::HasSubstr("Dumping corresponding downstream request:"));
 }
 
 } // namespace Http
