@@ -10,7 +10,6 @@
 #include "jwt_verify_lib/verify.h"
 #include "simple_lru_cache/simple_lru_cache_inl.h"
 
-using ::google::jwt_verify::Status;
 using ::google::simple_lru_cache::SimpleLRUCache;
 
 namespace Envoy {
@@ -23,7 +22,7 @@ namespace JwtAuthn {
 class TokenCache : public SimpleLRUCache<std::string, ::google::jwt_verify::Jwt> {
 public:
   TokenCache(int cache_size);
-  ~TokenCache();
+  ~TokenCache() override { clear(); }
   ::google::jwt_verify::Jwt* find(const std::string& token);
 };
 

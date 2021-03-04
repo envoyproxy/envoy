@@ -147,12 +147,11 @@ void AuthenticatorImpl::startVerify() {
       jwt_ = jwks_data_->getTokenCache().find(curr_token_->token());
       if (jwt_) {
         use_cache_jwt_ = true;
-        jwks_data_->getTokenCache().release(curr_token_->token(), jwt_);
       }
     }
   }
   Status status;
-  if (use_cache_jwt_ && provider_) {
+  if (use_cache_jwt_) {
     ENVOY_LOG(debug, "{}: Skip parsing, Jwt {} is in Cache.", name(), curr_token_->token());
     status = Status::Ok;
   } else {
@@ -319,7 +318,10 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     callback_ = nullptr;
     return;
   }
-  use_cache_jwt_ = false;
+  if (use_cache_jwt_) {
+    jwks_data_->getTokenCache().release(curr_token_->token(), jwt_);
+    use_cache_jwt_ = false;
+  }
   startVerify();
 }
 
