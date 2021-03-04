@@ -9,10 +9,30 @@ load(
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+container_image(
+    name = "envoy-docker",
+    base = "@distroless_base//image",
+    user = "nonroot",
+    cmd = [
+        "-c",
+        "/envoy-demo.yaml",
+    ],
+    entrypoint = ["/envoy-static"],
+    files = [
+        ":envoy-static",
+        "//configs:envoy-demo.yaml",
+    ],
+    symlinks = {
+        "/usr/local/bin/envoy": "/envoy-static",
+        "/etc/envoy.yaml": "/envoy-demo.yaml",
+    },
+)
 
 alias(
     name = "envoy",
