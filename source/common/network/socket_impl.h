@@ -19,7 +19,7 @@ public:
     direct_remote_address_ = direct_remote_address;
   }
 
-  void dumpState(std::ostream& os, int indent_level) const {
+  void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "SocketAddressSetterImpl " << this
        << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())

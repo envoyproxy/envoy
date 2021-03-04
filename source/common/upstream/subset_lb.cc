@@ -102,8 +102,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
 }
 
 SubsetLoadBalancer::~SubsetLoadBalancer() {
-  original_priority_set_callback_handle_->remove();
-
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
     if (entry->active()) {

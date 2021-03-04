@@ -337,6 +337,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
+      using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
@@ -1498,6 +1499,18 @@ PerFilterConfigs::PerFilterConfigs(
         name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 
@@ -1510,6 +1523,18 @@ PerFilterConfigs::PerFilterConfigs(
                                                   it.second, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 }

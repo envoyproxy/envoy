@@ -31,7 +31,7 @@ public:
    * @param callback callback that is executed by secret provider.
    * @return CallbackHandle the handle which can remove that validation callback.
    */
-  virtual Common::CallbackHandle*
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addValidationCallback(std::function<void(const SecretType&)> callback) PURE;
 
   /**
@@ -41,7 +41,8 @@ public:
    * @param callback callback that is executed by secret provider.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addUpdateCallback(std::function<void()> callback) PURE;
 
   /**
    * @return const Init::Target* A shared init target that can be used by multiple init managers.

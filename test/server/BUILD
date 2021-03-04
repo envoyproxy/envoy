@@ -136,6 +136,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_base_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
+    deps = [
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_base",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
@@ -287,6 +299,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
