@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "extensions/common/wasm//well_known_names.h"
+
 #include "include/proxy-wasm/wasm.h"
 
 namespace Envoy {
@@ -33,6 +35,13 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
                         key, config_.name()));
       }
     }
+
+    if (config.vm_config().runtime() == WasmRuntimeNames::get().Null && !keys.empty()) {
+      // We reject NullVm with environment_variables configuration
+      // since it directly accesses Envoy's env vars.
+      throw EnvoyException("Environment variables must not be set for NullVm.");
+    }
+
     // Construct merged key-value pairs.
     for (auto& env : envs.key_values()) {
       envs_[env.first] = env.second;
