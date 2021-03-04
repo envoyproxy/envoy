@@ -468,17 +468,17 @@ message RouteMatch {
     //
     // .. code-block:: text
     //
-    // * wildcard "*": matchs only 1 path segment.
+    // * wildcard "*": matches only 1 path segment.
     // * double wildcard "**": matches 0 or more path segments.
-    // * variable /foo/{x=**}: group path segments to a variable.
-    // * variable /foo/{x}: same as /foo/{x=*}
+    // * variable "/foo/{x=**}": group path segments to a variable.
+    // * variable "/foo/{x}": same as "/foo/{x=*}"
     //
     // For examples:
     //
     // .. code-block:: text
     //
-    // * /foo/*: "/foo/bar" should match. But "/foo" and "/foo/bar1/bar2" should not match.
-    // * /foo/**: "/foo", "/foo/bar", "/foo/bar1/bar2" all should match.
+    // * "/foo/*": "/foo/bar" should match. But "/foo" and "/foo/bar1/bar2" should not match.
+    // * "/foo/**": "/foo", "/foo/bar", "/foo/bar1/bar2" all should match.
     //
     string url_template = 13;
 
