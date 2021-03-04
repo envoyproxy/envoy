@@ -1291,7 +1291,8 @@ TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
 };
 
 // Tests to ensure transcoding buffer limits do not apply when the runtime feature is disabled.
-class BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest : public GrpcJsonTranscoderIntegrationTest {
+class BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest
+    : public GrpcJsonTranscoderIntegrationTest {
 public:
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -1307,7 +1308,8 @@ public:
         fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
 
     // Disable runtime feature.
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits", "false");
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits", "false");
   }
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest,
@@ -1326,8 +1328,8 @@ TEST_P(BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest, UnaryPostRequestEx
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
       R"({"theme": "Children 0123456789 0123456789 0123456789 0123456789"})",
-      {R"(shelf { theme: "Children 0123456789 0123456789 0123456789 0123456789" })"},
-      {R"(id: 1)"}, Status(),
+      {R"(shelf { theme: "Children 0123456789 0123456789 0123456789 0123456789" })"}, {R"(id: 1)"},
+      Status(),
       Http::TestResponseHeaderMapImpl{{":status", "200"},
                                       {"content-type", "application/json"},
                                       {"content-length", "10"},
@@ -1350,9 +1352,8 @@ TEST_P(BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest, UnaryPostResponseE
                                      {"content-type", "application/json"}},
       R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
       {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "500"},
-                                      {"content-type", "text/plain"},
-                                      {"content-length", "21"}},
+      Http::TestResponseHeaderMapImpl{
+          {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "21"}},
       R"(Internal Server Error)");
 }
 

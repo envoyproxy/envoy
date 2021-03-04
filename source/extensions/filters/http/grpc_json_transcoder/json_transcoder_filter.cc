@@ -64,7 +64,8 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 
-constexpr absl::string_view buffer_limits_runtime_feature = "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits";
+constexpr absl::string_view buffer_limits_runtime_feature =
+    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits";
 
 const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
