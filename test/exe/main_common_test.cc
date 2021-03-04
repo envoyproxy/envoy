@@ -117,10 +117,30 @@ TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 #endif
 }
 
-// Exercise enabling core dump.
+// Exercise enabling core dump and succeeding.
+// Note: this test will call the real prctl(), which is what we want.
 TEST_P(MainCommonTest, EnableCoreDump) {
   addArg("--enable-core-dump");
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+}
+
+class MockPlatformImpl : public PlatformImpl {
+  bool enableCoreDump() override { return false; }
+}
+
+// Exercise enabling core dump and failing.
+// Note: this simulates a failed prctl() call.
+TEST_P(MainCommonTest, EnableCoreDumpFails) {
+  Event::TestRealTimeSystem real_time_system;
+  DefaultListenerHooks default_listener_hooks;
+  ProdComponentFactory prod_component_factory;
+
+  const auto args = std::vector<std::string>(
+      {"envoy-static", "--use-dynamic-base-id", "-c", config_file_.c_str(), "--enable-core-dump"});
+  OptionsImpl options(args, &MainCommon::hotRestartVersion, spdlog::level::info);
+  MainCommonBase first(options, real_time_system, default_listener_hooks, prod_component_factory,
+                       std::make_unique<MockPlatformImpl>(),
+                       std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
 }
 
 // Test that an in-use base id triggers a retry and that we eventually give up.
@@ -136,8 +156,8 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
                                                     config_file_, "--base-id-path", base_id_path});
   OptionsImpl first_options(first_args, &MainCommon::hotRestartVersion, spdlog::level::info);
   MainCommonBase first(first_options, real_time_system, default_listener_hooks,
-                       prod_component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
-                       nullptr);
+                       prod_component_factory, std::make_unique<PlatformImpl>(),
+                       std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
 
   const std::string base_id_str = TestEnvironment::readFileToStringForTest(base_id_path);
   uint32_t base_id;
@@ -151,7 +171,7 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
   OptionsImpl second_options(second_args, &MainCommon::hotRestartVersion, spdlog::level::info);
 
   EXPECT_THROW_WITH_MESSAGE(MainCommonBase(second_options, real_time_system, default_listener_hooks,
-                                           prod_component_factory,
+                                           prod_component_factory, std::make_unique<PlatformImpl>(),
                                            std::unique_ptr<Random::RandomGenerator>{mock_rng},
                                            nullptr),
                             EnvoyException, "unable to select a dynamic base id");
