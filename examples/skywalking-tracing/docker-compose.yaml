@@ -56,7 +56,7 @@ services:
         soft: -1
         hard: -1
   skywalking-oap:
-    image: apache/skywalking-oap-server:8.2.0-es7
+    image: apache/skywalking-oap-server:8.4.0-es7
     networks:
       - envoymesh
     depends_on:
@@ -72,7 +72,7 @@ services:
       start_period: 40s
     restart: on-failure
   skywalking-ui:
-    image: apache/skywalking-ui:8.2.0
+    image: apache/skywalking-ui:8.4.0
     networks:
       - envoymesh
     depends_on:
