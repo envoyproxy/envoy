@@ -29,9 +29,8 @@ message StatsSink {
   reserved "config";
 
   // The name of the stats sink to instantiate. The name must match a supported
-  // stats sink. The built-in stats sinks are:
-  //
-  // See below for list of names in the :ref:`typed_config<envoy_v3_api_field_config.metrics.v3.StatsSink.typed_config>`.
+  // stats sink.
+  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.stats_sinks>` for the default list of available stats sink.
   // Sinks optionally support tagged/multiple dimensional metrics.
   string name = 1;
 

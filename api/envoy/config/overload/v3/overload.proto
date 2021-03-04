@@ -32,9 +32,8 @@ message ResourceMonitor {
   reserved "config";
 
   // The name of the resource monitor to instantiate. Must match a registered
-  // resource monitor type. The built-in resource monitors are:
-  //
-  // See below for list of names in the :ref:`typed_config<envoy_v3_api_field_config.overload.v3.ResourceMonitor.typed_config>`.
+  // resource monitor type.
+  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.resource_monitors>` for the default list of available resource monitor.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Configuration for the resource monitor being instantiated.
