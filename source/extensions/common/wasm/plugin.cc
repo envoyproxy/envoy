@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "extensions/common/wasm//well_known_names.h"
+#include "extensions/common/wasm/well_known_names.h"
 
 #include "include/proxy-wasm/wasm.h"
 

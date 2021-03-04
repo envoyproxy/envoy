@@ -2,8 +2,8 @@
 
 #include "envoy/common/exception.h"
 
-#include "extensions/common/wasm/well_known_names.h"
 #include "extensions/common/wasm/plugin.h"
+#include "extensions/common/wasm/well_known_names.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
