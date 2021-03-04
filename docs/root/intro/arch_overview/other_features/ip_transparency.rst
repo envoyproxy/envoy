@@ -91,6 +91,7 @@ Some drawbacks to the Original Source filter:
 * It requires that Envoy have access to the downstream remote address.
 * Its configuration is relatively complex.
 * It may introduce a slight performance hit due to restrictions on connection pooling.
+* Not supported on Windows.
 
 .. _arch_overview_ip_transparency_original_src_http:
 

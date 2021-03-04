@@ -12,6 +12,10 @@ Wasm
 
 The HTTP Wasm filter is used implement an HTTP filter with a Wasm plugin.
 
+.. note::
+
+ This filter is not supported on Windows.
+
 Example configuration
 ---------------------
 
