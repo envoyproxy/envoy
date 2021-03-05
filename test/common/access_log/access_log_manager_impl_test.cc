@@ -37,8 +37,8 @@ protected:
                 createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                     Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})))
         .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file_))))
-        .WillRepeatedly(Invoke(
-            [this](const Envoy::Filesystem::FilePathAndType& file_info) -> Filesystem::FilePtr {
+        .WillRepeatedly(
+            Invoke([this](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
               NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
               EXPECT_CALL(*file, path()).WillRepeatedly(Return("foo"));
               return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
@@ -466,8 +466,8 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
               createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                   Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"})))
       .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))))
-      .WillRepeatedly(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> Filesystem::FilePtr {
+      .WillRepeatedly(
+          Invoke([this](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
             NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
             EXPECT_CALL(*file, path()).WillRepeatedly(Return("bar"));
             return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);

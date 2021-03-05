@@ -37,7 +37,8 @@ protected:
 
 template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin32 {
   static_assert(std_handle_ == STD_OUTPUT_HANDLE || std_handle_ == STD_ERROR_HANDLE);
-  StdStreamFileImplWin32() : FileImplWin32(StdStreamFileImplWin32::fromStdHandle()) {}
+  StdStreamFileImplWin32()
+      : FileImplWin32(FilePathAndType{destinationTypeFromStdHandle(), filenameFromStdHandle()}) {}
   ~StdStreamFileImplWin32() { fd_ = INVALID_HANDLE; }
 
   Api::IoCallBoolResult open(FlagSet) {
@@ -61,11 +62,19 @@ template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin3
     return resultSuccess(true);
   }
 
-  static constexpr FilePathAndType fromStdHandle() {
+  static constexpr absl::string_view filenameFromStdHandle() {
     if constexpr (std_handle_ == STD_OUTPUT_HANDLE) {
-      return FilePathAndType{DestinationType::Stdout, "/dev/stdout"};
+      return "/dev/stdout";
     } else {
-      return FilePathAndType{DestinationType::Stderr, "/dev/stderr"};
+      return "/dev/stderr";
+    }
+  }
+
+  static constexpr DestinationType destinationTypeFromStdHandle() {
+    if constexpr (std_handle_ == STD_OUTPUT_HANDLE) {
+      return DestinationType::Stdout;
+    } else {
+      return DestinationType::Stderr;
     }
   }
 };
