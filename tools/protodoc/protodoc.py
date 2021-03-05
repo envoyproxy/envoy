@@ -76,7 +76,11 @@ $categories
 EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
 
 .. tip::
+  EXTENSION_CATEGORY_TRACER
+
   This extension category has the following known extensions:
+
+
 
 $extensions
 
