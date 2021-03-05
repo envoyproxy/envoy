@@ -80,7 +80,7 @@ mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
-PYTHONPATH=. ./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst
 
 function generate_api_rst() {
   local proto_target

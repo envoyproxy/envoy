@@ -3,6 +3,7 @@
 # Generate RST lists of external dependencies.
 
 from collections import defaultdict, namedtuple
+import os
 import pathlib
 import sys
 import urllib.parse
@@ -67,7 +68,8 @@ def GetVersionUrl(metadata):
 
 
 if __name__ == '__main__':
-  security_rst_root = sys.argv[1]
+  generated_rst_dir = os.getenv("GENERATED_RST_DIR")
+  security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
 
   Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
   use_categories = defaultdict(lambda: defaultdict(list))

@@ -21,5 +21,4 @@ py_binary(
     name = "generate_extension_rst",
     srcs = ["generate_extension_rst.py"],
     data = [":generate_extension_db"],
-    visibility = ["//visibility:public"],
 )
