@@ -39,8 +39,7 @@ const CorsPolicy* DelegatingRouteEntry::corsPolicy() const {
 void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   bool insert_envoy_original_path) const {
-  return base_route_entry_.finalizeRequestHeaders(headers, stream_info,
-                                                   insert_envoy_original_path);
+  return base_route_entry_.finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
 }
 
 const Http::HashPolicy* DelegatingRouteEntry::hashPolicy() const {
@@ -164,9 +163,7 @@ const absl::optional<ConnectConfig>& DelegatingRouteEntry::connectConfig() const
   return base_route_entry_.connectConfig();
 }
 
-const std::string& DelegatingRouteEntry::routeName() const {
-  return base_route_entry_.routeName();
-}
+const std::string& DelegatingRouteEntry::routeName() const { return base_route_entry_.routeName(); }
 
 } // namespace Router
 } // namespace Envoy
