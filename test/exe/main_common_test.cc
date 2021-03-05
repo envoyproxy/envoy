@@ -144,7 +144,7 @@ public:
   }
 
 private:
-  bool called_{};
+  bool& called_;
 };
 
 // Exercise enabling core dump and failing.
