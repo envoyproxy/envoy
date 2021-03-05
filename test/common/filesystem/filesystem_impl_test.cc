@@ -390,6 +390,7 @@ TEST_F(FileSystemImplTest, Win32InvalidHandleThrows) {
   FlushFileBuffers(hh);
   auto original_handle = GetStdHandle(STD_OUTPUT_HANDLE);
   EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, NULL));
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
   EXPECT_FALSE(result.rc_);
   EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, original_handle));
 }

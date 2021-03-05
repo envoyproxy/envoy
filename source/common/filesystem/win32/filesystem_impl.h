@@ -46,7 +46,7 @@ template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin3
       // If an application does not have associated standard handles,
       // such as a service running on an interactive desktop
       // and has not redirected them, the return value is NULL.
-      return resultFailure(false, INVALID_HANDLE);
+      return resultFailure(false, ERROR_INVALID_HANDLE);
     }
     if (fd_ == INVALID_HANDLE) {
       return resultFailure(false, ::GetLastError());
