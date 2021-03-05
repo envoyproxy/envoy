@@ -1249,7 +1249,6 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
-// Validated exception thrown when anyConvertAndValidate observes a PGV failures.
 TEST_F(ProtobufUtilityTest, AnyBytes) {
   {
     ProtobufWkt::StringValue source;
