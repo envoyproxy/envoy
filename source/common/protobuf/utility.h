@@ -331,7 +331,7 @@ public:
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
-   * @param message source google.protobuf.Any message.
+   * @param any source google.protobuf.Any message.
    *
    * @return std::string consists of bytes in the input message.
    */
