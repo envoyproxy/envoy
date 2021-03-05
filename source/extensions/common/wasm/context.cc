@@ -25,6 +25,7 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
@@ -148,7 +149,7 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, absl::string_view data)
 Context::Context() = default;
 Context::Context(Wasm* wasm) : ContextBase(wasm) {}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
-  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->local_info_;
+  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin)
     : ContextBase(wasm, root_context_id, plugin) {}
@@ -493,7 +494,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->local_info_.node(), arena);
+      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
     }
     break;
   case PropertyToken::SOURCE:
@@ -510,12 +511,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::LISTENER_DIRECTION:
     if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction_);
+      return CelValue::CreateInt64(plugin()->direction());
     }
     break;
   case PropertyToken::LISTENER_METADATA:
     if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listener_metadata_, arena);
+      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
     }
     break;
   case PropertyToken::CLUSTER_NAME:
@@ -999,11 +1000,11 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client =
-      clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
-          ->create();
+  auto grpc_client = clusterManager()
+                         .grpcAsyncClientManager()
+                         .factoryForGrpcService(service_proto, *wasm()->scope_,
+                                                Grpc::AsyncClientFactoryClusterChecks::Skip)
+                         ->create();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1057,11 +1058,11 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client =
-      clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
-          ->create();
+  auto grpc_client = clusterManager()
+                         .grpcAsyncClientManager()
+                         .factoryForGrpcService(service_proto, *wasm()->scope_,
+                                                Grpc::AsyncClientFactoryClusterChecks::Skip)
+                         ->create();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash

@@ -28,20 +28,35 @@ bool validateGrpcHeaderChars(absl::string_view key) {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const envoy::config::core::v3::GrpcService& config,
-                                               bool skip_cluster_check, TimeSource& time_source)
+                                               AsyncClientFactoryClusterChecks checks,
+                                               TimeSource& time_source)
     : cm_(cm), config_(config), time_source_(time_source) {
-  if (skip_cluster_check) {
+  const std::string& cluster_name = config.envoy_grpc().cluster_name();
+  switch (checks) {
+  case AsyncClientFactoryClusterChecks::Skip:
+    return;
+  case AsyncClientFactoryClusterChecks::ValidateStaticDuringBootstrap: {
+    ASSERT(Thread::MainThread::isMainThread());
+    auto all_clusters = cm_.clusters();
+    const auto& it = all_clusters.active_clusters_.find(cluster_name);
+    if (it == all_clusters.active_clusters_.end()) {
+      throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
+    }
+    if (it->second.get().info()->addedViaApi()) {
+      throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
+    }
     return;
   }
-
-  const std::string& cluster_name = config.envoy_grpc().cluster_name();
-  auto all_clusters = cm_.clusters();
-  const auto& it = all_clusters.active_clusters_.find(cluster_name);
-  if (it == all_clusters.active_clusters_.end()) {
-    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
+  case AsyncClientFactoryClusterChecks::ValidateStatic: {
+    const auto cluster = cm_.getThreadLocalCluster(cluster_name);
+    if (!cluster) {
+      throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
+    }
+    if (cluster->info()->addedViaApi()) {
+      throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
+    }
+    return;
   }
-  if (it->second.get().info()->addedViaApi()) {
-    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
   }
 }
 
@@ -103,10 +118,11 @@ RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 
 AsyncClientFactoryPtr
 AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
-                                              Stats::Scope& scope, bool skip_cluster_check) {
+                                              Stats::Scope& scope,
+                                              AsyncClientFactoryClusterChecks checks) {
   switch (config.target_specifier_case()) {
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check, time_source_);
+    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, checks, time_source_);
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
                                                           config, api_, stat_names_);

@@ -68,7 +68,7 @@ public:
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                   ClusterConnectivityState& state) override;
+                   TimeSource& time_source, ClusterConnectivityState& state) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
@@ -188,8 +188,8 @@ private:
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
-  std::list<ClusterManagerCluster*> primary_init_clusters_;
-  std::list<ClusterManagerCluster*> secondary_init_clusters_;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*> primary_init_clusters_;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*> secondary_init_clusters_;
   State state_{State::Loading};
   bool started_secondary_initialize_{};
 };
