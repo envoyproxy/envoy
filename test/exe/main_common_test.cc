@@ -148,7 +148,6 @@ private:
 };
 
 // Exercise enabling core dump and failing.
-// Note: this simulates a failed prctl() call.
 TEST_P(MainCommonTest, EnableCoreDumpFails) {
   Event::TestRealTimeSystem real_time_system;
   DefaultListenerHooks default_listener_hooks;
