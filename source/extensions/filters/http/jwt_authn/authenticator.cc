@@ -158,7 +158,7 @@ void AuthenticatorImpl::startVerify() {
     ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
     owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
     status = owned_jwt_->parseFromString(curr_token_->token());
-    jwt_ = owned_jwt_.release();
+    jwt_ = owned_jwt_.get();
   }
 
   if (status != Status::Ok) {
@@ -290,7 +290,7 @@ void AuthenticatorImpl::verifyKey() {
   }
   if (provider_ && jwks_data_->getJwtProvider().enable_token_cache() && !use_cache_jwt_) {
     ENVOY_LOG(debug, "JWT {} added in cache", curr_token_->token());
-    jwks_data_->getTokenCache().insert(curr_token_->token(), jwt_, 1);
+    jwks_data_->getTokenCache().insert(curr_token_->token(), owned_jwt_.release(), 1);
   }
   doneWithStatus(Status::Ok);
 }
