@@ -1249,6 +1249,29 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
+TEST_F(ProtobufUtilityTest, AnyBytes) {
+  {
+    ProtobufWkt::StringValue source;
+    source.set_value("abc");
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "abc");
+  }
+  {
+    ProtobufWkt::BytesValue source;
+    source.set_value({0x01, 0x02, 0x03});
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
+  }
+  {
+    envoy::config::cluster::v3::Filter filter;
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(filter);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), source_any.value());
+  }
+}
+
 // MessageUtility::anyConvert() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   ProtobufWkt::Duration source_duration;
