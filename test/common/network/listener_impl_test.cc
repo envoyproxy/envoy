@@ -35,7 +35,6 @@ static void errorCallbackTest(Address::IpVersion version) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -84,7 +83,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpListenerImplTest,
 // Test that socket options are set after the listener is setup.
 TEST_P(TcpListenerImplTest, SetListeningSocketOptionsSuccess) {
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Random::MockRandomGenerator random_generator;
 
   auto socket = std::make_shared<TcpListenSocket>(
@@ -100,7 +98,6 @@ TEST_P(TcpListenerImplTest, SetListeningSocketOptionsSuccess) {
 // Test that an exception is thrown if there is an error setting socket options.
 TEST_P(TcpListenerImplTest, SetListeningSocketOptionsError) {
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Random::MockRandomGenerator random_generator;
 
   auto socket = std::make_shared<TcpListenSocket>(
@@ -121,7 +118,6 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   auto socketDst = std::make_shared<TcpListenSocket>(alt_address_, nullptr, false);
   Network::MockTcpListenerCallbacks listener_callbacks1;
-  Network::MockConnectionHandler connection_handler;
   Random::MockRandomGenerator random_generator;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
@@ -162,7 +158,6 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -226,7 +221,6 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Random::MockRandomGenerator random_generator;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
@@ -268,7 +262,6 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   auto socket = std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_, true),
                                                   options, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Random::MockRandomGenerator random_generator;
 
   ASSERT_TRUE(socket->addressProvider().localAddress()->ip()->isAnyAddress());

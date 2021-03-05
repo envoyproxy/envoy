@@ -551,7 +551,6 @@ protected:
   virtual bool setResolverInConstructor() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
-  Network::MockConnectionHandler connection_handler_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   std::unique_ptr<Network::Listener> listener_;
   Api::ApiPtr api_;

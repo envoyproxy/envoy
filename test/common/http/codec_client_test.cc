@@ -365,7 +365,6 @@ protected:
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockTcpListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
