@@ -131,8 +131,11 @@ TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 // Exercise enabling core dump and succeeding.
 // Note: this test will call the real system call, which is what we want.
 TEST_P(MainCommonTest, EnableCoreDump) {
+#ifdef __linux__
   addArg("--enable-core-dump");
-  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+  auto test = [&]() { MainCommon main_common(argc(), argv()); };
+  EXPECT_LOG_CONTAINS("info", "core dump enabled", test());
+#endif
 }
 
 class MockPlatformImpl : public PlatformImpl {
