@@ -50,6 +50,7 @@ Minor Behavior Changes
 * oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. Enables this value to be overridden in the Authorization request to the OAuth provider.
 * perf: allow reading more bytes per operation from raw sockets to improve performance.
 * router: extended custom date formatting to DOWNSTREAM_PEER_CERT_V_START and DOWNSTREAM_PEER_CERT_V_END when using :ref:`custom request/response header formats <config_http_conn_man_headers_custom_request_headers>`.
+* router: made the path rewrite available without finalizing headers, so the filter could calculate the current value of the final url.
 * tracing: added `upstream_cluster.name` tag that resolves to resolve to :ref:`alt_stat_name <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` if provided (and otherwise the cluster name).
 * upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
   atomically inline. This change has been made to support load balancer pre-computation of data
@@ -78,6 +79,7 @@ Bug Fixes
 * overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
 * sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.
 * tls: fix the subject alternative name of the presented certificate matches the specified matchers as the case-insensitive way when it uses DNS name.
+* tls: fix issue where OCSP was inadvertently removed from SSL response in multi-context scenarios.
 * upstream: fix handling of moving endpoints between priorities when active health checks are enabled. Previously moving to a higher numbered priority was a NOOP, and moving to a lower numbered priority caused an abort.
 * upstream: retry budgets will now set default values for xDS configurations.
 
