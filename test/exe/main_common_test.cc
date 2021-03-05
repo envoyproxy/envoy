@@ -157,7 +157,7 @@ TEST_P(MainCommonTest, EnableCoreDumpFails) {
   ProdComponentFactory prod_component_factory;
 
   const auto args = std::vector<std::string>(
-      {"envoy-static", "--use-dynamic-base-id", "-c", config_file_.c_str(), "--enable-core-dump"});
+      {"envoy-static", "--use-dynamic-base-id", "-c", config_file_, "--enable-core-dump"});
   OptionsImpl options(args, &MainCommon::hotRestartVersion, spdlog::level::info);
 
   bool enable_core_dump_called;
