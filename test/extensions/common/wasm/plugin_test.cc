@@ -18,18 +18,18 @@ namespace {
 
 TEST(TestWasmConfig, Basic) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
-  auto name = "my-plugin";
-  plugin_config.set_name("my-plugin");
+  const std::string name = "my-plugin";
+  plugin_config.set_name(name);
 
-  auto function = "function";
+  const std::string function = "function";
   plugin_config.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
       {function, envoy::extensions::wasm::v3::SanitizationConfig()});
 
   auto proto_envs = plugin_config.mutable_vm_config()->mutable_environment_variables();
-  std::string host_env_key = "HOST_KEY";
-  std::string host_env_value = "HOST_VALUE";
-  std::string key = "KEY";
-  std::string value = "VALUE";
+  const std::string host_env_key = "HOST_KEY";
+  const std::string host_env_value = "HOST_VALUE";
+  const std::string key = "KEY";
+  const std::string value = "VALUE";
   TestEnvironment::setEnvVar(host_env_key, host_env_value, 0);
   proto_envs->mutable_host_env_keys()->Add(host_env_key.c_str());
   (*proto_envs->mutable_key_values())[key] = value;

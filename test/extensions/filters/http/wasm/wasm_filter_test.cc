@@ -113,10 +113,10 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
   envoy::extensions::wasm::v3::EnvironmentVariables envs;
   if (std::get<0>(GetParam()) != "null") {
     // Setup env vars.
-    std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
-    std::string host_env_value = "foo";
-    std::string env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV";
-    std::string env_value = "bar";
+    const std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
+    const std::string host_env_value = "foo";
+    const std::string env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV";
+    const std::string env_value = "bar";
     TestEnvironment::setEnvVar(host_env_key, host_env_value, 0);
     envs.mutable_host_env_keys()->Add(host_env_key.c_str());
     (*envs.mutable_key_values())[env_key] = env_value;
