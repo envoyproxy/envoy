@@ -84,6 +84,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "parser_interface",
     hdrs = ["parser.h"],
+    deps = [
+        "//source/common/common:statusor_lib",
+        "//source/common/http:status_lib",
+    ],
 )
 
 envoy_cc_library(
