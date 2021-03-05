@@ -158,7 +158,7 @@ void AuthenticatorImpl::startVerify() {
     ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
     owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
     status = owned_jwt_->parseFromString(curr_token_->token());
-    jwt_ = owned_jwt_.get();
+    jwt_ = owned_jwt_.release();
   }
 
   if (status != Status::Ok) {
@@ -299,6 +299,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
+  if (use_cache_jwt_) {
+    jwks_data_->getTokenCache().release(curr_token_->token(), jwt_);
+    use_cache_jwt_ = false;
+  }
+
   // If a request has multiple tokens, all of them must be valid. Otherwise it may have
   // following security hole: a request has a good token and a bad one, it will pass
   // verification, forwarded to the backend, and the backend may mistakenly use the bad
@@ -318,10 +323,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     callback_ = nullptr;
     return;
   }
-  if (use_cache_jwt_) {
-    jwks_data_->getTokenCache().release(curr_token_->token(), jwt_);
-    use_cache_jwt_ = false;
-  }
+
   startVerify();
 }
 
