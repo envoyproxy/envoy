@@ -6,7 +6,6 @@
 #include "extensions/transport_sockets/alts/config.h"
 #include "extensions/transport_sockets/alts/tsi_socket.h"
 
-
 #ifdef major
 #undef major
 #endif
@@ -185,8 +184,7 @@ public:
     auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket),
-                                               nullptr);
+                                               std::move(client_transport_socket), nullptr);
   }
 
   void verifyActualFrameSizeToUse() {
