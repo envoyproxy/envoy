@@ -43,11 +43,11 @@ public:
       const std::string& stats_prefix, Stats::Scope& scope);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
-  std::string shadowEffectivePolicyIdField() {
+  std::string shadowEffectivePolicyIdField() const {
     return shadow_rules_stat_prefix_ +
            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField;
   }
-  std::string shadowEngineResultField() {
+  std::string shadowEngineResultField() const {
     return shadow_rules_stat_prefix_ +
            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
   }
@@ -64,7 +64,7 @@ private:
   }
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
-  std::string shadow_rules_stat_prefix_;
+  const std::string shadow_rules_stat_prefix_;
 
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
