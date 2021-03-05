@@ -203,6 +203,57 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
                                    ->second->toString()
                                    .value()));
   }
+  // Test case that request only have parameters.
+  {
+    DubboHessian2SerializerImpl serializer;
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        0x05, '2', '.', '0', '.', '2', // Dubbo version
+        0x04, 't', 'e', 's', 't',      // Service name
+        0x05, '0', '.', '0', '.', '0', // Service version
+        0x04, 't', 'e', 's', 't',      // method name
+    }));
+
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(buffer));
+
+    encoder.encode<std::string>(parameters_type);
+
+    for (const auto& object : params) {
+      encoder.encode<Hessian2::Object>(*object);
+    }
+    // Encode attachment as fourth parameter.
+    encoder.encode<Hessian2::Object>(attach.attachment());
+
+    std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+
+    context->setBodySize(buffer.length());
+
+    auto result = serializer.deserializeRpcInvocation(buffer, context);
+    EXPECT_EQ(true, result.second);
+
+    auto invo = dynamic_cast<RpcInvocationImpl*>(result.first.get());
+
+    context->originMessage().move(buffer, buffer.length());
+
+    EXPECT_EQ(false, invo->hasAttachment());
+    EXPECT_EQ(false, invo->hasParameters());
+
+    auto& result_attach = invo->mutableAttachment();
+
+    // When parsing attachment, parameters will also be parsed.
+    EXPECT_EQ(true, invo->hasAttachment());
+    EXPECT_EQ(true, invo->hasParameters());
+
+    auto& result_params = invo->parameters();
+    EXPECT_EQ("test_value2", *(result_params.at(3)
+                                   ->toUntypedMap()
+                                   .value()
+                                   ->find(std::make_unique<Hessian2::StringObject>("test2"))
+                                   ->second->toString()
+                                   .value()));
+
+    EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value()->empty());
+  }
 }
 
 TEST(HessianProtocolTest, deserializeRpcResult) {

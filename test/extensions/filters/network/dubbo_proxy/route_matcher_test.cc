@@ -37,13 +37,13 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
 }
 
 void setDefaultInvocationCallback(RpcInvocationImpl& invo) {
-  invo.setParametersLazyCallback([](RpcInvocationImpl::ParametersPtr& params) {
-    params = std::make_unique<RpcInvocationImpl::Parameters>();
+  invo.setParametersLazyCallback([]() -> RpcInvocationImpl::ParametersPtr {
+    return std::make_unique<RpcInvocationImpl::Parameters>();
   });
 
-  invo.setAttachmentLazyCallback([](RpcInvocationImpl::AttachmentPtr& attach) {
+  invo.setAttachmentLazyCallback([]() -> RpcInvocationImpl::AttachmentPtr {
     auto map = std::make_unique<RpcInvocationImpl::Attachment::MapObject>();
-    attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
+    return std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
   });
 }
 

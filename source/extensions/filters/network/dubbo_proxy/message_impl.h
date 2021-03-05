@@ -87,8 +87,8 @@ public:
   };
   using AttachmentPtr = std::unique_ptr<Attachment>;
 
-  using AttachmentLazyCallback = std::function<void(AttachmentPtr&)>;
-  using ParametersLazyCallback = std::function<void(ParametersPtr&)>;
+  using AttachmentLazyCallback = std::function<AttachmentPtr()>;
+  using ParametersLazyCallback = std::function<ParametersPtr()>;
 
   bool hasParameters() const { return parameters_ != nullptr; }
   const Parameters& parameters() const;

@@ -32,7 +32,8 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
                                      context->bodySize()));
   }
 
-  if (!dubbo_version || !service_name || !service_version || !method_name) {
+  if (dubbo_version == nullptr || service_name == nullptr || service_version == nullptr ||
+      method_name == nullptr) {
     throw EnvoyException(fmt::format("RpcInvocation has no request metadata"));
   }
 
@@ -42,16 +43,15 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   invo->setMethodName(*method_name);
 
   size_t parsed_size = context->headerSize() + decoder.offset();
-  size_t buffer_size = context->headerSize() + context->bodySize();
 
   auto delayed_decoder = std::make_shared<Hessian2::Decoder>(
       std::make_unique<BufferReader>(context->originMessage(), parsed_size));
 
-  invo->setParametersLazyCallback([delayed_decoder](RpcInvocationImpl::ParametersPtr& params) {
-    params = std::make_unique<RpcInvocationImpl::Parameters>();
+  invo->setParametersLazyCallback([delayed_decoder]() -> RpcInvocationImpl::ParametersPtr {
+    auto params = std::make_unique<RpcInvocationImpl::Parameters>();
 
     if (auto types = delayed_decoder->decode<std::string>(); types && !types->empty()) {
-      size_t number = HessianUtils::getParametersNumber(*types);
+      uint32_t number = HessianUtils::getParametersNumber(*types);
       for (uint32_t i = 0; i < number; i++) {
         if (auto result = delayed_decoder->decode<Hessian2::Object>(); result) {
           params->push_back(std::move(result));
@@ -60,27 +60,20 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
         }
       }
     }
+    return params;
   });
 
-  invo->setAttachmentLazyCallback(
-      [delayed_decoder, buffer_size](RpcInvocationImpl::AttachmentPtr& attach) {
-        if (delayed_decoder->offset() >= buffer_size) {
-          // No more data for attachment.
-          attach = std::make_unique<RpcInvocationImpl::Attachment>(
-              std::make_unique<RpcInvocationImpl::Attachment::MapObject>());
-          return;
-        }
-
-        auto result = delayed_decoder->decode<Hessian2::Object>();
-        if (result && result->type() == Hessian2::Object::Type::UntypedMap) {
-          attach = std::make_unique<RpcInvocationImpl::Attachment>(
-              RpcInvocationImpl::Attachment::MapObjectPtr{
-                  dynamic_cast<RpcInvocationImpl::Attachment::MapObject*>(result.release())});
-        } else {
-          attach = std::make_unique<RpcInvocationImpl::Attachment>(
-              std::make_unique<RpcInvocationImpl::Attachment::MapObject>());
-        }
-      });
+  invo->setAttachmentLazyCallback([delayed_decoder]() -> RpcInvocationImpl::AttachmentPtr {
+    auto result = delayed_decoder->decode<Hessian2::Object>();
+    if (result && result->type() == Hessian2::Object::Type::UntypedMap) {
+      return std::make_unique<RpcInvocationImpl::Attachment>(
+          RpcInvocationImpl::Attachment::MapObjectPtr{
+              dynamic_cast<RpcInvocationImpl::Attachment::MapObject*>(result.release())});
+    } else {
+      return std::make_unique<RpcInvocationImpl::Attachment>(
+          std::make_unique<RpcInvocationImpl::Attachment::MapObject>());
+    }
+  });
 
   return std::pair<RpcInvocationSharedPtr, bool>(invo, true);
 }

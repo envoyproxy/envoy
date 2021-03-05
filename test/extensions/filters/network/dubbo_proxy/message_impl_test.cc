@@ -91,20 +91,22 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
   bool set_parameters{false};
   bool set_attachment{false};
 
-  invo.setParametersLazyCallback([&set_parameters](RpcInvocationImpl::ParametersPtr& params) {
-    params = std::make_unique<RpcInvocationImpl::Parameters>();
+  invo.setParametersLazyCallback([&set_parameters]() -> RpcInvocationImpl::ParametersPtr {
     set_parameters = true;
+    return std::make_unique<RpcInvocationImpl::Parameters>();
   });
 
-  invo.setAttachmentLazyCallback([&set_attachment](RpcInvocationImpl::AttachmentPtr& attach) {
+  invo.setAttachmentLazyCallback([&set_attachment]() -> RpcInvocationImpl::AttachmentPtr {
     auto map = std::make_unique<RpcInvocationImpl::Attachment::MapObject>();
 
     map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
                                         std::make_unique<Hessian2::StringObject>("new_fake_group"));
 
-    attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
+    auto attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
 
     set_attachment = true;
+
+    return attach;
   });
 
   EXPECT_EQ(false, invo.hasParameters());

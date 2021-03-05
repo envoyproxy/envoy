@@ -79,7 +79,7 @@ RpcInvocationImpl::ParametersPtr& RpcInvocationImpl::mutableParameters() {
 void RpcInvocationImpl::assignParametersIfNeed() {
   ASSERT(parameters_lazy_callback_);
   if (!parameters_) {
-    parameters_lazy_callback_(parameters_);
+    parameters_ = parameters_lazy_callback_();
   }
 }
 
@@ -90,7 +90,7 @@ void RpcInvocationImpl::assignAttachmentIfNeed() {
   }
 
   assignParametersIfNeed();
-  attachment_lazy_callback_(attachment_);
+  attachment_ = attachment_lazy_callback_();
 
   ASSERT(attachment_);
   if (auto g = attachment_->lookup("group"); g) {
