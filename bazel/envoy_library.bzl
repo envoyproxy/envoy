@@ -84,6 +84,7 @@ EXTENSION_CATEGORIES = [
     "envoy.io_socket",
     "envoy.http.original_ip_detection",
     "envoy.rate_limit_descriptors",
+    "envoy.request_id",
     "envoy.resource_monitors",
     "envoy.retry_host_predicates",
     "envoy.retry_priorities",

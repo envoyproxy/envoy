@@ -25,4 +25,5 @@ Extensions
   wasm/wasm
   watchdog/watchdog
   descriptors/descriptors
+  request_id/request_id
   original_ip_detection/original_ip_detection
