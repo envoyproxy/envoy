@@ -13,8 +13,6 @@ import sys
 import textwrap
 import urllib.request
 
-os.environ["API_PATH"] = "api"
-
 import utils as dep_utils
 
 # These CVEs are false positives for the match heuristics. An explanation is

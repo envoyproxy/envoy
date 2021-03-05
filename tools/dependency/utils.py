@@ -14,8 +14,7 @@ def LoadModule(name, path):
   spec.loader.exec_module(module)
   return module
 
-
-API_PATH = os.getenv("API_PATH", "external/envoy_api_canonical")
+API_PATH = os.getenv("API_PATH", "api")
 
 envoy_repository_locations = LoadModule('envoy_repository_locations',
                                         'bazel/repository_locations.bzl')
