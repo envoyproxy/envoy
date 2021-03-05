@@ -330,6 +330,26 @@ public:
   static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
+   * Convert from google.protobuf.Any to bytes as std::string
+   * @param message source google.protobuf.Any message.
+   *
+   * @return std::string consists of bytes in the input message.
+   */
+  static std::string anyToBytes(const ProtobufWkt::Any& any) {
+    if (any.Is<ProtobufWkt::StringValue>()) {
+      ProtobufWkt::StringValue s;
+      MessageUtil::unpackTo(any, s);
+      return s.value();
+    }
+    if (any.Is<ProtobufWkt::BytesValue>()) {
+      Protobuf::BytesValue b;
+      MessageUtil::unpackTo(any, b);
+      return b.value();
+    }
+    return any.value();
+  };
+
+  /**
    * Convert from google.protobuf.Any to a typed message.
    * @param message source google.protobuf.Any message.
    *

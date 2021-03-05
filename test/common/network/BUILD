@@ -451,6 +451,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "win32_redirect_records_option_test",
+    srcs = ["win32_redirect_records_option_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//source/common/network:address_lib",
+        "//source/common/network:win32_redirect_records_option_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "filter_matcher_test",
     srcs = ["filter_matcher_test.cc"],
     deps = [

@@ -32,7 +32,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_provider_interface",
     hdrs = ["context_provider.h"],
-    deps = ["@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto"],
+    deps = [
+        "//include/envoy/common:callback",
+        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

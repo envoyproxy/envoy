@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -21,6 +22,8 @@ MockLocalInfo::MockLocalInfo() : address_(new Network::Address::Ipv4Instance("12
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(node_.cluster()));
   ON_CALL(*this, nodeName()).WillByDefault(ReturnRef(node_.id()));
   ON_CALL(*this, node()).WillByDefault(ReturnRef(node_));
+  ON_CALL(*this, contextProvider()).WillByDefault(ReturnRef(context_provider_));
+  ON_CALL(Const(*this), contextProvider()).WillByDefault(ReturnRef(context_provider_));
 }
 
 MockLocalInfo::~MockLocalInfo() = default;

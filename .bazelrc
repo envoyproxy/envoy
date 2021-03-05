@@ -174,7 +174,7 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/10.0.0/lib/linux
+build:rbe-toolchain-asan --linkopt=-L/opt/llvm/lib/clang/11.0.1/lib/linux
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
 
@@ -246,7 +246,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:c8fa4235714003ba0896287ee2f91cae06e0e407
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:d9b1f1cbb24b2cecca768feaa9fa3c6e6660a948
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

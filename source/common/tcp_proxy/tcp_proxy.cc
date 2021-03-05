@@ -24,8 +24,10 @@
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
@@ -437,6 +439,23 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
+
+    auto has_options_from_downstream =
+        downstreamConnection() && downstreamConnection()
+                                      ->streamInfo()
+                                      .filterState()
+                                      .hasData<Network::UpstreamSocketOptionsFilterState>(
+                                          Network::UpstreamSocketOptionsFilterState::key());
+    if (has_options_from_downstream) {
+      auto downstream_options = downstreamConnection()
+                                    ->streamInfo()
+                                    .filterState()
+                                    .getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
+                                        Network::UpstreamSocketOptionsFilterState::key())
+                                    .value();
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
+      Network::Socket::appendOptions(upstream_options_, downstream_options);
+    }
   }
 
   if (!maybeTunnel(*thread_local_cluster)) {

@@ -3,6 +3,13 @@
 # Generate an extension database, a JSON file mapping from qualified well known
 # extension name to metadata derived from the envoy_cc_extension target.
 
+# This script expects a copy of the envoy source to be located at /source
+# Alternatively, you can specify a path to the source dir with `ENVOY_SRCDIR`
+
+# You must specify the target file to save the generated json db to.
+# You can do this either as an arg to this script/target or with the env var
+# `EXTENSION_DB_PATH`
+
 import ast
 import json
 import os
@@ -15,14 +22,21 @@ import sys
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
 
-BUILDOZER_PATH = os.getenv("BUILDOZER_BIN") or (os.path.expandvars("$GOPATH/bin/buildozer") if
-                                                os.getenv("GOPATH") else shutil.which("buildozer"))
+BUILDOZER_PATH = os.path.abspath(
+    "external/com_github_bazelbuild_buildtools/buildozer/buildozer_/buildozer")
+
+ENVOY_SRCDIR = os.getenv('ENVOY_SRCDIR', '/source')
+
+if not os.path.exists(ENVOY_SRCDIR):
+  raise SystemExit(
+      "Envoy source must either be located at /source, or ENVOY_SRCDIR env var must be set")
 
 # source/extensions/extensions_build_config.bzl must have a .bzl suffix for Starlark
 # import, so we are forced to do this workaround.
 _extensions_build_config_spec = spec_from_loader(
     'extensions_build_config',
-    SourceFileLoader('extensions_build_config', 'source/extensions/extensions_build_config.bzl'))
+    SourceFileLoader('extensions_build_config',
+                     os.path.join(ENVOY_SRCDIR, 'source/extensions/extensions_build_config.bzl')))
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
@@ -37,7 +51,9 @@ def IsMissing(value):
 
 def NumReadFiltersFuzzed():
   data = pathlib.Path(
-      'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc').read_text()
+      os.path.join(
+          ENVOY_SRCDIR,
+          'test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc')).read_text()
   # Hack-ish! We only search the first 50 lines to capture the filters in filterNames().
   return len(re.findall('NetworkFilterNames::get()', ''.join(data.splitlines()[:50])))
 
@@ -64,6 +80,10 @@ def GetExtensionMetadata(target):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
+  if IsMissing(categories):
+    raise ExtensionDbError(
+        'Missing extension category for %s. Please make sure the target is an envoy_cc_extension and category is set'
+        % target)
   # evaluate tuples/lists
   # wrap strings in a list
   categories = (ast.literal_eval(categories) if
@@ -77,7 +97,12 @@ def GetExtensionMetadata(target):
 
 
 if __name__ == '__main__':
-  output_path = sys.argv[1]
+  try:
+    output_path = os.getenv("EXTENSION_DB_PATH") or sys.argv[1]
+  except IndexError:
+    raise SystemExit(
+        "Output path must be either specified as arg or with EXTENSION_DB_PATH env var")
+
   extension_db = {}
   # Include all extensions from source/extensions/extensions_build_config.bzl
   all_extensions = {}
@@ -99,4 +124,5 @@ if __name__ == '__main__':
   extension_db['envoy.upstreams.http.http_protocol_options'] = GetExtensionMetadata(
       '//source/extensions/upstreams/http:config')
 
+  pathlib.Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
   pathlib.Path(output_path).write_text(json.dumps(extension_db))

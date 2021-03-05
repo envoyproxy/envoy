@@ -207,6 +207,8 @@ message Listener {
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
 
   // Specifies the intended direction of the traffic relative to the local Envoy.
+  // This property is required on Windows for listeners using the original destination filter,
+  // see :ref:`Original Destination <config_listener_filters_original_dst>`.
   core.v4alpha.TrafficDirection traffic_direction = 16;
 
   // If the protocol in the listener socket address in :ref:`protocol

@@ -337,6 +337,8 @@ public:
       return stream_info_->dynamicMetadata();
     };
 
+    StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
+
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
     const bool hand_off_restored_destination_connections_;
