@@ -88,6 +88,7 @@ struct FilePathAndType {
   bool operator==(const FilePathAndType& rhs) const {
     return file_type_ == rhs.file_type_ && path_ == rhs.path_;
   }
+  FilePathAndType() : {}
   FilePathAndType(DestinationType file_type, absl::string_view path)
       : file_type_(file_type), path_(path) {}
   DestinationType file_type_;
