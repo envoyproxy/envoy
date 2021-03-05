@@ -1112,6 +1112,12 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
     break;
   }
 
+  // Apply the selected context. This must be done before OCSP stapling below
+  // since applying the context can remove the previously-set OCSP response.
+  // This will only return NULL if memory allocation fails.
+  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
+                 "");
+
   if (client_ocsp_capable) {
     stats_.ocsp_staple_requests_.inc();
   }
@@ -1136,8 +1142,6 @@ ServerContextImpl::selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello) {
     break;
   }
 
-  RELEASE_ASSERT(SSL_set_SSL_CTX(ssl_client_hello->ssl, selected_ctx->ssl_ctx_.get()) != nullptr,
-                 "");
   return ssl_select_cert_success;
 }
 
