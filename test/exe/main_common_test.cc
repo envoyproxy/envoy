@@ -140,14 +140,7 @@ TEST_P(MainCommonTest, EnableCoreDump) {
 
 class MockPlatformImpl : public PlatformImpl {
 public:
-  MockPlatformImpl(bool& called) : called_(called) {}
-  bool enableCoreDump() override {
-    called_ = true;
-    return false;
-  }
-
-private:
-  bool& called_;
+  MOCK_METHOD(bool, enableCoreDump, ());
 };
 
 // Exercise enabling core dump and failing.
@@ -160,19 +153,16 @@ TEST_P(MainCommonTest, EnableCoreDumpFails) {
       {"envoy-static", "--use-dynamic-base-id", "-c", config_file_, "--enable-core-dump"});
   OptionsImpl options(args, &MainCommon::hotRestartVersion, spdlog::level::info);
 
-  bool enable_core_dump_called;
   auto test = [&]() {
+    auto* platform_impl = new NiceMock<MockPlatformImpl>();
+    EXPECT_CALL(*platform_impl, enableCoreDump()).WillOnce(Return(false));
     MainCommonBase first(options, real_time_system, default_listener_hooks, prod_component_factory,
-                         std::make_unique<MockPlatformImpl>(enable_core_dump_called),
+                         std::unique_ptr<PlatformImpl>{platform_impl},
                          std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
   };
 
   EXPECT_NO_THROW(test());
-  EXPECT_TRUE(enable_core_dump_called);
-
-  enable_core_dump_called = false;
   EXPECT_LOG_CONTAINS("warn", "failed to enable core dump", test());
-  EXPECT_TRUE(enable_core_dump_called);
 }
 
 // Test that an in-use base id triggers a retry and that we eventually give up.
