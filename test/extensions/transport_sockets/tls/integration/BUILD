@@ -39,19 +39,3 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_test(
-    name = "spiffe_cert_validator_integration_test",
-    srcs = [
-        "spiffe_cert_validator_integration_test.cc",
-        "spiffe_cert_validator_integration_test.h",
-    ],
-    data = [
-        "//test/config/integration/certs",
-        "//test/extensions/transport_sockets/tls/test_data:certs",
-    ],
-    deps = [
-        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
-        "//test/integration:http_integration_lib",
-    ],
-)
