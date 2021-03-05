@@ -142,6 +142,7 @@ public:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Random::MockRandomGenerator> random_;
   std::shared_ptr<NiceMock<MockRequestIDExtension>> request_id_extension_;
+  const std::shared_ptr<MockRequestIDExtension> request_id_extension_;
   const std::shared_ptr<RequestIDExtension> request_id_extension_to_return_;
   std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   NiceMock<MockConnectionManagerConfig> config_;
