@@ -16,7 +16,6 @@ envoy_cc_test(
     ],
     data = [
         "//test/config/integration/certs",
-        "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
         "//source/common/event:dispatcher_includes",
@@ -27,7 +26,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
-        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
         "//test/mocks/secret:secret_mocks",
@@ -39,5 +37,21 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "spiffe_cert_validator_integration_test",
+    srcs = [
+        "spiffe_cert_validator_integration_test.cc",
+        "spiffe_cert_validator_integration_test.h",
+    ],
+    data = [
+        "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    deps = [
+        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+        "//test/integration:http_integration_lib",
     ],
 )
