@@ -612,10 +612,17 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
-  if ((existing_active_cluster != active_clusters_.end() &&
-       existing_active_cluster->second->blockUpdate(new_hash)) ||
-      (existing_warming_cluster != warming_clusters_.end() &&
-       existing_warming_cluster->second->blockUpdate(new_hash))) {
+  if (existing_warming_cluster != warming_clusters_.end()) {
+    // If the cluster is the same as the warming cluster of the same name, block the update.
+    if (existing_warming_cluster->second->blockUpdate(new_hash)) {
+      return false;
+    }
+    // NB: https://github.com/envoyproxy/envoy/issues/14598
+    // Always proceed if the cluster is different from the existing warming cluster.
+  } else if (existing_active_cluster != active_clusters_.end() &&
+             existing_active_cluster->second->blockUpdate(new_hash)) {
+    // If there's no warming cluster of the same name, and if the cluster is the same as the active
+    // cluster of the same name, block the update.
     return false;
   }
 

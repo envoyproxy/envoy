@@ -1446,6 +1446,87 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/14598.
+// Make sure the revert isn't blocked due to being the same as the active version.
+TEST_F(ClusterManagerImplTest, TestRevertWarmingCluster) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  const std::string cluster_json1 = defaultStaticClusterJson("cds_cluster");
+  const std::string cluster_json2 = fmt::sprintf(kDefaultStaticClusterTmpl, "cds_cluster",
+                                                 R"EOF(
+"socket_address": {
+  "address": "127.0.0.1",
+  "port_value": 11002
+})EOF");
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
+  std::shared_ptr<MockClusterMockPrioritySet> cluster3(new NiceMock<MockClusterMockPrioritySet>());
+  cluster1->info_->name_ = "cds_cluster";
+  cluster2->info_->name_ = "cds_cluster";
+  cluster3->info_->name_ = "cds_cluster";
+
+  // Initialize version1.
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initialize(_));
+  checkStats(0 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 0 /*warming*/);
+
+  cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json1), "version1");
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+
+  cluster1->initialize_callback_();
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+
+  // Start warming version2.
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  EXPECT_CALL(*cluster2, initialize(_));
+  cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json2), "version2");
+  checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
+
+  // Start warming version3 instead, which is the same as version1.
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster3, nullptr)));
+  EXPECT_CALL(*cluster3, initialize(_));
+  cluster_manager_->addOrUpdateCluster(parseClusterFromV3Json(cluster_json1), "version3");
+  checkStats(1 /*added*/, 2 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
+
+  // Finish warming version3.
+  cluster3->initialize_callback_();
+  checkStats(1 /*added*/, 2 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  checkConfigDump(R"EOF(
+ dynamic_active_clusters:
+   - version_info: "version3"
+     cluster:
+       "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+       name: "cds_cluster"
+       type: STATIC
+       connect_timeout: 0.25s
+       load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+     last_updated:
+       seconds: 1234567891
+       nanos: 234000000
+ )EOF");
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));
+}
+
 // Verify that shutting down the cluster manager destroys warming clusters.
 TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
   create(defaultConfig());
