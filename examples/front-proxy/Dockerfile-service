@@ -1,3 +1,4 @@
+# FROM envoyproxy/envoy-alpine:v1.17.1
 FROM envoyproxy/envoy-alpine-dev:latest
 
 RUN apk update && apk add py3-pip bash curl
