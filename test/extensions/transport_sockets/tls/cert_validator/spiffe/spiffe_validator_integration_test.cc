@@ -1,4 +1,4 @@
-#include "spiffe_cert_validator_integration_test.h"
+#include "spiffe_validator_integration_test.h"
 
 #include <memory>
 

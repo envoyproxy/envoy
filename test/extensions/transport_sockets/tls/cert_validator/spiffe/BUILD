@@ -32,10 +32,10 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "spiffe_cert_validator_integration_test",
+    name = "spiffe_validator_integration_test",
     srcs = [
-        "spiffe_cert_validator_integration_test.cc",
-        "spiffe_cert_validator_integration_test.h",
+        "spiffe_validator_integration_test.cc",
+        "spiffe_validator_integration_test.h",
     ],
     data = [
         "//test/config/integration/certs",
