@@ -1,6 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
 
@@ -11,7 +12,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
     const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
     const quic::ProofVerifyContext* /*context*/, std::string* error_details,
-    std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
+    std::unique_ptr<quic::ProofVerifyDetails>* /*details*/, uint8_t* /*out_alert*/,
     std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
   ASSERT(!certs.empty());
   bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());

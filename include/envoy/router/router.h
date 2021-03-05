@@ -728,6 +728,17 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
+   * Returns the URL path as it will be calculated by finalizeRequestHeaders
+   * using current values of headers. Note that final path may be different if
+   * headers change before finalization.
+   * @param headers supplies the request headers.
+   * @return absl::optional<std::string> the value of the URL path after rewrite or absl::nullopt
+   *         if rewrite is not configured.
+   */
+  virtual absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;
+
+  /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
    * example URL prefix rewriting, adding headers, etc. This should only be called ONCE
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
@@ -798,6 +809,11 @@ public:
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return true if new style max_stream_duration config should be used over the old style.
+   */
+  virtual bool usingNewTimeouts() const PURE;
 
   /**
    * @return optional<std::chrono::milliseconds> the route's maximum stream duration.

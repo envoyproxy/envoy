@@ -35,7 +35,7 @@ namespace Config {
 // and/or stream/request (if required by the configuration being processed).
 //
 // Dynamic configuration is distributed via xDS APIs (see
-// https://github.com/envoyproxy/data-plane-api/blob/master/xds_protocol.rst). The framework exposed
+// https://github.com/envoyproxy/data-plane-api/blob/main/xds_protocol.rst). The framework exposed
 // by these classes simplifies creation of client xDS implementations following a shared ownership
 // model, where according to the config source specification, a config subscription, config protos
 // received over the subscription and the subsequent config "implementation" (i.e., data structures

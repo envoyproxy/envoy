@@ -61,7 +61,7 @@ public:
     return *listener.crypto_config_;
   }
 
-  static bool enabled(ActiveQuicListener& listener) { return listener.enabled_.enabled(); }
+  static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
 };
 
 class ActiveQuicListenerFactoryPeer {
@@ -87,7 +87,6 @@ protected:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
           return quic::CurrentSupportedVersions();
         }()[0]) {}
 
@@ -331,7 +330,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   sendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
-  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
+  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   readFromClientSockets();
 }
 
@@ -356,7 +355,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
-  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
+  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   readFromClientSockets();
 }
 
@@ -365,19 +364,19 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   sendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(quic_dispatcher_->session_map().size(), 1);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " false"}});
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // If listener was enabled, there should have been session created for active connection.
-  EXPECT_EQ(quic_dispatcher_->session_map().size(), 1);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
   sendCHLO(quic::test::TestConnectionId(2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_EQ(quic_dispatcher_->session_map().size(), 2);
+  EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
 
@@ -402,7 +401,7 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
   sendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
-  EXPECT_FALSE(quic_dispatcher_->session_map().empty());
+  EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   readFromClientSockets();
 }
