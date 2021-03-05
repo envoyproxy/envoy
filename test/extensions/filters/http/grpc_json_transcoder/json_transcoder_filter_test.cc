@@ -1224,6 +1224,25 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
   EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
+       TranscodingPercentEncodedTextHeadersInTrailerOnlyResponse) {
+  const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+        EXPECT_EQ(expected_response, data.toString());
+      }));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "5"},
+                                                   {"grpc-message", "Resource%20not%20found"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("404", response_headers.get_(":status"));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+  EXPECT_FALSE(response_headers.has("grpc-status"));
+  EXPECT_FALSE(response_headers.has("grpc-message"));
+}
+
 // Trailer-only response with grpc-status-details-bin header with details.
 // Also tests that a user-defined type from a proto descriptor in config can be used in details.
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
