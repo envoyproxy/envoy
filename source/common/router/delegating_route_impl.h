@@ -37,7 +37,7 @@ private:
  */
 class DelegatingRouteEntry : public Router::RouteEntry {
 public:
-  explicit DelegatingRouteEntry(const Router::RouteEntry* route_entry)
+  explicit DelegatingRouteEntry(const Router::RouteEntry& route_entry)
       : base_route_entry_(route_entry) {}
 
   // Router::ResponseEntry
@@ -84,7 +84,7 @@ public:
   const std::string& routeName() const override;
 
 private:
-  const Router::RouteEntry* base_route_entry_;
+  const Router::RouteEntry& base_route_entry_;
 };
 
 } // namespace Router
