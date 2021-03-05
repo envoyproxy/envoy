@@ -225,18 +225,12 @@ def envoy_cc_posix_without_linux_library(name, srcs = [], hdrs = [], **kargs):
         name = name + "_posix",
         srcs = select({
             "@envoy//bazel:windows_x86_64": [],
-            "@envoy//bazel:linux_x86_64": [],
-            "@envoy//bazel:linux_aarch64": [],
-            "@envoy//bazel:linux_ppc": [],
-            "@envoy//bazel:linux_mips64": [],
+            "@envoy//bazel:linux": [],
             "//conditions:default": srcs,
         }),
         hdrs = select({
             "@envoy//bazel:windows_x86_64": [],
-            "@envoy//bazel:linux_x86_64": [],
-            "@envoy//bazel:linux_aarch64": [],
-            "@envoy//bazel:linux_ppc": [],
-            "@envoy//bazel:linux_mips64": [],
+            "@envoy//bazel:linux": [],
             "//conditions:default": hdrs,
         }),
         **kargs
@@ -247,17 +241,11 @@ def envoy_cc_linux_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
         name = name + "_linux",
         srcs = select({
-            "@envoy//bazel:linux_x86_64": srcs,
-            "@envoy//bazel:linux_aarch64": srcs,
-            "@envoy//bazel:linux_ppc": srcs,
-            "@envoy//bazel:linux_mips64": srcs,
+            "@envoy//bazel:linux": srcs,
             "//conditions:default": [],
         }),
         hdrs = select({
-            "@envoy//bazel:linux_x86_64": hdrs,
-            "@envoy//bazel:linux_aarch64": hdrs,
-            "@envoy//bazel:linux_ppc": hdrs,
-            "@envoy//bazel:linux_mips64": hdrs,
+            "@envoy//bazel:linux": hdrs,
             "//conditions:default": [],
         }),
         **kargs
