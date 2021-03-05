@@ -11,7 +11,7 @@ namespace Envoy {
 TEST(PlatformImpl, Basic) {
   PlatformImpl platform;
 
-#if !defined(WIN32) && !defined(__APPLE__)
+#ifdef __linux__
   EXPECT_EQ(true, platform.enableCoreDump());
 #else
   EXPECT_EQ(false, platform.enableCoreDump());
