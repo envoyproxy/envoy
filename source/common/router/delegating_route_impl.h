@@ -15,7 +15,9 @@ namespace Router {
  */
 class DelegatingRoute : public Router::Route {
 public:
-  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(route) {}
+  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(route) {
+    ASSERT(base_route_ != nullptr);
+  }
 
   const Router::DirectResponseEntry* directResponseEntry() const override;
   const Router::RouteEntry* routeEntry() const override;
@@ -28,17 +30,17 @@ private:
 };
 
 /**
- * Wrapper class around Router::RouteEntry that delegates all method calls to the const
- * Router::RouteEntry* base route entry it wraps around.
+ * Wrapper class around Router::RouteEntry that delegates all method calls to the
+ * RouteConstSharedPtr base route it wraps around.
  *
- * Intended to be used with DelegatingRoute when a filter wants to override the routeEntry() method
- * while preserving the rest of the properties/behavior of the base route. See example with
- * SetRouteFilter in test/integration/filters.
+ * Intended to be used with DelegatingRoute when a filter wants to override the routeEntry() method.
+ * See example with SetRouteFilter in test/integration/filters.
  */
 class DelegatingRouteEntry : public Router::RouteEntry {
 public:
-  explicit DelegatingRouteEntry(const Router::RouteEntry& route_entry)
-      : base_route_entry_(route_entry) {}
+  explicit DelegatingRouteEntry(Router::RouteConstSharedPtr route) : base_route_(route) {
+    ASSERT(base_route_ != nullptr);
+  }
 
   // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -84,7 +86,7 @@ public:
   const std::string& routeName() const override;
 
 private:
-  const Router::RouteEntry& base_route_entry_;
+  Router::RouteConstSharedPtr base_route_;
 };
 
 } // namespace Router
