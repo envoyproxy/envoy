@@ -5,6 +5,19 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace KillRequest {
+namespace {
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define ASANITIZED /* Sanitized by Clang */
+#endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+#define ASANITIZED /* Sanitized by GCC */
+#endif
 
 class CrashIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
@@ -14,6 +27,12 @@ protected:
     initialize();
   }
 };
+
+// Insufficient support on Windows.
+#ifndef WIN32
+// ASAN hijacks the signal handlers, so the process will die but not output
+// the particular messages we expect.
+#ifndef ASANITIZED
 
 // Tests should run with all protocols.
 class CrashIntegrationTestAllProtocols : public CrashIntegrationTest {};
@@ -69,5 +88,11 @@ TEST_P(CrashIntegrationTestAllProtocols, ResponseCrashDumpsTheCorrespondingReque
       sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 1024),
       "Dumping corresponding downstream request.*UpstreamRequest.*request_headers:");
 }
+#endif
+#endif
 
+} // namespace
+} // namespace KillRequest
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
