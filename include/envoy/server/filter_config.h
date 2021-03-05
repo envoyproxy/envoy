@@ -207,7 +207,7 @@ public:
   virtual bool isTerminalFilter() { return false; }
 
   /**
-   * @return FilterDependencies specification of dependencies required or
+   * @return FilterDependenciesPtr specification of dependencies required or
    * provided on the decode and encode paths. This function returns an empty
    * filter dependencies specification by default, and can be overridden.
    */
