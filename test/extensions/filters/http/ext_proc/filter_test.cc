@@ -3,6 +3,7 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -36,6 +37,7 @@ using Http::LowerCaseString;
 
 using testing::Eq;
 using testing::Invoke;
+using testing::ReturnRef;
 using testing::Unused;
 
 using namespace std::chrono_literals;
@@ -48,12 +50,14 @@ protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
     EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
 
     envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
+    config_.reset(new FilterConfig(proto_config, 200ms, 10s, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -179,6 +183,7 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
