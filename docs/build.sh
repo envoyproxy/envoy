@@ -52,7 +52,6 @@ rm -rf "${DOCS_OUTPUT_DIR}"
 mkdir -p "${DOCS_OUTPUT_DIR}"
 
 rm -rf "${GENERATED_RST_DIR}"
-mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
@@ -76,7 +75,6 @@ BAZEL_BUILD_OPTIONS+=(
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
-mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.

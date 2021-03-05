@@ -10,13 +10,9 @@ py_binary(
     srcs = ["utils.py"],
     data = [
         "//bazel:repository_locations.bzl",
-        "@com_google_protobuf//:protobuf_python",
-        "@com_google_protobuf//:well_known_protos",
         "@envoy_api_canonical//bazel:repository_locations.bzl",
         "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
     ],
-    python_version = "PY3",
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
 )
 
@@ -25,8 +21,6 @@ py_binary(
     srcs = ["generate_external_dep_rst.py"],
     data = [
         ":utils",
-        "@com_google_protobuf//:protobuf_python",
-        "@com_google_protobuf//:well_known_protos",
     ],
     visibility = ["//visibility:public"],
 )
