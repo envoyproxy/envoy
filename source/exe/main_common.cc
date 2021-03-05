@@ -197,8 +197,8 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 MainCommon::MainCommon(const std::vector<std::string>& args)
     : options_(args, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            std::make_unique<Random::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
-            platform_impl_.fileSystem(), nullptr) {}
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
 
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
