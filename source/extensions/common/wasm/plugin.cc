@@ -20,11 +20,14 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
   if (config_.vm_config().has_environment_variables()) {
     auto envs = config_.vm_config().environment_variables();
 
-    // We reject NullVm with environment_variables configuration
-    // since it directly accesses Envoy's env vars.
+    // We reject NullVm with key_values configuration
+    // since it directly accesses Envoy's env vars and we should not modify Envoy's env vars here.
+    // TODO(mathetake): Once proxy_get_map_values(type::EnvironmentVariables, ..) call is supported,
+    // then remove this restriction
     if (config.vm_config().runtime() == WasmRuntimeNames::get().Null &&
-        (!envs.key_values().empty() || !envs.host_env_keys().empty())) {
-      throw EnvoyException("Environment variables must not be set for NullVm.");
+        (!envs.key_values().empty())) {
+      throw EnvoyException("envoy.extensions.wasm.v3.VmConfig.EnvironmentVariable.key_values must "
+                           "not be set for NullVm.");
     }
 
     // Check key duplication.
