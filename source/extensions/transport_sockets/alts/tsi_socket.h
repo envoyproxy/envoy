@@ -85,7 +85,7 @@ private:
   // default_max_frame_size_ is the maximum frame size supported by
   // TsiSocket.
   size_t default_max_frame_size_{16384};
-  // actual_frame_size_to_use_ is the acutal frame size used by
+  // actual_frame_size_to_use_ is the actual frame size used by
   // frame protector, which is the result of frame size negotiation.
   size_t actual_frame_size_to_use_{0};
 
