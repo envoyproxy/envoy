@@ -26,7 +26,7 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
     // then remove this restriction
     if (config.vm_config().runtime() == WasmRuntimeNames::get().Null &&
         !envs.key_values().empty()) {
-      throw EnvoyException("envoy.extensions.wasm.v3.VmConfig.EnvironmentVariable.key_values must "
+      throw EnvoyException("envoy.extensions.wasm.v3.VmConfig.EnvironmentVariables.key_values must "
                            "not be set for NullVm.");
     }
 
