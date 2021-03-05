@@ -518,6 +518,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-08-06",
         cpe = "cpe:2.3:a:json_project:json:*",
     ),
+    # This is an external dependency needed while running the
+    # envoy docker image. A bazel target has been created since
+    # there is no binary package available for the utility on Ubuntu
+    # which is the base image used to build an envoy container.
+    # This is not needed to build an envoy binary or run tests.
+    com_github_ncopa_suexec = dict(
+        project_name = "su-exec",
+        project_desc = "Utility to switch user and group id, setgroups and exec",
+        project_url = "https://github.com/ncopa/su-exec",
+        version = "212b75144bbc06722fbd7661f651390dc47a43d1",
+        sha256 = "939782774079ec156788ea3e04dd5e340e993544f4296be76a9c595334ca1779",
+        strip_prefix = "su-exec-{version}",
+        urls = ["https://github.com/ncopa/su-exec/archive/{version}.tar.gz"],
+        use_category = ["other"],
+        release_date = "2019-09-18",
+        cpe = "N/A",
+    ),
     com_github_twitter_common_lang = dict(
         project_name = "twitter.common.lang (Thrift)",
         project_desc = "twitter.common Python language and compatibility facilities",
