@@ -17,11 +17,11 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)) {
   ASSERT(worker_index_ < concurrency_);
-  config_->udpListenerWorkerRouter()->get().registerWorkerForListener(*this);
+  config_->udpListenerConfig()->listenerWorkerRouter().registerWorkerForListener(*this);
 }
 
 ActiveUdpListenerBase::~ActiveUdpListenerBase() {
-  config_->udpListenerWorkerRouter()->get().unregisterWorkerForListener(*this);
+  config_->udpListenerConfig()->listenerWorkerRouter().unregisterWorkerForListener(*this);
 }
 
 void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
@@ -56,8 +56,16 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
   if (dest == worker_index_) {
     onDataWorker(std::move(data));
   } else {
-    config_->udpListenerWorkerRouter()->get().deliver(dest, std::move(data));
+    config_->udpListenerConfig()->listenerWorkerRouter().deliver(dest, std::move(data));
   }
+}
+
+Event::Dispatcher::CreateUdpListenerParams
+ActiveUdpListenerBase::configToUdpListenerParams(Network::ListenerConfig& config) {
+  Event::Dispatcher::CreateUdpListenerParams params;
+  params.max_packet_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.udpListenerConfig()->config(), max_packet_size, 1500);
+  return params;
 }
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
@@ -81,8 +89,10 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
-                           dispatcher.createUdpListener(listen_socket_ptr, *this), config) {}
+    : ActiveRawUdpListener(
+          worker_index, concurrency, parent, listen_socket,
+          dispatcher.createUdpListener(listen_socket_ptr, *this, configToUdpListenerParams(config)),
+          config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
@@ -103,7 +113,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
   }
 
   // Create udp_packet_writer
-  udp_packet_writer_ = config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+  udp_packet_writer_ = config_->udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
       listen_socket_.ioHandle(), config.listenerScope());
 }
 

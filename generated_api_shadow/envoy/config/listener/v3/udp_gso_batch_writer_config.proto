@@ -9,9 +9,9 @@ option java_outer_classname = "UdpGsoBatchWriterConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Udp Gso Batch Writer Config]
+// [#protodoc-title: UDP GSO Batch Writer]
+// [#extension: envoy.udp_packet_writers.udp_gso_batch_writer]
 
-// [#not-implemented-hide:]
-// Configuration specific to the Udp Gso Batch Writer.
+// Configuration specific to the UDP GSO Batch Writer.
 message UdpGsoBatchWriterOptions {
 }

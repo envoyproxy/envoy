@@ -459,14 +459,15 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "udp_gso_batch_writer_config_lib",
     srcs = ["udp_gso_batch_writer_config.cc"],
     hdrs = ["udp_gso_batch_writer_config.h"],
+    category = "envoy.udp_packet_writers",
+    security_posture = "unknown",
+    status = "alpha",
     tags = ["nofips"],
-    visibility = [
-        "//test/server:__subpackages__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         ":udp_gso_batch_writer_lib",
         "//include/envoy/network:udp_packet_writer_config_interface",

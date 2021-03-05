@@ -231,10 +231,16 @@ public:
    * Creates a logical udp listener on a specific port.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the udp listener callbacks to invoke for listener events.
+   * @param params supplies the listener creation params.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
+  struct CreateUdpListenerParams {
+    // The maximum size packet to receive.
+    uint64_t max_packet_size_;
+  };
   virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                                    Network::UdpListenerCallbacks& cb) PURE;
+                                                    Network::UdpListenerCallbacks& cb,
+                                                    const CreateUdpListenerParams& params) PURE;
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */

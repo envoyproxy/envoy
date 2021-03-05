@@ -179,14 +179,14 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  * instantiate the buffer returned in data.
  */
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data);
+                                       UdpRecvData& data, uint64_t max_packet_size = 1500);
 
 /**
  * A synchronous UDP peer that can be used for testing.
  */
 class UdpSyncPeer {
 public:
-  UdpSyncPeer(Network::Address::IpVersion version);
+  UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_packet_size = 1500);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);
@@ -201,6 +201,7 @@ public:
 
 private:
   const Network::SocketPtr socket_;
+  const uint64_t max_packet_size_;
   std::list<Network::UdpRecvData> received_datagrams_;
 };
 

@@ -63,7 +63,7 @@ public:
       server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
     }
     listener_ = std::make_unique<UdpListenerImpl>(
-        dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+        dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource(), 1500);
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
@@ -86,7 +86,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
-                           dispatcherImpl().timeSource());
+                           dispatcherImpl().timeSource(), 1500);
 
 #ifdef SO_RXQ_OVFL
   // Verify that overflow detection is enabled.
@@ -177,6 +177,26 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(2, listener_->packetsDropped());
 }
+
+#ifdef UDP_GRO
+TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
+  ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
+  client_.write(std::string(32768, 'a'), *send_to_addr_);
+  const std::string second("second");
+  client_.write(second, *send_to_addr_);
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data, 1);
+    EXPECT_EQ(data.buffer_->toString(), second);
+
+    dispatcher_->exit();
+  }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(1, listener_->packetsDropped());
+}
+#endif
 
 /**
  * Tests UDP listener for read and write callbacks with actual data.

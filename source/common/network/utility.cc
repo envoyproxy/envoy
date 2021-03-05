@@ -575,16 +575,17 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
     const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
+    ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_packet_size_with_gro);
 
     Api::IoCallUint64Result result =
         receiveMessage(max_packet_size_with_gro, buffer, output, handle, local_address);
 
-    if (!result.ok()) {
+    if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
       return result;
     }
 
     const uint64_t gso_size = output.msg_[0].gso_size_;
-    ENVOY_LOG_MISC(trace, "recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
+    ENVOY_LOG_MISC(trace, "gro recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
 
     // Skip gso segmentation and proceed as a single payload.
     if (gso_size == 0u) {
@@ -595,6 +596,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     }
 
     // Segment the buffer read by the recvmsg syscall into gso_sized sub buffers.
+    // TODO(mattklein123): The following code should be optimized to avoid buffer copies, either by
+    // switching to slices or by using a CoW buffer type.
     while (buffer->length() > 0) {
       const uint64_t bytes_to_copy = std::min(buffer->length(), gso_size);
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -631,6 +634,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     }
 
     IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
+    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", num_packets_per_mmsg_call,
+                   max_packet_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
     if (!result.ok()) {
       return result;
@@ -660,6 +665,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
+  ENVOY_LOG_MISC(trace, "starting recvmsg with max={}", udp_packet_processor.maxPacketSize());
   Api::IoCallUint64Result result =
       receiveMessage(udp_packet_processor.maxPacketSize(), buffer, output, handle, local_address);
 
@@ -700,8 +706,10 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
               : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
                  1);
       // TODO(danzh) add stats for this.
-      ENVOY_LOG_MISC(
-          debug, "Kernel dropped {} more packets. Consider increase receive buffer size.", delta);
+      ENVOY_LOG_MISC(debug,
+                     "Kernel dropped {} packet(s). Consider increasing receive buffer size and/or "
+                     "max packet size.",
+                     delta);
     }
   } while (true);
 }

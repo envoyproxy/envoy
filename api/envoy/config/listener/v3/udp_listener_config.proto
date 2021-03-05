@@ -2,7 +2,10 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/core/v3/extension.proto";
+
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -15,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: UDP Listener Config]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// [#next-free-field: 6]
 message UdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.UdpListenerConfig";
@@ -34,6 +38,17 @@ message UdpListenerConfig {
   oneof config_type {
     google.protobuf.Any typed_config = 3;
   }
+
+  // The maximum size of received UDP packets. Using a larger size will cause Envoy to allocate
+  // more memory per listener. If not set defaults to 1500 bytes.
+  google.protobuf.UInt64Value max_packet_size = 4;
+
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the
+  // actual UDP writer to create. If not specified the default UDP writer is used.
+  // [#extension-category: envoy.udp_packet_writers]
+  core.v3.TypedExtensionConfig writer_config = 5;
 }
 
 message ActiveRawUdpListenerConfig {
