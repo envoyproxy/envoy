@@ -248,20 +248,7 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
 
 TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
-  EXPECT_TRUE(stream_info.getRequestIDExtension());
-
-  auto rid_extension = stream_info.getRequestIDExtension();
-
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  rid_extension->set(request_headers, false);
-  rid_extension->set(request_headers, true);
-  rid_extension->setInResponse(response_headers, request_headers);
-  uint64_t out = 123;
-  EXPECT_FALSE(rid_extension->modBy(request_headers, out, 10000));
-  EXPECT_EQ(out, 123);
-  rid_extension->setTraceStatus(request_headers, Http::TraceStatus::Forced);
-  EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
+  EXPECT_EQ(nullptr, stream_info.getRequestIDProvider());
 }
 
 TEST_F(StreamInfoImplTest, ConnectionID) {

@@ -89,8 +89,11 @@ public:
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));
-  MOCK_METHOD(Http::RequestIDExtensionSharedPtr, getRequestIDExtension, (), (const));
-  MOCK_METHOD(void, setRequestIDExtension, (Http::RequestIDExtensionSharedPtr));
+  MOCK_METHOD(const Http::RequestIdStreamInfoProvider*, getRequestIDProvider, (), (const));
+  MOCK_METHOD(void, setRequestIDProvider,
+              (const Http::RequestIdStreamInfoProviderSharedPtr& provider));
+  MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
+  MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
   MOCK_METHOD(void, setConnectionID, (uint64_t));
   MOCK_METHOD(void, setFilterChainName, (const absl::string_view));

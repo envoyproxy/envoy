@@ -3,15 +3,12 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/http/request_id_extension.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
-#include "common/common/random_generator.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -42,34 +39,15 @@ namespace Tracing {
 namespace {
 
 TEST(HttpTracerUtilityTest, IsTracing) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  StreamInfo::MockStreamInfo stream_info;
   NiceMock<Stats::MockStore> stats;
-  Random::RandomGeneratorImpl random;
-  std::string not_traceable_guid = random.uuid();
-
-  auto rid_extension = Http::RequestIDExtensionFactory::defaultInstance(random);
-  ON_CALL(stream_info, getRequestIDExtension()).WillByDefault(Return(rid_extension));
-
-  std::string forced_guid = random.uuid();
-  Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
-  rid_extension->setTraceStatus(forced_header, Http::TraceStatus::Forced);
-
-  std::string sampled_guid = random.uuid();
-  Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
-  rid_extension->setTraceStatus(sampled_header, Http::TraceStatus::Sampled);
-
-  std::string client_guid = random.uuid();
-  Http::TestRequestHeaderMapImpl client_header{{"x-request-id", client_guid}};
-  rid_extension->setTraceStatus(client_header, Http::TraceStatus::Client);
-
-  Http::TestRequestHeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
-  Http::TestRequestHeaderMapImpl empty_header{};
 
   // Force traced.
   {
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
+    EXPECT_CALL(stream_info, traceReason()).WillOnce(Return(Reason::ServiceForced));
 
-    Decision result = HttpTracerUtility::isTracing(stream_info, forced_header);
+    Decision result = HttpTracerUtility::shouldTraceRequest(stream_info);
     EXPECT_EQ(Reason::ServiceForced, result.reason);
     EXPECT_TRUE(result.traced);
   }
@@ -77,18 +55,18 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   // Sample traced.
   {
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
+    EXPECT_CALL(stream_info, traceReason()).WillOnce(Return(Reason::Sampling));
 
-    Decision result = HttpTracerUtility::isTracing(stream_info, sampled_header);
+    Decision result = HttpTracerUtility::shouldTraceRequest(stream_info);
     EXPECT_EQ(Reason::Sampling, result.reason);
     EXPECT_TRUE(result.traced);
   }
 
   // Health Check request.
   {
-    Http::TestRequestHeaderMapImpl traceable_header_hc{{"x-request-id", forced_guid}};
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
 
-    Decision result = HttpTracerUtility::isTracing(stream_info, traceable_header_hc);
+    Decision result = HttpTracerUtility::shouldTraceRequest(stream_info);
     EXPECT_EQ(Reason::HealthCheck, result.reason);
     EXPECT_FALSE(result.traced);
   }
@@ -96,27 +74,20 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   // Client traced.
   {
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
+    EXPECT_CALL(stream_info, traceReason()).WillOnce(Return(Reason::ClientForced));
 
-    Decision result = HttpTracerUtility::isTracing(stream_info, client_header);
+    Decision result = HttpTracerUtility::shouldTraceRequest(stream_info);
     EXPECT_EQ(Reason::ClientForced, result.reason);
     EXPECT_TRUE(result.traced);
   }
 
   // No request id.
   {
-    Http::TestRequestHeaderMapImpl headers;
     EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
-    Decision result = HttpTracerUtility::isTracing(stream_info, headers);
-    EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
-    EXPECT_FALSE(result.traced);
-  }
+    EXPECT_CALL(stream_info, traceReason()).WillOnce(Return(Reason::NotTraceable));
 
-  // Broken request id.
-  {
-    Http::TestRequestHeaderMapImpl headers{{"x-request-id", "not-real-x-request-id"}};
-    EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(false));
-    Decision result = HttpTracerUtility::isTracing(stream_info, headers);
-    EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
+    Decision result = HttpTracerUtility::shouldTraceRequest(stream_info);
+    EXPECT_EQ(Reason::NotTraceable, result.reason);
     EXPECT_FALSE(result.traced);
   }
 }

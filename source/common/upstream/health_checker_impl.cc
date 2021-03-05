@@ -22,7 +22,6 @@
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "absl/strings/match.h"

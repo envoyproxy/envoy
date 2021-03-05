@@ -25,7 +25,6 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
-#include "common/config/resource_name.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_utility.h"

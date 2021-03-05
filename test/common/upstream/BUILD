@@ -303,6 +303,7 @@ envoy_cc_test(
     srcs = ["load_balancer_simulation_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -522,6 +523,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/common:random_generator_lib",
         "//source/common/memory:stats_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",

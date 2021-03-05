@@ -514,7 +514,7 @@ public:
     return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
-  MOCK_METHOD(RequestIDExtensionSharedPtr, requestIDExtension, ());
+  MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));

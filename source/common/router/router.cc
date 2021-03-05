@@ -39,7 +39,6 @@
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 

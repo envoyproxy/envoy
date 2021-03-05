@@ -149,13 +149,13 @@ private:
    * Wraps a single active stream on the connection. These are either full request/response pairs
    * or pushes.
    */
-  struct ActiveStream : LinkedObject<ActiveStream>,
-                        public Event::DeferredDeletable,
-                        public StreamCallbacks,
-                        public RequestDecoder,
-                        public Tracing::Config,
-                        public ScopeTrackedObject,
-                        public FilterManagerCallbacks {
+  struct ActiveStream final : LinkedObject<ActiveStream>,
+                              public Event::DeferredDeletable,
+                              public StreamCallbacks,
+                              public RequestDecoder,
+                              public Tracing::Config,
+                              public ScopeTrackedObject,
+                              public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
     void completeRequest();
 

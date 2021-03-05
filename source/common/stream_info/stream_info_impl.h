@@ -9,11 +9,11 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/macros.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
@@ -253,12 +253,16 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) override {
-    request_id_extension_ = utils;
+  void setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) override {
+    ASSERT(provider != nullptr);
+    request_id_provider_ = provider;
   }
-  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
-    return request_id_extension_;
+  const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const override {
+    return request_id_provider_.get();
   }
+
+  void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
+  Tracing::Reason traceReason() const override { return trace_reason_; }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -324,7 +328,7 @@ private:
         downstream_address_provider_(downstream_address_provider != nullptr
                                          ? downstream_address_provider
                                          : emptyDownstreamAddressProvider()),
-        request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
+        trace_reason_(Tracing::Reason::NotTraceable) {}
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
@@ -334,12 +338,13 @@ private:
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
-  Http::RequestIDExtensionSharedPtr request_id_extension_;
+  Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
+  Tracing::Reason trace_reason_;
 };
 
 } // namespace StreamInfo

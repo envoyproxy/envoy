@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -66,25 +67,20 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
-                                      const Http::RequestHeaderMap& request_headers) {
+Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
   // Exclude health check requests immediately.
   if (stream_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }
 
-  Http::TraceStatus trace_status =
-      stream_info.getRequestIDExtension()->getTraceStatus(request_headers);
-
-  switch (trace_status) {
-  case Http::TraceStatus::Client:
-    return {Reason::ClientForced, true};
-  case Http::TraceStatus::Forced:
-    return {Reason::ServiceForced, true};
-  case Http::TraceStatus::Sampled:
-    return {Reason::Sampling, true};
-  case Http::TraceStatus::NoTrace:
-    return {Reason::NotTraceableRequestId, false};
+  const Tracing::Reason trace_reason = stream_info.traceReason();
+  switch (trace_reason) {
+  case Reason::ClientForced:
+  case Reason::ServiceForced:
+  case Reason::Sampling:
+    return {trace_reason, true};
+  default:
+    return {trace_reason, false};
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
