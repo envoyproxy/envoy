@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/filter.h"
@@ -152,6 +153,9 @@ public:
   std::string category() const override { return "envoy.filters.upstream_network"; }
 };
 
+using FilterDependenciesPtr =
+    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::FilterDependencies>;
+
 /**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
@@ -201,6 +205,16 @@ public:
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
   virtual bool isTerminalFilter() { return false; }
+
+  /**
+   * @return FilterDependenciesPtr specification of dependencies required or
+   * provided on the decode and encode paths. This function returns an empty
+   * filter dependencies specification by default, and can be overridden.
+   */
+  virtual FilterDependenciesPtr dependencies() {
+    return std::make_unique<
+        envoy::extensions::filters::common::dependency::v3::FilterDependencies>();
+  }
 };
 
 } // namespace Configuration
