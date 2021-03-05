@@ -5,17 +5,38 @@ namespace Router {
 
 // Router::DelegatingRoute
 const DirectResponseEntry* DelegatingRoute::directResponseEntry() const {
-  return base_route_->directResponseEntry();
+  if (base_route_ != nullptr) {
+    return base_route_->directResponseEntry();
+  }
+  return nullptr;
 }
 
-const RouteEntry* DelegatingRoute::routeEntry() const { return base_route_->routeEntry(); }
+const RouteEntry* DelegatingRoute::routeEntry() const {
+  if (base_route_ != nullptr) {
+    return base_route_->routeEntry();
+  }
+  return nullptr;
+}
 
-const Decorator* DelegatingRoute::decorator() const { return base_route_->decorator(); }
+const Decorator* DelegatingRoute::decorator() const {
+  if (base_route_ != nullptr) {
+    return base_route_->decorator();
+  }
+  return nullptr;
+}
 
-const RouteTracing* DelegatingRoute::tracingConfig() const { return base_route_->tracingConfig(); }
+const RouteTracing* DelegatingRoute::tracingConfig() const {
+  if (base_route_ != nullptr) {
+    return base_route_->tracingConfig();
+  }
+  return nullptr;
+}
 
 const RouteSpecificFilterConfig* DelegatingRoute::perFilterConfig(const std::string& name) const {
-  return base_route_->perFilterConfig(name);
+  if (base_route_ != nullptr) {
+    return base_route_->perFilterConfig(name);
+  }
+  return nullptr;
 }
 
 // Router:DelegatingRouteEntry
