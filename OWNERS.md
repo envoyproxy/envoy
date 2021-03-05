@@ -43,7 +43,6 @@ routing PRs, questions, etc. to the right place.
 # Envoy security team
 
 * All maintainers
-* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
 
 # Emeritus maintainers
@@ -58,15 +57,9 @@ routing PRs, questions, etc. to the right place.
 This section lists a few people that are not maintainers but typically help out with subject
 matter expert reviews. Feel free to loop them in as needed.
 
-* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-  * TLS, BoringSSL, and core networking (listeners, connections, etc.).
-* Shriram Rajagopalan ([rshriram](https://github.com/rshriram)) (shriram@us.ibm.com)
-  * Istio, APIs, HTTP routing, and WebSocket.
-* John Millikin ([jmillikin-stripe](https://github.com/jmillikin-stripe)) (jmillikin@stripe.com)
-  * Bazel/build.
-* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
-  * Redis, Python, configuration/operational questions.
 * Yuchen Dai ([lambdai](https://github.com/lambdai)) (lambdai@google.com)
   * v2 xDS, listeners, filter chain discovery service.
 * Michael Payne ([moderation](https://github.com/moderation)) (m@m17e.org)
   * External dependencies, Envoy's supply chain and documentation.
+* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
+  * Scalability and performance.

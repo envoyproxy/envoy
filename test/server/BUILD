@@ -20,6 +20,7 @@ envoy_cc_test(
     srcs = ["api_listener_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/extensions/request_id/uuid:config",
         "//source/server:listener_manager_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
@@ -132,6 +133,18 @@ envoy_cc_test(
         "//source/server:hot_restarting_child",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "hot_restarting_base_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
+    deps = [
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_base",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -264,6 +277,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",

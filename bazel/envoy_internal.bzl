@@ -104,6 +104,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({
+               repository + "//bazel:enable_log_fast_debug_assert_in_release": ["-DENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_known_issue_asserts": ["-DENVOY_DISABLE_KNOWN_ISSUE_ASSERTS"],
                "//conditions:default": [],
            }) + select({

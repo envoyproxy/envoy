@@ -2,7 +2,7 @@
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
-load("@rules_fuzzing//fuzzing:cc_deps.bzl", "fuzzing_decoration")
+load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
 load(
@@ -133,21 +133,6 @@ def envoy_cc_fuzz_test(
         corpus = [corpus_name],
         dicts = dictionaries,
         define_regression_test = False,
-    )
-
-    # This target exists only for
-    # https://github.com/google/oss-fuzz/blob/master/projects/envoy/build.sh. It won't yield
-    # anything useful on its own, as it expects to be run in an environment where the linker options
-    # provide a path to FuzzingEngine.
-    cc_binary(
-        name = name + "_driverless",
-        copts = ["-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"] +
-                envoy_copts("@envoy", test = True),
-        linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
-        linkstatic = 1,
-        testonly = 1,
-        deps = [":" + test_lib_name],
-        tags = ["manual"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.
