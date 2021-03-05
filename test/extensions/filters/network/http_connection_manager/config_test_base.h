@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
