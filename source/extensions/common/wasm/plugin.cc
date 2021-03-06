@@ -18,12 +18,12 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
   }
 
   if (config_.vm_config().has_environment_variables()) {
-    auto envs = config_.vm_config().environment_variables();
+    const auto& envs = config_.vm_config().environment_variables();
 
     // We reject NullVm with key_values configuration
     // since it directly accesses Envoy's env vars and we should not modify Envoy's env vars here.
     // TODO(mathetake): Once proxy_get_map_values(type::EnvironmentVariables, ..) call is supported,
-    // then remove this restriction
+    // then remove this restriction.
     if (config.vm_config().runtime() == WasmRuntimeNames::get().Null &&
         !envs.key_values().empty()) {
       throw EnvoyException("envoy.extensions.wasm.v3.VmConfig.EnvironmentVariables.key_values must "
@@ -32,13 +32,11 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
 
     // Check key duplication.
     absl::flat_hash_set<std::string> keys;
-    for (auto& env : envs.key_values()) {
+    for (const auto& env : envs.key_values()) {
       keys.insert(env.first);
     }
-    for (auto& key : envs.host_env_keys()) {
-      if (keys.find(key) == keys.end()) {
-        keys.insert(key);
-      } else {
+    for (const auto& key : envs.host_env_keys()) {
+      if (!keys.insert(key).second) {
         throw EnvoyException(
             fmt::format("Key {} is duplicated in "
                         "envoy.extensions.wasm.v3.VmConfig.environment_variables for {}. "
@@ -48,10 +46,10 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
     }
 
     // Construct merged key-value pairs.
-    for (auto& env : envs.key_values()) {
+    for (const auto& env : envs.key_values()) {
       envs_[env.first] = env.second;
     }
-    for (auto& key : envs.host_env_keys()) {
+    for (const auto& key : envs.host_env_keys()) {
       if (auto value = std::getenv(key.data())) {
         envs_[key] = value;
       }

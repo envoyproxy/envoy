@@ -79,9 +79,10 @@ TEST(TestWasmConfig, NullVMEnv) {
         ->mutable_environment_variables()
         ->mutable_key_values())["key"] = "value";
 
-  EXPECT_THROW_WITH_MESSAGE(WasmConfig config(plugin_config), EnvoyException,
-                            "envoy.extensions.wasm.v3.VmConfig.EnvironmentVariables.key_values must "
-                            "not be set for NullVm.");
+  EXPECT_THROW_WITH_MESSAGE(
+      WasmConfig config(plugin_config), EnvoyException,
+      "envoy.extensions.wasm.v3.VmConfig.EnvironmentVariables.key_values must "
+      "not be set for NullVm.");
 }
 
 } // namespace
