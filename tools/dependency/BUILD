@@ -13,7 +13,6 @@ py_binary(
         "@envoy_api_canonical//bazel:repository_locations.bzl",
         "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
     ],
-    visibility = ["//visibility:public"],
 )
 
 py_binary(
@@ -22,5 +21,4 @@ py_binary(
     data = [
         ":utils",
     ],
-    visibility = ["//visibility:public"],
 )
