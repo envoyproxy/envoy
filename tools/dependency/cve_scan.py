@@ -7,7 +7,6 @@ from collections import defaultdict, namedtuple
 import datetime as dt
 import gzip
 import json
-import os
 import re
 import sys
 import textwrap
