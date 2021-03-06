@@ -7,10 +7,13 @@ from collections import defaultdict, namedtuple
 import datetime as dt
 import gzip
 import json
+import os
 import re
 import sys
 import textwrap
 import urllib.request
+
+os.environ["API_PATH"] = "external/envoy_api_canonical"
 
 import utils as dep_utils
 

@@ -22,3 +22,19 @@ py_binary(
         ":utils",
     ],
 )
+
+py_binary(
+    name = "cve_scan",
+    srcs = ["cve_scan.py"],
+    data = [
+        ":utils",
+    ],
+)
+
+py_binary(
+    name = "cve_scan_test",
+    srcs = ["cve_scan_test.py"],
+    data = [
+        ":cve_scan",
+    ],
+)
