@@ -6,6 +6,7 @@
 #include <queue>
 #include <sstream>
 
+#include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
@@ -62,5 +63,8 @@ inline std::ostream& operator<<(std::ostream& os,
   debug_string << "}";
   return os << debug_string.str();
 }
+
+template <typename Key, typename Compare, typename Rep>
+using QuicOrderedSetImpl = absl::btree_set<Key, Compare>;
 
 } // namespace quic

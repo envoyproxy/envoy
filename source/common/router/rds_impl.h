@@ -119,10 +119,7 @@ class RdsRouteConfigSubscription
 public:
   ~RdsRouteConfigSubscription() override;
 
-  absl::node_hash_set<RouteConfigProvider*>& routeConfigProviders() {
-    ASSERT(route_config_providers_.size() == 1 || route_config_providers_.empty());
-    return route_config_providers_;
-  }
+  absl::optional<RouteConfigProvider*>& routeConfigProvider() { return route_config_provider_opt_; }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
   void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
@@ -139,7 +136,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);
   }
 
@@ -169,8 +166,7 @@ private:
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const uint64_t manager_identifier_;
-  // TODO(lambdai): Prove that a subscription has exactly one provider and remove the container.
-  absl::node_hash_set<RouteConfigProvider*> route_config_providers_;
+  absl::optional<RouteConfigProvider*> route_config_provider_opt_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;

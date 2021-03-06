@@ -5,6 +5,7 @@
 
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

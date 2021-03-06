@@ -2,8 +2,6 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
-#include "common/runtime/runtime_features.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -66,9 +64,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-    client->connection_->noDelay(true);
-  }
+  client->connection_->noDelay(true);
   return client;
 }
 

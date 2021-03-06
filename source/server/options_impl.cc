@@ -156,6 +156,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   TCLAP::ValueArg<std::string> socket_mode("", "socket-mode", "Socket file permission", false,
                                            "600", "string", cmd);
+  TCLAP::SwitchArg enable_core_dump("", "enable-core-dump", "Enable core dumps", cmd, false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -177,6 +178,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
+  core_dump_enabled_ = enable_core_dump.getValue();
 
   cpuset_threads_ = cpuset_threads.getValue();
 

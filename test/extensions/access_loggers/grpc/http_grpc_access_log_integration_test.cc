@@ -107,8 +107,7 @@ public:
     }
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -151,9 +150,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -174,9 +174,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -222,9 +223,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:

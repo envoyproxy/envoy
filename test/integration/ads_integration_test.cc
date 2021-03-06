@@ -1467,6 +1467,60 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   testBasicFlow();
 }
 
+// Node is resent on a dynamic context parameter update.
+TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
+  initialize();
+
+  // Check that the node is sent in each request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}, false));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, false));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {}, {}, false));
+
+  // Set a Cluster DCP.
+  test_server_->setDynamicContextParam(Config::TypeUrl::get().Cluster, "foo", "bar");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_EQ("bar",
+            last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().at("foo"));
+
+  // Modify Cluster DCP.
+  test_server_->setDynamicContextParam(Config::TypeUrl::get().Cluster, "foo", "baz");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_EQ("baz",
+            last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().at("foo"));
+
+  // Modify CLA DCP (some other resource type URL).
+  test_server_->setDynamicContextParam(Config::TypeUrl::get().ClusterLoadAssignment, "foo", "b");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {}, {}, true));
+  EXPECT_EQ("b", last_node_.dynamic_parameters()
+                     .at(Config::TypeUrl::get().ClusterLoadAssignment)
+                     .params()
+                     .at("foo"));
+  EXPECT_EQ("baz",
+            last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().at("foo"));
+
+  // Clear Cluster DCP.
+  test_server_->unsetDynamicContextParam(Config::TypeUrl::get().Cluster, "foo");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_EQ(
+      0, last_node_.dynamic_parameters().at(Config::TypeUrl::get().Cluster).params().count("foo"));
+}
+
 class XdsTpAdsIntegrationTest : public AdsIntegrationTest {
 public:
   void initialize() override {

@@ -1,9 +1,9 @@
-load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary")
 load("@proxy_wasm_cpp_sdk//bazel/wasm:wasm.bzl", "wasm_cc_binary")
+load("@rules_rust//rust:rust.bzl", "rust_binary")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
-        "//command_line_option:platforms": "@io_bazel_rules_rust//rust/platform:wasm",
+        "//command_line_option:platforms": "@rules_rust//rust/platform:wasm",
     }
 
 wasm_rust_transition = transition(

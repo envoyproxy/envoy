@@ -337,6 +337,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
+      using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
@@ -638,43 +639,54 @@ RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
   return prefix_rewrite_redirect_;
 }
 
-// finalizePathHeaders does the "standard" path rewriting, meaning that it
+void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
+                                            absl::string_view matched_path,
+                                            bool insert_envoy_original_path) const {
+  absl::optional<std::string> new_path =
+      currentUrlPathAfterRewriteWithMatchedPath(headers, matched_path);
+  if (!new_path.has_value()) {
+    // There are no rewrites configured. Just return.
+    return;
+  }
+
+  if (insert_envoy_original_path) {
+    headers.setEnvoyOriginalPath(headers.getPathValue());
+  }
+
+  headers.setPath(new_path.value());
+}
+
+// currentUrlPathAfterRewriteWithMatchedPath does the "standard" path rewriting, meaning that it
 // handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
 // which can be specified. The "matched_path" argument applies only to the
 // prefix rewriting, and describes the portion of the path (excluding query
 // parameters) that should be replaced by the rewrite. A "regex_rewrite"
 // applies to the entire path (excluding query parameters), regardless of what
 // portion was matched.
-void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
-                                            absl::string_view matched_path,
-                                            bool insert_envoy_original_path) const {
+absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
+    const Http::RequestHeaderMap& headers, absl::string_view matched_path) const {
   absl::optional<std::string> container;
   const auto& rewrite = getPathRewrite(headers, container);
-  if (rewrite.empty() && regex_rewrite_ == nullptr) {
-    // There are no rewrites configured. Just return.
-    return;
+  if (!rewrite.empty() || regex_rewrite_ != nullptr) {
+    // TODO(perf): can we avoid the string copy for the common case?
+    std::string path(headers.getPathValue());
+
+    if (!rewrite.empty()) {
+      ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                             : absl::StartsWithIgnoreCase(path, matched_path));
+      return path.replace(0, matched_path.size(), rewrite);
+    }
+
+    if (regex_rewrite_ != nullptr) {
+      // Replace the entire path, but preserve the query parameters
+      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+      return path.replace(0, just_path.size(),
+                          regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
+    }
   }
 
-  // TODO(perf): can we avoid the string copy for the common case?
-  std::string path(headers.getPathValue());
-  if (insert_envoy_original_path) {
-    headers.setEnvoyOriginalPath(path);
-  }
-
-  if (!rewrite.empty()) {
-    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                           : absl::StartsWithIgnoreCase(path, matched_path));
-    headers.setPath(path.replace(0, matched_path.size(), rewrite));
-    return;
-  }
-
-  if (regex_rewrite_ != nullptr) {
-    // Replace the entire path, but preserve the query parameters
-    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
-    headers.setPath(path.replace(
-        0, just_path.size(), regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_)));
-    return;
-  }
+  // There are no rewrites configured.
+  return absl::optional<std::string>();
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
@@ -1018,6 +1030,11 @@ void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   finalizePathHeader(headers, prefix_, insert_envoy_original_path);
 }
 
+absl::optional<std::string>
+PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
+}
+
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
@@ -1038,6 +1055,11 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
   finalizePathHeader(headers, path_, insert_envoy_original_path);
+}
+
+absl::optional<std::string>
+PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_);
 }
 
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1079,6 +1101,12 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
+absl::optional<std::string>
+RegexRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path);
+}
+
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
@@ -1101,6 +1129,12 @@ void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
   const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   finalizePathHeader(headers, path, insert_envoy_original_path);
+}
+
+absl::optional<std::string>
+ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path);
 }
 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1498,6 +1532,18 @@ PerFilterConfigs::PerFilterConfigs(
         name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 
@@ -1510,6 +1556,18 @@ PerFilterConfigs::PerFilterConfigs(
                                                   it.second, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
+        throw EnvoyException(fmt::format(
+            "The filter {} doesn't support virtual host-specific configurations", name));
+      } else {
+        ENVOY_LOG(warn,
+                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                  "true to reject any invalid virtual-host specific configuration.",
+                  name);
+      }
     }
   }
 }
