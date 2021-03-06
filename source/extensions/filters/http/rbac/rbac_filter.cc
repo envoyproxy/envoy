@@ -18,6 +18,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
+      shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
 
@@ -91,14 +92,10 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
 
     auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
-      *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
-                  .ShadowEffectivePolicyIdField]
-           .mutable_string_value() = effective_policy_id;
+      *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = effective_policy_id;
     }
 
-    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
-         .mutable_string_value() = shadow_resp_code;
-
+    *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_resp_code;
     callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
 

@@ -16,6 +16,7 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
+      shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
       enforcement_type_(proto_config.enforcement_type()) {}
@@ -86,11 +87,9 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
   ProtobufWkt::Struct metrics;
   auto& fields = *metrics.mutable_fields();
   if (!shadow_policy_id.empty()) {
-    *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEffectivePolicyIdField]
-         .mutable_string_value() = shadow_policy_id;
+    *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = shadow_policy_id;
   }
-  *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
-       .mutable_string_value() = shadow_engine_result;
+  *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_engine_result;
   callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
 }
 
