@@ -235,6 +235,11 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
+   * @return bool indicating whether core dumps have been enabled.
+   */
+  virtual bool coreDumpEnabled() const PURE;
+
+  /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.
    */
   virtual bool cpusetThreadsEnabled() const PURE;

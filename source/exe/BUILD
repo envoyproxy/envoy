@@ -2,8 +2,9 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_library",
-    "envoy_cc_platform_dep",
-    "envoy_cc_posix_library",
+    "envoy_cc_linux_library",
+    "envoy_cc_platform_specific_dep",
+    "envoy_cc_posix_without_linux_library",
     "envoy_cc_win32_library",
     "envoy_package",
 )
@@ -142,7 +143,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "platform_impl_lib",
     deps = [":platform_header_lib"] +
-           envoy_cc_platform_dep("platform_impl_lib"),
+           envoy_cc_platform_specific_dep("platform_impl_lib"),
 )
 
 envoy_cc_library(
@@ -154,9 +155,19 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_posix_library(
+envoy_cc_posix_without_linux_library(
     name = "platform_impl_lib",
     srcs = ["posix/platform_impl.cc"],
+    deps = [
+        ":platform_header_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
+)
+
+envoy_cc_linux_library(
+    name = "platform_impl_lib",
+    srcs = ["linux/platform_impl.cc"],
     deps = [
         ":platform_header_lib",
         "//source/common/common:thread_lib",

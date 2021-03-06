@@ -58,4 +58,6 @@ PlatformImpl::PlatformImpl()
 
 PlatformImpl::~PlatformImpl() { ::WSACleanup(); }
 
+bool PlatformImpl::enableCoreDump() { return false; }
+
 } // namespace Envoy

@@ -243,6 +243,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
   EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
   EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
+  EXPECT_EQ(options->coreDumpEnabled(), command_line_options->enable_core_dump());
   EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
   EXPECT_EQ(options->socketPath(), command_line_options->socket_path());
   EXPECT_EQ(options->socketMode(), command_line_options->socket_mode());

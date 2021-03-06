@@ -1,3 +1,9 @@
+#if !defined(__linux__)
+#error "Linux platform file is part of non-Linux build."
+#endif
+
+#include <sys/prctl.h>
+
 #include "common/common/thread_impl.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -11,6 +17,6 @@ PlatformImpl::PlatformImpl()
 
 PlatformImpl::~PlatformImpl() = default;
 
-bool PlatformImpl::enableCoreDump() { return false; }
+bool PlatformImpl::enableCoreDump() { return prctl(PR_SET_DUMPABLE, 1) != -1; }
 
 } // namespace Envoy

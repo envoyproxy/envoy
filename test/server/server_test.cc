@@ -1334,6 +1334,13 @@ TEST_P(ServerInstanceImplTest, MutexContentionEnabled) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
 }
 
+TEST_P(ServerInstanceImplTest, CoreDumpEnabled) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.core_dump_enabled_ = true;
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
+}
+
 TEST_P(ServerInstanceImplTest, NoHttpTracing) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
