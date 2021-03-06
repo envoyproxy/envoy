@@ -214,30 +214,32 @@ public:
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
 
-  // For testing Router::DelegatingRoute
-  class ExampleDelegatingRouteEntryDerived : public Router::DelegatingRouteEntry {
+  // For testing purposes only. Example derived class of DelegatingRouteEntry.
+  class ExampleDerivedDelegatingRouteEntry : public Router::DelegatingRouteEntry {
   public:
-    ExampleDelegatingRouteEntryDerived(const Router::RouteEntry* base_route_entry,
+    ExampleDerivedDelegatingRouteEntry(Router::RouteConstSharedPtr base_route,
                                        const std::string& cluster_name_override)
-        : DelegatingRouteEntry(base_route_entry), custom_cluster_name_(cluster_name_override) {}
+        : DelegatingRouteEntry(base_route), custom_cluster_name_(cluster_name_override) {}
 
     const std::string& clusterName() const override { return custom_cluster_name_; }
 
   private:
-    const std::string& custom_cluster_name_;
+    const std::string custom_cluster_name_;
   };
 
-  class ExampleDelegatingRouteDerived : public Router::DelegatingRoute {
+  // For testing purposes only. Example derived class of DelegatingRoute.
+  class ExampleDerivedDelegatingRoute : public Router::DelegatingRoute {
   public:
-    ExampleDelegatingRouteDerived(Router::RouteConstSharedPtr base_route,
+    ExampleDerivedDelegatingRoute(Router::RouteConstSharedPtr base_route,
                                   const std::string& cluster_name_override)
-        : DelegatingRoute(base_route), custom_route_entry_(new ExampleDelegatingRouteEntryDerived(
-                                           base_route->routeEntry(), cluster_name_override)) {}
+        : DelegatingRoute(base_route),
+          custom_route_entry_(std::make_unique<const ExampleDerivedDelegatingRouteEntry>(
+              base_route, cluster_name_override)) {}
 
-    const Router::RouteEntry* routeEntry() const override { return custom_route_entry_; }
+    const Router::RouteEntry* routeEntry() const override { return custom_route_entry_.get(); }
 
   private:
-    ExampleDelegatingRouteEntryDerived* custom_route_entry_;
+    const std::unique_ptr<const ExampleDerivedDelegatingRouteEntry> custom_route_entry_;
   };
 };
 
