@@ -18,6 +18,23 @@ message Description {
   // Additional information for when this field is used in edge deployments.
   EdgeConfiguration edge_config = 1;
 
+  message ExtensionConfiguration {
+    // Example extension config for the field.
+    google.protobuf.Value example = 1;
+
+    // Additional note to include in the configuration message.
+    string note = 2;
+  }
+
+  // Name used to refer/link to the extension, eg within categories
+  string extension_name = 2;
+
+  // @type
+  string type_url = 3;
+
+  // Additional information for when this field is used in extension deployments.
+  ExtensionConfiguration extension_config = 4;
+
   // TODO: add additional information here to reflect things like Envoy
   // implementation status.
 }

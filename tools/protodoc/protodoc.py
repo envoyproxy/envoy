@@ -78,11 +78,23 @@ This extension may be referenced by the qualified name *{{extension}}*
 EXTENSION_CATEGORY_TEMPLATE = Template("""
 .. _extension_category_{{category}}:
 
-.. tip::
-  This extension category has the following known extensions:
+This extension category has the following known extensions:
 
-{% for ext in extensions %}
-  - :ref:`{{ext}} <extension_{{ext}}>`
+.. tabs::
+
+{% for k, v in extensions.items() %}
+   .. tab:: {{v.name}}
+
+      name: :ref:`{{k}} <extension_{{k}}>`
+
+{% if v.type_url %}
+      @type: {{v.type_url}}
+{% endif %}
+
+      Example:
+
+      {{v.example}}
+
 {% endfor %}
 
 """)
@@ -149,7 +161,7 @@ def GithubUrl(type_context):
   return ''
 
 
-def FormatCommentWithAnnotations(comment, type_name=''):
+def FormatCommentWithAnnotations(protodoc_manifest, comment, type_name=''):
   """Format a comment string with additional RST for annotations.
 
   Args:
@@ -166,8 +178,8 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     formatted_extension = FormatExtension(extension)
   formatted_extension_category = ''
   if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
-    formatted_extension_category = FormatExtensionCategory(
-        comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
+    category = comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION]
+    formatted_extension_category = FormatExtensionCategory(protodoc_manifest, category)
   comment = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
   return comment + formatted_extension + formatted_extension_category
 
@@ -242,7 +254,7 @@ def FormatExtension(extension):
                                    categories=categories)
 
 
-def FormatExtensionCategory(extension_category):
+def FormatExtensionCategory(protodoc_manifest, extension_category):
   """Format extension metadata as RST.
 
   Args:
@@ -252,11 +264,24 @@ def FormatExtensionCategory(extension_category):
     RST formatted extension category description.
   """
   try:
-    extensions = EXTENSION_CATEGORIES[extension_category]
+    extension_list = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
     raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-  return EXTENSION_CATEGORY_TEMPLATE.render(category=extension_category,
-                                            extensions=sorted(extensions))
+
+  extensions = {}
+
+  for extension in sorted(extension_list):
+    extensions[extension] = dict(name=extension.split(".")[-1])
+    manifest = protodoc_manifest.fields.get(extension)
+
+    if manifest:
+      extensions[extension]["name"] = manifest.extension_name or extensions[extension]["name"]
+      extensions[extension]["type_url"] = manifest.type_url
+      extensions[extension]["example"] = str(json_format.MessageToDict(manifest.extension_config))
+
+  return EXTENSION_CATEGORY_TEMPLATE.render(
+    category=extension_category,
+    extensions=extensions)
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):
@@ -512,7 +537,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field, pro
         (rule.HasField('repeated') and rule.repeated.min_items > 0)):
       field_annotations = ['*REQUIRED*']
   leading_comment = type_context.leading_comment
-  formatted_leading_comment = FormatCommentWithAnnotations(leading_comment)
+  formatted_leading_comment = FormatCommentWithAnnotations(protodoc_manifest, leading_comment)
   if HideNotImplemented(leading_comment):
     return ''
 
@@ -520,7 +545,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field, pro
     oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
                                                    type_context.oneof_names[field.oneof_index])
     oneof_comment = oneof_context.leading_comment
-    formatted_oneof_comment = FormatCommentWithAnnotations(oneof_comment)
+    formatted_oneof_comment = FormatCommentWithAnnotations(protodoc_manifest, oneof_comment)
     if HideNotImplemented(oneof_comment):
       return ''
 
@@ -594,7 +619,7 @@ def FormatMessageAsDefinitionList(type_context, msg, protodoc_manifest):
       for index, field in enumerate(msg.field)) + '\n'
 
 
-def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
+def FormatEnumValueAsDefinitionListItem(protodoc_manifest, type_context, enum_value):
   """Format a EnumValueDescriptorProto as RST definition list item.
 
   Args:
@@ -607,14 +632,14 @@ def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
   anchor = FormatAnchor(EnumValueCrossRefLabel(NormalizeTypeContextName(type_context.name)))
   default_comment = '*(DEFAULT)* ' if enum_value.number == 0 else ''
   leading_comment = type_context.leading_comment
-  formatted_leading_comment = FormatCommentWithAnnotations(leading_comment)
+  formatted_leading_comment = FormatCommentWithAnnotations(protodoc_manifest, leading_comment)
   if HideNotImplemented(leading_comment):
     return ''
   comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
   return anchor + enum_value.name + '\n' + MapLines(functools.partial(Indent, 2), comment)
 
 
-def FormatEnumAsDefinitionList(type_context, enum):
+def FormatEnumAsDefinitionList(protodoc_manifest, type_context, enum):
   """Format a EnumDescriptorProto as RST definition list.
 
   Args:
@@ -625,7 +650,8 @@ def FormatEnumAsDefinitionList(type_context, enum):
     RST formatted definition list item.
   """
   return '\n'.join(
-      FormatEnumValueAsDefinitionListItem(type_context.ExtendEnumValue(index, enum_value.name),
+      FormatEnumValueAsDefinitionListItem(protodoc_manifest,
+                                          type_context.ExtendEnumValue(index, enum_value.name),
                                           enum_value)
       for index, enum_value in enumerate(enum.value)) + '\n'
 
@@ -660,11 +686,11 @@ class RstFormatVisitor(visitor.Visitor):
     github_url = GithubUrl(type_context)
     proto_link = FormatExternalLink('[%s proto]' % normal_enum_type, github_url) + '\n\n'
     leading_comment = type_context.leading_comment
-    formatted_leading_comment = FormatCommentWithAnnotations(leading_comment, 'enum')
+    formatted_leading_comment = FormatCommentWithAnnotations(self.protodoc_manifest, leading_comment, 'enum')
     if HideNotImplemented(leading_comment):
       return ''
     return anchor + header + proto_link + formatted_leading_comment + FormatEnumAsDefinitionList(
-        type_context, enum_proto)
+      self.protodoc_manifest, type_context, enum_proto)
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     # Skip messages synthesized to represent map types.
@@ -676,7 +702,7 @@ class RstFormatVisitor(visitor.Visitor):
     github_url = GithubUrl(type_context)
     proto_link = FormatExternalLink('[%s proto]' % normal_msg_type, github_url) + '\n\n'
     leading_comment = type_context.leading_comment
-    formatted_leading_comment = FormatCommentWithAnnotations(leading_comment, 'message')
+    formatted_leading_comment = FormatCommentWithAnnotations(self.protodoc_manifest, leading_comment, 'message')
     if HideNotImplemented(leading_comment):
       return ''
     return anchor + header + proto_link + formatted_leading_comment + FormatMessageAsJson(

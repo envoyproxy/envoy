@@ -1,4 +1,48 @@
 fields:
+  envoy.access_loggers.file:
+    type_url: type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+    extension_name: File
+    extension_config:
+      example:
+        foo: BAR_file
+  envoy.access_loggers.http_grpc:
+    extension_name: Http/GRPC
+    extension_config:
+      example:
+        foo: BAR_http_grpc
+  envoy.access_loggers.tcp_grpc:
+    extension_name: TCP/GRPC
+    extension_config:
+      example:
+        foo: BAR_tcp_grpc
+
+  envoy.compression.brotli.compressor:
+    type_url: type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
+    extension_name: Brotli
+    extension_config:
+      example:
+        foo: BAR_file
+
+  envoy.compression.gzip.compressor:
+    type_url: type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+    extension_name: Gzip
+    extension_config:
+      example:
+        foo: BAR_file
+
+  envoy.watchdog.profile_action:
+    extension_name: Profile action
+    extension_config:
+      example:
+        foo: BAR_profile_action
+
+  envoy.filters.network.http_connection_manager:
+    type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    extension_name: Http connection manager
+    extension_config:
+      example:
+        foo: BAR_file
+
   envoy.config.bootstrap.v3.Bootstrap.overload_manager:
     edge_config:
       example:
