@@ -56,6 +56,7 @@ mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
+pip3 install remote-pdb
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
