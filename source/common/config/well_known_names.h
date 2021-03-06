@@ -140,7 +140,11 @@ public:
 
 private:
   void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
-  void addTokenized(const std::string& name, const std::string& regex);
+
+  // See class doc for TagExtractorTokensImpl in
+  // source/common/stats/tag_extractor_impl.h for details on the format of
+  // tokens.
+  void addTokenized(const std::string& name, const std::string& tokens);
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;

@@ -137,19 +137,25 @@ private:
   const re2::RE2 regex_;
 };
 
+/**
+ * Performs tag extraction using a tokenized syntax rather than a regex. The
+ * tokens are separated by dots. Special token pattern-values are
+ *  *     matches any single token value.
+ *  **    matches 0 or more dot-separated token values.
+ *  $     used as the tag value. There must be exactly one of these in each tokens descriptor.
+ */
 class TagExtractorTokensImpl : public TagExtractorImplBase {
 public:
-  TagExtractorTokensImpl(absl::string_view name, absl::string_view regex,
-                         absl::string_view substr = "");
+  TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens);
 
   bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
 
 private:
   static uint32_t findMatchIndex(const std::vector<std::string>& tokens);
-  bool extractTagHelper(const std::vector<absl::string_view>& input_tokens, uint32_t input_index,
-                        uint32_t pattern_index, uint32_t char_index, uint32_t& start,
-                        uint32_t& match_input_index) const;
+  bool searchTags(const std::vector<absl::string_view>& input_tokens, uint32_t input_index,
+                  uint32_t pattern_index, uint32_t char_index, uint32_t& start,
+                  uint32_t& match_input_index) const;
 
   const std::vector<std::string> tokens_;
   const uint32_t match_index_;

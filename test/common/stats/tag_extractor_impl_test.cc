@@ -410,13 +410,13 @@ protected:
     IntervalSetImpl<size_t> remove_characters;
     tags_.clear();
     TagExtractionContext tag_extraction_context(stat_name);
-    bool ret = tokens.extractTag(tag_extraction_context, tags_, remove_characters);
-    if (ret) {
+    bool extracted = tokens.extractTag(tag_extraction_context, tags_, remove_characters);
+    if (extracted) {
       tag_extracted_name_ = StringUtil::removeCharacters(stat_name, remove_characters);
     } else {
       tag_extracted_name_.clear();
     }
-    return ret;
+    return extracted;
   }
 
   std::vector<Tag> tags_;
@@ -468,14 +468,15 @@ TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackEarlyMatch) {
   EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
   EXPECT_EQ("is.the.time.to.come.to.the.aid.backtrack.now.aid.of.their", tag_extracted_name_);
 }
-TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackImmediateMatch) {
+
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackImmediateMatchMiddle) {
   EXPECT_TRUE(extract("match", "now.**.$.of.their",
                       "now.is.the.time.to.come.to.the.aid.fake.aid.real.of.their"));
   EXPECT_THAT(tags_, ElementsAre(Tag{"match", "real"}));
   EXPECT_EQ("now.is.the.time.to.come.to.the.aid.fake.aid.of.their", tag_extracted_name_);
 }
 
-TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackLateMatch) {
+TEST_F(TagExtractorTokensTest, TokensMatchStartDoubleWildBacktrackLateMatchMiddle) {
   EXPECT_TRUE(extract("match", "now.**.aid.$.of.their",
                       "now.is.the.time.to.come.to.the.aid.fake.aid.real.of.their"));
   EXPECT_THAT(tags_, ElementsAre(Tag{"match", "real"}));
