@@ -10,7 +10,6 @@ envoy_package()
 
 proto_library(
     name = "protos",
-    visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/common/wasm/ext:declare_property_proto",
         "//source/extensions/common/wasm/ext:node_subset_proto",
