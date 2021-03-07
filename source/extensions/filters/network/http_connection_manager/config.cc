@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
@@ -280,13 +281,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If we are provided a different request_id_extension implementation to use try and create a
   // new instance of it, otherwise use default one.
-  if (config.request_id_extension().has_typed_config()) {
-    request_id_extension_ =
-        Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
-  } else {
-    request_id_extension_ =
-        Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
+      final_rid_config = config.request_id_extension();
+  if (!final_rid_config.has_typed_config()) {
+    // This creates a default version of the UUID extension which is a required extension in the
+    // build.
+    final_rid_config.mutable_typed_config()->PackFrom(
+        envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
+  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.

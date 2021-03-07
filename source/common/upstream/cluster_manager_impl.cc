@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,12 +67,20 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   Cluster& cluster = cm_cluster.cluster();
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     // Remove the previous cluster before the cluster object is destroyed.
-    primary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
+    primary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](ClusterManagerCluster* cluster_iter) {
+          return cluster_iter->cluster().info()->name() == name_to_remove;
+        });
+    primary_init_clusters_.push_back(&cm_cluster);
     cluster.initialize(initialize_cb);
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
     // Remove the previous cluster before the cluster object is destroyed.
-    secondary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
+    secondary_init_clusters_.remove_if(
+        [name_to_remove = cluster.info()->name()](ClusterManagerCluster* cluster_iter) {
+          return cluster_iter->cluster().info()->name() == name_to_remove;
+        });
+    secondary_init_clusters_.push_back(&cm_cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
       // already started secondary init. In this case, just immediately initialize.
@@ -96,20 +105,17 @@ void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
 
   // There is a remote edge case where we can remove a cluster via CDS that has not yet been
   // initialized. When called via the remove cluster API this code catches that case.
-  absl::flat_hash_map<std::string, ClusterManagerCluster*>* cluster_map;
+  std::list<ClusterManagerCluster*>* cluster_list;
   if (cluster.cluster().initializePhase() == Cluster::InitializePhase::Primary) {
-    cluster_map = &primary_init_clusters_;
+    cluster_list = &primary_init_clusters_;
   } else {
     ASSERT(cluster.cluster().initializePhase() == Cluster::InitializePhase::Secondary);
-    cluster_map = &secondary_init_clusters_;
+    cluster_list = &secondary_init_clusters_;
   }
 
   // It is possible that the cluster we are removing has already been initialized, and is not
-  // present in the initializer map. If so, this is fine.
-  absl::string_view cluster_name = cluster.cluster().info()->name();
-  if (cluster_map->at(cluster_name) == &cluster) {
-    cluster_map->erase(cluster_name);
-  }
+  // present in the initializer list. If so, this is fine.
+  cluster_list->remove(&cluster);
   ENVOY_LOG(debug, "cm init: init complete: cluster={} primary={} secondary={}",
             cluster.cluster().info()->name(), primary_init_clusters_.size(),
             secondary_init_clusters_.size());
@@ -118,13 +124,13 @@ void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
 
 void ClusterManagerInitHelper::initializeSecondaryClusters() {
   started_secondary_initialize_ = true;
-  // Cluster::initialize() method can modify the map of secondary_init_clusters_ to remove
+  // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
   // the item currently being initialized, so we eschew range-based-for and do this complicated
   // dance to increment the iterator before calling initialize.
   for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
-    ClusterManagerCluster* cluster = iter->second;
-    ENVOY_LOG(debug, "initializing secondary cluster {}", iter->first);
+    ClusterManagerCluster* cluster = *iter;
     ++iter;
+    ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->cluster().info()->name());
     cluster->cluster().initialize([cluster, this] { onClusterInit(*cluster); });
   }
 }
@@ -612,10 +618,17 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
-  if ((existing_active_cluster != active_clusters_.end() &&
-       existing_active_cluster->second->blockUpdate(new_hash)) ||
-      (existing_warming_cluster != warming_clusters_.end() &&
-       existing_warming_cluster->second->blockUpdate(new_hash))) {
+  if (existing_warming_cluster != warming_clusters_.end()) {
+    // If the cluster is the same as the warming cluster of the same name, block the update.
+    if (existing_warming_cluster->second->blockUpdate(new_hash)) {
+      return false;
+    }
+    // NB: https://github.com/envoyproxy/envoy/issues/14598
+    // Always proceed if the cluster is different from the existing warming cluster.
+  } else if (existing_active_cluster != active_clusters_.end() &&
+             existing_active_cluster->second->blockUpdate(new_hash)) {
+    // If there's no warming cluster of the same name, and if the cluster is the same as the active
+    // cluster of the same name, block the update.
     return false;
   }
 
