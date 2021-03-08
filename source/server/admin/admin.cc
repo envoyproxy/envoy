@@ -38,6 +38,7 @@
 #include "server/listener_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/request_id/uuid/config.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -146,8 +147,9 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
 }
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
-    : server_(server), request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(
-                           server_.api().randomGenerator())),
+    : server_(server),
+      request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
+          server_.api().randomGenerator())),
       profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       null_overload_manager_(server_.threadLocal()),

@@ -145,8 +145,6 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
   EXPECT_FALSE(last_response_);
   EXPECT_TRUE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
-
-  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
@@ -160,8 +158,6 @@ TEST_F(ExtProcStreamTest, StreamError) {
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 123);
-
-  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
