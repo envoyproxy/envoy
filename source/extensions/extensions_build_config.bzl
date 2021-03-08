@@ -45,6 +45,12 @@ EXTENSIONS = {
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
 
     #
+    # Input Matchers
+    #
+
+    "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
+
+    #
     # HTTP filters
     #
 
