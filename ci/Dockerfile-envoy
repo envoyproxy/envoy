@@ -1,15 +1,8 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=18.04
 
-# Final stage
 FROM $BUILD_OS:$BUILD_TAG
 ARG TARGETPLATFORM
-
-RUN apt-get update && apt-get upgrade -y \
-    && apt-get install --no-install-recommends -y ca-certificates \
-    && apt-get autoremove -y && apt-get clean \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /etc/envoy
 
