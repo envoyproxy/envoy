@@ -36,6 +36,10 @@ const CorsPolicy* DelegatingRouteEntry::corsPolicy() const {
   return base_route_->routeEntry()->corsPolicy();
 }
 
+absl::optional<std::string> DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
+  return base_route_->routeEntry()->currentUrlPathAfterRewrite(headers);
+}
+
 void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   bool insert_envoy_original_path) const {
@@ -71,7 +75,7 @@ uint32_t DelegatingRouteEntry::retryShadowBufferLimit() const {
   return base_route_->routeEntry()->retryShadowBufferLimit();
 }
 
-const std::vector<ShadowPolicyPtr>& DelegatingRouteEntry::shadowPolicies() const {
+const std::vector<Router::ShadowPolicyPtr>& DelegatingRouteEntry::shadowPolicies() const {
   return base_route_->routeEntry()->shadowPolicies();
 }
 
@@ -81,6 +85,10 @@ std::chrono::milliseconds DelegatingRouteEntry::timeout() const {
 
 absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() const {
   return base_route_->routeEntry()->idleTimeout();
+}
+
+bool DelegatingRouteEntry::usingNewTimeouts() const {
+  return base_route_->routeEntry()->usingNewTimeouts();
 }
 
 absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::maxStreamDuration() const {

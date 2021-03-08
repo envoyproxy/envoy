@@ -50,6 +50,7 @@ public:
   const std::string& clusterName() const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
+  absl::optional<std::string> currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
@@ -60,9 +61,10 @@ public:
   const RetryPolicy& retryPolicy() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
   uint32_t retryShadowBufferLimit() const override;
-  const std::vector<ShadowPolicyPtr>& shadowPolicies() const override;
+  const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
   absl::optional<std::chrono::milliseconds> idleTimeout() const override;
+  bool usingNewTimeouts() const override;
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override;
