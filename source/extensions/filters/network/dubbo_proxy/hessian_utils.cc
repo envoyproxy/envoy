@@ -15,6 +15,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
+// Check
+// https://github.com/apache/dubbo/blob/master/dubbo-common/src/main/java/org/apache/dubbo/common/utils/ReflectUtils.java
+// for details of parameters type.
 uint32_t HessianUtils::getParametersNumber(const std::string& parameters_type) {
   if (parameters_type.empty()) {
     return 0;

@@ -57,7 +57,7 @@ const std::string* RpcInvocationImpl::Attachment::lookup(const std::string& key)
 }
 
 const RpcInvocationImpl::Attachment& RpcInvocationImpl::attachment() const {
-  ASSERT(attachment_);
+  ASSERT(attachment_ != nullptr);
   return *attachment_;
 }
 
@@ -67,7 +67,7 @@ RpcInvocationImpl::AttachmentPtr& RpcInvocationImpl::mutableAttachment() {
 }
 
 const RpcInvocationImpl::Parameters& RpcInvocationImpl::parameters() const {
-  ASSERT(parameters_);
+  ASSERT(parameters_ != nullptr);
   return *parameters_;
 }
 
@@ -77,22 +77,22 @@ RpcInvocationImpl::ParametersPtr& RpcInvocationImpl::mutableParameters() {
 }
 
 void RpcInvocationImpl::assignParametersIfNeed() {
-  ASSERT(parameters_lazy_callback_);
-  if (!parameters_) {
+  ASSERT(parameters_lazy_callback_ != nullptr);
+  if (parameters_ == nullptr) {
     parameters_ = parameters_lazy_callback_();
   }
 }
 
 void RpcInvocationImpl::assignAttachmentIfNeed() {
-  ASSERT(attachment_lazy_callback_);
-  if (attachment_) {
+  ASSERT(attachment_lazy_callback_ != nullptr);
+  if (attachment_ != nullptr) {
     return;
   }
 
   assignParametersIfNeed();
   attachment_ = attachment_lazy_callback_();
 
-  ASSERT(attachment_);
+  ASSERT(attachment_ != nullptr);
   if (auto g = attachment_->lookup("group"); g) {
     setServiceGroup(*g);
   }

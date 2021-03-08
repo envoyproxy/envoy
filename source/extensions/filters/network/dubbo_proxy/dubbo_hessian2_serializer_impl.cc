@@ -50,10 +50,10 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   invo->setParametersLazyCallback([delayed_decoder]() -> RpcInvocationImpl::ParametersPtr {
     auto params = std::make_unique<RpcInvocationImpl::Parameters>();
 
-    if (auto types = delayed_decoder->decode<std::string>(); types && !types->empty()) {
+    if (auto types = delayed_decoder->decode<std::string>(); types != nullptr && !types->empty()) {
       uint32_t number = HessianUtils::getParametersNumber(*types);
       for (uint32_t i = 0; i < number; i++) {
-        if (auto result = delayed_decoder->decode<Hessian2::Object>(); result) {
+        if (auto result = delayed_decoder->decode<Hessian2::Object>(); result != nullptr) {
           params->push_back(std::move(result));
         } else {
           throw EnvoyException("Cannot parse RpcInvocation parameter from buffer");
@@ -65,7 +65,7 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
 
   invo->setAttachmentLazyCallback([delayed_decoder]() -> RpcInvocationImpl::AttachmentPtr {
     auto result = delayed_decoder->decode<Hessian2::Object>();
-    if (result && result->type() == Hessian2::Object::Type::UntypedMap) {
+    if (result != nullptr && result->type() == Hessian2::Object::Type::UntypedMap) {
       return std::make_unique<RpcInvocationImpl::Attachment>(
           RpcInvocationImpl::Attachment::MapObjectPtr{
               dynamic_cast<RpcInvocationImpl::Attachment::MapObject*>(result.release())});
@@ -88,7 +88,7 @@ DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
 
   Hessian2::Decoder decoder(std::make_unique<BufferReader>(buffer));
   auto type_value = decoder.decode<int32_t>();
-  if (!type_value) {
+  if (type_value == nullptr) {
     throw EnvoyException(fmt::format("Cannot parse RpcResult type from buffer"));
   }
 
