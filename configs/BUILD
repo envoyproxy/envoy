@@ -48,6 +48,8 @@ genrule(
     srcs = [
         ":configs",
         "//examples:configs",
+        "//examples:certs",
+        "//examples:lua",
         "//docs:configs",
         "//test/config/integration/certs",
     ],
@@ -56,6 +58,8 @@ genrule(
         "$(location configgen.sh) $(location configgen) $(@D) " +
         "$(locations :configs) " +
         "$(locations //examples:configs) " +
+        "$(locations //examples:certs) " +
+        "$(locations //examples:lua) " +
         "$(locations //docs:configs) " +
         "$(locations //test/config/integration/certs)"
     ),
