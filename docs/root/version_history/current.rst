@@ -12,7 +12,6 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* access_logs: add `access_log_destination` property to :ref:`FileAccessLog <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog>` to write to standard streams in a cross platform way.
 * access_logs: change command operator %UPSTREAM_CLUSTER% to resolve to :ref:`alt_stat_name <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` if provided. This behavior can be reverted by disabling the runtime feature `envoy.reloadable_features.use_observable_cluster_name`.
 * access_logs: fix substition formatter to recognize commands ending with an integer such as DOWNSTREAM_PEER_FINGERPRINT_256.
 * admin: added :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>` information to GET /clusters?format=json :ref:`cluster status <envoy_v3_api_msg_admin.v3.ClusterStatus>`.
@@ -102,6 +101,7 @@ Removed Config or Runtime
 New Features
 ------------
 
+* access_log: added :ref:`access_log_destination <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.access_log_destination>` property to :ref:`FileAccessLog <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog>` to write to standard streams in a cross platform way.
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
 * access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
