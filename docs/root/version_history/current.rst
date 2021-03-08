@@ -102,8 +102,8 @@ Removed Config or Runtime
 New Features
 ------------
 
-* access_log: added :ref:`access_log_destination <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.access_log_destination>` property to :ref:`FileAccessLog <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog>` to write to standard streams in a cross platform way.
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
+* access_log: added :ref:`access_log_destination <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.access_log_destination>` property to :ref:`FileAccessLog <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>` to write to standard streams in a cross platform way.
 * access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
 * compression: add brotli :ref:`compressor <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`.
