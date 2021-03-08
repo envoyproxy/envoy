@@ -62,7 +62,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_);
+  MatchTreeFactory<TestData> factory("", factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -101,7 +101,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_);
+  MatchTreeFactory<TestData> factory("", factory_context_);
 
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
   NeverMatchFactory match_factory;
@@ -156,7 +156,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_);
+  MatchTreeFactory<TestData> factory("", factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -212,7 +212,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_);
+  MatchTreeFactory<TestData> factory("", factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -262,7 +262,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_);
+  MatchTreeFactory<TestData> factory("", factory_context_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
