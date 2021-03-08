@@ -357,6 +357,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
+        "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
@@ -615,6 +616,7 @@ envoy_cc_test_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:metadata_interface",
+        "//source/common/common:dump_state_utils",
     ],
 )
 
@@ -690,6 +692,7 @@ envoy_cc_test_library(
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http/http1:codec_lib",
@@ -768,6 +771,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/common:thread_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/thread_local:thread_local_lib",

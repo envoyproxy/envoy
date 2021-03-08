@@ -518,6 +518,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-08-06",
         cpe = "cpe:2.3:a:json_project:json:*",
     ),
+    # This is an external dependency needed while running the
+    # envoy docker image. A bazel target has been created since
+    # there is no binary package available for the utility on Ubuntu
+    # which is the base image used to build an envoy container.
+    # This is not needed to build an envoy binary or run tests.
+    com_github_ncopa_suexec = dict(
+        project_name = "su-exec",
+        project_desc = "Utility to switch user and group id, setgroups and exec",
+        project_url = "https://github.com/ncopa/su-exec",
+        version = "212b75144bbc06722fbd7661f651390dc47a43d1",
+        sha256 = "939782774079ec156788ea3e04dd5e340e993544f4296be76a9c595334ca1779",
+        strip_prefix = "su-exec-{version}",
+        urls = ["https://github.com/ncopa/su-exec/archive/{version}.tar.gz"],
+        use_category = ["other"],
+        release_date = "2019-09-18",
+        cpe = "N/A",
+    ),
     com_github_twitter_common_lang = dict(
         project_name = "twitter.common.lang (Thrift)",
         project_desc = "twitter.common Python language and compatibility facilities",
@@ -919,8 +936,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "d1a2a7db59a72edacc9a6286b64280b72767d2d0",
-        sha256 = "3e81235c963291bd01f9425ed6e34d6b44ca0adc9f281b0cafc5cba6ad3bcc6d",
+        version = "dd33aa6d825cd63deaa0f793c8caca8a9132a05f",
+        sha256 = "dac7998459616396684f17f35890fb03116450110f4d3bce3d9ae652141f2d3f",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -935,7 +952,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-02-19",
+        release_date = "2021-03-03",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

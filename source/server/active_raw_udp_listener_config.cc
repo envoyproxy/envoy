@@ -5,6 +5,7 @@
 
 #include "envoy/api/v2/listener/listener.pb.h"
 
+#include "server/active_udp_listener.h"
 #include "server/connection_handler_impl.h"
 #include "server/well_known_names.h"
 
@@ -16,7 +17,7 @@ ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
 
 Network::ConnectionHandler::ActiveUdpListenerPtr
 ActiveRawUdpListenerFactory::createActiveUdpListener(uint32_t worker_index,
-                                                     Network::ConnectionHandler& parent,
+                                                     Network::UdpConnectionHandler& parent,
                                                      Event::Dispatcher& dispatcher,
                                                      Network::ListenerConfig& config) {
   return std::make_unique<ActiveRawUdpListener>(worker_index, concurrency_, parent, dispatcher,
