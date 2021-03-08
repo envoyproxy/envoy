@@ -28,6 +28,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -309,7 +310,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // Load all the primary clusters.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     if (is_primary_cluster(cluster)) {
-      loadCluster(cluster, "", false, active_clusters_);
+      loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
     }
   }
 
@@ -365,7 +366,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
         cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
-      loadCluster(cluster, "", false, active_clusters_);
+      loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
     }
   }
 
@@ -617,10 +618,17 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
-  if ((existing_active_cluster != active_clusters_.end() &&
-       existing_active_cluster->second->blockUpdate(new_hash)) ||
-      (existing_warming_cluster != warming_clusters_.end() &&
-       existing_warming_cluster->second->blockUpdate(new_hash))) {
+  if (existing_warming_cluster != warming_clusters_.end()) {
+    // If the cluster is the same as the warming cluster of the same name, block the update.
+    if (existing_warming_cluster->second->blockUpdate(new_hash)) {
+      return false;
+    }
+    // NB: https://github.com/envoyproxy/envoy/issues/14598
+    // Always proceed if the cluster is different from the existing warming cluster.
+  } else if (existing_active_cluster != active_clusters_.end() &&
+             existing_active_cluster->second->blockUpdate(new_hash)) {
+    // If there's no warming cluster of the same name, and if the cluster is the same as the active
+    // cluster of the same name, block the update.
     return false;
   }
 
@@ -650,7 +658,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
-  const auto previous_cluster = loadCluster(cluster, version_info, true, warming_clusters_);
+  const auto previous_cluster =
+      loadCluster(cluster, new_hash, version_info, true, warming_clusters_);
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   if (!all_clusters_initialized) {
     ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
@@ -720,8 +729,8 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
 ClusterManagerImpl::ClusterDataPtr
 ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                const std::string& version_info, bool added_via_api,
-                                ClusterMap& cluster_map) {
+                                const uint64_t cluster_hash, const std::string& version_info,
+                                bool added_via_api, ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
   auto& new_cluster = new_cluster_pair.first;
@@ -770,14 +779,15 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
   if (cluster_entry_it != cluster_map.end()) {
     result = std::exchange(cluster_entry_it->second,
-                           std::make_unique<ClusterData>(cluster, version_info, added_via_api,
-                                                         std::move(new_cluster), time_source_));
+                           std::make_unique<ClusterData>(cluster, cluster_hash, version_info,
+                                                         added_via_api, std::move(new_cluster),
+                                                         time_source_));
   } else {
     bool inserted = false;
-    std::tie(cluster_entry_it, inserted) =
-        cluster_map.emplace(cluster_reference.info()->name(),
-                            std::make_unique<ClusterData>(cluster, version_info, added_via_api,
-                                                          std::move(new_cluster), time_source_));
+    std::tie(cluster_entry_it, inserted) = cluster_map.emplace(
+        cluster_reference.info()->name(),
+        std::make_unique<ClusterData>(cluster, cluster_hash, version_info, added_via_api,
+                                      std::move(new_cluster), time_source_));
     ASSERT(inserted);
   }
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
@@ -1419,7 +1429,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.cluster_manager_state_);
+            parent_.parent_.time_source_, parent_.cluster_manager_state_);
       });
 
   if (pool.has_value()) {
@@ -1488,7 +1498,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
   if (protocols.size() == 2) {
     ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
@@ -1502,6 +1512,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state);
+  }
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
+      runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+    return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
+                                         options, transport_socket_options, state, source);
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,

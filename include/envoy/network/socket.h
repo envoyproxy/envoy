@@ -72,6 +72,14 @@ public:
    *         connected peer, and cannot be modified by listener filters.
    */
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+
+  /**
+   * Dumps the state of the SocketAddressProvider to the given ostream.
+   *
+   * @param os the std::ostream to dump to.
+   * @param indent_level the level of indentation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level) const PURE;
 };
 
 class SocketAddressSetter : public SocketAddressProvider {

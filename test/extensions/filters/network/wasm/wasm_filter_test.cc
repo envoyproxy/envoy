@@ -47,19 +47,19 @@ public:
   ~WasmNetworkFilterTest() override = default;
 
   void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
-                   AllowedCapabilitiesMap allowed_capabilities = {}) {
+                   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities = {}) {
     if (code.empty()) {
       setupWasmCode(vm_configuration);
     } else {
       code_ = code;
     }
-    setupBase(
-        std::get<0>(GetParam()), code_,
-        [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-          return new TestRoot(wasm, plugin);
-        },
-        "" /* root_id */, "" /* vm_configuration */, fail_open, "" /* plugin configuration*/,
-        allowed_capabilities);
+    setVmConfiguration(vm_configuration);
+    setFailOpen(fail_open);
+    setAllowedCapabilities(allowed_capabilities);
+    setupBase(std::get<0>(GetParam()), code_,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new TestRoot(wasm, plugin);
+              });
   }
 
   void setupFilter() { setupFilterBase<TestFilter>(); }
