@@ -1,6 +1,6 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
@@ -264,6 +264,18 @@ def envoy_py_test_binary(
         deps = [],
         **kargs):
     py_binary(
+        name = name,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
+        **kargs
+    )
+
+# Envoy py_tests should be specified with this function.
+def envoy_py_test(
+        name,
+        external_deps = [],
+        deps = [],
+        **kargs):
+    py_test(
         name = name,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs

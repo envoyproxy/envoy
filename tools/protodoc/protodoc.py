@@ -238,7 +238,8 @@ def FormatExtension(extension):
     return f"{extension}\n\n{extension_category}"
   except KeyError as e:
     sys.stderr.write(
-        '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
+        f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
+    )
     exit(1)  # Raising the error buries the above message in tracebacks.
 
 
