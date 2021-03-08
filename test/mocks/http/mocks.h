@@ -106,7 +106,7 @@ public:
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
 
-ResponseHeaderMapPtr continue_headers_;
+  ResponseHeaderMapPtr continue_headers_;
   ResponseHeaderMapPtr response_headers_;
   ResponseTrailerMapPtr response_trailers_;
 };
