@@ -219,7 +219,7 @@ The following table shows the available Docker images
      -
      - latest
      - latest
-   * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
+   * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
      - Build image which includes tools for building multi-arch Envoy and containers.
      -
      -
