@@ -14,6 +14,9 @@ namespace {
 class TapIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
+  static void SetUpTestSuite() {
+    Filesystem::fileSystemForTest().setUseMemfiles(false);
+  }
   TapIntegrationTest()
       // Note: This test must use HTTP/2 because of the lack of early close detection for
       // HTTP/1 on OSX. In this test we close the admin /tap stream when we don't want any
@@ -24,6 +27,11 @@ public:
     // Also use HTTP/2 for upstream so that we can fully test trailers.
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
+
+   static void SetUpTestSuite() {
+           Filesystem::fileSystemForTest().setUseMemfiles(false);
+                  }
+
 
   void initializeFilter(const std::string& filter_config) {
     config_helper_.addFilter(filter_config);

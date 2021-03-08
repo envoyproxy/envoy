@@ -25,6 +25,10 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 
+   static void SetUpTestSuite() {
+        Filesystem::fileSystemForTest().setUseMemfiles(false);
+         }
+
   void createEnvoy() override {
     createEnvoyServer({
         "test/config/integration/server_xds.bootstrap.yaml",
@@ -105,6 +109,9 @@ class LdsInplaceUpdateTcpProxyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
 public:
+   static void SetUpTestSuite() {
+        Filesystem::fileSystemForTest().setUseMemfiles(false);
+         }
   LdsInplaceUpdateTcpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
     filter_chains:
@@ -279,6 +286,9 @@ class LdsInplaceUpdateHttpIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
+   static void SetUpTestSuite() {
+        Filesystem::fileSystemForTest().setUseMemfiles(false);
+         }
   LdsInplaceUpdateHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 

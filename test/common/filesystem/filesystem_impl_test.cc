@@ -7,6 +7,7 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,6 +20,11 @@ static constexpr FlagSet DefaultFlags{
     1 << Filesystem::File::Operation::Create | 1 << Filesystem::File::Operation::Append};
 
 class FileSystemImplTest : public testing::Test {
+ public:
+  static void SetUpTestSuite() {
+    Filesystem::fileSystemForTest().setUseMemfiles(false);
+  }
+
 protected:
   filesystem_os_id_t getFd(File* file) {
 #ifdef WIN32
