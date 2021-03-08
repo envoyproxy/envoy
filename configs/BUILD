@@ -52,6 +52,7 @@ genrule(
         "//examples:lua",
         "//examples/wasm-cc:configs",
         "//docs:configs",
+        "//docs:proto_examples",
         "//test/config/integration/certs",
     ],
     outs = ["example_configs.tar"],
@@ -63,6 +64,7 @@ genrule(
         "$(locations //examples:lua) " +
         "$(locations //examples/wasm-cc:configs) " +
         "$(locations //docs:configs) " +
+        "$(locations //docs:proto_examples) " +
         "$(locations //test/config/integration/certs)"
     ),
     tools = [

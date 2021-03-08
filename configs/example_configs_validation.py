@@ -1,8 +1,6 @@
 import os
 import pathlib
-import subprocess
 import sys
-import traceback
 
 import yaml
 
@@ -29,7 +27,7 @@ def main():
       print()
 
   if errors:
-    raise SystemExit(f"ERROR: some configuration files ({len(errors)}) failed to parse")
+    raise SystemExit(f"ERROR: some configuration files ({len(errors)}) failed to validate")
 
 
 if __name__ == "__main__":
