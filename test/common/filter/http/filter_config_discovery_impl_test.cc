@@ -225,12 +225,18 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-  Protobuf::RepeatedPtrField<std::string> remove;
-  *remove.Add() = "bar";
   EXPECT_CALL(init_watcher_, ready());
-  callbacks_->onConfigUpdate(decoded_resources.refvec_, remove, response.version_info());
+  callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, response.version_info());
   EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
+
+  // Ensure that we honor resource removals.
+  Protobuf::RepeatedPtrField<std::string> remove;
+  *remove.Add() = "foo";
+  callbacks_->onConfigUpdate({}, remove, response.version_info());
+  EXPECT_EQ(absl::nullopt, provider_->config());
+  EXPECT_EQ(2UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
 

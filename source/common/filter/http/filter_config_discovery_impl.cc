@@ -1,6 +1,7 @@
 #include "common/filter/http/filter_config_discovery_impl.h"
 
 #include "envoy/config/core/v3/extension.pb.validate.h"
+#include "envoy/config/extension_config_provider.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/utility.h"
@@ -63,6 +64,21 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
         // This happens after all workers have discarded the previous config so it can be safely
         // deleted on the main thread by an update with the new config.
         this->current_config_ = config;
+      });
+}
+
+void DynamicFilterConfigProviderImpl::onConfigRemoved(Config::ConfigAppliedCb cb) {
+  tls_.runOnAllThreads(
+      [cb](OptRef<ThreadLocalConfig> tls) {
+        tls->config_ = absl::nullopt;
+        if (cb) {
+          cb();
+        }
+      },
+      [this]() {
+        // This happens after all workers have discarded the previous config so it can be safely
+        // deleted on the main thread by an update with the new config.
+        this->current_config_ = absl::nullopt;
       });
 }
 
@@ -148,10 +164,17 @@ void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
-    ENVOY_LOG(error,
-              "Server sent a delta ExtensionConfigDS update attempting to remove a resource (name: "
-              "{}). Ignoring.",
-              removed_resources[0]);
+    ASSERT(removed_resources.size() == 1);
+    ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
+    const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
+        (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
+    for (auto* provider : filter_config_providers_) {
+      provider->onConfigRemoved([this, pending_update]() {
+        if (--(*pending_update) == 0) {
+          stats_.config_reload_.inc();
+        }
+      });
+    }
   }
   if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());

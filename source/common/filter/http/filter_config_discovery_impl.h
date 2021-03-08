@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
+#include "envoy/config/extension_config_provider.h"
 #include "envoy/config/subscription.h"
 #include "envoy/filter/http/filter_config_provider.h"
 #include "envoy/protobuf/message_validator.h"
@@ -10,6 +11,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/assert.h"
 #include "common/config/subscription_base.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
@@ -43,6 +45,7 @@ public:
                       Server::Configuration::NamedHttpFilterConfigFactory&) override;
   void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
                       Config::ConfigAppliedCb cb) override;
+  void onConfigRemoved(Config::ConfigAppliedCb cb) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -154,6 +157,7 @@ public:
                       Config::ConfigAppliedCb) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  void onConfigRemoved(Config::ConfigAppliedCb) override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
 private:
   Envoy::Http::FilterFactoryCb config_;

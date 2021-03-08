@@ -51,6 +51,12 @@ public:
    */
   virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info,
                               ConfigAppliedCb cb) PURE;
+
+  /**
+   * Removes the current configuration from the provider.
+   * @param cb the continuation callback for a completed configuration application.
+   */
+  virtual void onConfigRemoved(ConfigAppliedCb cb) PURE;
 };
 
 } // namespace Config
