@@ -181,6 +181,8 @@ int LegacyHttpParserImpl::statusToInt(const ParserStatus code) const {
     return 2;
   case ParserStatus::Paused:
     return 31;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
