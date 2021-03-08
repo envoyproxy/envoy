@@ -176,7 +176,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_balancer_lib",
     srcs = ["load_balancer_impl.cc"],
-    hdrs = ["load_balancer_impl.h"],
+    hdrs = ["load_balancer_impl.h", "infima.h"],
     deps = [
         ":edf_scheduler_lib",
         "//include/envoy/common:random_generator_interface",
@@ -185,6 +185,7 @@ envoy_cc_library(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

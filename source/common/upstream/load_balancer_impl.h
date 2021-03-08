@@ -18,6 +18,8 @@
 #include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
 
+#include "infima.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -585,6 +587,35 @@ public:
 
 protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
+};
+
+
+class ShuffleShardLoadBalancer : public ZoneAwareLoadBalancerBase {
+public:
+  ShuffleShardLoadBalancer(LoadBalancerType lb_type, const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                     ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                     const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& config);
+
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
+
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+
+private:
+  void remove_hosts(const HostVector&);
+
+  void add_hosts(const HostVector&);
+
+  std::optional<std::vector<std::string>> get_coord(const HostConstSharedPtr&);
+
+  const LoadBalancerType lb_type_;
+  const uint32_t endpoints_per_cell_;
+  const bool use_zone_as_dimension_;
+  std::vector<std::string> dimensions_;
+  const bool use_dimensions_;
+  Lattice<Upstream::HostConstSharedPtr>* lattice_;
+  ShuffleSharder<Upstream::HostConstSharedPtr> shuffle_sharder_;
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 /**
