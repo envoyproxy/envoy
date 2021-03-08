@@ -220,7 +220,9 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(*stream_filter, decodeData(_, false)).WillOnce(Return(FilterDataStatus::Continue));
 
-  auto decoder_filter = std::make_shared<NiceMock<Envoy::Http::MockStreamDecoderFilter>>();
+  auto decoder_filter = std::make_shared<Envoy::Http::MockStreamDecoderFilter>();
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, onDestroy());
   EXPECT_CALL(*decoder_filter, decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filter, decodeData(_, false))
@@ -349,7 +351,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingTrailers) {
   filter_manager_->destroyFilters();
 }
 
-// Verify that we propagate custom match actions to a decoding filter when matching on response
+// Verify that we propagate custom match actions to an encoding filter when matching on response
 // trailers.
 TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
   initialize();
@@ -390,6 +392,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
 
   filter_manager_->requestHeadersInitialized();
 
+  EXPECT_CALL(*filter, onMatchCallback(_));
   EXPECT_CALL(*filter, encodeHeaders(_, _));
   EXPECT_CALL(*filter, encodeData(_, _));
   EXPECT_CALL(*filter, encodeTrailers(_));
