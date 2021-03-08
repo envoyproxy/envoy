@@ -249,8 +249,10 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
 
 bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
   bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
-  // Treat this as a remote reset, since the remote StopSending frame is causing stream destruction.
-  runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
+  if (read_side_closed()) {
+    // Treat this as a remote reset, since the stream will be closed in both directions.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
+  }
   return ret;
 }
 
