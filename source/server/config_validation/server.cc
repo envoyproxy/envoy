@@ -62,7 +62,9 @@ ValidationInstance::ValidationInstance(
                                              !options.ignoreUnknownDynamicFields()),
       stats_store_(store),
       validation_file_system_(Filesystem::makeValidationFilesystem(options, real_file_system)),
-      api_(new Api::ValidationImpl(thread_factory, store, time_system, *validation_file_system_,
+      api_(new Api::ValidationImpl(thread_factory, store, time_system,
+                                   validation_file_system_ ? *validation_file_system_
+                                                           : real_file_system,
                                    random_generator_)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),

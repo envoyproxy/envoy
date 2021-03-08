@@ -46,28 +46,6 @@ private:
 };
 } // namespace
 
-WrapInstance::WrapInstance(Filesystem::Instance& impl) : impl_(impl) {}
-
-Filesystem::FilePtr WrapInstance::createFile(const std::string& path) {
-  return impl_.createFile(path);
-}
-
-bool WrapInstance::fileExists(const std::string& path) { return impl_.fileExists(path); }
-
-bool WrapInstance::directoryExists(const std::string& path) { return impl_.directoryExists(path); }
-
-ssize_t WrapInstance::fileSize(const std::string& path) { return impl_.fileSize(path); }
-
-std::string WrapInstance::fileReadToEnd(const std::string& path) {
-  return impl_.fileReadToEnd(path);
-}
-
-Filesystem::PathSplitResult WrapInstance::splitPathFromFilename(absl::string_view path) {
-  return impl_.splitPathFromFilename(path);
-}
-
-bool WrapInstance::illegalPath(const std::string& path) { return impl_.illegalPath(path); }
-
 NullInstance::NullInstance(Filesystem::Instance& impl) : impl_(impl) {}
 
 Filesystem::FilePtr NullInstance::createFile(const std::string& path) {
@@ -149,7 +127,9 @@ InstancePtr makeValidationFilesystem(const Server::Options& options, Instance& r
     }
     return std::make_unique<RestrictedInstance>(options.configPath(), real_file_system);
   }
-  return std::make_unique<WrapInstance>(real_file_system);
+  // No restrictions needed, return nullptr to signal the caller to just use real_file_system
+  // directly.
+  return nullptr;
 }
 
 } // namespace Filesystem

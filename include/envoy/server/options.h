@@ -38,7 +38,8 @@ enum class Mode {
 
   /**
    * Medium fidelity validation: load and initialize with the configuration, assuming full access to
-   * the file system but without opening network connections, and then exit.
+   * the file system but without opening network connections or validating sources of dynamic
+   * configuration, and then exit.
    *
    * This allows verifying that Envoy has all the local resources it needs to start, though not that
    * remote resources exist.
