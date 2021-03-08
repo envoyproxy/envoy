@@ -4,8 +4,8 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/http/status.h"
 #include "common/common/statusor.h"
+#include "common/http/status.h"
 
 namespace Envoy {
 namespace Http {
