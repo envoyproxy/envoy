@@ -91,7 +91,7 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
       return;
     }
   }
-  bool transport_secure =
+  const bool transport_secure =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")
           ? downstream_secure
           : upstream_secure;
