@@ -37,5 +37,5 @@ filegroup(
         [
             "root/**/*.pb",
         ],
-    )
+    ),
 )
