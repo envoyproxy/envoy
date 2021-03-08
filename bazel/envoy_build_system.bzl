@@ -34,6 +34,7 @@ load(
     _envoy_cc_test = "envoy_cc_test",
     _envoy_cc_test_binary = "envoy_cc_test_binary",
     _envoy_cc_test_library = "envoy_cc_test_library",
+    _envoy_py_test = "envoy_py_test",
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
@@ -229,5 +230,6 @@ envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
 envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
 envoy_benchmark_test = _envoy_benchmark_test
+envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
