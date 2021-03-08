@@ -49,6 +49,7 @@ public:
     shadow_policy.add_principals()->set_any(true);
     config.mutable_shadow_rules()->set_action(action);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
+    config.set_shadow_rules_stat_prefix("prefix_");
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
   }
@@ -184,8 +185,8 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
-  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
+  EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
+  EXPECT_EQ("bar", filter_meta.fields().at("prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
