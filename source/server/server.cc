@@ -494,8 +494,15 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   if (initial_config.admin().address()) {
-    if (initial_config.admin().accessLogPath().empty()) {
+    if (initial_config.admin().accessLogPath().empty() &&
+        initial_config.admin().accessLogDestination() == Filesystem::DestinationType::File) {
       throw EnvoyException("An admin access log path is required for a listening server.");
+    }
+
+    if (!initial_config.admin().accessLogPath().empty() &&
+        initial_config.admin().accessLogDestination() != Filesystem::DestinationType::File) {
+      throw EnvoyException(
+          "An admin access log path should be empty when the access log destination is set.");
     }
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
     Filesystem::FilePathAndType file_info{initial_config.admin().accessLogDestination(),
