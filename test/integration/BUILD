@@ -616,6 +616,7 @@ envoy_cc_test_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:metadata_interface",
+        "//source/common/common:dump_state_utils",
     ],
 )
 
@@ -691,6 +692,7 @@ envoy_cc_test_library(
         "//source/common/common:linked_object",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:utility_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http/http1:codec_lib",
@@ -769,6 +771,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/common:thread_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/thread_local:thread_local_lib",

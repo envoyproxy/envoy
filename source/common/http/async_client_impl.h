@@ -229,6 +229,10 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
+    absl::optional<std::string>
+    currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+      return absl::optional<std::string>();
+    }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
@@ -257,6 +261,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    bool usingNewTimeouts() const override { return false; }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
     absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
       return absl::nullopt;
