@@ -5426,7 +5426,7 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   TestScopedRuntime scoped_runtime;
 
-  // With no scheme and XFP, set scheme based on encryption level
+  // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
     FilterUtility::setUpstreamScheme(headers, false, false);
@@ -5438,7 +5438,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
-  // With invalid XFP, still use scheme.
+  // With invalid x-forwarded-proto, still use scheme.
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto("foo");
@@ -5446,7 +5446,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 
-  // Use valid XFP.
+  // Use valid x-forwarded-proto.
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
@@ -5454,7 +5454,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
 
-  // Trust scheme over XFP.
+  // Trust scheme over x-forwarded-proto.
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);

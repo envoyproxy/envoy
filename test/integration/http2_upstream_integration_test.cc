@@ -71,13 +71,13 @@ TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
       response->waitForEndStream();
       auto headers = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
                          ->lastRequestHeaders();
-      // Ensure original scheme and XFP are preserved.
+      // Ensure original scheme and x-forwarded-proto are preserved.
       EXPECT_EQ(headers->getSchemeValue(), scheme);
       EXPECT_EQ(headers->getForwardedProtoValue(), xff);
     }
   });
 
-  // Ensure regardless of value, scheme and XFP are independantly preserved.
+  // Ensure regardless of value, scheme and x-forwarded-proto are independently preserved.
   check_preserved("http", "https");
   check_preserved("https", "http");
 
