@@ -51,9 +51,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   route_config_after_this_update->CopyFrom(*route_config_proto_);
   rebuildRouteConfig(rds_virtual_hosts_, *vhosts_after_this_update,
                      *route_config_after_this_update);
-  ConfigConstSharedPtr new_config;
 
-  new_config = std::make_shared<ConfigImpl>(
+  auto new_config = std::make_shared<ConfigImpl>(
       *route_config_after_this_update, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
