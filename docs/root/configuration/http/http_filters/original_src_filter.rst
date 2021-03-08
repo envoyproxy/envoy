@@ -17,6 +17,10 @@ Note that the filter is intended to be used in conjunction with the
 :ref:`Router <config_http_filters_router>` filter. In particular, it must run prior to the router
 filter so that it may add the desired source IP to the state of the filter chain.
 
+.. note::
+
+ This filter is not supported on Windows.
+
 IP Version Support
 ------------------
 The filter supports both IPv4 and IPv6 as addresses. Note that the upstream connection must support

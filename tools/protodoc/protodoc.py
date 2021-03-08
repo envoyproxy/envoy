@@ -16,6 +16,8 @@ from google.protobuf import json_format
 from bazel_tools.tools.python.runfiles import runfiles
 import yaml
 
+from jinja2 import Template
+
 # We have to do some evil things to sys.path due to the way that Python module
 # resolution works; we have both tools/ trees in bazel_tools and envoy. By
 # default, Bazel leaves us with a sys.path in which the @bazel_tools repository
@@ -53,32 +55,35 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
     os.environ['ENVOY_BLOB_SHA'])
 
 # Template for formating extension descriptions.
-EXTENSION_TEMPLATE = string.Template("""$anchor
-This extension may be referenced by the qualified name *$extension*
+EXTENSION_TEMPLATE = Template("""
+.. _extension_{{extension}}:
+
+This extension may be referenced by the qualified name *{{extension}}*
 
 .. note::
-  $status
+  {{status}}
 
-  $security_posture
+  {{security_posture}}
 
-""")
-
-# Template for formating extension's category/ies.
-EXTENSION_CATEGORIES_TEMPLATE = string.Template("""
 .. tip::
-  $message:
+  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
 
-$categories
+{% for cat in categories %}
+  - :ref:`{{cat}} <extension_category_{{cat}}>`
+{% endfor %}
 
 """)
 
 # Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = string.Template("""$anchor
+EXTENSION_CATEGORY_TEMPLATE = Template("""
+.. _extension_category_{{category}}:
 
 .. tip::
   This extension category has the following known extensions:
 
-$extensions
+{% for ext in extensions %}
+  - :ref:`{{ext}} <extension_{{ext}}>`
+{% endfor %}
 
 """)
 
@@ -222,31 +227,19 @@ def FormatExtension(extension):
   """
   try:
     extension_metadata = EXTENSION_DB[extension]
-    anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
-    extension = EXTENSION_TEMPLATE.substitute(anchor=anchor,
-                                              extension=extension,
-                                              status=status,
-                                              security_posture=security_posture)
-
-    categories = FormatExtensionList(extension_metadata["categories"], "extension_category")
-    cat_or_cats = "categories" if len(categories) > 1 else "category"
-    category_message = f"This extension extends and can be used with the following extension {cat_or_cats}"
-    extension_category = EXTENSION_CATEGORIES_TEMPLATE.substitute(message=category_message,
-                                                                  categories=categories)
-    return f"{extension}\n\n{extension_category}"
+    categories = extension_metadata["categories"]
   except KeyError as e:
     sys.stderr.write(
         f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
     )
     exit(1)  # Raising the error buries the above message in tracebacks.
 
-
-def FormatExtensionList(items, prefix="extension", indent=2):
-  indent = " " * indent
-  formatted_list = "\n".join(f"{indent}- :ref:`{ext} <{prefix}_{ext}>`" for ext in items)
-  return f"{formatted_list}\n{indent}\n"
+  return EXTENSION_TEMPLATE.render(extension=extension,
+                                   status=status,
+                                   security_posture=security_posture,
+                                   categories=categories)
 
 
 def FormatExtensionCategory(extension_category):
@@ -262,9 +255,8 @@ def FormatExtensionCategory(extension_category):
     extensions = EXTENSION_CATEGORIES[extension_category]
   except KeyError as e:
     raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-  anchor = FormatAnchor('extension_category_' + extension_category)
-  extensions = FormatExtensionList(sorted(extensions))
-  return EXTENSION_CATEGORY_TEMPLATE.substitute(anchor=anchor, extensions=extensions)
+  return EXTENSION_CATEGORY_TEMPLATE.render(category=extension_category,
+                                            extensions=sorted(extensions))
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):
