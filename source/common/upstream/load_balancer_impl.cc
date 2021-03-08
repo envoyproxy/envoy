@@ -710,9 +710,10 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()),
-      endpoint_warming_policy_(common_config.has_slow_start_config()
-                                   ? common_config.slow_start_config().endpoint_warming_policy()
-                                   : envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT),
+      endpoint_warming_policy_(
+          common_config.has_slow_start_config()
+              ? common_config.slow_start_config().endpoint_warming_policy()
+              : envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT),
       slow_start_window_(
           std::chrono::milliseconds(common_config.has_slow_start_config()
                                         ? common_config.slow_start_config().slow_start_window()
@@ -854,7 +855,8 @@ bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
   case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT:
     // Host enters slow start immediately.
     return true;
-  case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::WAIT_FOR_FIRST_PASSING_HC:
+  case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
+      WAIT_FOR_FIRST_PASSING_HC:
     if (host.health() == Upstream::Host::Health::Healthy) {
       return true;
     } else {

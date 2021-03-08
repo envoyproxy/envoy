@@ -506,13 +506,14 @@ message Cluster {
 
     // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
     message SlowStartConfig {
-      // Endpoint warming policy defines additional condition (apart from condition that endpoint creation duration should be within slow start window) 
+      // Endpoint warming policy defines additional condition (apart from condition that endpoint creation duration should be within slow start window)
       // for endpoint to enter slow start mode.
       // Refer to :ref:`endpoint warming policy types <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>`
       // for an explanation on each policy type.
       enum EndpointWarmingPolicy {
         // Endpoint would enter slow start immediately.
         NO_WAIT = 0;
+
         // Endpoint would enter slow start upon passing first active healthcheck.
         WAIT_FOR_FIRST_PASSING_HC = 1;
       }
@@ -582,7 +583,7 @@ message Cluster {
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
 
     // Configuration for slow start mode.
-// If this configuration is not set, slow start will not be not enabled.
+    // If this configuration is not set, slow start will not be not enabled.
     SlowStartConfig slow_start_config = 8;
   }
 

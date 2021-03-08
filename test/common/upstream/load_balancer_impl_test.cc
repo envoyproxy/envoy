@@ -35,8 +35,9 @@ namespace Upstream {
 
 class EdfLoadBalancerBasePeer {
 public:
-  static const envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::EndpointWarmingPolicy&
-  endpointWarmingPolicy(EdfLoadBalancerBase& edf_lb) {
+  static const envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
+      EndpointWarmingPolicy&
+      endpointWarmingPolicy(EdfLoadBalancerBase& edf_lb) {
     return edf_lb.endpoint_warming_policy_;
   }
   static const std::chrono::milliseconds& slowStartWindow(EdfLoadBalancerBase& edf_lb) {
@@ -1486,7 +1487,8 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   init(false);
   const auto endpoint_warming_policy =
       EdfLoadBalancerBasePeer::endpointWarmingPolicy(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT, endpoint_warming_policy);
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT,
+            endpoint_warming_policy);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
@@ -1563,7 +1565,8 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
   common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
-      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::WAIT_FOR_FIRST_PASSING_HC);
+      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
+          WAIT_FOR_FIRST_PASSING_HC);
   // Set slow start window to 10 seconds.
   common_config_.mutable_slow_start_config()->set_slow_start_window(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
@@ -1603,7 +1606,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
   // Trigger callbacks to add host1 to slow start mode.
   hostSet().runCallbacks({}, {});
   EXPECT_EQ(2, hosts_in_slow_start->size());
-  
+
   simTime().advanceTimeWait(std::chrono::seconds(1));
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   // Trigger callbacks to remove host1 from slow start mode.
@@ -1635,7 +1638,8 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
   common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
-      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::WAIT_FOR_FIRST_PASSING_HC);
+      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
+          WAIT_FOR_FIRST_PASSING_HC);
   // Set slow start window to 10 seconds.
   common_config_.mutable_slow_start_config()->set_slow_start_window(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
