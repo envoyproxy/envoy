@@ -147,6 +147,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_alibaba_hessian2_codec()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
+    _com_github_ncopa_suexec()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -487,6 +488,15 @@ def _com_github_alibaba_hessian2_codec():
     native.bind(
         name = "hessian2_codec_codec_impl",
         actual = "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
+
+def _com_github_ncopa_suexec():
+    external_http_archive(
+        name = "com_github_ncopa_suexec",
+        build_file = "@envoy//bazel/external:su-exec.BUILD",
+    )
+    native.bind(
+        name = "su-exec",
+        actual = "@com_github_ncopa_suexec//:su-exec",
     )
 
 def _com_google_googletest():

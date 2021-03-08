@@ -43,7 +43,6 @@
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 
 #include "absl/strings/escaping.h"
@@ -497,9 +496,6 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   case Tracing::Reason::ClientForced:
     tracing_stats.client_enabled_.inc();
     break;
-  case Tracing::Reason::NotTraceableRequestId:
-    tracing_stats.not_traceable_.inc();
-    break;
   case Tracing::Reason::Sampling:
     tracing_stats.random_sampling_.inc();
     break;
@@ -507,8 +503,8 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
     tracing_stats.service_forced_.inc();
     break;
   default:
-    throw std::invalid_argument(
-        absl::StrCat("invalid tracing reason, value: ", static_cast<int32_t>(tracing_reason)));
+    tracing_stats.not_traceable_.inc();
+    break;
   }
 }
 
@@ -593,7 +589,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     filter_manager_.addAccessLogHandler(access_log);
   }
 
-  filter_manager_.streamInfo().setRequestIDExtension(
+  filter_manager_.streamInfo().setRequestIDProvider(
       connection_manager.config_.requestIDExtension());
 
   if (connection_manager_.config_.isRoutable() &&
@@ -989,9 +985,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   refreshCachedRoute();
 
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
-    ConnectionManagerUtility::mutateTracingRequestHeader(
-        *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
-        cached_route_.value().get());
+    filter_manager_.streamInfo().setTraceReason(
+        ConnectionManagerUtility::mutateTracingRequestHeader(
+            *request_headers_, connection_manager_.runtime_, connection_manager_.config_,
+            cached_route_.value().get()));
   }
 
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
@@ -1052,8 +1049,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 }
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
-  Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::isTracing(filter_manager_.streamInfo(), *request_headers_);
+  const Tracing::Decision tracing_decision =
+      Tracing::HttpTracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
