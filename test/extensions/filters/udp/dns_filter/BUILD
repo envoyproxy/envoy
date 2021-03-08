@@ -19,6 +19,7 @@ envoy_extension_cc_test_library(
     hdrs = ["dns_filter_test_utils.h"],
     extension_name = "envoy.filters.udp_listener.dns_filter",
     deps = [
+        "//source/common/common:random_generator_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/test_common:environment_lib",
     ],

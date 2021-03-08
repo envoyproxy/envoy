@@ -660,7 +660,6 @@ TEST_P(WasmCommonTest, VmCache) {
           }));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
@@ -754,7 +753,6 @@ TEST_P(WasmCommonTest, RemoteCode) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::BytesValue vm_configuration_bytes;
   vm_configuration_bytes.set_value(vm_configuration);
@@ -862,7 +860,6 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
@@ -1290,13 +1287,14 @@ public:
   WasmCommonContextTest() = default;
 
   void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
-    setupBase(
-        GetParam(), code,
-        [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-          return new TestContext(wasm, plugin);
-        },
-        root_id, vm_configuration);
+    setRootId(root_id);
+    setVmConfiguration(vm_configuration);
+    setupBase(GetParam(), code,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new TestContext(wasm, plugin);
+              });
   }
+
   void setupContext() {
     context_ = std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_);
     context_->onCreate();
