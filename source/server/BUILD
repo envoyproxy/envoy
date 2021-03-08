@@ -60,8 +60,17 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_handler_lib",
+    deps = [
+        ":connection_handler_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_handler_impl",
     srcs = ["connection_handler_impl.cc"],
-    hdrs = ["connection_handler_impl.h"],
+    hdrs = [
+        "connection_handler_impl.h",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",

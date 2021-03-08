@@ -3318,6 +3318,13 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   init_helper_.startInitializingSecondaryClusters();
 }
 
+TEST_F(ClusterManagerInitHelperTest, RemoveUnknown) {
+  InSequence s;
+
+  NiceMock<MockClusterManagerCluster> cluster;
+  init_helper_.removeCluster(cluster);
+}
+
 // If secondary clusters initialization triggered outside of CdsApiImpl::onConfigUpdate()'s
 // callback flows, sending ClusterLoadAssignment should not be paused before calling
 // ClusterManagerInitHelper::maybeFinishInitialize(). This case tests that
