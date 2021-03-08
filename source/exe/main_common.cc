@@ -45,15 +45,24 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                                ListenerHooks& listener_hooks,
                                Server::ComponentFactory& component_factory,
+                               std::unique_ptr<PlatformImpl> platform_impl,
                                std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                               Thread::ThreadFactory& thread_factory,
-                               Filesystem::Instance& file_system,
                                std::unique_ptr<ProcessContext> process_context)
-    : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system), stats_allocator_(symbol_table_) {
+    : platform_impl_(std::move(platform_impl)), options_(options),
+      component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
   OptionsImpl::disableExtensions(options.disabledExtensions());
+
+  // Enable core dumps as early as possible.
+  if (options_.coreDumpEnabled()) {
+    const auto ret = platform_impl_->enableCoreDump();
+    if (ret) {
+      ENVOY_LOG_MISC(info, "core dump enabled");
+    } else {
+      ENVOY_LOG_MISC(warn, "failed to enable core dump");
+    }
+  }
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
@@ -79,7 +88,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
     server_ = std::make_unique<Server::InstanceImpl>(
         *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
         *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        thread_factory_, file_system_, std::move(process_context));
+        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
 
     break;
   }
@@ -163,8 +172,8 @@ bool MainCommonBase::run() {
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_, thread_factory_,
-                                  file_system_);
+    return Server::validateConfig(options_, local_address, component_factory_,
+                                  platform_impl_->threadFactory(), platform_impl_->fileSystem());
   }
   case Server::Mode::InitOnly:
     PERF_DUMP();
@@ -188,14 +197,14 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 MainCommon::MainCommon(const std::vector<std::string>& args)
     : options_(args, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            std::make_unique<Random::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
-            platform_impl_.fileSystem(), nullptr) {}
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
 
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            std::make_unique<Random::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
-            platform_impl_.fileSystem(), nullptr) {}
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
 
 std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
