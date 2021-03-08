@@ -105,10 +105,12 @@ void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
   }
 
   // It is possible that the cluster we are removing has already been initialized, and is not
-  // present in the initializer map. If so, this is fine.
-  absl::string_view cluster_name = cluster.cluster().info()->name();
-  if (cluster_map->at(cluster_name) == &cluster) {
-    cluster_map->erase(cluster_name);
+  // present in the initializer map. If so, this is fine as a CDS update may happen for a
+  // cluster with the same name. See the case "UpdateAlreadyInitialized" of the
+  // target //test/common/upstream:cluster_manager_impl_test.
+  auto iter = cluster_map->find(cluster.cluster().info()->name());
+  if (iter != cluster_map->end() && iter->second == &cluster) {
+    cluster_map->erase(iter);
   }
   ENVOY_LOG(debug, "cm init: init complete: cluster={} primary={} secondary={}",
             cluster.cluster().info()->name(), primary_init_clusters_.size(),
@@ -612,10 +614,17 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
-  if ((existing_active_cluster != active_clusters_.end() &&
-       existing_active_cluster->second->blockUpdate(new_hash)) ||
-      (existing_warming_cluster != warming_clusters_.end() &&
-       existing_warming_cluster->second->blockUpdate(new_hash))) {
+  if (existing_warming_cluster != warming_clusters_.end()) {
+    // If the cluster is the same as the warming cluster of the same name, block the update.
+    if (existing_warming_cluster->second->blockUpdate(new_hash)) {
+      return false;
+    }
+    // NB: https://github.com/envoyproxy/envoy/issues/14598
+    // Always proceed if the cluster is different from the existing warming cluster.
+  } else if (existing_active_cluster != active_clusters_.end() &&
+             existing_active_cluster->second->blockUpdate(new_hash)) {
+    // If there's no warming cluster of the same name, and if the cluster is the same as the active
+    // cluster of the same name, block the update.
     return false;
   }
 

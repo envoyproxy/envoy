@@ -12,6 +12,7 @@ envoy_package()
 wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
+    wasi = True,
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",
