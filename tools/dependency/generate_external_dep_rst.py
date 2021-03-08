@@ -8,11 +8,6 @@ import pathlib
 import sys
 import urllib.parse
 
-# TODO(phlax): remove this
-# this needs to be before the utils import
-# if we move cve_scan to a bazel job then we can remove
-os.environ["API_PATH"] = "external/envoy_api_canonical"
-
 from tools.dependency import utils as dep_utils
 
 

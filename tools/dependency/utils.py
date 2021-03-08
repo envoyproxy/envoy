@@ -15,18 +15,16 @@ def LoadModule(name, path):
   return module
 
 
-API_PATH = os.getenv("API_PATH", "api")
-
-envoy_repository_locations = LoadModule('envoy_repository_locations',
-                                        'bazel/repository_locations.bzl')
-api_repository_locations = LoadModule('api_repository_locations',
-                                      os.path.join(API_PATH, 'bazel/repository_locations.bzl'))
-repository_locations_utils = LoadModule(
-    'repository_locations_utils', os.path.join(API_PATH, 'bazel/repository_locations_utils.bzl'))
-
-
 # All repository location metadata in the Envoy repository.
 def RepositoryLocations():
+  api_path = os.getenv("API_PATH", "external/envoy_api_canonical")
+
+  envoy_repository_locations = LoadModule('envoy_repository_locations',
+                                          'bazel/repository_locations.bzl')
+  repository_locations_utils = LoadModule(
+    'repository_locations_utils', os.path.join(api_path, 'bazel/repository_locations_utils.bzl'))
+  api_repository_locations = LoadModule('api_repository_locations',
+                                        os.path.join(api_path, 'bazel/repository_locations.bzl'))
   spec_loader = repository_locations_utils.load_repository_locations_spec
   locations = spec_loader(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
   locations.update(spec_loader(api_repository_locations.REPOSITORY_LOCATIONS_SPEC))
