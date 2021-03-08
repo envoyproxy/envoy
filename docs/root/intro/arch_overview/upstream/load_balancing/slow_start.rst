@@ -3,49 +3,54 @@
 Slow start mode
 ===============
 
-Slow start mode is a configuration setting in Envoy to progressively increase amount of traffic for newly spawned service instances.
-With no slow start enabled Envoy would send a proportional amount of traffic to new instances.
+Slow start mode is a configuration setting in Envoy to progressively increase amount of traffic for newly added upstream endpoints.
+With no slow start enabled Envoy would send a proportional amount of traffic to new upstream ednpoints.
 This could be undesirable for services that require warm up time to serve full production load and could result in request timeouts, loss of data and deteriorated user experience.
 
-Slow start mode is a weight-adjustment mechanism in number of load balancer types and can be configured per cluster basis. 
+Slow start mode is a mechanism that affects load balancing weight of upstream endpoints and can be configured per upstream cluster. 
 Currently, slow start is supported in Round Robin and Least Request load balancer types.
 
-Users can specify a slow start window parameter (in seconds), so that if host’s “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode, given that the host satisfies endpoint warming policy. 
-Whenever a slow start window duration elapses, it exits slow start mode and gets regular amount of traffic acccording to load balanacing algorithm.
-Host could also exit slow start mode in case it leaves the cluster.
+Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode, given that the endpoint satisfies endpoint warming policy. 
+During slow start window, load balancing weight of a particular endpoint will be scaled with :ref:`time bias parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.time_bias>`, e.g.:
+`weight = load_balancing_weight * time_bias`.
 
-To reiterate, host enters slow start mode when:
-  * For :ref:`NO_WAIT<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.EndpointWarmingPolicy.NO_WAIT>` endpoint warming policy, immediately if it's cluster membership duration is within slow start window.
-  * For :ref:`WAIT_FOR_FIRST_PASSING_HC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.EndpointWarmingPolicy.WAIT_FOR_FIRST_PASSING_HC>` endpoint warming policy, upon passing an active healthcheck, given that it's cluster membership duration is within slow start window.
+Whenever a slow start window duration elapses, upstream endpoint exits slow start mode and gets regular amount of traffic acccording to load balanacing algorithm.
+Endpoint could also exit slow start mode in case it leaves the cluster.
 
-Host exists slow start mode when:
+To reiterate, endpoint enters slow start mode when:
+  * For :ref:`NO_WAIT<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.NO_WAIT>` endpoint warming policy, immediately if it's cluster membership duration is within slow start window.
+  * For :ref:`WAIT_FOR_FIRST_PASSING_HC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.WAIT_FOR_FIRST_PASSING_HC>` endpoint warming policy, if it's cluster membership duration is within slow start window and endpoint has passed an active healthcheck. 
+    If endpoint does not pass an active healcheck during entire slow start window (since it has been added to upstream cluster), then it never enter slow start mode.
+
+Endpoint exits slow start mode when:
   * It leaves the cluster.
   * It's cluster membership duration is greater than slow start window.
-  * For :ref:`WAIT_FOR_FIRST_PASSING_HC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.EndpointWarmingPolicy.WAIT_FOR_FIRST_PASSING_HC>` endpoint warming policy, if host's health status changes to anything rather than `Healthy`.
+  * For :ref:`WAIT_FOR_FIRST_PASSING_HC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.WAIT_FOR_FIRST_PASSING_HC>` endpoint warming policy, if endpoint health status changes to anything rather than `Healthy`.
+    Endpoint could further re-enter slow start, if it passes an active healtcheck and it's creation time is within slow start window.
 
-Below is example of how requests would be distributed across hosts with Round Robin Loadbalancer, slow start window of 10 seconds, `NO_WAIT` ednpoint warming policy and 0.5 time bias.
-Host H1 has statically configured initial weight of X and host H2 weight of Y, the actual numerical values are of no significance for this example.
+Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, `NO_WAIT` ednpoint warming policy and 0.5 time bias.
+Endpoint E1 has statically configured initial weight of X and endpoint E2 weight of Y, the actual numerical values are of no significance for this example.
 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| Timestamp   | Event          | H1 in slow | H2 in slow | H1 LB     | H2 LB    | LB decision |
-|             |                | start      | start      | weight    | weight   |             |
-+=============+================+============+============+===========+==========+=============+
-| 1           |  H1 create     |    YES     |     --     |   0.5X    |    --    |     --      |
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 11          |  H2 create     |     NO     |    YES     |    X      |   0.5Y   |     --      |
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 12          | LB select host |     NO     |    YES     |    X      |   0.5Y   |     H1      | 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 13          | LB select host |     NO     |    YES     |    X      |   0.5Y   |     H1      | 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 14          | LB select host |     NO     |    YES     |    X      |   0.5Y   |     H1      | 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 15          |LB select host  |     NO     |    YES     |    X      |   0.5Y   |     H2      | 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 22          | LB select host |     NO     |     NO     |    X      |    Y     |     H1      | 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
-| 23          | LB select host |     NO     |     NO     |    X      |    Y     |     H2      | 
-+-------------+----------------+------------+------------+-----------+----------+-------------+
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| Timestamp   | Event              | E1 in slow | E2 in slow | E1 LB     | E2 LB    | LB decision |
+|             |                    | start      | start      | weight    | weight   |             |
++=============+====================+============+============+===========+==========+=============+
+| 1           |  E1 create         |    YES     |     --     |   0.5X    |    --    |     --      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 11          |  E2 create         |     NO     |    YES     |    X      |   0.5Y   |     --      |
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 12          | LB select endpoint |     NO     |    YES     |    X      |   0.5Y   |     E1      | 
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 13          | LB select endpoint |     NO     |    YES     |    X      |   0.5Y   |     E1      | 
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 14          | LB select endpoint |     NO     |    YES     |    X      |   0.5Y   |     E1      | 
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 15          |LB select endpoint  |     NO     |    YES     |    X      |   0.5Y   |     E2      | 
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 22          | LB select endpoint |     NO     |     NO     |    X      |    Y     |     E1      | 
++-------------+--------------------+------------+------------+-----------+----------+-------------+
+| 23          | LB select endpoint |     NO     |     NO     |    X      |    Y     |     E2      | 
++-------------+--------------------+------------+------------+-----------+----------+-------------+
 
 
 .. _arch_overview_load_balancing_slow_start_endpoint_warming_policy_types:
@@ -58,9 +63,9 @@ Endpoint warming policy defines conditions for host to enter slow start mode.
 No Wait
 ^^^^^^^
 
-If configured, host would enter slow start immediately.
+If configured, endpoint would enter slow start immediately.
 
 Wait For First Passing Healthcheck
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If configured, host would enter slow start upon having passed an active healthcheck.
+If configured, endpoint would enter slow start upon having passed an active healthcheck.

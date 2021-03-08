@@ -423,7 +423,7 @@ private:
 
 protected:
   // Slow start related configs
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::EndpointWarmingPolicy
       endpoint_warming_policy_;
   const std::chrono::milliseconds slow_start_window_;
   double time_bias_{1.0};
@@ -438,7 +438,7 @@ protected:
   // Used exclusively for:
   //    - checking if at least one host is in slow start;
   //    - ordering of hosts by creation date in ascending order.
-  // Not meant to check if given host is in slow start as it does not rely on current time.
+  // Not meant to check if given host is in slow start as check relies on current time.
   // That check could be done inline by comparing the diff of current time and host creation date
   // against slow start window and by checking if hosts adheres to endpoint warming policy.
   std::shared_ptr<absl::btree_set<HostSharedPtr, OrderByCreateDateDesc>> hosts_in_slow_start_;
@@ -481,6 +481,9 @@ private:
 
         if (time_bias_ < 0.0) {
           time_bias_ = 1.0;
+        }
+        if (time_bias_ > 0.0) {
+          return host.weight() * time_bias_;
         }
         return host.weight() * time_bias_;
       } else {

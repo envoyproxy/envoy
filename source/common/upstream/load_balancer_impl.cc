@@ -712,7 +712,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       seed_(random_.random()),
       endpoint_warming_policy_(common_config.has_slow_start_config()
                                    ? common_config.slow_start_config().endpoint_warming_policy()
-                                   : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
+                                   : envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT),
       slow_start_window_(
           std::chrono::milliseconds(common_config.has_slow_start_config()
                                         ? common_config.slow_start_config().slow_start_window()
@@ -800,14 +800,16 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
           time_source_.monotonicTime() - host->creationTime());
       if (host_create_duration <= slow_start_window_ && adheresToEndpointWarmingPolicy(*host)) {
 
-        time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
+        time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : time_bias_;
 
         if (time_bias_ < 0.0) {
           ENVOY_LOG(warn, "upstream: invalid time bias supplied (runtime key {}), using 1.0",
                     time_bias_runtime_->runtimeKey());
           time_bias_ = 1.0;
         }
-        host_weight *= time_bias_;
+        if (time_bias_ > 0.0) {
+          host_weight *= time_bias_;
+        }
       }
       scheduler.edf_->add(host_weight, host);
     }
@@ -849,10 +851,10 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 
 bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
   switch (endpoint_warming_policy_) {
-  case envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT:
+  case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT:
     // Host enters slow start immediately.
     return true;
-  case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
+  case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::WAIT_FOR_FIRST_PASSING_HC:
     if (host.health() == Upstream::Host::Health::Healthy) {
       return true;
     } else {

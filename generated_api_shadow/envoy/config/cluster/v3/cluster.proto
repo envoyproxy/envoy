@@ -442,13 +442,6 @@ message Cluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
 
-    // Refer to :ref:`endpoint warming policy types <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>`
-    // for an explanation on each policy type.
-    enum EndpointWarmingPolicy {
-      NO_WAIT = 0;
-      WAIT_FOR_FIRST_PASSING_HC = 1;
-    }
-
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
     message ZoneAwareLbConfig {
@@ -514,6 +507,16 @@ message Cluster {
 
     // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
     message SlowStartConfig {
+      // Refer to :ref:`endpoint warming policy types <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>`
+      // for an explanation on each policy type.
+      enum EndpointWarmingPolicy {
+        // Endpoint would enter slow start immediately.
+        NO_WAIT = 0;
+
+        // Endpoint would enter slow start upon passing first active healthcheck.
+        WAIT_FOR_FIRST_PASSING_HC = 1;
+      }
+
       // Size of slow start window in seconds, defaults to 0.
       // If set to value greater than 0, the newly created host remains in slow start mode starting from it's creation time
       // for the duration of slow start window.
@@ -525,6 +528,14 @@ message Cluster {
       EndpointWarmingPolicy endpoint_warming_policy = 2
           [(validate.rules).enum = {defined_only: true}];
 
+      // This parameter linearly affects load balancing weight of an endpoint.
+      // The smaller the time bias is, the less traffic would be sent to endpoint that is within slow start window.
+      // The value of time bias should be greater than or equal to 0.0 and less than or equal to 1.0.
+      // If slow start window and time bias are configured, effective weight of an endpoint would be scaled with time bias:
+      // `weight = load_balancing_weight * time_bias`
+      //
+      // When `time bias == 0.0` the Round Robin and Least Request Load Balancers will not scale enpoint weight with time bias
+      // and will behave as if slow start is not enabled.
       core.v3.RuntimeDouble time_bias = 3;
     }
 
@@ -571,6 +582,7 @@ message Cluster {
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
 
     // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
     SlowStartConfig slow_start_config = 8;
   }
 
