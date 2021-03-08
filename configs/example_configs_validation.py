@@ -1,4 +1,5 @@
-import os
+
+65;6202;1cimport os
 import pathlib
 import sys
 
@@ -19,10 +20,7 @@ def main():
                        yaml.safe_load(pathlib.Path(arg).read_text()))
     except (ParseError, KeyError) as e:
       errors.append(arg)
-      print()
-      print(f"ERROR (validation failed): {arg}")
-      print(e)
-      print()
+      print(f"\nERROR (validation failed): {arg}\n{e}\n\n")
 
   if errors:
     raise SystemExit(f"ERROR: some configuration files ({len(errors)}) failed to validate")
