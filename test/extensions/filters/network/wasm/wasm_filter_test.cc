@@ -53,13 +53,13 @@ public:
     } else {
       code_ = code;
     }
-    setupBase(
-        std::get<0>(GetParam()), code_,
-        [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-          return new TestRoot(wasm, plugin);
-        },
-        "" /* root_id */, "" /* vm_configuration */, fail_open, "" /* plugin configuration*/,
-        allowed_capabilities);
+    setVmConfiguration(vm_configuration);
+    setFailOpen(fail_open);
+    setAllowedCapabilities(allowed_capabilities);
+    setupBase(std::get<0>(GetParam()), code_,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new TestRoot(wasm, plugin);
+              });
   }
 
   void setupFilter() { setupFilterBase<TestFilter>(); }

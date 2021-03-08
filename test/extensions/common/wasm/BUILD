@@ -58,6 +58,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "plugin_test",
+    srcs = ["plugin_test.cc"],
+    deps = [
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
 envoy_cc_test_binary(
     name = "wasm_speed_test",
     srcs = ["wasm_speed_test.cc"],

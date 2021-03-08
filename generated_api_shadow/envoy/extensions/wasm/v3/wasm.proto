@@ -40,7 +40,7 @@ message SanitizationConfig {
 }
 
 // Configuration for a Wasm VM.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
@@ -93,6 +93,22 @@ message VmConfig {
   // update and do a background fetch to fill the cache, otherwise fetch the code asynchronously and enter
   // warming state.
   bool nack_on_code_cache_miss = 6;
+
+  // Specifies environment variables to be injected to this VM which will be available through
+  // WASI's ``environ_get`` and ``environ_get_sizes`` system calls. Note that these functions are mostly implicitly
+  // called in your language's standard library, so you do not need to call them directly and you can access to env
+  // vars just like when you do on native platforms.
+  // Warning: Envoy rejects the configuration if there's conflict of key space.
+  EnvironmentVariables environment_variables = 7;
+}
+
+message EnvironmentVariables {
+  // The keys of *Envoy's* environment variables exposed to this VM. In other words, if a key exists in Envoy's environment
+  // variables, then that key-value pair will be injected. Note that if a key does not exist, it will be ignored.
+  repeated string host_env_keys = 1;
+
+  // Explicitly given key-value pairs to be injected to this VM in the form of "KEY=VALUE".
+  map<string, string> key_values = 2;
 }
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
