@@ -4,6 +4,11 @@ ARG BUILD_TAG=18.04
 FROM $BUILD_OS:$BUILD_TAG
 ARG TARGETPLATFORM
 
+RUN apt-get update \
+    && apt-get upgrade -qq -y \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN mkdir -p /etc/envoy
 
 ARG ENVOY_BINARY_SUFFIX=_stripped
