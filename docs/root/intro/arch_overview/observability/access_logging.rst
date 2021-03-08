@@ -40,6 +40,7 @@ File
   threads.
 * Customizable access log formats using predefined fields as well as arbitrary HTTP request and
   response headers.
+* Cross platform support for writing to standard output, standard error, and console.
 
 gRPC
 ****
