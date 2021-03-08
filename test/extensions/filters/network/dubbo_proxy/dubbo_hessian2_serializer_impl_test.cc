@@ -58,6 +58,20 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcInvocation(buffer, context), EnvoyException,
                               exception_string);
   }
+
+  // Missing key metadata.
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        0x05, '2', '.', '0', '.', '2', // Dubbo version
+        0x04, 't', 'e', 's', 't',      // Service name
+        0x05, '0', '.', '0', '.', '0', // Service version
+    }));
+    std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+    context->setBodySize(buffer.length());
+    EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcInvocation(buffer, context), EnvoyException,
+                              "RpcInvocation has no request metadata");
+  }
 }
 
 TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
@@ -93,10 +107,10 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (const auto& object : params) {
-      encoder.encode<Hessian2::Object>(*object);
+    for (size_t i = 0; i < params.size(); i++) {
+      encoder.encode<Hessian2::Object>(*params[i]);
     }
-    // Encode attachment as fourth parameter.
+    // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
 
     // Encode attachment
@@ -159,10 +173,10 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (const auto& object : params) {
-      encoder.encode<Hessian2::Object>(*object);
+    for (size_t i = 0; i < params.size(); i++) {
+      encoder.encode<Hessian2::Object>(*params[i]);
     }
-    // Encode attachment as fourth parameter.
+    // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
 
     // Encode attachment
@@ -218,10 +232,10 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (const auto& object : params) {
-      encoder.encode<Hessian2::Object>(*object);
+    for (size_t i = 0; i < params.size(); i++) {
+      encoder.encode<Hessian2::Object>(*params[i]);
     }
-    // Encode attachment as fourth parameter.
+    // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
 
     std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
@@ -252,6 +266,79 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
                                    ->second->toString()
                                    .value()));
 
+    EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value()->empty());
+  }
+  // Test the case where there are not enough parameters in the request buffer.
+  {
+    DubboHessian2SerializerImpl serializer;
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        0x05, '2', '.', '0', '.', '2', // Dubbo version
+        0x04, 't', 'e', 's', 't',      // Service name
+        0x05, '0', '.', '0', '.', '0', // Service version
+        0x04, 't', 'e', 's', 't',      // method name
+    }));
+
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(buffer));
+
+    encoder.encode<std::string>(parameters_type);
+
+    // There are actually only three parameters in the request.
+    for (size_t i = 0; i < params.size(); i++) {
+      encoder.encode<Hessian2::Object>(*params[i]);
+    }
+
+    std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+
+    context->setBodySize(buffer.length());
+
+    auto result = serializer.deserializeRpcInvocation(buffer, context);
+    EXPECT_EQ(true, result.second);
+
+    auto invo = dynamic_cast<RpcInvocationImpl*>(result.first.get());
+
+    context->originMessage().move(buffer, buffer.length());
+
+    // There are not enough parameters and throws an exception.
+    EXPECT_THROW_WITH_MESSAGE(invo->mutableParameters(), EnvoyException,
+                              "Cannot parse RpcInvocation parameter from buffer");
+  }
+  // Test for incorrect attachment types.
+  {
+    DubboHessian2SerializerImpl serializer;
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        0x05, '2', '.', '0', '.', '2', // Dubbo version
+        0x04, 't', 'e', 's', 't',      // Service name
+        0x05, '0', '.', '0', '.', '0', // Service version
+        0x04, 't', 'e', 's', 't',      // method name
+    }));
+
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(buffer));
+
+    encoder.encode<std::string>(parameters_type);
+
+    for (size_t i = 0; i < params.size(); i++) {
+      encoder.encode<Hessian2::Object>(*params[i]);
+    }
+    // Encode an untyped map object as fourth parameter.
+    encoder.encode<Hessian2::Object>(attach.attachment());
+
+    // Encode a string object as attachment.
+    encoder.encode<Hessian2::Object>(*params[0]);
+
+    std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+
+    context->setBodySize(buffer.length());
+
+    auto result = serializer.deserializeRpcInvocation(buffer, context);
+    EXPECT_EQ(true, result.second);
+
+    auto invo = dynamic_cast<RpcInvocationImpl*>(result.first.get());
+
+    context->originMessage().move(buffer, buffer.length());
+
+    auto& result_attach = invo->mutableAttachment();
     EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value()->empty());
   }
 }
