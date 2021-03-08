@@ -97,6 +97,7 @@ Removed Config or Runtime
 * http: removed legacy date header overwriting logic and runtime guard `envoy.reloadable_features.preserve_upstream_date deprecation`.
 * listener: removed legacy runtime guard `envoy.reloadable_features.listener_in_place_filterchain_update`.
 * router: removed `envoy.reloadable_features.consume_all_retry_headers` and legacy code path.
+* router: removed `envoy.reloadable_features.preserve_query_string_in_path_redirects` and legacy code path.
 
 New Features
 ------------
