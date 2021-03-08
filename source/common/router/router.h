@@ -119,7 +119,7 @@ public:
    * - security of downstream connection
    */
   static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
-                                bool upstream_Secure);
+                                bool upstream_secure);
 
   /**
    * Determine whether a request should be shadowed.
