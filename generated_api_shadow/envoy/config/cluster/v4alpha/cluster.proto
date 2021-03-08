@@ -522,10 +522,10 @@ message Cluster {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
 
-      // Size of slow start window in seconds, default value is 0.
+      // Size of slow start window in seconds, defaults to 0.
       // If set to value greater than 0, the newly created host remains in slow start mode starting from it's creation time
       // for the duration of slow start window.
-      google.protobuf.UInt32Value slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
+      uint32 slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
 
       // This :ref:`endpoint warming policy type <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>` defines condition
       // to be satisfied for host to enter slow start mode. The value defaults to

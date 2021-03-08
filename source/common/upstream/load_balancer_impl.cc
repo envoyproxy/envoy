@@ -713,12 +713,11 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       endpoint_warming_policy_(common_config.has_slow_start_config()
                                    ? common_config.slow_start_config().endpoint_warming_policy()
                                    : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
-      slow_start_window_(std::chrono::milliseconds(
-                             common_config.has_slow_start_config()
-                                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                       common_config.slow_start_config(), slow_start_window, 0)
-                                 : 0) *
-                         1000),
+      slow_start_window_(
+          std::chrono::milliseconds(common_config.has_slow_start_config()
+                                        ? common_config.slow_start_config().slow_start_window()
+                                        : 0) *
+          1000),
       time_bias_runtime_(
           common_config.has_slow_start_config() && common_config.slow_start_config().has_time_bias()
               ? std::make_unique<Runtime::Double>(common_config.slow_start_config().time_bias(),

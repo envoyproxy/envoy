@@ -1501,7 +1501,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
       envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT);
   // Set slow start window to 60 seconds.
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_value(60);
+  common_config_.mutable_slow_start_config()->set_slow_start_window(60);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
   simTime().advanceTimeWait(std::chrono::seconds(1));
@@ -1565,7 +1565,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
   common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
       envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC);
   // Set slow start window to 10 seconds.
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_value(10);
+  common_config_.mutable_slow_start_config()->set_slow_start_window(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
   simTime().advanceTimeWait(std::chrono::seconds(1));
@@ -1632,7 +1632,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
   common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
       envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC);
   // Set slow start window to 10 seconds.
-  common_config_.mutable_slow_start_config()->mutable_slow_start_window()->set_value(10);
+  common_config_.mutable_slow_start_config()->set_slow_start_window(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(1);
 
