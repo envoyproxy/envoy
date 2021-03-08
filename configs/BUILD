@@ -50,6 +50,7 @@ genrule(
         "//examples:configs",
         "//examples:certs",
         "//examples:lua",
+        "//examples/wasm-cc:configs",
         "//docs:configs",
         "//test/config/integration/certs",
     ],
@@ -60,6 +61,7 @@ genrule(
         "$(locations //examples:configs) " +
         "$(locations //examples:certs) " +
         "$(locations //examples:lua) " +
+        "$(locations //examples/wasm-cc:configs) " +
         "$(locations //docs:configs) " +
         "$(locations //test/config/integration/certs)"
     ),
