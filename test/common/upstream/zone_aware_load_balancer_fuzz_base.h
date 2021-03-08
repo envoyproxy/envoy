@@ -1,3 +1,5 @@
+#pragma once
+
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 

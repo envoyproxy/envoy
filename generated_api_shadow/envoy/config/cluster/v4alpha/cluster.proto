@@ -161,6 +161,7 @@ message Cluster {
     google.protobuf.Struct match = 2;
 
     // The configuration of the transport socket.
+    // [#extension-category: envoy.transport_sockets.upstream]
     core.v4alpha.TransportSocket transport_socket = 3;
   }
 
@@ -174,6 +175,7 @@ message Cluster {
 
     // Cluster specific configuration which depends on the cluster being instantiated.
     // See the supported cluster for further documentation.
+    // [#extension-category: envoy.clusters]
     google.protobuf.Any typed_config = 2;
   }
 
@@ -734,11 +736,16 @@ message Cluster {
   // Any ``:`` in the cluster name will be converted to ``_`` when emitting statistics.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // An optional alternative to the cluster name to be used while emitting stats.
-  // Any ``:`` in the name will be converted to ``_`` when emitting statistics. This should not be
-  // confused with :ref:`Router Filter Header
-  // <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
-  string alt_stat_name = 28;
+  // An optional alternative to the cluster name to be used for observability. This name is used
+  // emitting stats for the cluster and access logging the cluster name. This will appear as
+  // additional information in configuration dumps of a cluster's current status as
+  // :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>`
+  // and as an additional tag "upstream_cluster.name" while tracing. Note: access logging using
+  // this field is presently enabled with runtime feature
+  // `envoy.reloadable_features.use_observable_cluster_name`. Any ``:`` in the name will be
+  // converted to ``_`` when emitting statistics. This should not be confused with :ref:`Router
+  // Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
+  string observability_name = 28;
 
   oneof cluster_discovery_type {
     // The :ref:`service discovery type <arch_overview_service_discovery_types>`
@@ -1060,6 +1067,7 @@ message Cluster {
   // If users desire custom connection pool or upstream behavior, for example terminating
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
+  // [#extension-category: envoy.upstreams]
   core.v4alpha.TypedExtensionConfig upstream_config = 48;
 
   // Configuration to track optional cluster stats.

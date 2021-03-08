@@ -651,6 +651,18 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
 
+TEST(HeaderIsValidTest, ShouldHaveNoBody) {
+  const std::vector<std::string> methods{{"CONNECT"}, {"GET"}, {"DELETE"}, {"TRACE"}, {"HEAD"}};
+
+  for (const auto& method : methods) {
+    TestRequestHeaderMapImpl headers{{":method", method}};
+    EXPECT_TRUE(HeaderUtility::requestShouldHaveNoBody(headers));
+  }
+
+  TestRequestHeaderMapImpl post{{":method", "POST"}};
+  EXPECT_FALSE(HeaderUtility::requestShouldHaveNoBody(post));
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestRequestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestRequestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};

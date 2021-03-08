@@ -4,10 +4,12 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
 #include "envoy/common/random_generator.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
@@ -90,7 +92,9 @@ public:
 /**
  * Base class for HTTP/2 client and server codecs.
  */
-class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
+class ConnectionImpl : public virtual Connection,
+                       protected Logger::Loggable<Logger::Id::http2>,
+                       public ScopeTrackedObject {
 public:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  Random::RandomGenerator& random_generator,
@@ -128,6 +132,9 @@ public:
    * TODO(#10878): Remove this when exception removal is complete.
    */
   virtual Http::Status innerDispatch(Buffer::Instance& data);
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
   friend class ProdNghttp2SessionFactory;
@@ -172,7 +179,8 @@ protected:
                       public Stream,
                       public LinkedObject<StreamImpl>,
                       public Event::DeferredDeletable,
-                      public StreamCallbackHelper {
+                      public StreamCallbackHelper,
+                      public ScopeTrackedObject {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
     ~StreamImpl() override;
@@ -226,6 +234,9 @@ protected:
     void setFlushTimeout(std::chrono::milliseconds timeout) override {
       stream_idle_timeout_ = timeout;
     }
+
+    // ScopeTrackedObject
+    void dumpState(std::ostream& os, int indent_level) const override;
 
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
@@ -358,6 +369,9 @@ protected:
     }
     void enableTcpTunneling() override {}
 
+    // ScopeTrackedObject
+    void dumpState(std::ostream& os, int indent_level) const override;
+
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
@@ -400,6 +414,9 @@ protected:
       encodeTrailersBase(trailers);
     }
 
+    // ScopeTrackedObject
+    void dumpState(std::ostream& os, int indent_level) const override;
+
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
@@ -414,6 +431,7 @@ protected:
   // NOTE: Always use non debug nullptr checks against the return value of this function. There are
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
+  const StreamImpl* getStream(int32_t stream_id) const;
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 
@@ -472,6 +490,9 @@ protected:
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
+  // Tracks the stream id of the current stream we're processing.
+  // This should only be set while we're in the context of dispatching to nghttp2.
+  absl::optional<int32_t> current_stream_id_;
   nghttp2_session* session_{};
   CodecStats& stats_;
   Network::Connection& connection_;
@@ -506,6 +527,9 @@ protected:
   // flag.
   const bool skip_encoding_empty_trailers_;
 
+  // dumpState helper method.
+  virtual void dumpStreams(std::ostream& os, int indent_level) const;
+
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
@@ -531,6 +555,8 @@ private:
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
 
+  // Tracks the current slice we're processing in the dispatch loop.
+  const Buffer::RawSlice* current_slice_ = nullptr;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
@@ -571,7 +597,10 @@ private:
   ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override;
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
 
+  void dumpStreams(std::ostream& os, int indent_level) const override;
   Http::ConnectionCallbacks& callbacks_;
+  // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
+  bool enable_upstream_http2_flood_checks_;
 };
 
 /**

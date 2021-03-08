@@ -350,12 +350,12 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousErrorInGetAddrInfo) {
   // The Query's sd ref will be deallocated.
   EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_));
 
-  EXPECT_EQ(nullptr, resolver_->resolve(
-                         "foo.com", Network::DnsLookupFamily::Auto,
-                         [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void {
-                           // This callback should never be executed.
-                           FAIL();
-                         }));
+  EXPECT_EQ(nullptr,
+            resolver_->resolve("foo.com", Network::DnsLookupFamily::Auto,
+                               [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void {
+                                 // This callback should never be executed.
+                                 FAIL();
+                               }));
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
@@ -428,7 +428,7 @@ TEST_F(AppleDnsImplFakeApiTest, IncorrectInterfaceIndexReturned) {
 
   resolver_->resolve(
       hostname, Network::DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void { FAIL(); });
+      [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void { FAIL(); });
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
@@ -785,7 +785,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
 
   auto query = resolver_->resolve(
       hostname, Network::DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void { FAIL(); });
+      [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void { FAIL(); });
   ASSERT_NE(nullptr, query);
 
   EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,

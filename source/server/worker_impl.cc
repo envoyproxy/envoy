@@ -135,6 +135,7 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");
   guard_dog.stopWatching(watch_dog_);
+  dispatcher_->shutdown();
 
   // We must close all active connections before we actually exit the thread. This prevents any
   // destructors from running on the main thread which might reference thread locals. Destroying

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
@@ -66,7 +67,7 @@ private:
       value = Config::DataSource::read(secret->secret(), true, api_);
     }
 
-    secret_provider.addUpdateCallback([&secret_provider, this, &value]() {
+    update_callback_ = secret_provider.addUpdateCallback([&secret_provider, this, &value]() {
       const auto* secret = secret_provider.secret();
       if (secret != nullptr) {
         value = Config::DataSource::read(secret->secret(), true, api_);
@@ -76,6 +77,7 @@ private:
   std::string client_secret_;
   std::string token_secret_;
   Api::Api& api_;
+  Envoy::Common::CallbackHandlePtr update_callback_;
 
   Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;
   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider_;
@@ -124,6 +126,7 @@ public:
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
   const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
+  const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -137,6 +140,7 @@ private:
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
+  const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
 };

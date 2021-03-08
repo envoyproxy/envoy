@@ -22,7 +22,6 @@
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "absl/strings/match.h"
@@ -554,9 +553,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
     expect_close_ = false;
     client_->connect();
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-      client_->noDelay(true);
-    }
+    client_->noDelay(true);
   }
 
   if (!parent_.send_bytes_.empty()) {
