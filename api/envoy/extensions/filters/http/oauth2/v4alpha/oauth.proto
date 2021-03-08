@@ -45,7 +45,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message OAuth2Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.oauth2.v3alpha.OAuth2Config";
@@ -83,6 +83,10 @@ message OAuth2Config {
   // defaults to "user" scope.
   // OAuth RFC https://tools.ietf.org/html/rfc6749#section-3.3
   repeated string auth_scopes = 9;
+
+  // Optional resource parameter for authorization request
+  // RFC: https://tools.ietf.org/html/rfc8707
+  repeated string resources = 10;
 }
 
 // Filter config.

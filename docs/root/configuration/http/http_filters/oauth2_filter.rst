@@ -76,6 +76,10 @@ The following is an example configuring the filter.
     - user
     - openid
     - email
+    # (Optional): set resource parameter for Authorization request
+    resources:
+    - oauth2-resource
+    - http://example.com
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
@@ -124,6 +128,10 @@ Below is a complete code example of how we employ the filter as one of
                 - user
                 - openid
                 - email
+                # (Optional): set resource parameter for Authorization request
+                resources:
+                - oauth2-resource
+                - http://example.com
           - name: envoy.router
           tracing: {}
           codec_type: "AUTO"
