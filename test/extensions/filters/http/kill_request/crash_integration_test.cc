@@ -33,6 +33,9 @@ protected:
 // ASAN hijacks the signal handlers, so the process will die but not output
 // the particular messages we expect.
 #ifndef ASANITIZED
+// If we don't install any signal handlers (i.e. due to compile options), we
+// won't get the crash report.
+#ifdef ENVOY_HANDLE_SIGNALS
 
 // Tests should run with all protocols.
 class CrashIntegrationTestAllProtocols : public CrashIntegrationTest {};
@@ -88,6 +91,7 @@ TEST_P(CrashIntegrationTestAllProtocols, ResponseCrashDumpsTheCorrespondingReque
       sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 1024),
       "Dumping corresponding downstream request.*UpstreamRequest.*request_headers:");
 }
+#endif
 #endif
 #endif
 
