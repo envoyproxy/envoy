@@ -9,7 +9,7 @@ envoy_package()
 
 filegroup(
     name = "configs",
-    glob(
+    srcs = glob(
         [
             "**/*.yaml",
         ],
