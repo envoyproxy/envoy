@@ -164,6 +164,18 @@ enum class FilterMetadataStatus {
 };
 
 /**
+ * Return codes for onLocalReply filter invocations.
+ */
+enum class LocalErrorStatus {
+  // Continue sending the local reply after onLocalError has been sent to all filters.
+  Continue,
+
+  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
+  // informed rather than sending the local reply.
+  ContinueAndResetStream,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -596,6 +608,36 @@ public:
    * @param action the resulting match action
    */
   virtual void onMatchCallback(const Matcher::Action&) {}
+
+  struct LocalReplyData {
+    // The error code which (barring reset) will be sent to the client.
+    Http::Code code_;
+    // The details of why a local reply is being sent.
+    absl::string_view details_;
+    // True if a reset will occur rather than the local reply (some prior filter
+    // has returned ContinueAndResetStream)
+    bool reset_imminent_;
+  };
+
+  /**
+   * Called after sendLocalReply is called, and before any local reply is
+   * serialized either to filters, or downstream.
+   * This will be called on both encoder and decoder filters starting at the
+   * terminal filter (generally the router filter) and working towards the first filter configured.
+   *
+   * Note that in some circumstances, onLocalReply may be called more than once
+   * for a given stream, because it is possible that a filter call
+   * sendLocalReply while processing the original local reply response.
+   *
+   * Filters implementing onLocalReply are responsible for never calling sendLocalReply
+   * from onLocalReply, as that has the potential for looping.
+   *
+   * @param data data associated with the sendLocalReply call.
+   * @param LocalErrorStatus the action to take after onLocalError completes.
+   */
+  virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
+    return LocalErrorStatus::Continue;
+  }
 };
 
 /**
