@@ -14,8 +14,6 @@ from tools.config_validation.validate_fragment import ValidateFragment
 def main():
   errors = []
   for arg in sys.argv[1:]:
-    if not arg.endswith(".yaml"):
-      raise SystemExit(f"ERROR: non yaml file {arg}")
     try:
       ValidateFragment("envoy.config.bootstrap.v3.Bootstrap",
                        yaml.safe_load(pathlib.Path(arg).read_text()))
