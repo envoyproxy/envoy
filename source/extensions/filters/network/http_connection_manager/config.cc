@@ -535,10 +535,8 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
     throw EnvoyException(fmt::format(
         "Error: filter config {} applied without warming but has no default config.", name));
   }
-  std::set<std::string> require_type_urls;
   for (const auto& type_url : config_discovery.type_urls()) {
     auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
-    require_type_urls.emplace(factory_type_url);
     auto* factory = Registry::FactoryRegistry<
         Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(factory_type_url);
     if (factory == nullptr) {
@@ -550,24 +548,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                              last_filter_in_current_config);
   }
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery.config_source(), name, require_type_urls, context_, stats_prefix_,
-      config_discovery.apply_default_config_without_warming());
-  if (config_discovery.has_default_config()) {
-    auto* default_factory =
-        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-            config_discovery.default_config());
-    if (default_factory == nullptr) {
-      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                       "configuration with type URL {}.",
-                                       name, config_discovery.default_config().type_url()));
-    }
-    filter_config_provider->validateConfig(config_discovery.default_config(), *default_factory);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
-    Http::FilterFactoryCb default_config =
-        default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
-    filter_config_provider->onConfigUpdate(default_config, "", nullptr);
-  }
+      config_discovery, name, context_, stats_prefix_);
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

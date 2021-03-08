@@ -38,10 +38,9 @@ public:
    * Validate that the configuration is applicable in the context of the provider. If an exception
    * is thrown by any of the config providers for an update, the extension configuration update is
    * rejected.
-   * @param proto_config is the candidate configuration update.
-   * @param factory used to instantiate an extension config.
+   * @param type_url is the candidate configuration protobuf type URL.
    */
-  virtual void validateConfig(const ProtobufWkt::Any& proto_config, Factory& factory) PURE;
+  virtual void validateConfig(const std::string& type_url) PURE;
 
   /**
    * Update the provider with a new configuration.
