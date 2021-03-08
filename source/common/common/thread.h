@@ -171,8 +171,20 @@ public:
 
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
-  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
-  static void init() { MainThreadSingleton::initialize(new MainThread()); }
+  bool inMainThread() const {
+    std::thread::id cur_id = std::this_thread::get_id();
+    return std::find(main_thread_id_.begin(), main_thread_id_.end(), cur_id) !=
+           main_thread_id_.end();
+  }
+  void registerMainThread() { main_thread_id_.push_back(std::this_thread::get_id()); }
+  static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
+  static void init() {
+    if (!initialized()) {
+      MainThreadSingleton::initialize(new MainThread());
+    } else {
+      MainThreadSingleton::get().registerMainThread();
+    }
+  }
   static void clear() {
     delete MainThreadSingleton::getExisting();
     MainThreadSingleton::clear();
@@ -187,7 +199,7 @@ struct MainThread {
   }
 
 private:
-  std::thread::id main_thread_id_{std::this_thread::get_id()};
+  std::vector<std::thread::id> main_thread_id_{std::this_thread::get_id()};
 };
 
 #define TRY_ASSERT_MAIN_THREAD                                                                     \

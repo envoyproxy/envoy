@@ -94,7 +94,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
     const std::string request_override_host(override_header[0]->value().getStringView());
     request_host =
         Network::Utility::parseInternetAddressAndPortNoThrow(request_override_host, false);
-    if (request_host) {
+    if (request_host != nullptr) {
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
     } else {
       ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",

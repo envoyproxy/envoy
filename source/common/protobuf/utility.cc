@@ -168,20 +168,22 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   Protobuf::DynamicMessageFactory dmf;
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
-  TRY_NEEDS_AUDIT {
+  TRY_ASSERT_MAIN_THREAD {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EarlierVersion);
     // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
     // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
     // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
-    TRY_NEEDS_AUDIT { f(message, MessageVersion::LatestVersionValidate); }
+    TRY_ASSERT_MAIN_THREAD { f(message, MessageVersion::LatestVersionValidate); }
+    END_TRY
     catch (EnvoyException& e) {
       MessageUtil::onVersionUpgradeDeprecation(e.what());
     }
     // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
   }
+  END_TRY
   catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
