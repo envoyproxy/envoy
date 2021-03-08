@@ -22,7 +22,7 @@ static_resources:
                 client_config:
                   service_name: service1-envoy
                   instance_name: service1-envoy-1
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: service1_route
@@ -64,7 +64,7 @@ static_resources:
                 client_config:
                   service_name: service1-envoy
                   instance_name: service1-envoy-1
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: egress_http
           route_config:
             name: service2_route
@@ -87,8 +87,8 @@ static_resources:
   clusters:
   - name: local_service
     connect_timeout: 0.250s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: local_service
       endpoints:
@@ -100,8 +100,8 @@ static_resources:
                 port_value: 8080
   - name: service2
     connect_timeout: 0.250s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
@@ -114,8 +114,8 @@ static_resources:
                 port_value: 8000
   - name: skywalking
     connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
       cluster_name: skywalking

@@ -26,7 +26,7 @@ static_resources:
           require_client_certificate: true
           common_tls_context:
             tls_certificates:
-              certificate_chain:
+            - certificate_chain:
                 filename: certs/servercert.pem
               private_key:
                 filename: certs/serverkey.pem
@@ -39,7 +39,7 @@ static_resources:
   clusters:
   - name: postgres_cluster
     connect_timeout: 1s
-    type: strict_dns
+    type: STRICT_DNS
     load_assignment:
       cluster_name: postgres_cluster
       endpoints:

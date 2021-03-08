@@ -78,7 +78,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.router
   clusters:
-    name: service_foo
+  - name: service_foo
     connect_timeout: 5s
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
     load_assignment:

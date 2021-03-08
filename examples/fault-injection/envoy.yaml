@@ -9,10 +9,10 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           access_log:
-            name: envoy.access_loggers.file
+          - name: envoy.access_loggers.file
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
               path: /dev/stdout
@@ -46,13 +46,13 @@ static_resources:
   clusters:
   - name: local_service
     connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: local_service
       endpoints:
       - lb_endpoints:
-          endpoint:
+        - endpoint:
             address:
               socket_address:
                 address: backend

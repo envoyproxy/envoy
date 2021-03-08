@@ -9,7 +9,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -39,7 +39,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -66,15 +66,15 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              # The following self-signed certificate pair is generated using:
-              # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
-              #
-              # Instead of feeding it as an inline_string, certificate pair can also be fed to Envoy
-              # via filename. Reference: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
-              #
-              # Or in a dynamic configuration scenario, certificate pair can be fetched remotely via
-              # Secret Discovery Service (SDS). Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/security/secret.
-              certificate_chain:
+            # The following self-signed certificate pair is generated using:
+            # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
+            #
+            # Instead of feeding it as an inline_string, certificate pair can also be fed to Envoy
+            # via filename. Reference: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
+            #
+            # Or in a dynamic configuration scenario, certificate pair can be fetched remotely via
+            # Secret Discovery Service (SDS). Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/security/secret.
+            - certificate_chain:
                 inline_string: |
                   -----BEGIN CERTIFICATE-----
                   MIICqDCCAZACCQCquzpHNpqBcDANBgkqhkiG9w0BAQsFADAWMRQwEgYDVQQDDAtm
@@ -127,8 +127,8 @@ static_resources:
   clusters:
   - name: service1
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
       cluster_name: service1
@@ -141,8 +141,8 @@ static_resources:
                 port_value: 8000
   - name: service2
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
