@@ -455,7 +455,8 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
-void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& expected_code) {
+void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& expected_code,
+                                                          const std::string& expected_flag) {
   useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS%");
   initialize();
 
@@ -479,7 +480,7 @@ void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& exp
   EXPECT_EQ(expected_code, response->headers().getStatusValue());
   std::string log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(log, HasSubstr(expected_code));
-  EXPECT_THAT(log, HasSubstr("UPE"));
+  EXPECT_THAT(log, HasSubstr(expected_flag));
 }
 
 IntegrationStreamDecoderPtr

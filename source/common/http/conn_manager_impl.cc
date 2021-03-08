@@ -204,7 +204,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     } else {
       // responseDetails are filled when codec encountered parsing error.
       if (!stream.response_encoder_->getStream().responseDetails().empty()) {
-        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+          stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+        } else {
+          stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+        }
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       }

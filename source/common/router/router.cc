@@ -1078,12 +1078,9 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   }
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
-  Http::Code error_code = Http::Code::ServiceUnavailable;
-  if (reset_reason == Http::StreamResetReason::ProtocolError &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-    error_code = Http::Code::BadGateway;
-  }
+  const Http::Code error_code = (reset_reason == Http::StreamResetReason::ProtocolError)
+                                    ? Http::Code::BadGateway
+                                    : Http::Code::ServiceUnavailable;
   chargeUpstreamAbort(error_code, dropped, upstream_request);
   upstream_request.removeFromList(upstream_requests_);
 

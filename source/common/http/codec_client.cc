@@ -99,14 +99,15 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
-    StreamResetReason reason;
+    StreamResetReason reason = StreamResetReason::ConnectionFailure;
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
-        reason = StreamResetReason::ProtocolError;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+          reason = StreamResetReason::ProtocolError;
+        }
       }
-    } else {
-      reason = StreamResetReason::ConnectionFailure;
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
