@@ -351,3 +351,10 @@ following are the command line options that Envoy supports.
   * build mode - either ``RELEASE`` or ``DEBUG``,
 
   * TLS library - either ``BoringSSL`` or ``BoringSSL-FIPS``.
+
+.. option:: --enable-core-dump
+
+  *(optional)* This flag is intended for Linux-based systems and it's a no-op for all other platforms.
+  It enables core dumps by invoking `prctl <https://man7.org/linux/man-pages/man2/prctl.2.html>`_ using the
+  PR_SET_DUMPABLE option. This is useful for container environments when using capabilities, given that when
+  Envoy has more capabilities than its base environment core dumping will be disabled by the kernel.

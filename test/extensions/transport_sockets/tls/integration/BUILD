@@ -16,7 +16,6 @@ envoy_cc_test(
     ],
     data = [
         "//test/config/integration/certs",
-        "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
         "//source/common/event:dispatcher_includes",
@@ -26,7 +25,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
-        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+        "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
         "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
         "//test/mocks/secret:secret_mocks",

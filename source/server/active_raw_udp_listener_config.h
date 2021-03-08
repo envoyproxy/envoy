@@ -12,7 +12,7 @@ public:
   ActiveRawUdpListenerFactory(uint32_t concurrency);
 
   Network::ConnectionHandler::ActiveUdpListenerPtr
-  createActiveUdpListener(uint32_t worker_index, Network::ConnectionHandler& parent,
+  createActiveUdpListener(uint32_t worker_index, Network::UdpConnectionHandler& parent,
                           Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
 
   bool isTransportConnectionless() const override { return true; }
