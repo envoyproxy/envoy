@@ -44,8 +44,6 @@ else
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 \
-    && pip3 install -U virtualenv \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
