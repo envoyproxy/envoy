@@ -17,10 +17,12 @@ instantiate a matching filter associated with the wrapped structure:
 .. literalinclude:: _include/simple.yaml
     :language: yaml
 
-The above example wraps a HTTP filter (the SetResponseCode filter) in an ExtensionWithMatcher, allowing us to define
-a match tree to be evaluated in conjunction with evaluation of the wrapped filter. Prior to data being made available
-to the filter, it will be provided to the match tree, which will then attempt to evaluate the matching rules with
-the provided data, triggering an action if match evaluation completes in an action.
+The above example wraps a HTTP filter (the
+:ref:`HTTPFault <envoy_v3_api_msg_extensions.filters.http.fault.v3.HttpFault>` filter) in an
+ExtensionWithMatcher, allowing us to define a match tree to be evaluated in conjunction with
+evaluation of the wrapped filter. Prior to data being made available to the filter, it will be
+provided to the match tree, which will then attempt to evaluate the matching rules with the
+provided data, triggering an action if match evaluation completes in an action.
 
 In the above example, we are specifying that we want to match on the incoming request header `some-header` by setting the `input` to
 :ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>` and configuring the header key to use.
