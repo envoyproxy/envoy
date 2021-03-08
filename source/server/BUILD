@@ -61,6 +61,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
+        ":active_udp_listener",
         ":connection_handler_impl",
     ],
 )
@@ -92,6 +93,26 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_udp_listener",
+    srcs = ["active_udp_listener.cc"],
+    hdrs = [
+        "active_udp_listener.h",
+    ],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:exception_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/server:active_udp_listener_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//source/extensions/transport_sockets:well_known_names",
+        "//source/server:connection_handler_impl",
     ],
 )
 
