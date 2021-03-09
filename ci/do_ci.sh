@@ -408,7 +408,6 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
-
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
