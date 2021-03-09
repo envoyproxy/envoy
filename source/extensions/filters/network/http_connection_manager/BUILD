@@ -68,7 +68,6 @@ envoy_cc_library(
     hdrs = ["dependency_manager.h"],
     external_deps = [
         "abseil_status",
-        # "abseil_strings",
     ],
     deps = [
         "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
