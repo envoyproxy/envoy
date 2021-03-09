@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -21,9 +23,9 @@ public:
    * from the filter factory. Filters must be registered in decode path order.
    */
   void registerFilter(
-      const std::string& name,
+      const std::string& filter_name,
       const envoy::extensions::filters::common::dependency::v3::FilterDependencies& dependencies) {
-    filter_chain_.push_back({name, dependencies});
+    filter_chain_.push_back({filter_name, dependencies});
   }
 
   /**
@@ -34,9 +36,10 @@ public:
    * TODO(auni53): Change this to a general valid() that checks decode and
    * encode path.
    */
-  bool validDecodeDependencies();
+  absl::Status validDecodeDependencies();
 
 private:
+  // Ordered mapping of filter names to dependency specifications.
   std::vector<std::pair<std::string,
                         envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
       filter_chain_;
