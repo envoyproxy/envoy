@@ -6,7 +6,7 @@ licenses(["notice"])  # Apache 2
 py_binary(
     name = "validate_fragment",
     srcs = ["validate_fragment.py"],
-    data = ["//tools/type_whisperer:all_protos_with_ext_pb_text_inc_source.pb_text"],
+    data = ["//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text"],
     visibility = ["//visibility:public"],
     deps = [
         requirement("PyYAML"),

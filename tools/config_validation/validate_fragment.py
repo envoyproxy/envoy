@@ -38,7 +38,7 @@ def ValidateFragment(type_name, fragment):
 
   r = runfiles.Create()
   all_protos_pb_text_path = r.Rlocation(
-      'envoy/tools/type_whisperer/all_protos_with_ext_pb_text_inc_source.pb_text')
+      'envoy/tools/type_whisperer/all_protos_with_ext_pb_text.pb_text')
   file_desc_set = descriptor_pb2.FileDescriptorSet()
   text_format.Parse(pathlib.Path(all_protos_pb_text_path).read_text(),
                     file_desc_set,
