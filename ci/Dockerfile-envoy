@@ -9,8 +9,7 @@ RUN apt-get update \
     && apt-get autoremove \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /etc/envoy
+    && rm -rf /var/lib/apt/lists/*
 
 ARG ENVOY_BINARY_SUFFIX=_stripped
 ADD ${TARGETPLATFORM}/build_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
