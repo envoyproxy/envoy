@@ -1014,7 +1014,6 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 // connection error is not detected under these circumstances.
 #if !defined(__APPLE__)
 TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
-  EXCLUDE_UPSTREAM_HTTP3;
   testEnvoyHandling100Continue(false, "", true);
 }
 #endif
