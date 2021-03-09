@@ -1,7 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
-#include <sys/types.h>
-
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
@@ -172,7 +170,6 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
   ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
-
   uint32_t len = 0;
   uint8_t seq = 0;
 

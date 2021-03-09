@@ -51,24 +51,24 @@ void ServerGreeting::setAuthPluginName(const std::string& name) { auth_plugin_na
 // https://github.com/mysql/mysql-proxy/blob/ca6ad61af9088147a568a079c44d0d322f5bee59/src/network-mysqld-packet.c#L1171
 DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   if (BufferHelper::readUint8(buffer, protocol_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing protocol of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing protocol of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readString(buffer, version_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing version of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing version of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readUint32(buffer, thread_id_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing thread_id of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing thread_id of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   // read auth plugin data part 1, which is 8 byte.
   if (BufferHelper::readStringBySize(buffer, 8, auth_plugin_data1_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing auth plugin data part1 of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing auth plugin data part1 of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readBytes(buffer, 1) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error skipping bytes of mysql greeting msg");
+    ENVOY_LOG(debug, "error skipping bytes of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   if (protocol_ == MYSQL_PROTOCOL_9) {
@@ -77,7 +77,7 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
 
   uint16_t base_server_cap = 0;
   if (BufferHelper::readUint16(buffer, base_server_cap) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing cap flag[lower 2 bytes] of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing cap flag[lower 2 bytes] of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   setBaseServerCap(base_server_cap);
@@ -87,22 +87,22 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
     return DecodeStatus::Success;
   }
   if (BufferHelper::readUint16(buffer, server_status_) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing server status of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing server status of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   uint16_t ext_server_cap = 0;
   if (BufferHelper::readUint16(buffer, ext_server_cap) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing cap flag[higher 2 bytes] of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing cap flag[higher 2 bytes] of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   setExtServerCap(ext_server_cap);
   uint8_t auth_plugin_data_len = 0;
   if (BufferHelper::readUint8(buffer, auth_plugin_data_len) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing length of auth plugin data of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing length of auth plugin data of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   if (BufferHelper::readBytes(buffer, 10) != DecodeStatus::Success) {
-    ENVOY_LOG(info, "error when parsing reserved bytes of mysql greeting msg");
+    ENVOY_LOG(debug, "error when parsing reserved bytes of mysql greeting msg");
     return DecodeStatus::Failure;
   }
   if (server_cap_ & CLIENT_PLUGIN_AUTH) {
@@ -112,25 +112,25 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
     }
     if (BufferHelper::readStringBySize(buffer, auth_plugin_data_len2, auth_plugin_data2_) !=
         DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth plugin data part2 of mysql greeting msg");
+      ENVOY_LOG(debug, "error when parsing auth plugin data part2 of mysql greeting msg");
       return DecodeStatus::Failure;
     }
-    int skiped_bytes = 12 - (12 > auth_plugin_data_len2 ? auth_plugin_data_len2 : 12);
+    int skiped_bytes = 13 - (13 > auth_plugin_data_len2 ? auth_plugin_data_len2 : 13);
     if (BufferHelper::readBytes(buffer, skiped_bytes) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when skipping bytes of mysql greeting msg");
+      ENVOY_LOG(debug, "error when skipping bytes of mysql greeting msg");
       return DecodeStatus::Failure;
     }
     if (BufferHelper::readString(buffer, auth_plugin_name_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth plugin name of mysql greeting msg");
+      ENVOY_LOG(debug, "error when parsing auth plugin name of mysql greeting msg");
       return DecodeStatus::Failure;
     }
   } else if (server_cap_ & CLIENT_SECURE_CONNECTION) {
     if (BufferHelper::readStringBySize(buffer, 12, auth_plugin_data2_) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when parsing auth plugin data part2 of mysql greeting msg");
+      ENVOY_LOG(debug, "error when parsing auth plugin data part2 of mysql greeting msg");
       return DecodeStatus::Failure;
     }
     if (BufferHelper::readBytes(buffer, 1) != DecodeStatus::Success) {
-      ENVOY_LOG(info, "error when skipping byte of mysql greeting msg");
+      ENVOY_LOG(debug, "error when skipping byte of mysql greeting msg");
       return DecodeStatus::Failure;
     }
   }
@@ -139,12 +139,12 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   auto auth_plugin_len = auth_plugin_data1_.size() + auth_plugin_data2_.size();
   if (server_cap_ & CLIENT_PLUGIN_AUTH) {
     if (auth_plugin_len != auth_plugin_data_len) {
-      ENVOY_LOG(info, "error when final check failure of mysql greeting msg");
+      ENVOY_LOG(debug, "error when final check failure of mysql greeting msg");
       return DecodeStatus::Failure;
     }
   } else if (server_cap_ & CLIENT_SECURE_CONNECTION) {
     if (auth_plugin_len != 20 && auth_plugin_data_len != 0) {
-      ENVOY_LOG(info, "error when final check failure of mysql greeting msg");
+      ENVOY_LOG(debug, "error when final check failure of mysql greeting msg");
       return DecodeStatus::Failure;
     }
   }
@@ -177,12 +177,14 @@ void ServerGreeting::encode(Buffer::Instance& out) const {
   for (int i = 0; i < 10; i++) {
     BufferHelper::addUint8(out, 0);
   }
+  auto auth_data = auth_plugin_data2_;
   if (server_cap_ & CLIENT_PLUGIN_AUTH) {
-    BufferHelper::addString(out, auth_plugin_data2_);
+    auth_data.resize(13);
+    BufferHelper::addString(out, auth_data);
     BufferHelper::addString(out, auth_plugin_name_);
-    // TODO(qinggniq) version 5.5.7-9 and 5.6.0-1 will not add tail \0
     BufferHelper::addUint8(out, enc_end_string);
   } else if (server_cap_ & CLIENT_SECURE_CONNECTION) {
+    auth_data.resize(12);
     BufferHelper::addString(out, auth_plugin_data2_);
     BufferHelper::addUint8(out, enc_end_string);
   }
