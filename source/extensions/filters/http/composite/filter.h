@@ -145,8 +145,8 @@ private:
   };
 
   Http::StreamFilterSharedPtr delegated_filter_;
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
 };
 
 } // namespace Composite

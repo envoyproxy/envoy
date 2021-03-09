@@ -12,6 +12,11 @@ namespace {
 
 class FilterTest : public ::testing::Test {
 public:
+  FilterTest() {
+    filter_.setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_.setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
   template <class T> void expectDelegatedDecoding(T& filter_mock) {
     EXPECT_CALL(filter_mock, decodeHeaders(HeaderMapEqualRef(&default_request_headers_), false));
     EXPECT_CALL(filter_mock, decodeData(_, false));
@@ -48,6 +53,8 @@ public:
     filter_.encodeTrailers(default_response_trailers_);
   }
 
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Filter filter_;
 
   Http::TestRequestHeaderMapImpl default_request_headers_{
