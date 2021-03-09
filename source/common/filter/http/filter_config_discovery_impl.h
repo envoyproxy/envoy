@@ -5,6 +5,7 @@
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/config/subscription.h"
 #include "envoy/filter/http/filter_config_provider.h"
+#include "envoy/http/filter.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
@@ -38,6 +39,13 @@ public:
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
 
+  void setDefaultConfiguration(Envoy::Http::FilterFactoryCb config) override {
+    ASSERT(!default_configuration_);
+    default_configuration_ = config;
+
+    onConfigUpdate(config, "", nullptr);
+  }
+
   // Config::ExtensionConfigProvider
   const std::string& name() override;
   absl::optional<Envoy::Http::FilterFactoryCb> config() override;
@@ -58,6 +66,7 @@ private:
   // Currently applied configuration to ensure that the main thread deletes the last reference to
   // it.
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
+  absl::optional<Envoy::Http::FilterFactoryCb> default_configuration_{absl::nullopt};
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
   // Local initialization target to ensure that the subscription starts in
@@ -158,6 +167,9 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void onConfigRemoved(Config::ConfigAppliedCb) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void setDefaultConfiguration(Envoy::Http::FilterFactoryCb) override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 
 private:
   Envoy::Http::FilterFactoryCb config_;

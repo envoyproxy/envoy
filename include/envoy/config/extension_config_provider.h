@@ -57,6 +57,8 @@ public:
    * @param cb the continuation callback for a completed configuration application.
    */
   virtual void onConfigRemoved(ConfigAppliedCb cb) PURE;
+
+  virtual void setDefaultConfiguration(FactoryCallback config) PURE;
 };
 
 } // namespace Config

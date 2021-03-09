@@ -69,8 +69,8 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
 
 void DynamicFilterConfigProviderImpl::onConfigRemoved(Config::ConfigAppliedCb cb) {
   tls_.runOnAllThreads(
-      [cb](OptRef<ThreadLocalConfig> tls) {
-        tls->config_ = absl::nullopt;
+      [cb, config = default_configuration_](OptRef<ThreadLocalConfig> tls) {
+        tls->config_ = config;
         if (cb) {
           cb();
         }
@@ -78,7 +78,7 @@ void DynamicFilterConfigProviderImpl::onConfigRemoved(Config::ConfigAppliedCb cb
       [this]() {
         // This happens after all workers have discarded the previous config so it can be safely
         // deleted on the main thread by an update with the new config.
-        this->current_config_ = absl::nullopt;
+        this->current_config_ = default_configuration_;
       });
 }
 
@@ -175,8 +175,7 @@ void FilterConfigSubscription::onConfigUpdate(
         }
       });
     }
-  }
-  if (!added_resources.empty()) {
+  } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }
 }
