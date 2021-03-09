@@ -1043,7 +1043,7 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) {
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // Hits assert in switchStreamBlockState.
   testTwoRequests(true);
 }
 
@@ -1724,7 +1724,6 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
-  EXCLUDE_UPSTREAM_HTTP3; // Somehow picks up an extra byte?
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
@@ -1831,7 +1830,6 @@ name: passthrough-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndBuffer.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAll) {
-  EXCLUDE_UPSTREAM_HTTP3; // Somehow picks up an extra byte?
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
@@ -1859,12 +1857,16 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
+  // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
+  int times_added = (upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ||
+                     downstreamProtocol() == Http::CodecClient::Type::HTTP1)
+                        ? 1
+                        : 2;
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAllWatermark) {
-  EXCLUDE_UPSTREAM_HTTP3; // Somehow picks up an extra byte?
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
@@ -1900,7 +1902,12 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
+  // Data is added in encodeData for all protocols, and encodeTrailers for HTTP/2 and above.
+  int times_added = (upstreamProtocol() == FakeHttpConnection::Type::HTTP1 ||
+                     downstreamProtocol() == Http::CodecClient::Type::HTTP1)
+                        ? 1
+                        : 2;
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * times_added, response->body().size());
 }
 
 // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
