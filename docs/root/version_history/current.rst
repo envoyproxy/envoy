@@ -67,6 +67,7 @@ Bug Fixes
 * adaptive concurrency: fixed a bug where concurrent requests on different worker threads could update minRTT back-to-back.
 * buffer: tighten network connection read and write buffer high watermarks in preparation to more careful enforcement of read limits. Buffer high-watermark is now set to the exact configured value; previously it was set to value + 1.
 * cds: fix blocking the update for a warming cluster when the update is the same as the active version.
+* ext_authz: emit :ref:`CheckResponse.dynamic_metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` when the external authorization response has "Denied" check status.
 * fault injection: stop counting as active fault after delay elapsed. Previously fault injection filter continues to count the injected delay as an active fault even after it has elapsed. This produces incorrect output statistics and impacts the max number of consecutive faults allowed (e.g., for long-lived streams). This change decreases the active fault count when the delay fault is the only active and has gone finished.
 * filter_chain: fix filter chain matching with the server name as the case-insensitive way.
 * grpc-web: fix local reply and non-proto-encoded gRPC response handling for small response bodies. This fix can be temporarily reverted by setting `envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling` to false.
