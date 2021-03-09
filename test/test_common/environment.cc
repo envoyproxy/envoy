@@ -342,8 +342,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return temporaryFileSubstitute(path, ParamMap(), port_map, version);
 }
 
-std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
-                                                     bool /*require_existence*/, bool /*read_binary*/) {
+std::string TestEnvironment::readFileToStringForTest(const std::string& filename) {
   return Filesystem::fileSystemForTest().fileReadToEnd(filename);
 }
 
@@ -413,12 +412,12 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
   unlink(out_path.c_str());
 
   Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_path);
-  const Filesystem::FlagSet flags{
-    1 << Filesystem::File::Operation::Write | 1 << Filesystem::File::Operation::Create};
+  const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
+                                  1 << Filesystem::File::Operation::Create};
   const Api::IoCallBoolResult open_result = file->open(flags);
   EXPECT_TRUE(open_result.rc_);
   const Api::IoCallSizeResult result = file->write(contents);
-  EXPECT_EQ(contents.length(), result.rc_) << strerror(errno);
+  EXPECT_EQ(contents.length(), result.rc_);
   return out_path;
 }
 
