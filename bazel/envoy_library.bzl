@@ -83,6 +83,7 @@ EXTENSION_CATEGORIES = [
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
     "envoy.http.original_ip_detection",
+    "envoy.matching.input_matchers",
     "envoy.rate_limit_descriptors",
     "envoy.request_id",
     "envoy.resource_monitors",
