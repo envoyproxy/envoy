@@ -58,7 +58,7 @@ private:
   constexpr static absl::string_view body_ = "body";
   // For HTTP/3 upstream, the headers and fin will arrive separately.
   // Make sure that the body is added, and then continue encoding occurs once.
-  // If encodeData hits before the post, encodeData will stop ieration to ensure
+  // If encodeData hits before the post, encodeData will stop iteration to ensure
   // the fin is not passed on, and when the post happens it will resume
   // encoding.
   // If the post happens first, encodeData can simply continue.
