@@ -28,7 +28,7 @@ public:
   void add_endpoints_for_sector(Coordinate sector_coordinates, std::vector<Type> endpoints) {
     // Add coordinate value if it's not already present
     if (!endpoints_by_coordinate_[sector_coordinates].size())
-      for (uint i = 0; i < dimension_names_.size(); i++)
+      for (unsigned int i = 0; i < dimension_names_.size(); i++)
         values_by_dimension_[dimension_names_[i]].push_back(sector_coordinates[i]);
 
     endpoints_by_coordinate_[sector_coordinates].insert(
