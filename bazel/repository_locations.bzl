@@ -500,7 +500,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/wbpcode/hessian2-codec/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.network.dubbo_proxy"],
-        release_date = "2021-03-08",
+        release_date = "2021-03-09",
         cpe = "N/A",
     ),
     com_github_tencent_rapidjson = dict(
