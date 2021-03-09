@@ -296,5 +296,25 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   }
 }
 
+Http::HeaderTransforms
+HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+  Http::HeaderTransforms transforms;
+
+  for (const auto& [key, entry] : headers_to_add_) {
+    const std::string value = entry.formatter_->format(stream_info);
+    if (!value.empty()) {
+      if (entry.formatter_->append()) {
+        transforms.headers_to_append.push_back({key, value});
+      } else {
+        transforms.headers_to_overwrite.push_back({key, value});
+      }
+    }
+  }
+
+  transforms.headers_to_remove = headers_to_remove_;
+
+  return transforms;
+}
+
 } // namespace Router
 } // namespace Envoy
