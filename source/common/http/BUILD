@@ -443,6 +443,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_googlesource_googleurl//url:envoy_url",
+        "@envoy_api//envoy/type/http/v3:pkg_cc_proto",
     ],
 )
 

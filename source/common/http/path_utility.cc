@@ -1,5 +1,7 @@
 #include "common/http/path_utility.h"
 
+
+
 #include "common/common/logger.h"
 #include "common/http/legacy_path_canonicalizer.h"
 #include "common/runtime/runtime_features.h"
@@ -83,6 +85,25 @@ absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path)
     ret.remove_suffix(ret.length() - offset);
   }
   return ret;
+}
+
+
+
+PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_transformation) {
+  const google::protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation> operations = path_transformation.operations();
+  for (auto const& operation: operations) {
+    if (operation.has_normalize_path_rfc_3986()) {
+      
+    }
+    else if (operation.has_merge_slashes()) {
+      
+    }
+  }
+}
+
+
+std::string PathTransformer::transform(absl::string_view original) {
+  return std::string(original[0], 3);
 }
 
 } // namespace Http

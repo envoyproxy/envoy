@@ -4,6 +4,8 @@
 
 #include "absl/strings/string_view.h"
 
+#include "envoy/type/http/v3/path_transformation.pb.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -22,6 +24,13 @@ public:
   // Removes the query and/or fragment string (if present) from the input path.
   // For example, this function returns "/data" for the input path "/data?param=value#fragment".
   static absl::string_view removeQueryAndFragment(const absl::string_view path);
+};
+
+class PathTransformer {
+public:
+  PathTransformer(envoy::type::http::v3::PathTransformation operations);
+
+  std::string transform(const absl::string_view original);
 };
 
 } // namespace Http
