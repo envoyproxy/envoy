@@ -589,13 +589,13 @@ protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
 };
 
-
 class ShuffleShardLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
-  ShuffleShardLoadBalancer(LoadBalancerType lb_type, const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                     ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                     const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& config);
+  ShuffleShardLoadBalancer(LoadBalancerType lb_type, const PrioritySet& priority_set,
+                           const PrioritySet* local_priority_set, ClusterStats& stats,
+                           Runtime::Loader& runtime, Random::RandomGenerator& random,
+                           const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                           const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& config);
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
@@ -606,7 +606,7 @@ private:
 
   void add_hosts(const HostVector&);
 
-  std::optional<std::vector<std::string>> get_coord(const HostConstSharedPtr&);
+  absl::optional<std::vector<std::string>> get_coord(const HostConstSharedPtr&);
 
   const LoadBalancerType lb_type_;
   const uint32_t endpoints_per_cell_;

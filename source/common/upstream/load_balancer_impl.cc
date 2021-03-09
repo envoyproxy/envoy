@@ -14,6 +14,7 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -891,10 +892,12 @@ HostConstSharedPtr RandomLoadBalancer::peekOrChoose(LoadBalancerContext* context
   return hosts_to_use[random_hash % hosts_to_use.size()];
 }
 
-ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(LoadBalancerType lb_type, const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                   ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
-                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                   const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& config)
+ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
+    LoadBalancerType lb_type, const PrioritySet& priority_set,
+    const PrioritySet* local_priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+    Random::RandomGenerator& random,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       lb_type_(lb_type),
@@ -915,11 +918,12 @@ ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(LoadBalancerType lb_type, con
 
   lattice_ = new Lattice<HostConstSharedPtr>(dimensions_);
 
-  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-    [this](uint32_t /*priority*/, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
-      add_hosts(hosts_added);
-      remove_hosts(hosts_removed);
-    });
+  priority_update_cb_ =
+      priority_set_.addPriorityUpdateCb([this](uint32_t /*priority*/, const HostVector& hosts_added,
+                                               const HostVector& hosts_removed) -> void {
+        add_hosts(hosts_added);
+        remove_hosts(hosts_removed);
+      });
 }
 
 HostConstSharedPtr ShuffleShardLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
@@ -929,7 +933,8 @@ HostConstSharedPtr ShuffleShardLoadBalancer::chooseHostOnce(LoadBalancerContext*
   }
   const uint64_t seed = hash ? hash.value() : random_.random();
 
-  auto endpoints = shuffle_sharder_.shuffleShard(*lattice_, seed, endpoints_per_cell_)->get_endpoints();
+  auto endpoints =
+      shuffle_sharder_.shuffleShard(*lattice_, seed, endpoints_per_cell_)->get_endpoints();
 
   // Random
   if (lb_type_ == LoadBalancerType::Random)
@@ -983,7 +988,8 @@ void ShuffleShardLoadBalancer::add_hosts(const HostVector& hosts) {
   }
 }
 
-std::optional<std::vector<std::string>> ShuffleShardLoadBalancer::get_coord(const HostConstSharedPtr& host) {
+absl::optional<std::vector<std::string>>
+ShuffleShardLoadBalancer::get_coord(const HostConstSharedPtr& host) {
   std::vector<std::string> coord;
 
   if (use_dimensions_) {
@@ -992,7 +998,8 @@ std::optional<std::vector<std::string>> ShuffleShardLoadBalancer::get_coord(cons
       return {};
     }
     const envoy::config::core::v3::Metadata& metadata = *host->metadata();
-    const auto& filter_it = metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    const auto& filter_it =
+        metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it == metadata.filter_metadata().end()) {
       // ENVOY_LOG(warn, "ignoring host {} because it has no envoy.lb metadata", host->hostname());
       return {};
@@ -1001,7 +1008,8 @@ std::optional<std::vector<std::string>> ShuffleShardLoadBalancer::get_coord(cons
     for (const auto& key : dimensions_) {
       const auto it = fields.find(key);
       if (it == fields.end()) {
-        // ENVOY_LOG(warn, "ignoring host {} because it has no envoy.lb tag {}", host->hostname(), key);
+        // ENVOY_LOG(warn, "ignoring host {} because it has no envoy.lb tag {}", host->hostname(),
+        // key);
         return {};
       }
       std::ostringstream buf;

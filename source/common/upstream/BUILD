@@ -176,7 +176,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_balancer_lib",
     srcs = ["load_balancer_impl.cc"],
-    hdrs = ["load_balancer_impl.h", "infima.h"],
+    hdrs = [
+        "infima.h",
+        "load_balancer_impl.h",
+    ],
     deps = [
         ":edf_scheduler_lib",
         "//include/envoy/common:random_generator_interface",

@@ -1318,9 +1318,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else if (auto config = cluster->lbShuffleShardConfig()) {
     lb_ = std::make_unique<ShuffleShardLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_,
-        cluster->stats(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbConfig(), *config);
+        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
+        parent.parent_.runtime_, parent.parent_.random_, cluster->lbConfig(), *config);
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
