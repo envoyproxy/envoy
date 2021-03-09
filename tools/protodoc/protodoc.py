@@ -58,7 +58,7 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
 EXTENSION_TEMPLATE = Template("""
 .. _extension_{{extension}}:
 
-This extension may be referenced by the qualified name *{{extension}}*
+This extension may be referenced with the type url: ``{{type_url}}``
 
 .. note::
   {{status}}
@@ -239,6 +239,7 @@ def FormatExtension(extension):
   return EXTENSION_TEMPLATE.render(extension=extension,
                                    status=status,
                                    security_posture=security_posture,
+                                   type_url=f"type.googleapis.com/{NormalizeTypeContextName(extension)}",
                                    categories=categories)
 
 
