@@ -6,10 +6,11 @@ ARG TARGETPLATFORM
 
 RUN apt-get update \
     && apt-get upgrade -qq -y \
+    && apt-get autoremove \
+    && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /etc/envoy
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /etc/envoy
 
 ARG ENVOY_BINARY_SUFFIX=_stripped
 ADD ${TARGETPLATFORM}/build_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
