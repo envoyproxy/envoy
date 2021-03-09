@@ -241,12 +241,14 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetad
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
+                                     {":path", "/test"},
                                      {":scheme", "http"},
-                                     {":authority", "host"}});
+                                     {":authority", "host"},
+                                     {"x-type", "a"},
+                                     {"x-hash", "hash-a"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), Http::HttpStatusIs("404"));
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
 }
 
 } // namespace Envoy
