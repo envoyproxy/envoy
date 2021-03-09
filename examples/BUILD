@@ -24,18 +24,10 @@ filegroup(
 
 filegroup(
     name = "certs",
-    srcs = glob(
-        [
-            "_extra_certs/*.pem",
-        ],
-    ),
+    srcs = glob(["_extra_certs/*.pem"]),
 )
 
 filegroup(
     name = "lua",
-    srcs = glob(
-        [
-            "**/*.lua",
-        ],
-    ),
+    srcs = glob(["**/*.lua"]),
 )
