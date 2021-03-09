@@ -14,7 +14,6 @@ filegroup(
     srcs = glob(
         [
             "root/**/*.yaml",
-            "root/**/*.pb",
         ],
         exclude = [
             "root/**/envoy-dynamic*.yaml",
@@ -30,4 +29,13 @@ filegroup(
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
     }),
+)
+
+filegroup(
+    name = "proto_examples",
+    srcs = glob(
+        [
+            "root/**/*.pb",
+        ],
+    ),
 )
