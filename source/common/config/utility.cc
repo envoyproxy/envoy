@@ -195,8 +195,9 @@ Filesystem::DestinationType Utility::filesystemDestinationTypeFromProtoConfig(
     return Filesystem::DestinationType::Stderr;
   case envoy::config::core::v3::DestinationType::STDOUT:
     return Filesystem::DestinationType::Stdout;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
