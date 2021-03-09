@@ -343,18 +343,8 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 }
 
 std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
-                                                     bool require_existence, bool read_binary) {
-  std::ifstream file(filename, read_binary ? std::ios::binary : std::ios::in);
-  if (file.fail()) {
-    if (!require_existence) {
-      return "";
-    }
-    RELEASE_ASSERT(false, absl::StrCat("failed to open: ", filename));
-  }
-
-  std::stringstream file_string_stream;
-  file_string_stream << file.rdbuf();
-  return file_string_stream.str();
+                                                     bool /*require_existence*/, bool /*read_binary*/) {
+  return Filesystem::fileSystemForTest().fileReadToEnd(filename);
 }
 
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
@@ -421,11 +411,14 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
   const std::string out_path =
       fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
   unlink(out_path.c_str());
-  {
-    std::ofstream out_file(out_path, std::ios_base::binary);
-    RELEASE_ASSERT(!out_file.fail(), "");
-    out_file << contents;
-  }
+
+  Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_path);
+  const Filesystem::FlagSet flags{
+    1 << Filesystem::File::Operation::Write | 1 << Filesystem::File::Operation::Create};
+  const Api::IoCallBoolResult open_result = file->open(flags);
+  EXPECT_TRUE(open_result.rc_);
+  const Api::IoCallSizeResult result = file->write(contents);
+  EXPECT_EQ(contents.length(), result.rc_) << strerror(errno);
   return out_path;
 }
 
