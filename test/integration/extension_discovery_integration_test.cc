@@ -174,6 +174,13 @@ public:
       RELEASE_ASSERT(result, result.message());
       ecds_connection_.reset();
     }
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      lds_connection_.reset();
+    }
   }
 
   void createUpstreams() override {
@@ -244,15 +251,15 @@ public:
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
   FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
 
-  // gRPC ECDS set-up
-  FakeHttpConnectionPtr ecds_connection_{nullptr};
-  FakeStreamPtr ecds_stream_{nullptr};
-
   // gRPC LDS set-up
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"testing-listener-0"};
   FakeHttpConnectionPtr lds_connection_{nullptr};
   FakeStreamPtr lds_stream_{nullptr};
+
+  // gRPC ECDS set-up
+  FakeHttpConnectionPtr ecds_connection_{nullptr};
+  FakeStreamPtr ecds_stream_{nullptr};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtensionDiscoveryIntegrationTest,
