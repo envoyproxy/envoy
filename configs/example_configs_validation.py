@@ -1,5 +1,5 @@
 
-65;6202;1cimport os
+import os
 import pathlib
 import sys
 
