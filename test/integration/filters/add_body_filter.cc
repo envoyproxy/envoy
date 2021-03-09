@@ -24,9 +24,18 @@ public:
       Buffer::OwnedImpl body("body");
       headers.setContentLength(body.length());
       decoder_callbacks_->addDecodedData(body, false);
+    } else {
+      headers.removeContentLength();
     }
 
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
+    // For HTTP/3, there's no headers-only streams so the data will be added here.
+    ASSERT(end_stream == false || decoder_callbacks_->connection()->streamInfo().protocol());
+    data.add("body");
+    return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
