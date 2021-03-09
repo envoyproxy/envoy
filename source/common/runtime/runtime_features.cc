@@ -16,7 +16,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
         feature);
   }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), debug,
                       "Unable to use runtime singleton for feature {}", feature);
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
 }
@@ -27,7 +27,7 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
         std::string(feature), default_value);
   }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), debug,
                       "Unable to use runtime singleton for feature {}", feature);
   return default_value;
 }
