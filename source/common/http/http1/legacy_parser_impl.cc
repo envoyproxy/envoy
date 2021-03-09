@@ -81,7 +81,7 @@ public:
 
   int getErrno() { return HTTP_PARSER_ERRNO(&parser_); }
 
-  int statusCode() const { return parser_.status_code; }
+  uint16_t statusCode() const { return parser_.status_code; }
 
   int httpMajor() const { return parser_.http_major; }
 
