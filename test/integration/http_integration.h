@@ -105,6 +105,8 @@ public:
                       const std::string& config = ConfigHelper::httpProxyConfig());
   ~HttpIntegrationTest() override;
 
+  void initialize() override;
+
 protected:
   void useAccessLog(absl::string_view format = "",
                     std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
@@ -114,6 +116,9 @@ protected:
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
+  // Makes a downstream network connection object based on client codec version.
+  Network::ClientConnectionPtr makeClientConnectionWithOptions(
+      uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   // Makes a http connection object with asserting a connected state.
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
@@ -260,6 +265,10 @@ protected:
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+
+  bool set_reuse_port_{false};
+  std::string san_to_match_{"spiffe://lyft.com/backend-team"};
+  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
@@ -20,6 +21,7 @@
 #include "common/common/fmt.h"
 #include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
+#include "common/http/http3/quic_client_connection_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -32,6 +34,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/ssl_utility.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -40,7 +43,20 @@
 #include "test/test_common/registry.h"
 
 #include "absl/time/time.h"
+#include "base_integration_test.h"
 #include "gtest/gtest.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/quic_utils.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace Envoy {
 namespace {
@@ -72,6 +88,7 @@ IntegrationCodecClient::IntegrationCodecClient(
     CodecClient::Type type)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
       dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
+  std::cerr << "=========== IntegrationCodecClient add connection callback " << &callbacks_ << "\n";
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -212,6 +229,23 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
   }
 }
 
+Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  if (downstream_protocol_ <= Http::CodecClient::Type::HTTP2) {
+    return BaseIntegrationTest::makeClientConnectionWithOptions(port, options);
+  }
+  // Setting socket options is not supported for HTTP3.
+  ASSERT(!options);
+  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  return Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+             Http::QuicCodecNames::get().Quiche)
+      .createQuicNetworkConnection(server_addr, local_addr, *quic_transport_socket_factory_,
+                                   stats_store_, *dispatcher_, timeSystem());
+}
+
 IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port) {
   return makeHttpConnection(makeClientConnection(port));
 }
@@ -232,8 +266,16 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
       timeSystem())};
-  return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                  host_description, downstream_protocol_);
+  // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
+  // in-connection version negotiation.
+  auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                        host_description, downstream_protocol_);
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP3 && codec->disconnected()) {
+    // Connection may get closed during version negotiation or handshake.
+    ENVOY_LOG(error, "Fail to connect to server with error: {}",
+              codec->connection()->transportFailureReason());
+  }
+  return codec;
 }
 
 IntegrationCodecClientPtr
@@ -274,6 +316,44 @@ void HttpIntegrationTest::useAccessLog(
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+
+void HttpIntegrationTest::initialize() {
+  if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
+    return BaseIntegrationTest::initialize();
+  }
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(*api_));
+
+  quic_transport_socket_factory_ =
+      IntegrationUtil::createQuicClientTransportSocketFactory(mock_factory_ctx, san_to_match_);
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+        quic_transport_socket_config;
+    auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+    ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
+                                *tls_context->mutable_common_tls_context());
+    for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
+      if (listener.udp_listener_config().udp_listener_name() == "quiche_quic_listener") {
+        auto* filter_chain = listener.mutable_filter_chains(0);
+        auto* transport_socket = filter_chain->mutable_transport_socket();
+        transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+
+        listener.set_reuse_port(set_reuse_port_);
+      }
+    }
+  });
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_drain_timeout()->clear_seconds();
+        hcm.mutable_drain_timeout()->set_nanos(500 * 1000 * 1000);
+        EXPECT_EQ(hcm.codec_type(), envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager::HTTP3);
+      });
+  BaseIntegrationTest::initialize();
+  registerTestServerPorts({"http"});
+}
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
@@ -497,7 +577,6 @@ void HttpIntegrationTest::testRouterNotFound() {
 void HttpIntegrationTest::testRouterNotFoundWithBody() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   initialize();
-
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
@@ -846,6 +925,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send the rest of the request.
+  std::cerr << "============== finish sendData";
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.

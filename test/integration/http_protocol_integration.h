@@ -31,9 +31,9 @@ class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTe
 public:
   // By default returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
-  // [HTTP  upstream / HTTP2 downstream] x [Ipv4, IPv6]
+  // [HTTP2 upstream / HTTP  downstream] x [Ipv4, IPv6]
+  // [HTTP  upstream / HTTP2 downstream] x [IPv4, Ipv6]
   // [HTTP2 upstream / HTTP2 downstream] x [IPv4, Ipv6]
-  // [HTTP upstream  / HTTP2 downstream] x [IPv4, Ipv6]
   //
   // Upstream and downstream protocols may be changed via the input vectors.
   // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
@@ -49,7 +49,10 @@ public:
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version) {}
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version,
+                            GetParam().downstream_protocol == Http::CodecClient::Type::HTTP3
+                                ? ConfigHelper::quicHttpProxyConfig()
+                                : ConfigHelper::httpProxyConfig()) {}
 
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);

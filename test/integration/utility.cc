@@ -6,21 +6,27 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/http3/quic_client_connection_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -75,12 +81,71 @@ void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string
   ADD_FAILURE();
 }
 
+struct ConnectionCallbacks : public Network::ConnectionCallbacks {
+  ConnectionCallbacks(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::Connected) {
+      connected_ = true;
+      dispatcher_.exit();
+    } else if (event == Network::ConnectionEvent::RemoteClose) {
+      dispatcher_.exit();
+    } else {
+      if (!connected_) {
+        // Before handshake gets established, any connection failure should exit the loop. I.e. a
+        // QUIC connection may fail of INVALID_VERSION if both this client doesn't support any of
+        // the versions the server advertised before handshake established. In this case the
+        // connection is closed locally and this is in a blocking event loop.
+        dispatcher_.exit();
+      }
+    }
+  }
+
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  Event::Dispatcher& dispatcher_;
+  bool connected_{false};
+};
+
+Network::TransportSocketFactoryPtr IntegrationUtil::createQuicClientTransportSocketFactory(
+    Server::Configuration::TransportSocketFactoryContext& context,
+    const std::string& san_to_match) {
+  std::string yaml_plain = R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+)EOF";
+  envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
+      quic_transport_socket_config;
+  auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), *tls_context);
+  auto* common_context = tls_context->mutable_common_tls_context();
+
+  common_context->add_alpn_protocols("h3");
+  common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
+      san_to_match);
+  tls_context->set_sni("lyft.com");
+
+  common_context->mutable_tls_params()->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO);
+  common_context->mutable_tls_params()->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO);
+
+  envoy::config::core::v3::TransportSocket message;
+  message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
+  return config_factory.createTransportSocketFactory(quic_transport_socket_config, context);
+}
+
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
                                    const std::string& host, const std::string& content_type) {
-
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   NiceMock<Random::MockRandomGenerator> random;
   Event::GlobalTimeSystem time_system;
@@ -88,14 +153,36 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
                 Filesystem::fileSystemForTest(), random_generator);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
+  ConnectionCallbacks connection_callbacks(*dispatcher);
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_description{
-      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80", time_system)};
-  Http::CodecClientProd client(
-      type,
-      dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                         Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher, random);
+  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
+      cluster,
+      fmt::format("{}://127.0.0.1:80", (type == Http::CodecClient::Type::HTTP3 ? "udp" : "tcp")),
+      time_system)};
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
+  Network::TransportSocketFactoryPtr transport_socket_factory =
+      createQuicClientTransportSocketFactory(mock_factory_ctx, "spiffe://lyft.com/backend-team");
+  Network::ClientConnectionPtr connection =
+      (type == Http::CodecClient::Type::HTTP3
+           ? Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+                 Http::QuicCodecNames::get().Quiche)
+                 .createQuicNetworkConnection(addr, Network::Address::InstanceConstSharedPtr(),
+                                              *transport_socket_factory, mock_stats_store,
+                                              *dispatcher, time_system)
+           : dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr));
+  if (type == Http::CodecClient::Type::HTTP3) {
+    connection->addConnectionCallbacks(connection_callbacks);
+  }
+  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
+
+  if (type == Http::CodecClient::Type::HTTP3) {
+    // Quic connection needs to finish handshake.
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  }
+
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
