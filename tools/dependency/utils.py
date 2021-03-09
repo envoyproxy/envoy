@@ -22,7 +22,7 @@ def RepositoryLocations():
   envoy_repository_locations = LoadModule('envoy_repository_locations',
                                           'bazel/repository_locations.bzl')
   repository_locations_utils = LoadModule(
-    'repository_locations_utils', os.path.join(api_path, 'bazel/repository_locations_utils.bzl'))
+      'repository_locations_utils', os.path.join(api_path, 'bazel/repository_locations_utils.bzl'))
   api_repository_locations = LoadModule('api_repository_locations',
                                         os.path.join(api_path, 'bazel/repository_locations.bzl'))
   spec_loader = repository_locations_utils.load_repository_locations_spec
