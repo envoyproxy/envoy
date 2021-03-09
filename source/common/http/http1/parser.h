@@ -126,7 +126,7 @@ public:
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.
-  virtual int statusCode() const PURE;
+  virtual uint16_t statusCode() const PURE;
 
   // Returns an integer representing the HTTP major version.
   virtual int httpMajor() const PURE;
