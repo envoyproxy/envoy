@@ -75,12 +75,27 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
-TEST_F(AccessLogDestinationTest, FileThrows) {
+TEST_F(AccessLogDestinationTest, FileWithoutPathThrows) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   access_log_destination: FILE
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+               EnvoyException);
+}
+
+TEST_F(AccessLogDestinationTest, FileWithPathAndStdoutThrows) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  access_log_destination: STDOUT
+  path: /dev/null
   )EOF";
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));

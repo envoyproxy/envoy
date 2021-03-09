@@ -240,6 +240,11 @@ TEST_F(FileSystemImplTest, ConstructedConsoleFile) {
   FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_FALSE(file->isOpen());
   EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Console);
+#ifdef WIN32
+  EXPECT_EQ(file->path(), "CONOUT$");
+#else
+  EXPECT_EQ(file->path(), "/dev/console");
+#endif
 }
 
 TEST_F(FileSystemImplTest, ConstructedStdErrFile) {
@@ -248,6 +253,7 @@ TEST_F(FileSystemImplTest, ConstructedStdErrFile) {
   FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_FALSE(file->isOpen());
   EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stderr);
+  EXPECT_EQ(file->path(), "/dev/stderr");
 }
 
 TEST_F(FileSystemImplTest, ConstructedStdOutFile) {
@@ -256,6 +262,7 @@ TEST_F(FileSystemImplTest, ConstructedStdOutFile) {
   FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_FALSE(file->isOpen());
   EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stdout);
+  EXPECT_EQ(file->path(), "/dev/stdout");
 }
 
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
