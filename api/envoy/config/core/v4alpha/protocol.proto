@@ -244,6 +244,10 @@ message Http2ProtocolOptions {
   // For upstream connections, this also limits how many streams Envoy will initiate concurrently
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
   // additional connections (as allowed per circuit breaker limits).
+  //
+  // This acts as an upper bound: Envoy will lower the max concurrent streams allowed on a given
+  // connection based on upstream settings. Config dumps will reflect the configured upper bound,
+  // not the per-connection negotiated limits.
   google.protobuf.UInt32Value max_concurrent_streams = 2
       [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
 

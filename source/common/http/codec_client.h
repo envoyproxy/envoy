@@ -146,6 +146,11 @@ protected:
       codec_callbacks_->onGoAway(error_code);
     }
   }
+  void onSettings(ReceivedSettings& settings) override {
+    if (codec_callbacks_) {
+      codec_callbacks_->onSettings(settings);
+    }
+  }
 
   void onIdleTimeout() {
     host_->cluster().stats().upstream_cx_idle_timeout_.inc();

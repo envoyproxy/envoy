@@ -502,4 +502,35 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/13933
+TEST_P(Http2UpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
+  autonomous_upstream_ = true;
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(config);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start sending the request, but ensure no end stream will be sent, so the
+  // stream will stay in use.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {AutonomousStream::NO_END_STREAM, ""}});
+  // Wait until the response is sent to ensure the SETTINGS frame has been read
+  // by Envoy.
+  response->waitForHeaders();
+
+  // Now send a second request and make sure it is processed. Previously it
+  // would be queued on the original connection, as Envoy would ignore the
+  // peer's SETTINGS frame and nghttp2 would then queue it, but now it should
+  // result in a second connection and an immediate response.
+  FakeStreamPtr upstream_request2;
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  response2->waitForEndStream();
+}
+
 } // namespace Envoy
