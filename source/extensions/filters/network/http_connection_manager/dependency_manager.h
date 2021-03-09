@@ -29,9 +29,11 @@ public:
   }
 
   /**
-   * Returns true if the decode path of the filter chain is valid. A filter
-   * chain is valid iff for each filter, every decode dependency has been
-   * provided by a previous filter.
+   * Returns StatusCode::kOk if the decode path of the filter chain is valid.
+   * A filter chain is valid iff for each filter, every decode dependency has
+   * been provided by a previous filter.
+   * Returns StatusCode::kNotFoundError if the decode path is invalid, with
+   * details of the first dependency violation found.
    *
    * TODO(auni53): Change this to a general valid() that checks decode and
    * encode path.
