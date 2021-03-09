@@ -62,6 +62,7 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 rm -rf bazel-bin/external/envoy_api_canonical
 
 EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+rm -rf "${EXTENSION_DB_PATH}"
 GENERATED_RST_DIR="$(realpath "${GENERATED_RST_DIR}")"
 export EXTENSION_DB_PATH
 export GENERATED_RST_DIR
