@@ -41,7 +41,7 @@ public:
   absl::Status validDecodeDependencies();
 
 private:
-  // Ordered mapping of filter names to dependency specifications.
+  // Mapping of filter names to dependencies, in decode path order.
   std::vector<std::pair<std::string,
                         envoy::extensions::filters::common::dependency::v3::FilterDependencies>>
       filter_chain_;
