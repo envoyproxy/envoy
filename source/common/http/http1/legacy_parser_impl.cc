@@ -141,7 +141,7 @@ ParserStatus LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
 int LegacyHttpParserImpl::getErrno() { return impl_->getErrno(); }
 
-int LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
+uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 
 int LegacyHttpParserImpl::httpMajor() const { return impl_->httpMajor(); }
 
