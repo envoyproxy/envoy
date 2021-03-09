@@ -300,7 +300,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
 
 TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
-  addDynamicFilter("foo", false, false);
+  addDynamicFilter("foo", false, true);
   initialize();
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
