@@ -66,12 +66,12 @@ private:
   bool using_tls_{false};
 };
 
-class ServerStartTlsSocketFactory : public Network::TransportSocketFactory,
-                                    Logger::Loggable<Logger::Id::config> {
+class StartTlsSocketFactory : public Network::TransportSocketFactory,
+                              Logger::Loggable<Logger::Id::config> {
 public:
-  ~ServerStartTlsSocketFactory() override = default;
+  ~StartTlsSocketFactory() override = default;
 
-  ServerStartTlsSocketFactory(
+  StartTlsSocketFactory(
       const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig& config,
       Network::TransportSocketFactoryPtr raw_socket_factory,
       Network::TransportSocketFactoryPtr tls_socket_factory)

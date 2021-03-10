@@ -29,7 +29,11 @@ message StartTlsConfig {
   // (optional) Configuration for clear-text socket used at the beginning of the session.
   raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
 
-  // Configuration for TLS socket.
+  // Configuration for a downstream TLS socket.
   transport_sockets.tls.v3.DownstreamTlsContext tls_socket_config = 2
-      [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: false}];
+
+  // Configuration for a upstream TLS socket.
+  transport_sockets.tls.v3.UpstreamTlsContext upstream_tls_socket_config = 3
+      [(validate.rules).message = {required: false}];
 }

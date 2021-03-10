@@ -36,16 +36,44 @@ Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransp
       tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
                                                              context, server_names);
 
-  return std::make_unique<ServerStartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
-                                                       std::move(tls_socket_factory));
+  return std::make_unique<StartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
+                                                 std::move(tls_socket_factory));
 }
 
-ProtobufTypes::MessagePtr DownstreamStartTlsSocketFactory::createEmptyConfigProto() {
+Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTransportSocketFactory(
+    const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context) {
+
+  const auto& outer_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
+      message, context.messageValidationVisitor());
+
+  auto& raw_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(
+      TransportSocketNames::get().RawBuffer);
+
+  auto& tls_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(
+      TransportSocketNames::get().Tls);
+
+  Network::TransportSocketFactoryPtr raw_socket_factory =
+      raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(), context);
+
+  Network::TransportSocketFactoryPtr tls_socket_factory =
+      tls_socket_config_factory.createTransportSocketFactory(outer_config.upstream_tls_socket_config(), context);
+
+  return std::make_unique<StartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
+                                                 std::move(tls_socket_factory));
+}
+
+ProtobufTypes::MessagePtr BaseStartTlsSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig>();
 }
 
 REGISTER_FACTORY(DownstreamStartTlsSocketFactory,
                  Server::Configuration::DownstreamTransportSocketConfigFactory){"starttls"};
+
+REGISTER_FACTORY(UpstreamStartTlsSocketFactory,
+                 Server::Configuration::UpstreamTransportSocketConfigFactory){"starttls"};
 
 } // namespace StartTls
 } // namespace TransportSockets
