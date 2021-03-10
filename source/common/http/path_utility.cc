@@ -85,7 +85,7 @@ absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path)
   return ret;
 }
 
-std::string PathTransformer::mergeSlashes(absl::string_view original_path) {
+absl::optional<std::string> PathTransformer::mergeSlashes(absl::string_view original_path) {
   const absl::string_view::size_type query_start = original_path.find('?');
   const absl::string_view path = original_path.substr(0, query_start);
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
@@ -98,7 +98,7 @@ std::string PathTransformer::mergeSlashes(absl::string_view original_path) {
                       path_suffix, query);
 }
 
-std::string PathTransformer::rfcNormalize(absl::string_view original_path) {
+absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view original_path) {
   const auto query_pos = original_path.find('?');
   auto normalized_path_opt = canonicalizePath(
       query_pos == original_path.npos
@@ -129,12 +129,14 @@ PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_
   }
 }
 
-std::string PathTransformer::transform(absl::string_view original) {
-  std::string transformed = original.data();
+absl::optional<std::string> PathTransformer::transform(absl::string_view original) {
+  std::string path = original.data();
   for (Transformation transformation : transformations) {
-    transformed = transformation(transformed);
+    absl::optional<std::string> transformed = transformation(path).value();
+    if (!transformed.has_value()) return {};
+    path = transformed.value();
   }
-  return transformed;
+  return path;
 }
 
 } // namespace Http

@@ -94,12 +94,12 @@ TEST(PathTransformerTest, NormalizeValidPaths) {
 
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
-    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path)).value();
     EXPECT_EQ(path, result);
   }
   for (const auto& path_pair : non_normal_pairs) {
     const auto& path = path_pair.first;
-    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path)).value();
     EXPECT_EQ(result, path_pair.second);
   }
 }
@@ -133,7 +133,7 @@ TEST(PathTransformerTest, NormalizeCasePath) {
 
   for (const auto& path_pair : non_normal_pairs) {
     const auto& path = path_pair.first;
-    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path)).value();
     EXPECT_EQ(result, path_pair.second);
   }
 }
@@ -166,20 +166,20 @@ TEST_F(PathUtilityTest, MergeSlashes) {
 }
 
 TEST(PathTransformerTest, MergeSlashes) {
-  EXPECT_EQ("", PathTransformer::mergeSlashes(""));                // empty
-  EXPECT_EQ("a/b/c", PathTransformer::mergeSlashes("a//b/c"));     // relative
-  EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a//b/c/")); // ends with slash
-  EXPECT_EQ("a/b/c/", PathTransformer::mergeSlashes("a//b/c/"));   // relative ends with slash
-  EXPECT_EQ("/a", PathTransformer::mergeSlashes("/a"));            // no-op
-  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("//a/b/c"));   // double / start
-  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a//b/c"));   // double / in the middle
-  EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a/b/c//")); // double / end
-  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a///b/c"));  // triple / in the middle
-  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a////b/c")); // quadruple / in the middle
+  EXPECT_EQ("", PathTransformer::mergeSlashes("").value());                // empty
+  EXPECT_EQ("a/b/c", PathTransformer::mergeSlashes("a//b/c").value());     // relative
+  EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a//b/c/").value()); // ends with slash
+  EXPECT_EQ("a/b/c/", PathTransformer::mergeSlashes("a//b/c/").value());   // relative ends with slash
+  EXPECT_EQ("/a", PathTransformer::mergeSlashes("/a").value());            // no-op
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("//a/b/c").value());   // double / start
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a//b/c").value());   // double / in the middle
+  EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a/b/c//").value()); // double / end
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a///b/c").value());  // triple / in the middle
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a////b/c").value()); // quadruple / in the middle
   EXPECT_EQ("/a/b?a=///c",
-            PathTransformer::mergeSlashes("/a//b?a=///c"));    // slashes in the query are ignored
-  EXPECT_EQ("/a/b?", PathTransformer::mergeSlashes("/a//b?")); // empty query
-  EXPECT_EQ("/a/?b", PathTransformer::mergeSlashes("//a/?b")); // ends with slash + query
+            PathTransformer::mergeSlashes("/a//b?a=///c").value());    // slashes in the query are ignored
+  EXPECT_EQ("/a/b?", PathTransformer::mergeSlashes("/a//b?").value()); // empty query
+  EXPECT_EQ("/a/?b", PathTransformer::mergeSlashes("//a/?b").value()); // ends with slash + query
 }
 
 TEST_F(PathUtilityTest, RemoveQueryAndFragment) {

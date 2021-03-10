@@ -29,17 +29,17 @@ public:
   static absl::string_view removeQueryAndFragment(const absl::string_view path);
 };
 
-using Transformation = std::function<std::string(absl::string_view)>;
+using Transformation = std::function<absl::optional<std::string>(absl::string_view)>;
 
 class PathTransformer {
 public:
   PathTransformer(envoy::type::http::v3::PathTransformation operations);
 
-  std::string transform(const absl::string_view original_path);
+  absl::optional<std::string> transform(const absl::string_view original_path);
 
-  static std::string mergeSlashes(absl::string_view original_path);
+  static absl::optional<std::string> mergeSlashes(absl::string_view original_path);
 
-  static std::string rfcNormalize(absl::string_view original_path);
+  static absl::optional<std::string> rfcNormalize(absl::string_view original_path);
 
 private:
   std::list<Transformation> transformations;
