@@ -1,12 +1,11 @@
 #pragma once
 
+#include <list>
+
 #include "envoy/http/header_map.h"
-
-#include "absl/strings/string_view.h"
-
 #include "envoy/type/http/v3/path_transformation.pb.h"
 
-#include <list>
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
