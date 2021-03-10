@@ -175,6 +175,8 @@ void FilterConfigSubscription::onConfigUpdate(
         }
       });
     }
+
+    last_config_hash_ = 0;
   } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }

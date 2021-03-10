@@ -296,6 +296,18 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("500", response->headers().getStatusValue());
   }
+
+  {
+    // Reinstate the previous configuration.
+    sendXdsResponse("foo", "1", denyPrivateConfig(), true);
+    // Wait until the TTL removes the resource.
+    test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                   3);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
 }
 
 TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
