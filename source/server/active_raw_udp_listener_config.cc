@@ -3,8 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 
+#include "server/active_udp_listener.h"
 #include "server/connection_handler_impl.h"
 #include "server/well_known_names.h"
 
