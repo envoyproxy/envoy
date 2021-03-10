@@ -177,7 +177,6 @@ envoy_cc_library(
     name = "load_balancer_lib",
     srcs = ["load_balancer_impl.cc"],
     hdrs = [
-        "infima.h",
         "load_balancer_impl.h",
     ],
     deps = [
@@ -192,6 +191,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@com_github_cgetzen_cpp_infima//:infima",
     ],
 )
 

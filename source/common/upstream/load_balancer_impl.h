@@ -18,7 +18,7 @@
 #include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
 
-#include "infima.h"
+#include "infima/infima.h"
 
 namespace Envoy {
 namespace Upstream {

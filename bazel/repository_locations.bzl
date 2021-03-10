@@ -125,6 +125,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-11-19",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
+    com_github_cgetzen_cpp_infima = dict(
+        project_name = "cpp_infima",
+        project_desc = "C++ library for shuffle sharding",
+        project_url = "https://github.com/cgetzen/cpp-infima",
+        version = "0.1.0",
+        sha256 = "a547c68462f60d932ad545dc291ae3d943583a365f7ffad9ae39fe9071f13b61",
+        strip_prefix = "cpp-infima-{version}",
+        urls = ["https://github.com/cgetzen/cpp-infima/releases/download/{version}/cpp-infima-{version}.tar.gz"],
+        use_category = ["other"],
+        release_date = "2021-03-07",
+        cpe = "N/A",
+    ),
     com_github_circonus_labs_libcircllhist = dict(
         project_name = "libcircllhist",
         project_desc = "An implementation of Circonus log-linear histograms",
