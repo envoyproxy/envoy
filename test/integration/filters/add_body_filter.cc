@@ -32,7 +32,8 @@ public:
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    // For HTTP/3, there's no headers-only streams so the data will be added here.
+    // For HTTP/3, the only time the protocol is set at the connection level, there's no
+    // headers-only streams so the data will be added here.
     ASSERT(end_stream == false || decoder_callbacks_->connection()->streamInfo().protocol());
     data.add("body");
     return Http::FilterDataStatus::Continue;
