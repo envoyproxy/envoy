@@ -998,7 +998,10 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
       auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
       const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
       if (thread_local_cluster == nullptr) {
-        return WasmResult::BadArgument;
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
       }
       service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
     } else {
@@ -1065,7 +1068,10 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
       auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
       const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
       if (thread_local_cluster == nullptr) {
-        return WasmResult::BadArgument;
+        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+        // `BadArgument` after ABI 0.2.x will have released.
+        return WasmResult::ParseFailure;
       }
       service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
     } else {

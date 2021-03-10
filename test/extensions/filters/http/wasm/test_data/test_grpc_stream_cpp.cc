@@ -107,7 +107,7 @@ FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
   HeaderStringPairs initial_metadata;
   if (root()->grpcStreamHandler("bogus service string", "service", "method", initial_metadata,
                                 std::unique_ptr<GrpcStreamHandlerBase>(
-                                    new MyGrpcStreamHandler())) != WasmResult::BadArgument) {
+                                    new MyGrpcStreamHandler())) != WasmResult::ParseFailure) {
     logError("unexpected bogus service string OK");
   }
   if (root()->grpcStreamHandler("cluster", "service", "bad method", initial_metadata,

@@ -100,7 +100,7 @@ FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stre
   root()->handler_ = new MyGrpcCallHandler();
   if (root()->grpcCallHandler(
           "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
-          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::BadArgument) {
+          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::ParseFailure) {
     logError("bogus grpc_service rejected");
   }
   if (end_of_stream) {
