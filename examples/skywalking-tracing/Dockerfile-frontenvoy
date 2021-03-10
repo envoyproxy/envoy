@@ -1,4 +1,3 @@
-# FROM envoyproxy/envoy:v1.17.1
 FROM envoyproxy/envoy-dev:latest
 
 RUN apt-get update && apt-get -q install -y \

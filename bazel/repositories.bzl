@@ -436,12 +436,8 @@ def _com_github_datadog_dd_opentracing_cpp():
     )
 
 def _com_github_skyapm_cpp2sky():
-    # external_http_archive(
-    #     name = "com_github_skyapm_cpp2sky",
-    # )
-    native.local_repository(
+    external_http_archive(
         name = "com_github_skyapm_cpp2sky",
-        path = "/home/shikugawa/dev/cpp2sky",
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
