@@ -187,7 +187,7 @@ private:
           generic_factory->createGenericDataInput(*message, factory_context_));
     }
 
-    throw EnvoyException(
+    ExceptionUtil::throwEnvoyException(
         fmt::format("Didn't find a registered implementation for name: '{}'", config.name()));
   }
 
