@@ -35,6 +35,8 @@ if __name__ == '__main__':
     subprocess.run("tools/extensions/generate_extension_db".split(), check=True)
   extension_db = json.loads(pathlib.Path(extension_db_path).read_text())
 
+  pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
+
   security_postures = defaultdict(list)
   for extension, metadata in extension_db.items():
     security_postures[metadata['security_posture']].append(extension)
