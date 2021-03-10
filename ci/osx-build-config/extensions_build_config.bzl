@@ -12,3 +12,5 @@ EXTENSIONS = {
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
 }
 WINDOWS_EXTENSIONS = {}
+EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
+EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]

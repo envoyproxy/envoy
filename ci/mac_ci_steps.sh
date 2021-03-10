@@ -17,7 +17,7 @@ df -h
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 
-BUILD_CONFIG="$(dirname "$0")"/osx-build-config
+BUILD_CONFIG="$(dirname $(realpath "$0"))"/osx-build-config
 
 # TODO(zuercher): remove --flaky_test_attempts when https://github.com/envoyproxy/envoy/issues/2428
 # is resolved.
