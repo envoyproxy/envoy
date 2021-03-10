@@ -64,30 +64,29 @@ TagNameValues::TagNameValues() {
          ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
-  addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
-         ".collection.");
+  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
-  addRe2(MONGO_COLLECTION, R"(^mongo\.<NAME>\.collection\.((<NAME>)\.).*?query\.)", ".collection.");
+  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
-  addRe2(MONGO_CMD, R"(^mongo\.<NAME>\.cmd\.((<NAME>)\.))", ".cmd.");
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
-  addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
+  addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
-  addRe2(HTTP_USER_AGENT, R"(^http\.<NAME>\.user_agent\.((<NAME>)\.))", ".user_agent.");
+  addTokenized(HTTP_USER_AGENT, "http.*.user_agent.$.**");
 
   // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*
-  addRe2(VIRTUAL_CLUSTER, R"(^vhost\.<NAME>\.vcluster\.((<NAME>)\.))", ".vcluster.");
+  addTokenized(VIRTUAL_CLUSTER, "vhost.*.vcluster.$.**");
 
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
-  addRe2(FAULT_DOWNSTREAM_CLUSTER, R"(^http\.<NAME>\.fault\.((<NAME>)\.))", ".fault.");
+  addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
   addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
@@ -96,22 +95,22 @@ TagNameValues::TagNameValues() {
   addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<NAME>\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\.<NAME>\.grpc\.((<NAME>)\.))", ".grpc.");
+  addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**");
 
   // tcp.(<stat_prefix>.)*
-  addRe2(TCP_PREFIX, R"(^tcp\.((<NAME>)\.))");
+  addTokenized(TCP_PREFIX, "tcp.$.**");
 
   // udp.(<stat_prefix>.)*
-  addRe2(UDP_PREFIX, R"(^udp\.((<NAME>)\.))");
+  addTokenized(UDP_PREFIX, "udp.$.**");
 
   // auth.clientssl.(<stat_prefix>.)*
-  addRe2(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((<NAME>)\.))");
+  addTokenized(CLIENTSSL_PREFIX, "auth.clientssl.$.**");
 
   // ratelimit.(<stat_prefix>.)*
-  addRe2(RATELIMIT_PREFIX, R"(^ratelimit\.((<NAME>)\.))");
+  addTokenized(RATELIMIT_PREFIX, "ratelimit.$.**");
 
   // cluster.(<cluster_name>.)*
-  addRe2(CLUSTER_NAME, R"(^cluster\.((<NAME>)\.))");
+  addTokenized(CLUSTER_NAME, "cluster.$.**");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
   // The <address> part can be anything here (.*?) for the sake of a simpler
@@ -119,16 +118,16 @@ TagNameValues::TagNameValues() {
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<NAME>)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
-  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^http\.((<NAME>)\.))");
+  addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
   // listener.(<address>.)*
   addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
 
   // vhost.(<virtual host name>.)*
-  addRe2(VIRTUAL_HOST, R"(^vhost\.((<NAME>)\.))");
+  addTokenized(VIRTUAL_HOST, "vhost.$.**");
 
   // mongo.(<stat_prefix>.)*
-  addRe2(MONGO_PREFIX, R"(^mongo\.((<NAME>)\.))");
+  addTokenized(MONGO_PREFIX, "mongo.$.**");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
   // Note: <route_config_name> can contain dots thus we have to maintain full
@@ -142,6 +141,10 @@ TagNameValues::TagNameValues() {
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
                            const std::string& substr) {
   descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
+}
+
+void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {
+  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens});
 }
 
 } // namespace Config
