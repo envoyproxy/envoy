@@ -119,7 +119,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/listener/tls_inspector @piotrsikora @ggreenway @asraa
+/*/extensions/filters/listener/tls_inspector @ggreenway @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao
