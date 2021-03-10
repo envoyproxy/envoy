@@ -62,6 +62,12 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
 }
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
           AccessLogNames::get().Wasm);

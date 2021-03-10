@@ -4,7 +4,7 @@ load(
 )
 load(
     "//bazel:envoy_select.bzl",
-    "envoy_select_wasm",
+    "envoy_select_wasm_cpp_tests",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -18,7 +18,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp.wasm",
     ]),
     extension_name = "envoy.stat_sinks.wasm",
@@ -34,7 +34,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "wasm_stat_sink_test",
     srcs = ["wasm_stat_sink_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp.wasm",
     ]),
     extension_name = "envoy.stat_sinks.wasm",

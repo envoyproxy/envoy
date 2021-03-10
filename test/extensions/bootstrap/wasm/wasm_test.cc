@@ -131,7 +131,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                          testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
-                                          testing::Values("cpp", "rust")));
+                                          Envoy::Extensions::Common::Wasm::language_values));
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
@@ -169,6 +169,12 @@ TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
 }
 
 TEST_P(WasmTest, BadSignature) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/bad_signature_cpp.wasm"));
@@ -178,6 +184,12 @@ TEST_P(WasmTest, BadSignature) {
 }
 
 TEST_P(WasmTest, Segv) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
@@ -190,6 +202,12 @@ TEST_P(WasmTest, Segv) {
 }
 
 TEST_P(WasmTest, DivByZero) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
@@ -202,6 +220,12 @@ TEST_P(WasmTest, DivByZero) {
 }
 
 TEST_P(WasmTest, IntrinsicGlobals) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/emscripten_cpp.wasm"));
@@ -220,6 +244,12 @@ TEST_P(WasmTest, IntrinsicGlobals) {
 // change this behavior by providing non-trapping instructions, but in the mean time we support the
 // default Emscripten behavior.
 TEST_P(WasmTest, Asm2Wasm) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/asm2wasm_cpp.wasm"));
@@ -231,6 +261,12 @@ TEST_P(WasmTest, Asm2Wasm) {
 }
 
 TEST_P(WasmNullTest, Stats) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
 
@@ -248,6 +284,12 @@ TEST_P(WasmNullTest, Stats) {
 }
 
 TEST_P(WasmNullTest, StatsHigherLevel) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
 
@@ -272,6 +314,12 @@ TEST_P(WasmNullTest, StatsHigherLevel) {
 }
 
 TEST_P(WasmNullTest, StatsHighLevel) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   createWasm();
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
 

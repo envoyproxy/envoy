@@ -4,7 +4,7 @@ load(
 )
 load(
     "//bazel:envoy_select.bzl",
-    "envoy_select_wasm",
+    "envoy_select_wasm_cpp_tests",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -18,7 +18,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/access_loggers/wasm/test_data:test_cpp.wasm",
     ]),
     extension_name = "envoy.access_loggers.wasm",

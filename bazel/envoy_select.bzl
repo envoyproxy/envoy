@@ -32,13 +32,25 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values depending on the WASM runtimes enabled in the current build.
-def envoy_select_wasm(xs):
+# Selects the given values depending on the Wasm runtimes enabled in the current build,
+# and the ability to build tests using Proxy-Wasm C++ SDK on the current platform.
+def envoy_select_wasm_cpp_tests(xs):
+    return select({
+        "@envoy//bazel:darwin_arm64": [],
+        "@envoy//bazel:linux_aarch64": [],
+        "@envoy//bazel:wasm_none": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values depending on the Wasm runtimes enabled in the current build,
+# and the ability to build tests using Proxy-Wasm Rust SDK on the current platform.
+def envoy_select_wasm_rust_tests(xs):
     return select({
         "@envoy//bazel:wasm_none": [],
         "//conditions:default": xs,
     })
 
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_v8(xs):
     return select({
         "@envoy//bazel:wasm_wasmtime": [],
@@ -47,12 +59,14 @@ def envoy_select_wasm_v8(xs):
         "//conditions:default": xs,
     })
 
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wavm(xs):
     return select({
         "@envoy//bazel:wasm_wavm": xs,
         "//conditions:default": [],
     })
 
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wasmtime(xs):
     return select({
         "@envoy//bazel:wasm_wasmtime": xs,
