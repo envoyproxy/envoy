@@ -179,16 +179,12 @@ private:
       return factory->createDataInput(*message, factory_context_);
     }
 
-    auto* generic_factory = Config::Utility::getFactory<GenericDataInputFactory>(config);
-    if (generic_factory != nullptr) {
-      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          config.typed_config(), factory_context_.messageValidationVisitor(), *generic_factory);
-      return std::make_unique<GenericDataInputWrapper>(
-          generic_factory->createGenericDataInput(*message, factory_context_));
-    }
-
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("Didn't find a registered implementation for name: '{}'", config.name()));
+    // If the provided config doesn't match a typed input, assume that this is a generic input.
+    auto& generic_factory = Config::Utility::getAndCheckFactory<GenericDataInputFactory>(config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config.typed_config(), factory_context_.messageValidationVisitor(), generic_factory);
+    return std::make_unique<GenericDataInputWrapper>(
+        generic_factory.createGenericDataInput(*message, factory_context_));
   }
 
   InputMatcherPtr createInputMatcher(
