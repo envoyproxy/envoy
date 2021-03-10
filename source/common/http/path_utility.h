@@ -6,6 +6,8 @@
 
 #include "envoy/type/http/v3/path_transformation.pb.h"
 
+#include <list>
+
 namespace Envoy {
 namespace Http {
 
@@ -26,11 +28,16 @@ public:
   static absl::string_view removeQueryAndFragment(const absl::string_view path);
 };
 
+using Transformation = std::function<std::string(absl::string_view)>;
+
 class PathTransformer {
 public:
   PathTransformer(envoy::type::http::v3::PathTransformation operations);
 
   std::string transform(const absl::string_view original);
+
+private:
+  std::list<Transformation> transformations;
 };
 
 } // namespace Http

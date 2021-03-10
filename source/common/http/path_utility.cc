@@ -87,23 +87,58 @@ absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path)
   return ret;
 }
 
+std::string mergeSlashes(absl::string_view original_path) {
+  const absl::string_view::size_type query_start = original_path.find('?');
+  const absl::string_view path = original_path.substr(0, query_start);
+  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
+    if (path.find("//") == absl::string_view::npos) {
+    return original_path.data();
+  }
+  const absl::string_view path_prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
+  const absl::string_view path_suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
+  return absl::StrCat(path_prefix,
+                                absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
+                                path_suffix, query);
+}
 
+std::string rfcNormalize(absl::string_view original_path) {
+  const auto query_pos = original_path.find('?');
+  auto normalized_path_opt = canonicalizePath(
+      query_pos == original_path.npos
+          ? original_path
+          : absl::string_view(original_path.data(), query_pos) // '?' is not included
+  );
+
+  auto& normalized_path = normalized_path_opt.value();
+  const absl::string_view query_suffix =
+      query_pos == original_path.npos
+          ? absl::string_view{}
+          : absl::string_view{original_path.data() + query_pos, original_path.size() - query_pos};
+  if (!query_suffix.empty()) {
+    normalized_path.insert(normalized_path.end(), query_suffix.begin(), query_suffix.end());
+  }
+  return normalized_path;
+}
 
 PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_transformation) {
   const google::protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation> operations = path_transformation.operations();
   for (auto const& operation: operations) {
     if (operation.has_normalize_path_rfc_3986()) {
-      
+      transformations.emplace_back(rfcNormalize);
     }
     else if (operation.has_merge_slashes()) {
-      
+      transformations.emplace_back(mergeSlashes);
     }
   }
 }
 
 
 std::string PathTransformer::transform(absl::string_view original) {
-  return std::string(original[0], 3);
+  std::string transformed = original.data();
+  for (Transformation transformation: transformations) {
+    transformed = transformation(transformed);
+  }
+  return transformed;
 }
 
 } // namespace Http
