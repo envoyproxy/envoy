@@ -424,14 +424,21 @@ void UpstreamRequest::onPoolReady(
     paused_for_connect_ = true;
   }
 
-  if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    const auto max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+  absl::optional<std::chrono::milliseconds> max_stream_duration = absl::nullopt;
+  if (parent_.maxStreamDuration().has_value()) {
+    max_stream_duration = parent_.maxStreamDuration().value();
+  }
+
+  if (!max_stream_duration.has_value() &&
+      upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
-    if (max_stream_duration.count()) {
-      max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
-          [this]() -> void { onStreamMaxDurationReached(); });
-      max_stream_duration_timer_->enableTimer(max_stream_duration);
-    }
+  }
+
+  if (max_stream_duration.has_value() && max_stream_duration->count()) {
+    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
   const Http::Status status =

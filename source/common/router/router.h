@@ -142,6 +142,9 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
 
+  static absl::optional<std::chrono::milliseconds>
+  tryParseHeaderTimeout(const Http::HeaderEntry* header_timeout_entry);
+
   static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
                                   TimeoutData& timeout);
 
@@ -255,6 +258,7 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
   virtual FilterConfig& config() PURE;
   virtual FilterUtility::TimeoutData timeout() PURE;
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
   virtual Http::RequestHeaderMap* downstreamHeaders() PURE;
   virtual Http::RequestTrailerMap* downstreamTrailers() PURE;
   virtual bool downstreamResponseStarted() const PURE;
@@ -428,6 +432,9 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
   FilterUtility::TimeoutData timeout() override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return dymamic_max_stream_duration_;
+  }
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }
   bool downstreamResponseStarted() const override { return downstream_response_started_; }
@@ -525,7 +532,7 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
-
+  absl::optional<std::chrono::milliseconds> dymamic_max_stream_duration_;
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
