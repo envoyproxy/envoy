@@ -76,7 +76,7 @@ public:
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  FilterConfigProviderPtr createProvider(std::string name, bool warm) {
+  DynamicFilterConfigProviderPtr createProvider(std::string name, bool warm) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ConfigSource config_source;
     TestUtility::loadFromYaml("ads: {}", config_source);
@@ -96,7 +96,7 @@ public:
   }
 
   std::unique_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
-  FilterConfigProviderPtr provider_;
+  DynamicFilterConfigProviderPtr provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
 
