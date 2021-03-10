@@ -328,7 +328,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "c987be061e570ce7d0d8f415753f05555e787407",
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-03-02",
+        release_date = "2021-03-01",
         cpe = "N/A",
     ),
     com_github_skyapm_cpp2sky = dict(
