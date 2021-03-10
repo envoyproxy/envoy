@@ -5424,14 +5424,58 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 }
 
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
+  TestScopedRuntime scoped_runtime;
+
+  // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With invalid x-forwarded-proto, still use scheme.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto("foo");
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // Use valid x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Trust scheme over x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setScheme(Http::Headers::get().SchemeValues.Https);
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, false, false);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // New logic uses downstream crypto
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Legacy logic uses upstream crypto
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }

@@ -57,6 +57,33 @@ TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
+TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto check_preserved = ([&](absl::string_view scheme, absl::string_view xff) {
+    {
+      default_request_headers_.setScheme(scheme);
+      default_request_headers_.setForwardedProto(xff);
+      auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+      response->waitForEndStream();
+      auto headers = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+                         ->lastRequestHeaders();
+      // Ensure original scheme and x-forwarded-proto are preserved.
+      EXPECT_EQ(headers->getSchemeValue(), scheme);
+      EXPECT_EQ(headers->getForwardedProtoValue(), xff);
+    }
+  });
+
+  // Ensure regardless of value, scheme and x-forwarded-proto are independently preserved.
+  check_preserved("http", "https");
+  check_preserved("https", "http");
+
+  codec_client_->close();
+}
+
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
   initialize();

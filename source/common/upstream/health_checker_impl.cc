@@ -274,7 +274,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
        {Http::Headers::get().Path, parent_.path_},
        {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}});
   Router::FilterUtility::setUpstreamScheme(
-      *request_headers, host_->transportSocketFactory().implementsSecureTransport());
+      *request_headers,
+      // Here there is no downstream connection so scheme will be based on
+      // upstream crypto
+      host_->transportSocketFactory().implementsSecureTransport(),
+      host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
                                          local_address_provider_);
   stream_info.onUpstreamHostSelected(host_);
@@ -720,7 +724,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   Grpc::Common::toGrpcTimeout(parent_.timeout_, headers_message->headers());
 
   Router::FilterUtility::setUpstreamScheme(
-      headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
+      headers_message->headers(),
+      // Here there is no downstream connection so scheme will be based on
+      // upstream crypto
+      host_->transportSocketFactory().implementsSecureTransport(),
+      host_->transportSocketFactory().implementsSecureTransport());
 
   auto status = request_encoder_->encodeHeaders(headers_message->headers(), false);
   // Encoding will only fail if required headers are missing.
