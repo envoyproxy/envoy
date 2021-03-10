@@ -104,7 +104,7 @@ Envoy will return no addresses and set the response code appropriately. Converse
 matching records for the query type, each configured address is returned. This is also true for
 AAAA records. Only A, AAAA, and SRV records are supported. If the filter parses queries for other
 record types, the filter immediately responds indicating that the type is not supported. The
-filter can also redirect a query for a DNS name to the enpoints of a cluster. "www.domain4.com"
+filter can also redirect a query for a DNS name to the endpoints of a cluster. "www.domain4.com"
 in the configuration demonstrates this. Along with an address list, a cluster name is a valid
 endpoint for a DNS name.
 
