@@ -79,6 +79,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
+    "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_ocsp_response_for_must_staple_certs",
     "envoy.reloadable_features.stop_faking_paths",
