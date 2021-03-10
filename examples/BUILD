@@ -9,13 +9,9 @@ envoy_package()
 
 filegroup(
     name = "configs",
-    srcs = [
-        "//examples/wasm-cc:configs",
-    ] + glob(
+    srcs = glob(
         [
             "**/*.yaml",
-            "**/*.lua",
-            "_extra_certs/*.pem",
         ],
         exclude = [
             "cache/responses.yaml",
@@ -24,4 +20,14 @@ filegroup(
             "**/*docker-compose*.yaml",
         ],
     ),
+)
+
+filegroup(
+    name = "certs",
+    srcs = glob(["_extra_certs/*.pem"]),
+)
+
+filegroup(
+    name = "lua",
+    srcs = glob(["**/*.lua"]),
 )
