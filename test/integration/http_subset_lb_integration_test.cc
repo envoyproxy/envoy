@@ -216,4 +216,39 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {
   runTest(type_b_request_headers_, "b");
 }
 
+// Tests subset-compatible load balancer policy without metadata does not crash on initialization
+// with single_host_per_subset set to be true.
+TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetadata) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+
+    // Set single_host_per_subset to be true. This will avoid function
+    // SubsetLoadBalancer::rebuildSingle() bailout early. Thus exercise the no metadata logic.
+    auto* subset_selector = cluster->mutable_lb_subset_config()->mutable_subset_selectors(0);
+    subset_selector->set_single_host_per_subset(true);
+
+    // Clear the metadata for each host
+    auto* load_assignment = cluster->mutable_load_assignment();
+    auto* endpoints = load_assignment->mutable_endpoints(0);
+    for (uint32_t i = 0; i < num_hosts_; i++) {
+      auto* lb_endpoint = endpoints->mutable_lb_endpoints(i);
+      lb_endpoint->clear_metadata();
+    }
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                          {":path", "/test"},
+                                                                          {":scheme", "http"},
+                                                                          {":authority", "host"},
+                                                                          {"x-type", "a"},
+                                                                          {"x-hash", "hash-a"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
+}
+
 } // namespace Envoy
