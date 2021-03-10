@@ -1,8 +1,8 @@
-#include "extensions/filters/network/dubbo_proxy/buffer_helper.h"
+#include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
 
-#include "envoy/common/exception.h"
+#include "extensions/filters/network/dubbo_proxy/buffer_helper.h"
 
 #include "test/test_common/utility.h"
 
