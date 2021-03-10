@@ -538,7 +538,7 @@ message Cluster {
       // If slow start window and time bias are configured, effective weight of an endpoint would be scaled with time bias:
       // `weight = load_balancing_weight * time_bias`
       //
-      // When `time bias == 0.0` the Round Robin and Least Request Load Balancers will not scale enpoint weight with time bias
+      // When `time bias == 0.0` the Round Robin and Least Request Load Balancers will not scale endpoint weight with time bias
       // and will behave as if slow start is not enabled.
       core.v3.RuntimeDouble time_bias = 3;
     }
