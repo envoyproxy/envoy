@@ -377,8 +377,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
-        # TODO(alyssawilk) why does this not work?
-#        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
     ]),
 )
