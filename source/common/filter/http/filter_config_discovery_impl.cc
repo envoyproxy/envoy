@@ -14,7 +14,8 @@ namespace Filter {
 namespace Http {
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
-    FilterConfigSubscriptionSharedPtr& subscription, const std::set<std::string>& require_type_urls,
+    FilterConfigSubscriptionSharedPtr& subscription,
+    const absl::flat_hash_set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(subscription), require_type_urls_(require_type_urls),
       tls_(factory_context.threadLocal()),
@@ -33,17 +34,17 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
   subscription_->filter_config_providers_.erase(this);
 }
 
+void DynamicFilterConfigProviderImpl::validateTypeUrl(const std::string& type_url) const {
+  if (!require_type_urls_.contains(type_url)) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls_, ", ")));
+  }
+}
+
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
 
 absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
   return tls_->config_;
-}
-
-void DynamicFilterConfigProviderImpl::validateConfig(const std::string& type_url) {
-  if (require_type_urls_.count(type_url) == 0) {
-    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls_, ", ")));
-  }
 }
 
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
@@ -123,7 +124,7 @@ void FilterConfigSubscription::onConfigUpdate(
   // possible that the providers have distinct type URL constraints.
   const auto type_url = Config::Utility::getFactoryType(filter_config.typed_config());
   for (auto* provider : filter_config_providers_) {
-    provider->validateConfig(type_url);
+    provider->validateTypeUrl(type_url);
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
@@ -208,7 +209,7 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   if (!config_source.apply_default_config_without_warming()) {
     factory_context.initManager().add(subscription->initTarget());
   }
-  std::set<std::string> require_type_urls;
+  absl::flat_hash_set<std::string> require_type_urls;
   for (const auto& type_url : config_source.type_urls()) {
     auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
     require_type_urls.emplace(factory_type_url);
@@ -224,7 +225,7 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   bool config_applied = false;
   if (subscription->lastConfig().has_value()) {
     try {
-      provider->validateConfig(subscription->lastTypeUrl());
+      provider->validateTypeUrl(subscription->lastTypeUrl());
       provider->onConfigUpdate(subscription->lastConfig().value(), subscription->lastVersionInfo(),
                                nullptr);
       config_applied = true;
@@ -245,7 +246,7 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
                                        filter_config_name,
                                        config_source.default_config().type_url()));
     }
-    provider->validateConfig(Config::Utility::getFactoryType(config_source.default_config()));
+    provider->validateTypeUrl(Config::Utility::getFactoryType(config_source.default_config()));
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config_source.default_config(), factory_context.messageValidationVisitor(),
         *default_factory);

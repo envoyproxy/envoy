@@ -32,14 +32,15 @@ using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscripti
 class DynamicFilterConfigProviderImpl : public FilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
-                                  const std::set<std::string>& require_type_urls,
+                                  const absl::flat_hash_set<std::string>& require_type_urls,
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
+
+  void validateTypeUrl(const std::string& type_url) const;
 
   // Config::ExtensionConfigProvider
   const std::string& name() override;
   absl::optional<Envoy::Http::FilterFactoryCb> config() override;
-  void validateConfig(const std::string& type_url) override;
   void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
                       Config::ConfigAppliedCb cb) override;
 
@@ -50,7 +51,7 @@ private:
   };
 
   FilterConfigSubscriptionSharedPtr subscription_;
-  const std::set<std::string> require_type_urls_;
+  const absl::flat_hash_set<std::string> require_type_urls_;
   // Currently applied configuration to ensure that the main thread deletes the last reference to
   // it.
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
@@ -151,7 +152,6 @@ public:
   // Config::ExtensionConfigProvider
   const std::string& name() override { return filter_config_name_; }
   absl::optional<Envoy::Http::FilterFactoryCb> config() override { return config_; }
-  void validateConfig(const std::string&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&,
                       Config::ConfigAppliedCb) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
