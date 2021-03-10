@@ -89,7 +89,7 @@ public:
   GrpcCallRootContext* root() { return static_cast<GrpcCallRootContext*>(Context::root()); }
 };
 
-static RegisterContextFactory register_GrpcCallFallbackContext(CONTEXT_FACTORY(GrpcCallContext),
+static RegisterContextFactory register_GrpcCallContext(CONTEXT_FACTORY(GrpcCallContext),
                                                        ROOT_FACTORY(GrpcCallRootContext),
                                                        "grpc_call");
 
