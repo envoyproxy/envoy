@@ -57,7 +57,6 @@ ext = leaf[dot:]
 # or if the file doesn't exist.
 def emit(source_path, dest_path, source_ending, dest_ending):
   if fname.endswith(source_ending) and path.startswith(source_path + "/"):
-    path_len = len(path) - len(source_path) - len(source_ending)
     new_path = (absolute_location + dest_path + path[len(source_path):-len(source_ending)] +
                 dest_ending)
     if os.path.isfile(new_path):

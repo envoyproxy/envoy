@@ -2,7 +2,6 @@
 # and all API protos. This is not the ideal way to be generating docs, see
 # https://github.com/envoyproxy/envoy/issues/10311#issuecomment-603518498.
 
-import os
 import re
 import string
 import sys

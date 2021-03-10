@@ -11,7 +11,6 @@
 # In each case this script will add file and line information to any backtrace log
 # lines found and echo back all non-Backtrace lines untouched.
 
-import collections
 import re
 import subprocess
 import sys
@@ -22,7 +21,6 @@ import sys
 # and line information. Output appended to end of original backtrace line. Output
 # any nonmatching lines unmodified. End when EOF received.
 def decode_stacktrace_log(object_file, input_source, address_offset=0):
-  traces = {}
   # Match something like:
   #     [backtrace] [bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
   backtrace_marker = "\[backtrace\] [^\s]+"
@@ -108,7 +106,7 @@ def ignore_decoding_errors(io_wrapper):
   if hasattr(io_wrapper, 'reconfigure'):
     try:
       io_wrapper.reconfigure(errors='ignore')
-    except:
+    except:  # noqa: E722
       pass
 
   return io_wrapper

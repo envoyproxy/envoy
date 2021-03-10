@@ -5,7 +5,6 @@ import common
 import functools
 import multiprocessing
 import os
-import os.path
 import pathlib
 import re
 import subprocess
@@ -165,17 +164,17 @@ DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
     # Well-known types should be referenced from the ProtobufWkt namespace.
-    "Protobuf::Any":                    "ProtobufWkt::Any",
-    "Protobuf::Empty":                  "ProtobufWkt::Empty",
-    "Protobuf::ListValue":              "ProtobufWkt::ListValue",
-    "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
-    "Protobuf::StringValue":            "ProtobufWkt::StringValue",
-    "Protobuf::Struct":                 "ProtobufWkt::Struct",
-    "Protobuf::Value":                  "ProtobufWkt::Value",
+    "Protobuf::Any": "ProtobufWkt::Any",
+    "Protobuf::Empty": "ProtobufWkt::Empty",
+    "Protobuf::ListValue": "ProtobufWkt::ListValue",
+    "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE",
+    "Protobuf::StringValue": "ProtobufWkt::StringValue",
+    "Protobuf::Struct": "ProtobufWkt::Struct",
+    "Protobuf::Value": "ProtobufWkt::Value",
 
     # Other common mis-namespacing of protobuf types.
-    "ProtobufWkt::Map":                 "Protobuf::Map",
-    "ProtobufWkt::MapPair":             "Protobuf::MapPair",
+    "ProtobufWkt::Map": "Protobuf::Map",
+    "ProtobufWkt::MapPair": "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
 
@@ -372,8 +371,12 @@ class FormatChecker:
 
     nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
     text = self.readFile(file_path)
-    if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
-      not nolint in text:
+    namespace_found = (
+      re.search(
+        "^\s*namespace\s+%s\s*{"
+        % self.namespace_check, text, re.MULTILINE)
+      and nolint not in text)
+    if not namespace_found:
       return [
           "Unable to find %s namespace or %s for file: %s" %
           (self.namespace_check, nolint, file_path)
@@ -393,8 +396,8 @@ class FormatChecker:
 
   # To avoid breaking the Lyft import, we just check for path inclusion here.
   def allowlistedForProtobufDeps(self, file_path):
-    return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
-            any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
+    return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL)
+            or any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
 
   # Real-world time sources should not be instantiated in the source, except for a few
   # specific cases. They should be passed down from where they are instantied to where
@@ -437,8 +440,7 @@ class FormatChecker:
     if file_path.endswith(DOCS_SUFFIX):
       return False
 
-    return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
-        or self.isInSubdir(file_path, 'tools/testdata')
+    return (file_path.endswith('.h') and not file_path.startswith("./test/") and file_path not in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST or self.isInSubdir(file_path, 'tools/testdata')
 
   def allowlistedForBuildUrls(self, file_path):
     return file_path in BUILD_URLS_ALLOWLIST
@@ -685,9 +687,9 @@ class FormatChecker:
       # We don't check here for std::shared_timed_mutex because that may
       # legitimately show up in comments, for example this one.
       reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
-    if not self.allowlistedForRealTime(file_path) and not "NO_CHECK_FORMAT(real_time)" in line:
+    if not self.allowlistedForRealTime(file_path) and "NO_CHECK_FORMAT(real_time)" not in line:
       if "RealTimeSource" in line or \
-        ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
+        ("RealTimeSystem" in line and "TestRealTimeSystem" not in line) or \
         "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
         "std::this_thread::sleep_for" in line or self.hasCondVarWaitFor(line):
         reportError("Don't reference real-world time sources from production code; use injection")
@@ -796,9 +798,9 @@ class FormatChecker:
       reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
     if self.isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
-      ('.counterFromString(' in line or '.gaugeFromString(' in line or \
-        '.histogramFromString(' in line or '.textReadoutFromString(' in line or \
-        '->counterFromString(' in line or '->gaugeFromString(' in line or \
+      ('.counterFromString(' in line or '.gaugeFromString(' in line or
+        '.histogramFromString(' in line or '.textReadoutFromString(' in line or
+        '->counterFromString(' in line or '->gaugeFromString(' in line or
         '->histogramFromString(' in line or '->textReadoutFromString(' in line):
       reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
@@ -1006,7 +1008,7 @@ class FormatChecker:
     """Run checkFormat and return the traceback of any exception."""
     try:
       return self.checkFormat(file_path)
-    except:
+    except:  # noqa: E722
       return traceback.format_exc().split("\n")
 
   def checkOwners(self, dir_name, owned_directories, error_messages):

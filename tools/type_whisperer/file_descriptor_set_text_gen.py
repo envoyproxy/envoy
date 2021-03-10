@@ -7,7 +7,7 @@ import sys
 from google.protobuf import descriptor_pb2
 
 # Needed to avoid annotation option stripping during pb_text generation.
-from udpa.annotations import migrate_pb2
+from udpa.annotations import migrate_pb2  # noqa: F401
 
 
 def Decode(path):

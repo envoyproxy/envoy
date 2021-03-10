@@ -15,15 +15,15 @@ from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
 # Note: we have to include those proto definitions for text_format sanity.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
+from google.api import annotations_pb2 as _  # noqa: F811
+from validate import validate_pb2 as _  # noqa: F811
 from envoy.annotations import deprecation_pb2 as deprecation_pb2
-from envoy.annotations import resource_pb2 as _
-from udpa.annotations import migrate_pb2 as _
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
-from udpa.annotations import status_pb2 as _
-from udpa.annotations import versioning_pb2 as _
+from envoy.annotations import resource_pb2 as _  # noqa: F811
+from udpa.annotations import migrate_pb2 as _  # noqa: F811
+from udpa.annotations import security_pb2 as _  # noqa: F811
+from udpa.annotations import sensitive_pb2 as _  # noqa: F811
+from udpa.annotations import status_pb2 as _  # noqa: F811
+from udpa.annotations import versioning_pb2 as _  # noqa: F811,F401
 
 
 # Set reserved_range in target_proto to reflect previous_reserved_range skipping

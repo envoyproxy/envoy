@@ -46,7 +46,6 @@ def VerifyAndPrintLatestRelease(dep, repo, metadata_version, release_date):
 
 # Print GitHub release date, throw ReleaseDateError on mismatch with metadata release date.
 def VerifyAndPrintReleaseDate(dep, github_release_date, metadata_release_date):
-  mismatch = ''
   iso_release_date = FormatUtcDate(github_release_date)
   print(f'{dep} has a GitHub release date {iso_release_date}')
   if iso_release_date != metadata_release_date:

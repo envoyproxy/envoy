@@ -24,10 +24,8 @@ from __future__ import print_function
 
 import datetime
 from datetime import date
-from collections import defaultdict
 import os
 import re
-import subprocess
 import sys
 
 import github
@@ -119,14 +117,14 @@ def CreateIssues(access_token, runtime_and_pr):
     for title, body, login in issues:
       try:
         repo.create_issue(title, body=body, assignees=[login], labels=labels)
-      except github.GithubException as e:
+      except github.GithubException:
         try:
           if login:
             body += '\ncc @' + login
           repo.create_issue(title, body=body, labels=labels)
           print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
                  'and assign it their way.') % (title, login))
-        except github.GithubException as e:
+        except github.GithubException:
           print('GithubException while creating issue.')
           raise
 

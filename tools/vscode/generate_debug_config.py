@@ -26,7 +26,7 @@ def getExecutionRoot(workspace):
   try:
     compdb = pathlib.Path(workspace, "compile_commands.json").read_text()
     return json.loads(compdb)[0]['directory']
-  except:
+  except:  # noqa: E722
     return bazelInfo("execution_root")
 
 
@@ -47,7 +47,7 @@ def buildBinaryWithDebugInfo(target):
 def getLaunchJson(workspace):
   try:
     return json.loads(pathlib.Path(workspace, ".vscode", "launch.json").read_text())
-  except:
+  except:  # noqa: E722
     return {"version": "0.2.0"}
 
 

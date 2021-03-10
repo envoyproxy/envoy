@@ -8,8 +8,6 @@ import json
 import functools
 import os
 import pathlib
-import re
-import string
 import sys
 
 from google.protobuf import json_format
@@ -25,15 +23,15 @@ from jinja2 import Template
 # just remove it from the sys.path.
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
-from tools.api_proto_plugin import annotations
-from tools.api_proto_plugin import plugin
-from tools.api_proto_plugin import visitor
-from tools.config_validation import validate_fragment
+from tools.api_proto_plugin import annotations  # noqa: E402
+from tools.api_proto_plugin import plugin  # noqa: E402
+from tools.api_proto_plugin import visitor  # noqa: E402
+from tools.config_validation import validate_fragment  # noqa: E402
 
-from tools.protodoc import manifest_pb2
-from udpa.annotations import security_pb2
-from udpa.annotations import status_pb2
-from validate import validate_pb2
+from tools.protodoc import manifest_pb2  # noqa: E402
+from udpa.annotations import security_pb2  # noqa: E402
+from udpa.annotations import status_pb2  # noqa: E402
+from validate import validate_pb2  # noqa: E402
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
@@ -230,7 +228,7 @@ def FormatExtension(extension):
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
     categories = extension_metadata["categories"]
-  except KeyError as e:
+  except KeyError:
     sys.stderr.write(
         f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
     )
@@ -253,7 +251,7 @@ def FormatExtensionCategory(extension_category):
   """
   try:
     extensions = EXTENSION_CATEGORIES[extension_category]
-  except KeyError as e:
+  except KeyError:
     raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
   return EXTENSION_CATEGORY_TEMPLATE.render(category=extension_category,
                                             extensions=sorted(extensions))
@@ -653,7 +651,7 @@ class RstFormatVisitor(visitor.Visitor):
       self.protodoc_manifest = manifest_pb2.Manifest()
       json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     normal_enum_type = NormalizeTypeContextName(type_context.name)
     anchor = FormatAnchor(EnumCrossRefLabel(normal_enum_type))
     header = FormatHeader('-', 'Enum %s' % normal_enum_type)
@@ -666,7 +664,7 @@ class RstFormatVisitor(visitor.Visitor):
     return anchor + header + proto_link + formatted_leading_comment + FormatEnumAsDefinitionList(
         type_context, enum_proto)
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     # Skip messages synthesized to represent map types.
     if msg_proto.options.map_entry:
       return ''
@@ -684,7 +682,7 @@ class RstFormatVisitor(visitor.Visitor):
             type_context, msg_proto,
             self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     has_messages = True
     if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
       has_messages = False
@@ -693,7 +691,7 @@ class RstFormatVisitor(visitor.Visitor):
     # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
     # in the common case.
     if (has_messages and
-        not annotations.DOC_TITLE_ANNOTATION in type_context.source_code_info.file_level_annotations
+        annotations.DOC_TITLE_ANNOTATION not in type_context.source_code_info.file_level_annotations
         and file_proto.name.startswith('envoy')):
       raise ProtodocError('Envoy API proto file missing [#protodoc-title:] annotation: {}'.format(
           file_proto.name))
@@ -711,13 +709,13 @@ class RstFormatVisitor(visitor.Visitor):
       if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
         warnings += ('.. warning::\n   This API is work-in-progress and is '
                      'subject to breaking changes.\n\n')
-    debug_proto = FormatProtoAsBlockComment(file_proto)
+    # debug_proto = FormatProtoAsBlockComment(file_proto)
     return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 
-def Main():
+def main():
   plugin.Plugin([plugin.DirectOutputDescriptor('.rst', RstFormatVisitor)])
 
 
 if __name__ == '__main__':
-  Main()
+  main()

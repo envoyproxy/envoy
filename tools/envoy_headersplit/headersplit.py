@@ -6,13 +6,9 @@ remove the over-included header files in generated class codes and resolve depen
 corresponding Bazel files manually.
 """
 import argparse
-import os
-import subprocess
-import sys
 from typing import Type, List, Tuple, Dict
 
 # libclang imports
-import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
 
@@ -187,7 +183,7 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
 def get_implline(cursor: Cursor) -> int:
   """
   finds the first line of implementation source code for class method pointed by the cursor
-  parameter. 
+  parameter.
 
   Args:
       cursor: libclang cursor pointing to the target mock class definition.
@@ -201,7 +197,7 @@ def get_implline(cursor: Cursor) -> int:
       the method body and stops parsing early (see headersplit_test.test_class_implementations_error
       for details). To address this issue when parsing implementation code, we passed the flag that
       ask clang to ignore function bodies.
-      We can not get the function body directly with the same way we used in extract_definition() 
+      We can not get the function body directly with the same way we used in extract_definition()
       since clang didn't parse function this time. Though we can't get the correct method extent
       offset from Cursor, we can still get the start line of the corresponding method instead.
       (We can't get the correct line number for the last line due to skipping function bodies)
@@ -261,14 +257,14 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   class MockClass2 {...}
   namespace Configuration {
   class MockClass {...}
-        ^ 
+        ^
         defn
   }
   }
   }
 
   this function will return:
-  "namespace Envoy {\nnamespace Server {\nnamespace Configuration{\n" and "\n}\n}\n}\n" 
+  "namespace Envoy {\nnamespace Server {\nnamespace Configuration{\n" and "\n}\n}\n}\n"
 
   Args:
       defn: libclang Cursor pointing to a mock class

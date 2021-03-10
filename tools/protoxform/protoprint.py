@@ -18,7 +18,6 @@ import subprocess
 import sys
 
 from tools.api_proto_plugin import annotations
-from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
 from tools.protoxform import options as protoxform_options
@@ -31,13 +30,13 @@ from google.protobuf import text_format
 
 # Note: we have to include those proto definitions to make FormatOptions work,
 # this also serves as allowlist of extended options.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
-from envoy.annotations import deprecation_pb2 as _
-from envoy.annotations import resource_pb2
+from google.api import annotations_pb2 as _  # noqa: F811
+from validate import validate_pb2 as _  # noqa: F811
+from envoy.annotations import deprecation_pb2 as _  # noqa: F811
+from envoy.annotations import resource_pb2  # noqa: F401
 from udpa.annotations import migrate_pb2
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
+from udpa.annotations import security_pb2 as _  # noqa: F811
+from udpa.annotations import sensitive_pb2 as _  # noqa: F811,F401
 from udpa.annotations import status_pb2
 
 NEXT_FREE_FIELD_MIN = 5
@@ -149,7 +148,7 @@ def CreateNextFreeFieldXform(msg_proto):
           [rr.end for rr in msg_proto.reserved_range],
           [ex.end for ex in msg_proto.extension_range],
       ], [1]))
-  return lambda _: next_free if next_free > NEXT_FREE_FIELD_MIN else None
+  return lambda arg: next_free if next_free > NEXT_FREE_FIELD_MIN else None
 
 
 def FormatTypeContextComments(type_context, annotation_xforms=None):
@@ -566,7 +565,7 @@ class ProtoFormatVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def VisitService(self, service_proto, type_context):
+  def visit_service(self, service_proto, type_context):
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
     methods = '\n'.join(
         FormatServiceMethod(type_context.ExtendMethod(index, m.name), m)
@@ -575,7 +574,7 @@ class ProtoFormatVisitor(visitor.Visitor):
     return '%sservice %s {\n%s%s%s\n}\n' % (leading_comment, service_proto.name, options,
                                             trailing_comment, methods)
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     if protoxform_options.HasHideOption(enum_proto.options):
       return ''
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
@@ -589,7 +588,7 @@ class ProtoFormatVisitor(visitor.Visitor):
     return '%senum %s {\n%s%s%s%s\n}\n' % (leading_comment, enum_proto.name, trailing_comment,
                                            formatted_options, reserved_fields, joined_values)
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     # Skip messages synthesized to represent map types.
     if msg_proto.options.map_entry:
       return ''
@@ -629,7 +628,7 @@ class ProtoFormatVisitor(visitor.Visitor):
                                                   formatted_options, formatted_enums,
                                                   formatted_msgs, reserved_fields, fields)
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
     header = FormatHeaderFromFile(type_context.source_code_info, file_proto, empty_file)
     formatted_services = FormatBlock('\n'.join(services))

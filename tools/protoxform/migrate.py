@@ -141,7 +141,7 @@ class UpgradeVisitor(visitor.Visitor):
       field_proto.oneof_index = oneof_index
       migrate_annotation.oneof_promotion = ""
 
-  def VisitService(self, service_proto, type_context):
+  def visit_service(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
     for m in upgraded_proto.method:
       if m.options.HasExtension(annotations_pb2.http):
@@ -156,7 +156,7 @@ class UpgradeVisitor(visitor.Visitor):
           service_proto.options.Extensions[resource_pb2.resource].type)
     return upgraded_proto
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     upgraded_proto = copy.deepcopy(msg_proto)
     if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
       options.AddHideOption(upgraded_proto.options)
@@ -189,7 +189,7 @@ class UpgradeVisitor(visitor.Visitor):
     upgraded_proto.enum_type.extend(nested_enums)
     return upgraded_proto
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     upgraded_proto = copy.deepcopy(enum_proto)
     if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
       options.AddHideOption(upgraded_proto.options)
@@ -206,7 +206,7 @@ class UpgradeVisitor(visitor.Visitor):
         self._Rename(v, v.options.Extensions[migrate_pb2.enum_value_migrate])
     return upgraded_proto
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     upgraded_proto = copy.deepcopy(file_proto)
     # Upgrade imports.
     upgraded_proto.dependency[:] = [

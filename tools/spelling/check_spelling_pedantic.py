@@ -705,8 +705,6 @@ def extract_comments(lines):
 
 
 def check_file(checker, file, lines, error_handler):
-  in_code_block = 0
-  code_block_indent = 0
   num_errors = 0
 
   comments = extract_comments(lines)
@@ -758,7 +756,7 @@ if __name__ == "__main__":
   # language to handle hosts where en_US is not recognized (e.g. CI).
   try:
     locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-  except:
+  except locale.Error:
     locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
   default_dictionary = os.path.join(CURR_DIR, 'spelling_dictionary.txt')

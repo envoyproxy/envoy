@@ -4,7 +4,6 @@ from run_command import runCommand
 
 import logging
 import os
-import pathlib
 import re
 import subprocess
 import sys

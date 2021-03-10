@@ -47,9 +47,7 @@ def to_bazelname(filename: str, mockname: str) -> str:
   Returns:
       corresponding bazel target name
   """
-  bazelname = "//test/mocks/{}:".format(mockname)
-  bazelname += filename.split('/')[-1].replace('.h', '') + '_mocks'.format(mockname)
-  return bazelname
+  return f"//test/mocks/{mockname}:{filename.split('/')[-1].replace('.h', '')}_mocks"
 
 
 def get_filenames(mockname: str) -> List[str]:

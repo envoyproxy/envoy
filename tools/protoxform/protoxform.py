@@ -14,13 +14,13 @@ from tools.protoxform import utils
 
 # Note: we have to include those proto definitions to ensure we don't lose these
 # during FileDescriptorProto printing.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
-from envoy_api_canonical.envoy.annotations import deprecation_pb2 as _
-from envoy_api_canonical.envoy.annotations import resource_pb2
-from udpa.annotations import migrate_pb2
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
+from google.api import annotations_pb2 as _  # noqa: F811
+from validate import validate_pb2 as _  # noqa: F811
+from envoy_api_canonical.envoy.annotations import deprecation_pb2 as _  # noqa: F811
+from envoy_api_canonical.envoy.annotations import resource_pb2 as _  # noqa: F811
+from udpa.annotations import migrate_pb2 as _  # noqa: F811
+from udpa.annotations import security_pb2 as _  # noqa: F811
+from udpa.annotations import sensitive_pb2 as _  # noqa: F811,F401
 from udpa.annotations import status_pb2
 
 
@@ -40,16 +40,16 @@ class ProtoFormatVisitor(visitor.Visitor):
     self._freeze = 'extra_args' in params and params['extra_args'] == 'freeze'
     self._active_or_frozen = active_or_frozen
 
-  def VisitService(self, service_proto, type_context):
+  def visit_service(self, service_proto, type_context):
     return None
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     return None
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     return None
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     # Freeze protos that have next major version candidates.
     typedb = utils.GetTypeDb()
     output_proto = copy.deepcopy(file_proto)

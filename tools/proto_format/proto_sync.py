@@ -9,7 +9,6 @@
 
 import argparse
 from collections import defaultdict
-import functools
 import multiprocessing as mp
 import os
 import pathlib
@@ -394,7 +393,8 @@ def Sync(api_root, mode, labels, shadow):
           src_path = str(pathlib.Path(api_root, rel_dst_path))
           shutil.copy(src_path, abs_dst_path)
     with mp.Pool() as p:
-      pkg_deps = p.map(SyncProtoFile, dst_src_paths.items())
+      # this doesnt appear do anything
+      pkg_deps = p.map(SyncProtoFile, dst_src_paths.items())  # noqa: F841
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

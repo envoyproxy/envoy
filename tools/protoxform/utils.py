@@ -1,4 +1,3 @@
-import os
 
 from tools.type_whisperer.api_type_db_pb2 import TypeDb
 
@@ -8,7 +7,7 @@ _typedb = None
 
 
 def GetTypeDb():
-  assert _typedb != None
+  assert _typedb is not None
   return _typedb
 
 

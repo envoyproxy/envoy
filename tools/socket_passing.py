@@ -7,8 +7,6 @@
 # in the hot restart integration test to update listener addresses bound to
 # port 0 in the initial json config file.
 
-from collections import OrderedDict
-
 import argparse
 import http.client
 import json

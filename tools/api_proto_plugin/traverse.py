@@ -14,7 +14,7 @@ def TraverseService(type_context, service_proto, visitor):
   Returns:
     Plugin specific output.
   """
-  return visitor.VisitService(service_proto, type_context)
+  return visitor.visit_service(service_proto, type_context)
 
 
 def TraverseEnum(type_context, enum_proto, visitor):
@@ -28,7 +28,7 @@ def TraverseEnum(type_context, enum_proto, visitor):
   Returns:
     Plugin specific output.
   """
-  return visitor.VisitEnum(enum_proto, type_context)
+  return visitor.visit_enum(enum_proto, type_context)
 
 
 def TraverseMessage(type_context, msg_proto, visitor):
@@ -59,7 +59,7 @@ def TraverseMessage(type_context, msg_proto, visitor):
           type_context.ExtendNestedEnum(index, nested_enum.name, nested_enum.options.deprecated),
           nested_enum, visitor) for index, nested_enum in enumerate(msg_proto.enum_type)
   ]
-  return visitor.VisitMessage(msg_proto, type_context, nested_msgs, nested_enums)
+  return visitor.visit_message(msg_proto, type_context, nested_msgs, nested_enums)
 
 
 def TraverseFile(file_proto, visitor):
@@ -86,4 +86,4 @@ def TraverseFile(file_proto, visitor):
       TraverseEnum(package_type_context.ExtendEnum(index, enum.name, enum.options.deprecated), enum,
                    visitor) for index, enum in enumerate(file_proto.enum_type)
   ]
-  return visitor.VisitFile(file_proto, package_type_context, services, msgs, enums)
+  return visitor.visit_file(file_proto, package_type_context, services, msgs, enums)

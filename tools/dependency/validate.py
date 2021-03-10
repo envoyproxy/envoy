@@ -120,7 +120,7 @@ class BuildGraph(object):
     Returns:
       A set of dependency identifiers that are reachable from targets.
     """
-    deps_query = ' union '.join(f'deps({l})' for l in targets)
+    deps_query = ' union '.join(f'deps({dep})' for dep in targets)
     try:
       deps = subprocess.check_output(['bazel', 'query', deps_query],
                                      stderr=subprocess.PIPE).decode().splitlines()
@@ -130,7 +130,6 @@ class BuildGraph(object):
       )
       raise exc
     ext_deps = set()
-    implied_untracked_deps = set()
     for d in deps:
       match = BAZEL_QUERY_EXTERNAL_DEP_RE.match(d)
       if match:
@@ -269,7 +268,6 @@ class Validator(object):
     print(f'Validating extension {name} dependencies...')
     queried_deps = self._build_graph.QueryExternalDeps(target)
     marginal_deps = queried_deps.difference(self._queried_core_deps)
-    expected_deps = []
     for d in marginal_deps:
       metadata = self._dep_info.GetMetadata(d)
       if metadata:
