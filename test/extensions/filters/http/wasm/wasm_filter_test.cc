@@ -703,14 +703,10 @@ TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
 }
 
 TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): The Rust SDK does not support end_of_stream in on_http_request_headers.
-    return;
-  }
   setupTest("async_call");
   setupFilter();
 
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/bad"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
@@ -722,7 +718,34 @@ TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
             return nullptr;
           }));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("async_call rejected")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
+}
+
+TEST_P(WasmHttpFilterTest, AsyncCallBadCluster) {
+  setupTest("async_call");
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/bad"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+            // Simulate code path for "no healthy host for HTTP connection pool" inline callback.
+            cb.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("async_call rejected")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
 }
 
 TEST_P(WasmHttpFilterTest, AsyncCallFailure) {
