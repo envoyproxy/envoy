@@ -35,7 +35,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -86,6 +86,11 @@ message Listener {
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;
     }
+  }
+
+  // Configuration for envoy internal listener. All the future internal listener features should be added here.
+  // [#not-implemented-hide:]
+  message InternalListenerConfig {
   }
 
   reserved 14;
@@ -275,4 +280,26 @@ message Listener {
   // :ref:`use_original_dst <envoy_api_field_config.listener.v3.Listener.use_original_dst>`
   // to true. Default is true.
   google.protobuf.BoolValue bind_to_port = 26;
+
+  // The exclusive listener type and the corresponding config.
+  // TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372
+  // Will create and add TcpListenerConfig. Will add UdpListenerConfig and ApiListener.
+  // [#not-implemented-hide:]
+  oneof listener_specifier {
+    // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
+    // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
+    // The internal listener acts as a tcp listener. It supports listener filters and network filter chains.
+    // The internal listener require :ref:`address <envoy_api_field_config.listener.v3.Listener.address>` has
+    // field `envoy_internal_address`.
+    //
+    // There are some limitations are derived from the implementation. The known limitations include
+    //
+    // * :ref:`ConnectionBalanceConfig <envoy_api_msg_config.listener.v3.Listener.ConnectionBalanceConfig>` is not
+    //   allowed because both cluster connection and listener connection must be owned by the same dispatcher.
+    // * :ref:`tcp_backlog_size <envoy_api_field_config.listener.v3.Listener.tcp_backlog_size>`
+    // * :ref:`freebind <envoy_api_field_config.listener.v3.Listener.freebind>`
+    // * :ref:`transparent <envoy_api_field_config.listener.v3.Listener.transparent>`
+    // [#not-implemented-hide:]
+    InternalListenerConfig internal_listener = 27;
+  }
 }
