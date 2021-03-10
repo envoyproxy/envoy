@@ -126,6 +126,9 @@ public:
 
   std::string listener_access_log_name_;
 
+  // Last node received on an xDS stream from the server.
+  envoy::config::core::v3::Node last_node_;
+
   // Functions for testing reloadable config (xDS)
   void createXdsUpstream();
   void createXdsConnection();
@@ -375,6 +378,10 @@ protected:
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
     proxy_buffer_factory_ = proxy_buffer_factory;
+  }
+
+  void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
+    upstream_config_.http2_options_.MergeFrom(options);
   }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;

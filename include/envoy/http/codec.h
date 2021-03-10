@@ -239,6 +239,16 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Dump the response decoder to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 };
 
 /**
@@ -360,6 +370,19 @@ public:
 };
 
 /**
+ * A class for sharing what HTTP/2 SETTINGS were received from the peer.
+ */
+class ReceivedSettings {
+public:
+  virtual ~ReceivedSettings() = default;
+
+  /**
+   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or absl::nullopt if it was not present.
+   */
+  virtual const absl::optional<uint32_t>& maxConcurrentStreams() const PURE;
+};
+
+/**
  * Connection level callbacks.
  */
 class ConnectionCallbacks {
@@ -370,6 +393,13 @@ public:
    * Fires when the remote indicates "go away." No new streams should be created.
    */
   virtual void onGoAway(GoAwayErrorCode error_code) PURE;
+
+  /**
+   * Fires when the peer settings frame is received from the peer.
+   * This may occur multiple times across the lifetime of the connection.
+   * @param ReceivedSettings the settings received from the peer.
+   */
+  virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
 };
 
 /**
@@ -410,6 +440,10 @@ struct Http1Settings {
   // - if true, the HTTP/1.1 connection is left open (where possible)
   // - if false, the HTTP/1.1 connection is terminated
   bool stream_error_on_invalid_http_message_{false};
+
+  // True if this is an edge Envoy (using downstream address, no trusted hops)
+  // and https:// URLs should be rejected over unencrypted connections.
+  bool validate_scheme_{false};
 };
 
 /**

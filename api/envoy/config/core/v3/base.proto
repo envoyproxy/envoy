@@ -12,6 +12,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/core/v3/context_params.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -131,7 +133,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
@@ -164,6 +166,13 @@ message Node {
   // Opaque metadata extending the node identifier. Envoy will pass this
   // directly to the management server.
   google.protobuf.Struct metadata = 3;
+
+  // Map from xDS resource type URL to dynamic context parameters. These may vary at runtime (unlike
+  // other fields in this message). For example, the xDS client may have a shard identifier that
+  // changes during the lifetime of the xDS client. In Envoy, this would be achieved by updating the
+  // dynamic context on the Server::Instance's LocalInfo context provider. The shard ID dynamic
+  // parameter then appears in this field during future discovery requests.
+  map<string, xds.core.v3.ContextParams> dynamic_parameters = 12;
 
   // Locality specifying where the Envoy instance is running.
   Locality locality = 4;

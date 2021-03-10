@@ -143,7 +143,7 @@ def ApiBoostTree(target_paths,
   # a cleaner approach.
   llvm_include_path = os.path.join(
       sp.check_output([os.getenv('LLVM_CONFIG'), '--libdir']).decode().rstrip(),
-      'clang/9.0.0/include')
+      'clang/11.0.1/include')
 
   # Determine the files in the target dirs eligible for API boosting, based on
   # known files in the compilation database.
