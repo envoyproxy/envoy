@@ -11,9 +11,9 @@
 
 START_WASM_PLUGIN(HttpWasmTestCpp)
 
-class GrpcStreamContextLegacy : public Context {
+class GrpcStreamContextProto : public Context {
 public:
-  explicit GrpcStreamContextLegacy(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit GrpcStreamContextProto(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
 };
@@ -24,9 +24,9 @@ public:
       : RootContext(id, root_id) {}
 };
 
-static RegisterContextFactory register_GrpcStreamContextLegacy(CONTEXT_FACTORY(GrpcStreamContextLegacy),
+static RegisterContextFactory register_GrpcStreamContextProto(CONTEXT_FACTORY(GrpcStreamContextProto),
                                                          ROOT_FACTORY(GrpcStreamRootContext),
-                                                         "grpc_stream_legacy");
+                                                         "grpc_stream_proto");
 
 class MyGrpcStreamHandler
     : public GrpcStreamHandler<google::protobuf::Value, google::protobuf::Value> {
@@ -71,7 +71,7 @@ public:
   }
 };
 
-FilterHeadersStatus GrpcStreamContextLegacy::onRequestHeaders(uint32_t, bool) {
+FilterHeadersStatus GrpcStreamContextProto::onRequestHeaders(uint32_t, bool) {
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("cluster");
   std::string grpc_service_string;

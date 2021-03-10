@@ -40,20 +40,20 @@ public:
   MyGrpcCallHandler* handler_ = nullptr;
 };
 
-class GrpcCallContextLegacy : public Context {
+class GrpcCallContextProto : public Context {
 public:
-  explicit GrpcCallContextLegacy(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit GrpcCallContextProto(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
 
   GrpcCallRootContext* root() { return static_cast<GrpcCallRootContext*>(Context::root()); }
 };
 
-static RegisterContextFactory register_GrpcCallContextLegacy(CONTEXT_FACTORY(GrpcCallContextLegacy),
+static RegisterContextFactory register_GrpcCallContextProto(CONTEXT_FACTORY(GrpcCallContextProto),
                                                        ROOT_FACTORY(GrpcCallRootContext),
-                                                       "grpc_call_legacy");
+                                                       "grpc_call_proto");
 
-FilterHeadersStatus GrpcCallContextLegacy::onRequestHeaders(uint32_t, bool end_of_stream) {
+FilterHeadersStatus GrpcCallContextProto::onRequestHeaders(uint32_t, bool end_of_stream) {
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("cluster");
   std::string grpc_service_string;
@@ -62,6 +62,11 @@ FilterHeadersStatus GrpcCallContextLegacy::onRequestHeaders(uint32_t, bool end_o
   value.set_string_value("request");
   HeaderStringPairs initial_metadata;
   root()->handler_ = new MyGrpcCallHandler();
+  if (root()->grpcCallHandler(
+          "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
+          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::ParseFailure) {
+    logError("bogus grpc_service accepted error");
+  }
   if (end_of_stream) {
     if (root()->grpcCallHandler(grpc_service_string, "service", "method", initial_metadata, value,
                                 1000, std::unique_ptr<GrpcCallHandlerBase>(root()->handler_)) ==
@@ -72,11 +77,6 @@ FilterHeadersStatus GrpcCallContextLegacy::onRequestHeaders(uint32_t, bool end_o
   }
   root()->grpcCallHandler(grpc_service_string, "service", "method", initial_metadata, value, 1000,
                           std::unique_ptr<GrpcCallHandlerBase>(root()->handler_));
-  if (root()->grpcCallHandler(
-          "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
-          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::Ok) {
-    logError("bogus grpc_service accepted error");
-  }
   return FilterHeadersStatus::StopIteration;
 }
 
@@ -98,6 +98,11 @@ FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stre
   value.set_string_value("request");
   HeaderStringPairs initial_metadata;
   root()->handler_ = new MyGrpcCallHandler();
+  if (root()->grpcCallHandler(
+          "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
+          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::BadArgument) {
+    logError("bogus grpc_service rejected");
+  }
   if (end_of_stream) {
     if (root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value,
                                 1000, std::unique_ptr<GrpcCallHandlerBase>(root()->handler_)) ==
@@ -108,11 +113,6 @@ FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stre
   }
   root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value, 1000,
                           std::unique_ptr<GrpcCallHandlerBase>(root()->handler_));
-  if (root()->grpcCallHandler(
-          "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
-          std::unique_ptr<GrpcCallHandlerBase>(new MyGrpcCallHandler())) == WasmResult::Ok) {
-    logError("bogus grpc_service accepted error");
-  }
   return FilterHeadersStatus::StopIteration;
 }
 

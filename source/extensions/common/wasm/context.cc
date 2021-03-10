@@ -1022,6 +1022,7 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+
   auto grpc_request = grpc_client->sendRaw(service_name, method_name,
                                            std::make_unique<::Envoy::Buffer::OwnedImpl>(request),
                                            handler, Tracing::NullSpan::instance(), options);

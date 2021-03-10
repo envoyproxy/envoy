@@ -818,18 +818,22 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_call_legacy", "grpc_call"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_call_proto", "grpc_call"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_call_legacy") {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
-    } else {
-      cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    }
-
     setupTest(id);
     setupFilter();
+
+    if (id == "grpc_call_proto") {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
+      EXPECT_CALL(filter(), log_(spdlog::level::err,
+                                 Eq(absl::string_view("bogus grpc_service accepted error"))));
+    } else {
+      cluster_manager_.initializeThreadLocalClusters({"cluster"});
+      EXPECT_CALL(filter(),
+                  log_(spdlog::level::err, Eq(absl::string_view("bogus grpc_service rejected"))));
+    }
 
     NiceMock<Grpc::MockAsyncRequest> request;
     Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
@@ -837,6 +841,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
     auto async_client = std::make_unique<Grpc::MockAsyncClient>();
     Tracing::Span* parent_span{};
+
     EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
         .WillOnce(
             Invoke([&](absl::string_view service_full_name, absl::string_view method_name,
@@ -890,18 +895,22 @@ TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_call_legacy", "grpc_call"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_call_proto", "grpc_call"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_call_legacy") {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
-    } else {
-      cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    }
-
     setupTest(id);
     setupFilter();
+
+    if (id == "grpc_call_proto") {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
+      EXPECT_CALL(filter(), log_(spdlog::level::err,
+                                 Eq(absl::string_view("bogus grpc_service accepted error"))));
+    } else {
+      cluster_manager_.initializeThreadLocalClusters({"cluster"});
+      EXPECT_CALL(filter(),
+                  log_(spdlog::level::err, Eq(absl::string_view("bogus grpc_service rejected"))));
+    }
 
     Grpc::MockAsyncClientManager client_manager;
     auto client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
@@ -934,18 +943,22 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_call_legacy", "grpc_call"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_call_proto", "grpc_call"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_call_legacy") {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
-    } else {
-      cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    }
-
     setupTest(id);
     setupFilter();
+
+    if (id == "grpc_call_proto") {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
+      EXPECT_CALL(filter(), log_(spdlog::level::err,
+                                 Eq(absl::string_view("bogus grpc_service accepted error"))));
+    } else {
+      cluster_manager_.initializeThreadLocalClusters({"cluster"});
+      EXPECT_CALL(filter(),
+                  log_(spdlog::level::err, Eq(absl::string_view("bogus grpc_service rejected"))));
+    }
 
     NiceMock<Grpc::MockAsyncRequest> request;
     Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
@@ -1013,18 +1026,22 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_call_legacy", "grpc_call"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_call_proto", "grpc_call"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_call_legacy") {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
-    } else {
-      cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    }
-
     setupTest(id);
     setupFilter();
+
+    if (id == "grpc_call_proto") {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
+      EXPECT_CALL(filter(), log_(spdlog::level::err,
+                                 Eq(absl::string_view("bogus grpc_service accepted error"))));
+    } else {
+      cluster_manager_.initializeThreadLocalClusters({"cluster"});
+      EXPECT_CALL(filter(),
+                  log_(spdlog::level::err, Eq(absl::string_view("bogus grpc_service rejected"))));
+    }
 
     NiceMock<Grpc::MockAsyncRequest> request;
     Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
@@ -1074,18 +1091,22 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_call_legacy", "grpc_call"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_call_proto", "grpc_call"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_call_legacy") {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
-    } else {
-      cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    }
-
     setupTest(id);
     setupFilter();
+
+    if (id == "grpc_call_proto") {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
+      EXPECT_CALL(filter(), log_(spdlog::level::err,
+                                 Eq(absl::string_view("bogus grpc_service accepted error"))));
+    } else {
+      cluster_manager_.initializeThreadLocalClusters({"cluster"});
+      EXPECT_CALL(filter(),
+                  log_(spdlog::level::err, Eq(absl::string_view("bogus grpc_service rejected"))));
+    }
 
     NiceMock<Grpc::MockAsyncRequest> request;
     Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
@@ -1134,18 +1155,22 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
     // TODO(PiotrSikora): gRPC call outs not yet supported in the Rust SDK.
     return;
   }
-  std::array<std::string, 2> legacy_or_active{"grpc_call_legacy", "grpc_call"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_call_proto", "grpc_call"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_call_legacy") {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
-    } else {
-      cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    }
-
     setupTest(id);
     setupFilter();
+
+    if (id == "grpc_call_proto") {
+      Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
+      EXPECT_CALL(filter(), log_(spdlog::level::err,
+                                 Eq(absl::string_view("bogus grpc_service accepted error"))));
+    } else {
+      cluster_manager_.initializeThreadLocalClusters({"cluster"});
+      EXPECT_CALL(filter(),
+                  log_(spdlog::level::err, Eq(absl::string_view("bogus grpc_service rejected"))));
+    }
 
     Grpc::MockAsyncRequest request;
     Grpc::RawAsyncRequestCallbacks* callbacks = nullptr;
@@ -1246,10 +1271,10 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     // TODO(PiotrSikora): gRPC call outs not yet supported in the Rust SDK.
     return;
   }
-  std::array<std::string, 2> legacy_or_active{"grpc_stream_legacy", "grpc_stream"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_stream_proto", "grpc_stream"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_stream_legacy") {
+    if (id == "grpc_stream_proto") {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
     } else {
@@ -1288,10 +1313,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     // TODO(PiotrSikora): gRPC call outs not yet supported in the Rust SDK.
     return;
   }
-  std::array<std::string, 2> legacy_or_active{"grpc_stream_legacy", "grpc_stream"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_stream_proto", "grpc_stream"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_stream_legacy") {
+    if (id == "grpc_stream_proto") {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
     } else {
@@ -1330,10 +1355,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_stream_legacy", "grpc_stream"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_stream_proto", "grpc_stream"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_stream_legacy") {
+    if (id == "grpc_stream_proto") {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
     } else {
@@ -1371,10 +1396,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_stream_legacy", "grpc_stream"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_stream_proto", "grpc_stream"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_stream_legacy") {
+    if (id == "grpc_stream_proto") {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
     } else {
@@ -1410,10 +1435,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     return;
   }
 
-  std::array<std::string, 2> legacy_or_active{"grpc_stream_legacy", "grpc_stream"};
-  for (const auto& id : legacy_or_active) {
+  std::array<std::string, 2> proto_or_cluster{"grpc_stream_proto", "grpc_stream"};
+  for (const auto& id : proto_or_cluster) {
     TestScopedRuntime scoped_runtime;
-    if (id == "grpc_stream_legacy") {
+    if (id == "grpc_stream_proto") {
       Runtime::LoaderSingleton::getExisting()->mergeValues(
           {{"envoy.reloadable_features.wasm_cluster_name_envoy_grpc", "false"}});
     } else {
