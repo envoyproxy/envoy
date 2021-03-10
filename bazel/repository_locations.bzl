@@ -768,14 +768,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "8.9.255.6",
+        version = "8.9.255.20",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "34c41e1f62a68f94cc0715fa3dc02e8bdcd35b5ca45a038975d9aa6a3e2688b5",
+        sha256 = "3508840381e012d1fcd01d83a6e8d7b46d379925c25355aa37851b9d8a7dc391",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2021-01-18",
+        release_date = "2021-02-25",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -949,8 +949,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "d1a2a7db59a72edacc9a6286b64280b72767d2d0",
-        sha256 = "3e81235c963291bd01f9425ed6e34d6b44ca0adc9f281b0cafc5cba6ad3bcc6d",
+        version = "dd33aa6d825cd63deaa0f793c8caca8a9132a05f",
+        sha256 = "dac7998459616396684f17f35890fb03116450110f4d3bce3d9ae652141f2d3f",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -965,7 +965,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-02-19",
+        release_date = "2021-03-03",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

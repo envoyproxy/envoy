@@ -51,6 +51,16 @@ const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
+  dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
+                                src.headers_to_append.end());
+  dest.headers_to_overwrite.insert(dest.headers_to_overwrite.end(),
+                                   src.headers_to_overwrite.begin(),
+                                   src.headers_to_overwrite.end());
+  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
+                                src.headers_to_remove.end());
+}
+
 } // namespace
 
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
@@ -334,8 +344,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                          : ""),
       path_redirect_(route.redirect().path_redirect()),
       path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
-      enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
       using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
@@ -475,7 +483,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
   }
 
-  if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
+  if (path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
@@ -599,6 +607,29 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
     vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
     response_headers_parser_->evaluateHeaders(headers, stream_info);
   }
+}
+
+Http::HeaderTransforms
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+  Http::HeaderTransforms transforms;
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
+    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(
+        transforms,
+        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+  } else {
+    // Most specific mutations (route-level) take precedence by being applied
+    // last: if a header is specified at all levels, the last one applied wins.
+    mergeTransforms(
+        transforms,
+        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+  }
+  return transforms;
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>
@@ -759,44 +790,30 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   }
 
   std::string final_path_value;
-  if (enable_preserve_query_in_path_redirects_) {
-    if (!path_redirect_.empty()) {
-      // The path_redirect query string, if any, takes precedence over the request's query string,
-      // and it will not be stripped regardless of `strip_query`.
-      if (path_redirect_has_query_) {
-        final_path = path_redirect_.c_str();
-      } else {
-        const absl::string_view current_path = headers.getPathValue();
-        const size_t path_end = current_path.find('?');
-        const bool current_path_has_query = path_end != absl::string_view::npos;
-        if (current_path_has_query) {
-          final_path_value = path_redirect_;
-          final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
-          final_path = final_path_value;
-        } else {
-          final_path = path_redirect_.c_str();
-        }
-      }
+  if (!path_redirect_.empty()) {
+    // The path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
+    if (path_redirect_has_query_) {
+      final_path = path_redirect_.c_str();
     } else {
-      final_path = headers.getPathValue();
-    }
-    if (!path_redirect_has_query_ && strip_query_) {
-      const size_t path_end = final_path.find('?');
-      if (path_end != absl::string_view::npos) {
-        final_path = final_path.substr(0, path_end);
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
+      if (current_path_has_query) {
+        final_path_value = path_redirect_;
+        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+        final_path = final_path_value;
+      } else {
+        final_path = path_redirect_.c_str();
       }
     }
   } else {
-    if (!path_redirect_.empty()) {
-      final_path = path_redirect_.c_str();
-    } else {
-      final_path = headers.getPathValue();
-      if (strip_query_) {
-        const size_t path_end = final_path.find("?");
-        if (path_end != absl::string_view::npos) {
-          final_path = final_path.substr(0, path_end);
-        }
-      }
+    final_path = headers.getPathValue();
+  }
+  if (!path_redirect_has_query_ && strip_query_) {
+    const size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
     }
   }
 
@@ -1010,6 +1027,13 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       }
     }
   }
+}
+
+Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
+    const StreamInfo::StreamInfo& stream_info) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
+  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+  return transforms;
 }
 
 const RouteSpecificFilterConfig*

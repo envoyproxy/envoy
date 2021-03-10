@@ -64,10 +64,8 @@ public:
     };
   }
 
-  void setup(const std::string& code, std::string root_id = "", std::string vm_configuration = "") {
-    setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
-  }
-  void setupTest(std::string root_id = "", std::string vm_configuration = "") {
+  void setupTest(std::string root_id = "", std::string vm_configuration = "",
+                 envoy::extensions::wasm::v3::EnvironmentVariables envs = {}) {
     std::string code;
     if (std::get<0>(GetParam()) == "null") {
       code = "HttpWasmTestCpp";
@@ -82,8 +80,13 @@ public:
         code = TestEnvironment::readFileToStringForTest(basic_path + "_rust.wasm");
       }
     }
-    setupBase(std::get<0>(GetParam()), code, createContextFn(), root_id, vm_configuration);
+
+    setRootId(root_id);
+    setEnvs(envs);
+    setVmConfiguration(vm_configuration);
+    setupBase(std::get<0>(GetParam()), code, createContextFn());
   }
+
   void setupFilter() { setupFilterBase<TestFilter>(); }
 
   void setupGrpcStreamTest(Grpc::RawAsyncStreamCallbacks*& callbacks);
@@ -101,15 +104,31 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
 
 // Bad code in initial config.
 TEST_P(WasmHttpFilterTest, BadCode) {
-  setup("bad code");
+  setupBase(std::get<0>(GetParam()), "bad code", createContextFn());
   EXPECT_EQ(wasm_, nullptr);
 }
 
 // Script touching headers only, request that is headers only.
-TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnly) {
-  setupTest("", "headers");
+TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
+  envoy::extensions::wasm::v3::EnvironmentVariables envs;
+  if (std::get<0>(GetParam()) != "null") {
+    // Setup env vars.
+    const std::string host_env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV";
+    const std::string host_env_value = "foo";
+    const std::string env_key = "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV";
+    const std::string env_value = "bar";
+    TestEnvironment::setEnvVar(host_env_key, host_env_value, 0);
+    envs.mutable_host_env_keys()->Add(host_env_key.c_str());
+    (*envs.mutable_key_values())[env_key] = env_value;
+  }
+  setupTest("", "headers", envs);
   setupFilter();
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  if (std::get<0>(GetParam()) != "null") {
+    EXPECT_CALL(filter(),
+                log_(spdlog::level::trace, Eq("ENVOY_HTTP_WASM_TEST_HEADERS_HOST_ENV: foo\n"
+                                              "ENVOY_HTTP_WASM_TEST_HEADERS_KEY_VALUE_ENV: bar")));
+  }
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
@@ -684,14 +703,10 @@ TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
 }
 
 TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): The Rust SDK does not support end_of_stream in on_http_request_headers.
-    return;
-  }
   setupTest("async_call");
   setupFilter();
 
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/bad"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
@@ -703,7 +718,34 @@ TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
             return nullptr;
           }));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("async_call rejected")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
+}
+
+TEST_P(WasmHttpFilterTest, AsyncCallBadCluster) {
+  setupTest("async_call");
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/bad"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+            // Simulate code path for "no healthy host for HTTP connection pool" inline callback.
+            cb.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("async_call rejected")));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, false));
 }
 
 TEST_P(WasmHttpFilterTest, AsyncCallFailure) {

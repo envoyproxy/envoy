@@ -20,7 +20,8 @@ load(
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
-    _envoy_select_wasm = "envoy_select_wasm",
+    _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
+    _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
     _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
     _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
@@ -34,6 +35,7 @@ load(
     _envoy_cc_test = "envoy_cc_test",
     _envoy_cc_test_binary = "envoy_cc_test_binary",
     _envoy_cc_test_library = "envoy_cc_test_library",
+    _envoy_py_test = "envoy_py_test",
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
@@ -202,7 +204,8 @@ def envoy_google_grpc_external_deps():
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_hot_restart = _envoy_select_hot_restart
-envoy_select_wasm = _envoy_select_wasm
+envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
+envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
@@ -229,5 +232,6 @@ envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
 envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
 envoy_benchmark_test = _envoy_benchmark_test
+envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
