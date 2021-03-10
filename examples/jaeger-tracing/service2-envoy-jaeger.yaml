@@ -19,7 +19,7 @@ static_resources:
                 collector_endpoint: "/api/v2/spans"
                 shared_span_context: false
                 collector_endpoint_version: HTTP_JSON
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -40,8 +40,8 @@ static_resources:
   clusters:
   - name: local_service
     connect_timeout: 0.250s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: local_service
       endpoints:
@@ -53,8 +53,8 @@ static_resources:
                 port_value: 8080
   - name: jaeger
     connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: jaeger
       endpoints:

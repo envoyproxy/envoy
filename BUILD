@@ -20,6 +20,7 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
+        "//tools/extensions/...",
     ],
 )
 
