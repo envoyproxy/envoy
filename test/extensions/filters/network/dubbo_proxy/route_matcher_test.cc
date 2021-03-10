@@ -602,6 +602,40 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
+TEST(DubboRouteMatcherTest, RouteByParameterWithRangeMatchButNotMatch) {
+  const std::string yaml = R"EOF(
+name: local_route
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "add"
+        params_match:
+          0:
+            range_match:
+              start: 100
+              end: 200
+    route:
+        cluster: user_service_dubbo_server
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("add");
+
+  setDefaultInvocationCallback(*invo);
+  invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("300"));
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
+}
+
 TEST(DubboRouteMatcherTest, RouteByParameterWithExactMatch) {
   const std::string yaml = R"EOF(
 name: local_route

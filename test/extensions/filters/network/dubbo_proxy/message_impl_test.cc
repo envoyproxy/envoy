@@ -24,6 +24,8 @@ TEST(ContextImplTest, ContextImplTest) {
 
   test.setHeartbeat(true);
   EXPECT_EQ(true, test.isHeartbeat());
+
+  EXPECT_EQ(26, test.messageSize());
 }
 
 TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
@@ -50,6 +52,8 @@ TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
   EXPECT_EQ(nullptr, attachment.lookup("map_key"));
   EXPECT_EQ("fake_group", *attachment.lookup("group"));
 
+  EXPECT_FALSE(attachment.attachmentUpdated());
+
   // Test remove. Remove a normal string type key/value pair.
   EXPECT_EQ("fake_value", *attachment.lookup("fake_key"));
   attachment.remove("fake_key");
@@ -69,6 +73,8 @@ TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
   EXPECT_EQ(2, attachment.headers().size());
 
   EXPECT_EQ("test_value", *attachment.lookup("test"));
+
+  EXPECT_TRUE(attachment.attachmentUpdated());
 }
 
 TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
@@ -112,28 +118,31 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
   EXPECT_EQ(false, invo.hasParameters());
   EXPECT_EQ(false, invo.hasAttachment());
 
-  // When setting the attachment, the parameters will also be set.
-  invo.mutableAttachment();
-
+  // When parsing attachment, parameters will also be parsed.
+  EXPECT_NE(nullptr, invo.mutableAttachment());
+  invo.attachment();
   EXPECT_EQ(true, set_parameters);
   EXPECT_EQ(true, set_attachment);
-
   EXPECT_EQ(true, invo.hasParameters());
   EXPECT_EQ(true, invo.hasAttachment());
-
   EXPECT_EQ("new_fake_group", invo.serviceGroup().value());
 
-  // Reset attachment and parameters.
+  // If parameters and attachment have values, the callback function will not be executed.
   set_parameters = false;
   set_attachment = false;
+  EXPECT_NE(nullptr, invo.mutableParameters());
+  EXPECT_NE(nullptr, invo.mutableAttachment());
+  EXPECT_EQ(false, set_parameters);
+  EXPECT_EQ(false, set_attachment);
+
+  // Reset attachment and parameters.
   invo.mutableParameters() = nullptr;
   invo.mutableAttachment() = nullptr;
 
+  // When parsing parameters, attachment will not be parsed.
   invo.mutableParameters();
-
   EXPECT_EQ(true, set_parameters);
   EXPECT_EQ(false, set_attachment);
-
   EXPECT_EQ(true, invo.hasParameters());
   EXPECT_EQ(false, invo.hasAttachment());
 }

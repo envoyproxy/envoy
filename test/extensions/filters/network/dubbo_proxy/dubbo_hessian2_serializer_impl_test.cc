@@ -107,8 +107,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (size_t i = 0; i < params.size(); i++) {
-      encoder.encode<Hessian2::Object>(*params[i]);
+    for (const auto& param : params) {
+      encoder.encode<Hessian2::Object>(*param);
     }
     // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
@@ -132,7 +132,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     auto& result_params = invo->mutableParameters();
 
-    // When parsing parameters, attachment will not be parsed
+    // When parsing parameters, attachment will not be parsed.
     EXPECT_EQ(false, invo->hasAttachment());
     EXPECT_EQ(true, invo->hasParameters());
 
@@ -173,8 +173,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (size_t i = 0; i < params.size(); i++) {
-      encoder.encode<Hessian2::Object>(*params[i]);
+    for (const auto& param : params) {
+      encoder.encode<Hessian2::Object>(*param);
     }
     // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
@@ -232,8 +232,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (size_t i = 0; i < params.size(); i++) {
-      encoder.encode<Hessian2::Object>(*params[i]);
+    for (const auto& param : params) {
+      encoder.encode<Hessian2::Object>(*param);
     }
     // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
@@ -284,8 +284,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
     encoder.encode<std::string>(parameters_type);
 
     // There are actually only three parameters in the request.
-    for (size_t i = 0; i < params.size(); i++) {
-      encoder.encode<Hessian2::Object>(*params[i]);
+    for (const auto& param : params) {
+      encoder.encode<Hessian2::Object>(*param);
     }
 
     std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
@@ -318,8 +318,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     encoder.encode<std::string>(parameters_type);
 
-    for (size_t i = 0; i < params.size(); i++) {
-      encoder.encode<Hessian2::Object>(*params[i]);
+    for (const auto& param : params) {
+      encoder.encode<Hessian2::Object>(*param);
     }
     // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
@@ -346,6 +346,22 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 TEST(HessianProtocolTest, deserializeRpcResult) {
   DubboHessian2SerializerImpl serializer;
   std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
+
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        0x04,
+        't',
+        'e',
+        's',
+        't',
+    }));
+
+    context->setBodySize(4);
+
+    EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
+                              "Cannot parse RpcResult type from buffer");
+  }
 
   {
     Buffer::OwnedImpl buffer;

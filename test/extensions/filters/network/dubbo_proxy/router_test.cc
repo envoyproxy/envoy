@@ -396,6 +396,35 @@ TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   destroyRouter();
 }
 
+TEST_F(DubboRouterTest, UpstreamRemoteCloseNoRequest) {
+  initializeRouter();
+
+  startRequest(MessageType::Request);
+  connectUpstream();
+  returnResponse();
+
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  destroyRouter();
+}
+
+TEST_F(DubboRouterTest, UpstreamLocalCloseAndRequestReset) {
+  initializeRouter();
+
+  startRequest(MessageType::Request);
+  connectUpstream();
+
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(callbacks_, startUpstreamResponse());
+
+  EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
+      .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Reset));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+  destroyRouter();
+}
+
 TEST_F(DubboRouterTest, UpstreamRemoteCloseMidResponse) {
   initializeRouter();
 

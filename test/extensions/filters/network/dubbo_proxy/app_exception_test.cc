@@ -12,12 +12,15 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
+
+namespace {
 
 class AppExceptionTest : public testing::Test {
 public:
@@ -81,6 +84,28 @@ TEST_F(AppExceptionTest, Encode) {
   EXPECT_CALL(mock_protocol, encode(_, _, _, _)).WillOnce(Return(false));
   EXPECT_THROW(app_exception.encode(*(metadata_.get()), mock_protocol, buffer), EnvoyException);
 }
+
+class AppExceptionTestWithMock : public testing::Test {
+public:
+  AppExceptionTestWithMock() : metadata_(std::make_shared<MessageMetadata>()) {}
+
+  NiceMock<MockProtocol> mock_protocol_;
+  MessageMetadataSharedPtr metadata_;
+};
+
+TEST_F(AppExceptionTestWithMock, AppExceptionTestWithMock) {
+  std::string mock_message("MOCK_MESSAGE");
+  AppException app_exception(ResponseStatus::ServiceNotFound, mock_message);
+
+  Buffer::OwnedImpl buffer;
+
+  ON_CALL(mock_protocol_, encode(_, _, _, _)).WillByDefault(Return(false));
+
+  EXPECT_THROW_WITH_MESSAGE(app_exception.encode(*metadata_, mock_protocol_, buffer),
+                            EnvoyException, "Failed to encode local reply message");
+}
+
+} // namespace
 
 } // namespace DubboProxy
 } // namespace NetworkFilters
