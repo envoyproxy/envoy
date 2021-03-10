@@ -219,7 +219,7 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSu
   }
 }
 
-FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
+DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,

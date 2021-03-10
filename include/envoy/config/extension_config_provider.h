@@ -33,7 +33,11 @@ public:
    * generally apply only to new requests and connections.
    */
   virtual absl::optional<FactoryCallback> config() PURE;
+};
 
+template <class Factory, class FactoryCallback>
+class DynamicExtensionConfigProvider : public ExtensionConfigProvider<Factory, FactoryCallback> {
+public:
   /**
    * Validate that the configuration is applicable in the context of the provider. If an exception
    * is thrown by any of the config providers for an update, the extension configuration update is

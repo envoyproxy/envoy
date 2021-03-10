@@ -32,28 +32,29 @@ using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscripti
 /**
  * Implementation of a filter config provider using discovery subscriptions.
  **/
-class DynamicFilterConfigProviderImpl : public FilterConfigProvider {
+class DynamicFilterConfigProviderImpl : public DynamicFilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr&& subscription,
                                   const std::set<std::string>& require_type_urls,
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
 
+  // Config::ExtensionConfigProvider
+  const std::string& name() override;
+  absl::optional<Envoy::Http::FilterFactoryCb> config() override;
+
+  // Config::DynamicExtensionConfigProvider
+  void validateConfig(const ProtobufWkt::Any& proto_config,
+                      Server::Configuration::NamedHttpFilterConfigFactory&) override;
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
+                      Config::ConfigAppliedCb cb) override;
+  void onConfigRemoved(Config::ConfigAppliedCb cb) override;
   void setDefaultConfiguration(Envoy::Http::FilterFactoryCb config) override {
     ASSERT(!default_configuration_);
     default_configuration_ = config;
 
     onConfigUpdate(config, "", nullptr);
   }
-
-  // Config::ExtensionConfigProvider
-  const std::string& name() override;
-  absl::optional<Envoy::Http::FilterFactoryCb> config() override;
-  void validateConfig(const ProtobufWkt::Any& proto_config,
-                      Server::Configuration::NamedHttpFilterConfigFactory&) override;
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
-                      Config::ConfigAppliedCb cb) override;
-  void onConfigRemoved(Config::ConfigAppliedCb cb) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -158,18 +159,6 @@ public:
   // Config::ExtensionConfigProvider
   const std::string& name() override { return filter_config_name_; }
   absl::optional<Envoy::Http::FilterFactoryCb> config() override { return config_; }
-  void validateConfig(const ProtobufWkt::Any&,
-                      Server::Configuration::NamedHttpFilterConfigFactory&) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&,
-                      Config::ConfigAppliedCb) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  void onConfigRemoved(Config::ConfigAppliedCb) override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  void setDefaultConfiguration(Envoy::Http::FilterFactoryCb) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 
 private:
   Envoy::Http::FilterFactoryCb config_;
@@ -182,7 +171,7 @@ private:
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManager,
                                         public Singleton::Instance {
 public:
-  FilterConfigProviderPtr createDynamicFilterConfigProvider(
+  DynamicFilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ConfigSource& config_source,
       const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
