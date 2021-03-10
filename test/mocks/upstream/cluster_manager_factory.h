@@ -25,7 +25,7 @@ public:
                std::vector<Http::Protocol>& protocol,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-               ClusterConnectivityState& state));
+               TimeSource& source, ClusterConnectivityState& state));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,

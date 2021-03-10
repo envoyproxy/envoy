@@ -121,6 +121,7 @@ envoy_cc_library(
         ":config_lib",
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:route_config_update_info_interface",
+        "//include/envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",

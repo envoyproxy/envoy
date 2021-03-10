@@ -9,22 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
-
-// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
-#define GetQuicFlagImpl(flag) (quiche::flag)->value()
-
-// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
-#define SetQuicFlagImpl(flag, value) (quiche::flag)->setValue(value)
-
-#define GetQuicReloadableFlagImpl(flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
-
-#define SetQuicReloadableFlagImpl(flag, value)                                                     \
-  quiche::FLAGS_quic_reloadable_flag_##flag->setValue(value)
-
-#define GetQuicRestartFlagImpl(flag) quiche::FLAGS_quic_restart_flag_##flag->value()
-
-#define SetQuicRestartFlagImpl(flag, value) quiche::FLAGS_quic_restart_flag_##flag->setValue(value)
+#include "extensions/quic_listeners/quiche/platform/quiche_flags_impl.h"
 
 // Not wired into command-line parsing.
 #define DEFINE_QUIC_COMMAND_LINE_FLAG_IMPL(type, flag, value, help)                                \

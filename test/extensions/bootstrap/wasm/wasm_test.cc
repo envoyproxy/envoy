@@ -43,12 +43,22 @@ public:
         base_scope_(stats_store_.createScope("")), scope_(base_scope_->createScope("")) {}
 
   void createWasm(absl::string_view runtime) {
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    *plugin_config.mutable_name() = name_;
+    *plugin_config.mutable_root_id() = root_id_;
+    *plugin_config.mutable_vm_config()->mutable_runtime() =
+        absl::StrCat("envoy.wasm.runtime.", runtime);
+    *plugin_config.mutable_vm_config()->mutable_vm_id() = vm_id_;
+    plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration_);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        name_, root_id_, vm_id_, runtime, plugin_configuration_, false,
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(
-        absl::StrCat("envoy.wasm.runtime.", runtime), vm_id_, vm_configuration_, vm_key_,
-        allowed_capabilities, scope_, cluster_manager, *dispatcher_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_,
+        nullptr);
+    auto config = plugin_->wasmConfig();
+    config.allowedCapabilities() = allowed_capabilities_;
+    config.environmentVariables() = envs_;
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
+                                                             cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(
         nullptr,
@@ -69,7 +79,8 @@ public:
   std::string vm_id_;
   std::string vm_configuration_;
   std::string vm_key_;
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
+  Extensions::Common::Wasm::EnvironmentVariableMap envs_{};
   std::string plugin_configuration_;
   std::shared_ptr<Extensions::Common::Wasm::Plugin> plugin_;
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
@@ -123,17 +134,16 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
                                           testing::Values("cpp", "rust")));
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
-TEST_P(WasmTestMatrix, Logging) {
+TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
   plugin_configuration_ = "configure-test";
+  envs_ = {{"ON_TICK", "TICK_VALUE"}, {"ON_CONFIGURE", "CONFIGURE_VALUE"}};
   createWasm();
   setWasmCode("logging");
-
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm_);
   auto wasm_handler = std::make_unique<Extensions::Common::Wasm::WasmHandle>(std::move(wasm_));
 
   EXPECT_TRUE(wasm_weak.lock()->initialize(code_, false));
   auto context = static_cast<TestContext*>(wasm_weak.lock()->start(plugin_));
-
   if (std::get<1>(GetParam()) == "cpp") {
     EXPECT_CALL(*context, log_(spdlog::level::info, Eq("printf stdout test")));
     EXPECT_CALL(*context, log_(spdlog::level::err, Eq("printf stderr test")));
@@ -146,6 +156,8 @@ TEST_P(WasmTestMatrix, Logging) {
       .Times(testing::AtLeast(1));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("onDone logging")));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("onDelete logging")));
+  EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_CONFIGURE: CONFIGURE_VALUE")));
+  EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_TICK: TICK_VALUE")));
 
   EXPECT_TRUE(wasm_weak.lock()->configure(context, plugin_));
   wasm_handler.reset();
