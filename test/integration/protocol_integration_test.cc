@@ -1575,7 +1575,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
-  EXCLUDE_UPSTREAM_HTTP3; // TODO(danzh) buffer tsan bug.
+  EXCLUDE_UPSTREAM_HTTP3;  // TODO(danzh) QuicMemSliceImpl flake
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(66, 60);
 }
@@ -1928,6 +1928,7 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  EXCLUDE_UPSTREAM_HTTP3;  // TODO(danzh) QuicMemSliceImpl flake
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
 
