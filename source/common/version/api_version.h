@@ -4,12 +4,11 @@
 
 #include "common/version/api_version_struct.h"
 
-// Defines the ApiVersion version (Envoy::api_version).
+// Defines the ApiVersion current version (Envoy::api_version), and oldest
+// version (Envoy::oldest_api_version).
 #include "common/version/api_version_number.h"
 
 namespace Envoy {
-
-class ApiVersionInfoTestPeer;
 
 /**
  * Wraps compiled in api versioning.
@@ -21,10 +20,6 @@ public:
 
   // Returns the oldest API version that is supported by the client.
   static const ApiVersion& oldestApiVersion();
-
-private:
-  friend class Envoy::ApiVersionInfoTestPeer;
-  static ApiVersion computeOldestApiVersion(const ApiVersion& latest_version);
 };
 
 } // namespace Envoy
