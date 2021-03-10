@@ -109,10 +109,7 @@ static RegisterContextFactory register_GrpcCallFallbackContext(CONTEXT_FACTORY(G
                                                        "grpc_call_fallback");
 
 FilterHeadersStatus GrpcCallFallbackContext::onRequestHeaders(uint32_t, bool end_of_stream) {
-  std::string grpc_service_string = R"(
-envoy_grpc:
-  cluster_name: cluster
-  )";
+  std::string grpc_service_string = "cluster";
   google::protobuf::Value value;
   value.set_string_value("request");
   HeaderStringPairs initial_metadata;

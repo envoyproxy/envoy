@@ -11,9 +11,9 @@
 
 START_WASM_PLUGIN(HttpWasmTestCpp)
 
-class GrpcStreamContext : public Context {
+class GrpcStreamContextLegacy : public Context {
 public:
-  explicit GrpcStreamContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit GrpcStreamContextLegacy(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
 };
@@ -24,9 +24,10 @@ public:
       : RootContext(id, root_id) {}
 };
 
-static RegisterContextFactory register_GrpcStreamContext(CONTEXT_FACTORY(GrpcStreamContext),
+static RegisterContextFactory register_GrpcStreamContextLegacy(CONTEXT_FACTORY(GrpcStreamContextLegacy),
                                                          ROOT_FACTORY(GrpcStreamRootContext),
-                                                         "grpc_stream");
+                                                         "grpc_stream_legacy");
+
 class MyGrpcStreamHandler
     : public GrpcStreamHandler<google::protobuf::Value, google::protobuf::Value> {
 public:
@@ -70,7 +71,7 @@ public:
   }
 };
 
-FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
+FilterHeadersStatus GrpcStreamContextLegacy::onRequestHeaders(uint32_t, bool) {
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("cluster");
   std::string grpc_service_string;
@@ -87,6 +88,34 @@ FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
     logError("unexpected bogus method OK");
   }
   root()->grpcStreamHandler(grpc_service_string, "service", "method", initial_metadata,
+                            std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler()));
+  return FilterHeadersStatus::StopIteration;
+}
+
+class GrpcStreamContext : public Context {
+public:
+  explicit GrpcStreamContext(uint32_t id, RootContext* root) : Context(id, root) {}
+
+  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
+};
+
+static RegisterContextFactory register_GrpcStreamContext(CONTEXT_FACTORY(GrpcStreamContext),
+                                                         ROOT_FACTORY(GrpcStreamRootContext),
+                                                         "grpc_stream");
+
+FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
+  HeaderStringPairs initial_metadata;
+  if (root()->grpcStreamHandler("bogus service string", "service", "method", initial_metadata,
+                                std::unique_ptr<GrpcStreamHandlerBase>(
+                                    new MyGrpcStreamHandler())) != WasmResult::BadArgument) {
+    logError("unexpected bogus service string OK");
+  }
+  if (root()->grpcStreamHandler("cluster", "service", "bad method", initial_metadata,
+                                std::unique_ptr<GrpcStreamHandlerBase>(
+                                    new MyGrpcStreamHandler())) != WasmResult::InternalFailure) {
+    logError("unexpected bogus method OK");
+  }
+  root()->grpcStreamHandler("cluster", "service", "method", initial_metadata,
                             std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler()));
   return FilterHeadersStatus::StopIteration;
 }

@@ -23,8 +23,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/common/wasm/wasm.h"
@@ -982,11 +980,14 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
                              uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    try {
-      ProtobufMessage::StrictValidationVisitorImpl validation_visitor;
-      MessageUtil::loadFromYaml(std::string(grpc_service.substr(0, grpc_service.size())),
-                                service_proto, validation_visitor);
-    } catch (const EnvoyException& e) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        return WasmResult::BadArgument;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
       return WasmResult::ParseFailure;
     }
   }
@@ -1045,8 +1046,18 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
                                uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    return WasmResult::ParseFailure;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
+      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+      if (thread_local_cluster == nullptr) {
+        return WasmResult::BadArgument;
+      }
+      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
+    } else {
+      return WasmResult::ParseFailure;
+    }
   }
+
   uint32_t token = nextGrpcStreamToken();
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
