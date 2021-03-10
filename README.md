@@ -70,7 +70,7 @@ have prior experience. To get started:
 
 ## Community Meeting
 
-The Envoy team meets twice per month on Tuesday, alternating between 9am PT and 5PM PT. The public
+The Envoy team meets twice per month on Tuesday at 9am PT. The public
 Google calendar is here: https://goo.gl/PkDijT
 
 * Meeting minutes are [here](https://goo.gl/5Cergb)
