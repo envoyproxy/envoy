@@ -133,9 +133,14 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     // returns TSI_OK assuming there is no fatal error. Asserting OK.
     tsi_zero_copy_grpc_protector* frame_protector;
     grpc_core::ExecCtx exec_ctx;
-    status = tsi_handshaker_result_create_zero_copy_grpc_protector(handshaker_result, nullptr,
-                                                                   &frame_protector);
+    status = tsi_handshaker_result_create_zero_copy_grpc_protector(
+        handshaker_result, &default_max_frame_size_, &frame_protector);
     ASSERT(status == TSI_OK);
+
+    // TODO(yihuazhang): Check the return value once fake TSI frame protector
+    // used in tsi_socket_test.cc implements the interface returning the max frame size.
+    tsi_zero_copy_grpc_protector_max_frame_size(frame_protector, &actual_frame_size_to_use_);
+
     frame_protector_ = std::make_unique<TsiFrameProtector>(frame_protector);
 
     handshake_complete_ = true;

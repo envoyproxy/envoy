@@ -68,6 +68,9 @@ public:
   // TsiHandshakerCallbacks
   void onNextDone(NextResultPtr&& result) override;
 
+  // This API should be called only after ALTS handshake finishes successfully.
+  size_t actualFrameSizeToUse() { return actual_frame_size_to_use_; }
+
 private:
   Network::PostIoAction doHandshake();
   void doHandshakeNext();
@@ -79,6 +82,12 @@ private:
   bool handshaker_next_calling_{};
 
   TsiFrameProtectorPtr frame_protector_;
+  // default_max_frame_size_ is the maximum frame size supported by
+  // TsiSocket.
+  size_t default_max_frame_size_{16384};
+  // actual_frame_size_to_use_ is the actual frame size used by
+  // frame protector, which is the result of frame size negotiation.
+  size_t actual_frame_size_to_use_{0};
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
   NoOpTransportSocketCallbacksPtr noop_callbacks_;
