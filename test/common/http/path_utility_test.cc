@@ -37,6 +37,15 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
   }
 }
 
+// Already normalized path don't change.
+TEST(PathTransformationTest, AlreadyNormalPaths) {
+  const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
+  for (const auto& path : normal_paths) {
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    EXPECT_EQ(path, result);
+  }
+}
+
 // Invalid paths are rejected.
 TEST_F(PathUtilityTest, InvalidPaths) {
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",

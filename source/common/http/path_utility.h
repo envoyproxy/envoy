@@ -5,6 +5,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/type/http/v3/path_transformation.pb.h"
 
+#include "common/protobuf/protobuf.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -33,7 +35,11 @@ class PathTransformer {
 public:
   PathTransformer(envoy::type::http::v3::PathTransformation operations);
 
-  std::string transform(const absl::string_view original);
+  std::string transform(const absl::string_view original_path);
+
+  static std::string mergeSlashes(absl::string_view original_path);
+
+  static std::string rfcNormalize(absl::string_view original_path);
 
 private:
   std::list<Transformation> transformations;

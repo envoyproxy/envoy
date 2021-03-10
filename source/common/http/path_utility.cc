@@ -85,7 +85,7 @@ absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path)
   return ret;
 }
 
-std::string mergeSlashes(absl::string_view original_path) {
+std::string PathTransformer::mergeSlashes(absl::string_view original_path) {
   const absl::string_view::size_type query_start = original_path.find('?');
   const absl::string_view path = original_path.substr(0, query_start);
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
@@ -98,7 +98,7 @@ std::string mergeSlashes(absl::string_view original_path) {
                       path_suffix, query);
 }
 
-std::string rfcNormalize(absl::string_view original_path) {
+std::string PathTransformer::rfcNormalize(absl::string_view original_path) {
   const auto query_pos = original_path.find('?');
   auto normalized_path_opt = canonicalizePath(
       query_pos == original_path.npos
@@ -122,9 +122,9 @@ PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_
       path_transformation.operations();
   for (auto const& operation : operations) {
     if (operation.has_normalize_path_rfc_3986()) {
-      transformations.emplace_back(rfcNormalize);
+      transformations.emplace_back(PathTransformer::rfcNormalize);
     } else if (operation.has_merge_slashes()) {
-      transformations.emplace_back(mergeSlashes);
+      transformations.emplace_back(PathTransformer::mergeSlashes);
     }
   }
 }
