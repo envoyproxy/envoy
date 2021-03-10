@@ -747,7 +747,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
       .Times(1)
       .WillRepeatedly(Return(foo_cluster.get()));
 
-  // Route mock: default_route. foo_route doesn't need a mock bc it is a DelegatingRoute.
+  // Route mock: default_route. foo_route doesn't need a mock because it is a DelegatingRoute.
   std::shared_ptr<Router::MockRoute> default_route =
       std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(default_route->route_entry_, clusterName())
@@ -795,7 +795,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
           EXPECT_EQ(foo_route_override, decoder_filters_[0]->callbacks_->route());
           // Note: The route filter determines the finalized route's upstream cluster name via
           // routeEntry()->clusterName(), so that's the key piece to check.
-          // This should directly call the ExampleDerivedDelegatingRouteEntry overriden
+          // This should directly call the ExampleDerivedDelegatingRouteEntry overridden
           // clusterName() method.
           EXPECT_EQ(foo_cluster_name,
                     decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
