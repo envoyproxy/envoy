@@ -565,10 +565,10 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
       }
 
       total_parsed += statusor_parsed.value();
-      if (parser_->getErrno() != parser_->statusToInt(ParserStatus::Success)) {
+      if (parser_->getStatus() != ParserStatus::Success) {
         // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
         // this point.
-        ASSERT(parser_->getErrno() == parser_->statusToInt(ParserStatus::Paused));
+        ASSERT(parser_->getStatus() == ParserStatus::Paused);
         break;
       }
     }
@@ -772,8 +772,8 @@ void ConnectionImpl::bufferBody(const char* data, size_t length) {
 }
 
 void ConnectionImpl::dispatchBufferedBody() {
-  ASSERT(parser_->getErrno() == parser_->statusToInt(ParserStatus::Success) ||
-         parser_->getErrno() == parser_->statusToInt(ParserStatus::Paused));
+  ASSERT(parser_->getStatus() == ParserStatus::Success ||
+         parser_->getStatus() == ParserStatus::Paused);
   ASSERT(codec_status_.ok());
   if (buffered_body_.length() > 0) {
     onBody(buffered_body_);

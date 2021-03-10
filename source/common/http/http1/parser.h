@@ -35,6 +35,8 @@ enum class ParserStatus {
   NoBodyData = 2,
   // Pause parser.
   Paused,
+  // Other. This could be returning from a parser code that does not map to the above.
+  Unknown,
 };
 
 class ParserCallbacks {
@@ -121,8 +123,8 @@ public:
   // Pauses the parser and returns a status indicating pause.
   virtual ParserStatus pause() PURE;
 
-  // Returns an integer representing the errno value from the parser.
-  virtual int getErrno() PURE;
+  // Returns a parser status representing the errno value from the parser.
+  virtual ParserStatus getStatus() PURE;
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.

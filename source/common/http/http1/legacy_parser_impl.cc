@@ -8,6 +8,24 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
+ParserStatus intToStatus(int rc) {
+  switch (rc) {
+  case -1:
+    return ParserStatus::Error;
+  case 0:
+    return ParserStatus::Success;
+  case 1:
+    return ParserStatus::NoBody;
+  case 2:
+    return ParserStatus::NoBodyData;
+  case 31:
+    return ParserStatus::Paused;
+  default:
+    return ParserStatus::Unknown;
+  }
+}
+} // namespace
 
 class LegacyHttpParserImpl::Impl {
 public:
@@ -139,7 +157,7 @@ void LegacyHttpParserImpl::resume() { impl_->resume(); }
 
 ParserStatus LegacyHttpParserImpl::pause() { return impl_->pause(); }
 
-int LegacyHttpParserImpl::getErrno() { return impl_->getErrno(); }
+ParserStatus LegacyHttpParserImpl::getStatus() { return intToStatus(impl_->getErrno()); }
 
 uint16_t LegacyHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 
