@@ -40,20 +40,20 @@ public:
   MyGrpcCallHandler* handler_ = nullptr;
 };
 
-class GrpcCallContext : public Context {
+class GrpcCallContextLegacy : public Context {
 public:
-  explicit GrpcCallContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit GrpcCallContextLegacy(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
 
   GrpcCallRootContext* root() { return static_cast<GrpcCallRootContext*>(Context::root()); }
 };
 
-static RegisterContextFactory register_GrpcCallContext(CONTEXT_FACTORY(GrpcCallContext),
+static RegisterContextFactory register_GrpcCallContextLegacy(CONTEXT_FACTORY(GrpcCallContextLegacy),
                                                        ROOT_FACTORY(GrpcCallRootContext),
-                                                       "grpc_call");
+                                                       "grpc_call_legacy");
 
-FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stream) {
+FilterHeadersStatus GrpcCallContextLegacy::onRequestHeaders(uint32_t, bool end_of_stream) {
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("cluster");
   std::string grpc_service_string;
@@ -80,49 +80,33 @@ FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stre
   return FilterHeadersStatus::StopIteration;
 }
 
-class GrpcCallFallbackRootContext : public RootContext {
+class GrpcCallContext : public Context {
 public:
-  explicit GrpcCallFallbackRootContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
-
-  void onQueueReady(uint32_t op) override {
-    if (op == 0) {
-      handler_->cancel();
-    } else {
-      grpcClose(handler_->token());
-    }
-  }
-
-  MyGrpcCallHandler* handler_ = nullptr;
-};
-
-class GrpcCallFallbackContext : public Context {
-public:
-  explicit GrpcCallFallbackContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit GrpcCallContext(uint32_t id, RootContext* root) : Context(id, root) {}
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
 
   GrpcCallRootContext* root() { return static_cast<GrpcCallRootContext*>(Context::root()); }
 };
 
-static RegisterContextFactory register_GrpcCallFallbackContext(CONTEXT_FACTORY(GrpcCallFallbackContext),
-                                                       ROOT_FACTORY(GrpcCallFallbackRootContext),
-                                                       "grpc_call_fallback");
+static RegisterContextFactory register_GrpcCallFallbackContext(CONTEXT_FACTORY(GrpcCallContext),
+                                                       ROOT_FACTORY(GrpcCallRootContext),
+                                                       "grpc_call");
 
-FilterHeadersStatus GrpcCallFallbackContext::onRequestHeaders(uint32_t, bool end_of_stream) {
-  std::string grpc_service_string = "cluster";
+FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stream) {
   google::protobuf::Value value;
   value.set_string_value("request");
   HeaderStringPairs initial_metadata;
   root()->handler_ = new MyGrpcCallHandler();
   if (end_of_stream) {
-    if (root()->grpcCallHandler(grpc_service_string, "service", "method", initial_metadata, value,
+    if (root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value,
                                 1000, std::unique_ptr<GrpcCallHandlerBase>(root()->handler_)) ==
         WasmResult::Ok) {
       logError("expected failure did not occur");
     }
     return FilterHeadersStatus::Continue;
   }
-  root()->grpcCallHandler(grpc_service_string, "service", "method", initial_metadata, value, 1000,
+  root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value, 1000,
                           std::unique_ptr<GrpcCallHandlerBase>(root()->handler_));
   if (root()->grpcCallHandler(
           "bogus grpc_service", "service", "method", initial_metadata, value, 1000,
