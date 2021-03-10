@@ -40,29 +40,25 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
 
-  auto vhosts_before_this_update =
+  auto vhosts_after_this_update =
       std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>(
           *vhds_virtual_hosts_);
-  const bool removed = removeVhosts(*vhds_virtual_hosts_, removed_resources);
-  const bool updated = updateVhosts(*vhds_virtual_hosts_, added_vhosts);
+  const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
+  const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
-  auto route_config_before_this_update =
+  auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  route_config_before_this_update->CopyFrom(*route_config_proto_);
-  rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto_);
-  ConfigConstSharedPtr new_config;
+  route_config_after_this_update->CopyFrom(*route_config_proto_);
+  rebuildRouteConfig(rds_virtual_hosts_, *vhosts_after_this_update,
+                     *route_config_after_this_update);
 
-  try {
-    new_config = std::make_shared<ConfigImpl>(
-        *route_config_proto_, factory_context_,
-        factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
-  } catch (const Envoy::EnvoyException& e) {
-    // revert the changes that failed validation
-    vhds_virtual_hosts_ = std::move(vhosts_before_this_update);
-    route_config_proto_ = std::move(route_config_before_this_update);
-    throw;
-  }
+  auto new_config = std::make_shared<ConfigImpl>(
+      *route_config_after_this_update, factory_context_,
+      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
+  // No exception, route_config_after_this_update is valid, can update the state.
+  vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
+  route_config_proto_ = std::move(route_config_after_this_update);
   config_ = new_config;
   resource_ids_in_last_update_ = added_resource_ids;
   onUpdateCommon(version_info);
