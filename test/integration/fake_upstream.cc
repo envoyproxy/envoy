@@ -345,9 +345,7 @@ FakeHttpConnection::FakeHttpConnection(
     codec_ = std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this,
-                                        max_request_headers_kb, max_request_headers_count,
-                                        headers_with_underscores_action));
+            .createQuicServerConnection(shared_connection_.connection(), *this));
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});

@@ -39,6 +39,7 @@ ActiveQuicListener::ActiveQuicListener(
                                     &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing) {
+  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   if (Runtime::LoaderSingleton::getExisting()) {
     enabled_.emplace(Runtime::FeatureFlag(enabled, Runtime::LoaderSingleton::get()));
   }

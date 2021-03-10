@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/socket_option_factory.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -118,6 +119,13 @@ Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  if (local_addr == nullptr) {
+    if (peer_addr->ip()->ipv4() != nullptr) {
+      local_addr = Network::Utility::getCanonicalIpv4LoopbackAddress();
+    } else {
+      local_addr = Network::Utility::getIpv6LoopbackAddress();
+    }
+  }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram, local_addr, peer_addr);
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());

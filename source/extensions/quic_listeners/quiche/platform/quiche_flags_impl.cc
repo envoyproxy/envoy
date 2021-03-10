@@ -45,7 +45,9 @@ FlagRegistry& FlagRegistry::getInstance() {
   return *instance;
 }
 
-FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {}
+FlagRegistry::FlagRegistry() : flags_(makeFlagMap()) {
+  FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2->setValue(true);
+}
 
 void FlagRegistry::resetFlags() const {
   for (auto& kv : flags_) {
@@ -134,7 +136,6 @@ QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
 QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
 QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
 QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
-
 #undef QUIC_FLAG
 
 #define STRINGIFY(X) #X

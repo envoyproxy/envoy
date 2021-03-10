@@ -442,6 +442,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
 TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Header with at least 20kb of spaces surrounded by non-whitespace characters to ensure that
   // dispatching is split across 2 dispatch calls. This threshold comes from Envoy preferring 16KB
@@ -1077,6 +1078,8 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
+  // TODO(danzh) treat underscore in headers according to the config.
+  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1143,6 +1146,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1304,6 +1308,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -1325,6 +1330,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (many cookie headers).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   // Set header count limit to 2010.
   uint32_t max_count = 2010;
   config_helper_.addConfigModifier(
@@ -1353,6 +1359,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1418,7 +1425,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
-
+  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1508,6 +1515,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   // Send one 95 kB URL with limit 96 kB headers.
   testLargeRequestUrl(95, 96);
 }
@@ -1519,6 +1527,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   // Send one 95 kB header with limit 96 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 96, 100);
 }
@@ -1603,6 +1612,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(60, 96);
 }
@@ -1673,6 +1683,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
   // There will be no upstream connections for HTTP/1 downstream, we need to
   // test the full mesh regardless.
   testing_upstream_intentionally_ = true;
+  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3; // TODO(#14829) Rejected with QUIC_STREAM_EXCESSIVE_LOAD
   const std::string long_method = std::string(48 * 1024, 'a');
   const Http::TestRequestHeaderMapImpl request_headers{{":method", long_method},
@@ -2133,6 +2144,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
+  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

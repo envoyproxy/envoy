@@ -179,7 +179,7 @@ envoy_cc_library(
     srcs = ["quic_filter_manager_connection_impl.cc"],
     hdrs = ["quic_filter_manager_connection_impl.h"],
     tags = ["nofips"],
-visibility = ["//test:__subpackages__"],    
+    visibility = ["//test:__subpackages__"],
     deps = [
         ":envoy_quic_connection_lib",
         ":envoy_quic_simulated_watermark_buffer_lib",
@@ -388,8 +388,8 @@ envoy_cc_extension(
         "//source/server:__subpackages__",
     ],
     security_posture = "unknown",
-visibility = ["//test:__subpackages__"],
     tags = ["nofips"],
+    visibility = ["//test:__subpackages__"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:transport_socket_config_interface",
