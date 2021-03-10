@@ -4,6 +4,7 @@
 #include "common/common/thread.h"
 
 #include "extensions/transport_sockets/alts/config.h"
+#include "extensions/transport_sockets/alts/tsi_socket.h"
 
 #ifdef major
 #undef major
@@ -80,6 +81,10 @@ public:
   // Storing client and server RPC versions for later verification.
   grpc::gcp::RpcProtocolVersions client_versions;
   grpc::gcp::RpcProtocolVersions server_versions;
+
+  // TODO(yihuazhang): Test maximum frame size stored in handshake messages
+  // after updating test/core/tsi/alts/fake_handshaker/handshaker.proto to
+  // support maximum frame size negotiation.
 };
 
 class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
@@ -176,9 +181,15 @@ public:
 
   Network::ClientConnectionPtr makeAltsConnection() {
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
+    auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
+    client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_alts_->createTransportSocket(nullptr),
-                                               nullptr);
+                                               std::move(client_transport_socket), nullptr);
+  }
+
+  void verifyActualFrameSizeToUse() {
+    EXPECT_NE(client_tsi_socket_, nullptr);
+    EXPECT_EQ(client_tsi_socket_->actualFrameSizeToUse(), 16384);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
@@ -207,6 +218,7 @@ public:
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
   Network::TransportSocketFactoryPtr client_alts_;
+  TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;
 };
@@ -232,6 +244,7 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
@@ -253,6 +266,7 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {

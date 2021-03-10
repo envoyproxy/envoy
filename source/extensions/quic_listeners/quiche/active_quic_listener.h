@@ -9,6 +9,7 @@
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"
 
+#include "server/active_udp_listener.h"
 #include "server/connection_handler_impl.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"

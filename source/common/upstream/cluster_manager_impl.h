@@ -188,8 +188,8 @@ private:
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
-  std::list<ClusterManagerCluster*> primary_init_clusters_;
-  std::list<ClusterManagerCluster*> secondary_init_clusters_;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*> primary_init_clusters_;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*> secondary_init_clusters_;
   State state_{State::Loading};
   bool started_secondary_initialize_{};
 };

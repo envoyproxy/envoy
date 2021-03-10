@@ -50,6 +50,7 @@ public:
 
   // Http::ConnectionCallbacks
   MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
+  MOCK_METHOD(void, onSettings, (ReceivedSettings & settings));
 };
 
 class MockFilterManagerCallbacks : public FilterManagerCallbacks {
@@ -322,6 +323,7 @@ public:
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::StreamDecoderFilter
   MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (RequestHeaderMap & headers, bool end_stream));
@@ -348,6 +350,7 @@ public:
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
@@ -370,6 +373,7 @@ public:
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::StreamDecoderFilter
   MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (RequestHeaderMap & headers, bool end_stream));
@@ -570,6 +574,16 @@ public:
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
+};
+
+class MockReceivedSettings : public ReceivedSettings {
+public:
+  MockReceivedSettings();
+  ~MockReceivedSettings() override = default;
+
+  MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
+
+  absl::optional<uint32_t> max_concurrent_streams_{};
 };
 
 } // namespace Http
