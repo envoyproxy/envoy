@@ -155,12 +155,40 @@ private:
     return absl::nullopt;
   }
 
+  // Wrapper around a GenericDataInput that allows it to be used as a DataInput<DataType>.
+  class GenericDataInputWrapper : public DataInput<DataType> {
+  public:
+    explicit GenericDataInputWrapper(GenericDataInputPtr&& generic_data_input)
+        : generic_data_input_(std::move(generic_data_input)) {}
+
+    DataInputGetResult get(const DataType&) override {
+      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
+                                generic_data_input_->get()};
+    }
+
+  private:
+    const GenericDataInputPtr generic_data_input_;
+  };
+
   DataInputPtr<DataType>
   createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
-    auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), factory_context_.messageValidationVisitor(), factory);
-    return factory.createDataInput(*message, factory_context_);
+    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+    if (factory != nullptr) {
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          config.typed_config(), factory_context_.messageValidationVisitor(), *factory);
+      return factory->createDataInput(*message, factory_context_);
+    }
+
+    auto* generic_factory = Config::Utility::getFactory<GenericDataInputFactory>(config);
+    if (generic_factory != nullptr) {
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          config.typed_config(), factory_context_.messageValidationVisitor(), *generic_factory);
+      return std::make_unique<GenericDataInputWrapper>(
+          generic_factory->createGenericDataInput(*message, factory_context_));
+    }
+
+    throw EnvoyException(
+        fmt::format("Didn't find a registered implementation for name: '{}'", config.name()));
   }
 
   InputMatcherPtr createInputMatcher(

@@ -201,7 +201,8 @@ struct DataInputGetResult {
 };
 
 /**
- * Interface for types providing a way to extract a string from the DataType to perform matching on.
+ * Interface for types providing a way to extract a string from the DataType to perform matching
+ * on.
  */
 template <class DataType> class DataInput {
 public:
@@ -234,6 +235,25 @@ public:
                   "DataType must implement valid name() function");
     return fmt::format("envoy.matching.{}.input", DataType::name());
   }
+};
+
+class GenericDataInput {
+public:
+  virtual ~GenericDataInput() = default;
+  virtual absl::optional<absl::string_view> get() PURE;
+};
+using GenericDataInputPtr = std::unique_ptr<GenericDataInput>;
+
+class GenericDataInputFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates a GenericDataInput from the provided config.
+   */
+  virtual GenericDataInputPtr
+  createGenericDataInput(const Protobuf::Message& config,
+                         Server::Configuration::FactoryContext& factory_context) PURE;
+
+  std::string category() const override { return "envoy.matching.generic_inputs"; }
 };
 
 } // namespace Matcher
