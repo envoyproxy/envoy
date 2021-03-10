@@ -78,6 +78,32 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
   }
 }
 
+// Already normalized path don't change.
+TEST(PathTransformerTest, NormalizeValidPaths) {
+
+  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
+      {"/a/b/../c", "/a/c"},        // parent dir
+      {"/a/b/./c", "/a/b/c"},       // current dir
+      {"a/b/../c", "/a/c"},         // non / start
+      {"/a/b/../../../../c", "/c"}, // out number parent
+      {"/a/..\\c", "/c"},           // "..\\" canonicalization
+      {"/%c0%af", "/%c0%af"},       // 2 bytes unicode reserved characters
+      {"/%5c%25", "/%5c%25"},       // reserved characters
+      {"/a/b/%2E%2E/c", "/a/c"}     // %2E escape
+  };
+
+  const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
+  for (const auto& path : normal_paths) {
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    EXPECT_EQ(path, result);
+  }
+  for (const auto& path_pair : non_normal_pairs) {
+    const auto& path = path_pair.first;
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    EXPECT_EQ(result, path_pair.second);
+  }
+}
+
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeCasePath) {
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
@@ -95,6 +121,23 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
         << "original path: " << path_pair.second;
   }
 }
+
+// Paths that are valid get normalized.
+TEST(PathTransformerTest, NormalizeCasePath) {
+  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
+      {"/A/B/C", "/A/B/C"},           // not normalize to lower case
+      {"/a/b/%2E%2E/c", "/a/c"},      // %2E can be normalized to .
+      {"/a/b/%2e%2e/c", "/a/c"},      // %2e can be normalized to .
+      {"/a/%2F%2f/c", "/a/%2F%2f/c"}, // %2F is not normalized to %2f
+  };
+
+  for (const auto& path_pair : non_normal_pairs) {
+    const auto& path = path_pair.first;
+    const auto result = PathTransformer::rfcNormalize(absl::string_view(path));
+    EXPECT_EQ(result, path_pair.second);
+  }
+}
+
 // These test cases are explicitly not covered above:
 // "/../c\r\n\"  '\n' '\r' should be excluded by http parser
 // "/a/\0c",     '\0' should be excluded by http parser
@@ -120,6 +163,23 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
   EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
   EXPECT_EQ("/a/?b", mergeSlashes("//a/?b"));             // ends with slash + query
+}
+
+TEST(PathTransformerTest, MergeSlashes) {
+  EXPECT_EQ("", PathTransformer::mergeSlashes(""));                // empty
+  EXPECT_EQ("a/b/c", PathTransformer::mergeSlashes("a//b/c"));     // relative
+  EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a//b/c/")); // ends with slash
+  EXPECT_EQ("a/b/c/", PathTransformer::mergeSlashes("a//b/c/"));   // relative ends with slash
+  EXPECT_EQ("/a", PathTransformer::mergeSlashes("/a"));            // no-op
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("//a/b/c"));   // double / start
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a//b/c"));   // double / in the middle
+  EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a/b/c//")); // double / end
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a///b/c"));  // triple / in the middle
+  EXPECT_EQ("/a/b/c", PathTransformer::mergeSlashes("/a////b/c")); // quadruple / in the middle
+  EXPECT_EQ("/a/b?a=///c",
+            PathTransformer::mergeSlashes("/a//b?a=///c"));    // slashes in the query are ignored
+  EXPECT_EQ("/a/b?", PathTransformer::mergeSlashes("/a//b?")); // empty query
+  EXPECT_EQ("/a/?b", PathTransformer::mergeSlashes("//a/?b")); // ends with slash + query
 }
 
 TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
