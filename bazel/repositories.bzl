@@ -146,6 +146,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
+    _com_github_ncopa_suexec()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -477,6 +478,16 @@ def _com_github_nodejs_http_parser():
         actual = "@com_github_nodejs_http_parser//:http_parser",
     )
 
+def _com_github_ncopa_suexec():
+    external_http_archive(
+        name = "com_github_ncopa_suexec",
+        build_file = "@envoy//bazel/external:su-exec.BUILD",
+    )
+    native.bind(
+        name = "su-exec",
+        actual = "@com_github_ncopa_suexec//:su-exec",
+    )
+
 def _com_google_googletest():
     external_http_archive("com_google_googletest")
     native.bind(
@@ -592,7 +603,16 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    external_http_archive("rules_python")
+    # TODO(phlax): remove patch
+    #    patch is applied to update setuptools to version (0.5.4),
+    #    and can be removed once this has been updated in rules_python
+    #    see https://github.com/envoyproxy/envoy/pull/15236#issuecomment-788650946 for discussion
+    external_http_archive(
+        name = "rules_python",
+        patches = ["@envoy//bazel:rules_python.patch"],
+        patch_args = ["-p1"],
+    )
+
     external_http_archive(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],

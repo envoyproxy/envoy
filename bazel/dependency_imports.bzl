@@ -7,13 +7,6 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_rust//rust:repositories.bzl", "rust_repositories")
-load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
-load("@configs_pip3//:requirements.bzl", configs_pip_install = "pip_install")
-load("@headersplit_pip3//:requirements.bzl", headersplit_pip_install = "pip_install")
-load("@kafka_pip3//:requirements.bzl", kafka_pip_install = "pip_install")
-load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
-load("@thrift_pip3//:requirements.bzl", thrift_pip_install = "pip_install")
-load("@fuzzing_pip3//:requirements.bzl", fuzzing_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 
@@ -81,11 +74,3 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
         version = "v0.0.0-20180726023541-3605ed457bf7",
     )
-
-    config_validation_pip_install()
-    configs_pip_install()
-    headersplit_pip_install()
-    kafka_pip_install()
-    protodoc_pip_install()
-    thrift_pip_install()
-    fuzzing_pip_install()

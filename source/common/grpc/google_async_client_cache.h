@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include "envoy/grpc/async_client_manager.h"
@@ -27,8 +29,8 @@ private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCache(AsyncClientManager& async_client_manager, Stats::Scope& scope,
                      const ::envoy::config::core::v3::GrpcService& grpc_proto_config) {
-      const AsyncClientFactoryPtr factory =
-          async_client_manager.factoryForGrpcService(grpc_proto_config, scope, true);
+      const AsyncClientFactoryPtr factory = async_client_manager.factoryForGrpcService(
+          grpc_proto_config, scope, AsyncClientFactoryClusterChecks::Skip);
       async_client_ = factory->create();
     }
     RawAsyncClientSharedPtr async_client_;
