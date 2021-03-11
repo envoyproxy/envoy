@@ -116,7 +116,7 @@ TEST_F(HashingLoadBalancerTest, HashKey) {
       "tcp://127.0.0.1:90", simTime());
   EXPECT_EQ(hlb_->hashKey(host, false), "hash_key");
 
-  // other type(int) metadata
+  // other type(int) metadata throws exception
   envoy::config::core::v3::Metadata int_metadata;
   Config::Metadata::mutableMetadataValue(int_metadata, Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().HASH_KEY)
@@ -124,7 +124,7 @@ TEST_F(HashingLoadBalancerTest, HashKey) {
   host = makeTestHostWithMetadata(
       info_, std::make_shared<const envoy::config::core::v3::Metadata>(int_metadata),
       "tcp://127.0.0.1:90", simTime());
-  EXPECT_EQ(hlb_->hashKey(host, false), "127.0.0.1:90");
+  EXPECT_THROW(hlb_->hashKey(host, false), EnvoyException);
 };
 
 // Works correctly without any hosts.
