@@ -9,7 +9,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           add_user_agent: true
           access_log:
           - name: envoy.access_loggers.file
@@ -38,9 +38,9 @@ static_resources:
             typed_config: {}
   clusters:
   - name: backend-proxy
-    type: logical_dns
+    type: LOGICAL_DNS
     dns_lookup_family: V4_ONLY
-    lb_policy: round_robin
+    lb_policy: ROUND_ROBIN
     connect_timeout: 0.250s
     http_protocol_options: {}
     load_assignment:

@@ -45,6 +45,7 @@ public:
       shadow_policy_rules->add_rules()->set_destination_port(456);
       shadow_policy.add_principals()->set_any(true);
       config.mutable_shadow_rules()->set_action(action);
+      config.set_shadow_rules_stat_prefix("prefix_");
       (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
     }
 
@@ -189,8 +190,8 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
 
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
-  EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
+  EXPECT_EQ("bar", filter_meta.fields().at("prefix_shadow_effective_policy_id").string_value());
+  EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
 }
 
 // Log Tests

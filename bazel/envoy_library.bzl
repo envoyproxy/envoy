@@ -82,6 +82,7 @@ EXTENSION_CATEGORIES = [
     "envoy.health_checkers",
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
+    "envoy.matching.input_matchers",
     "envoy.rate_limit_descriptors",
     "envoy.request_id",
     "envoy.resource_monitors",
@@ -216,6 +217,38 @@ def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
         hdrs = select({
             "@envoy//bazel:windows_x86_64": [],
             "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on POSIX excluding Linux
+def envoy_cc_posix_without_linux_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_posix",
+        srcs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "@envoy//bazel:linux": [],
+            "//conditions:default": srcs,
+        }),
+        hdrs = select({
+            "@envoy//bazel:windows_x86_64": [],
+            "@envoy//bazel:linux": [],
+            "//conditions:default": hdrs,
+        }),
+        **kargs
+    )
+
+# Used to specify a library that only builds on Linux
+def envoy_cc_linux_library(name, srcs = [], hdrs = [], **kargs):
+    envoy_cc_library(
+        name = name + "_linux",
+        srcs = select({
+            "@envoy//bazel:linux": srcs,
+            "//conditions:default": [],
+        }),
+        hdrs = select({
+            "@envoy//bazel:linux": hdrs,
+            "//conditions:default": [],
         }),
         **kargs
     )

@@ -177,6 +177,10 @@ TEST_P(WasmCommonTest, Logging) {
 
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -237,6 +241,12 @@ TEST_P(WasmCommonTest, Logging) {
 }
 
 TEST_P(WasmCommonTest, BadSignature) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() != "v8") {
     return;
   }
@@ -264,6 +274,12 @@ TEST_P(WasmCommonTest, BadSignature) {
 }
 
 TEST_P(WasmCommonTest, Segv) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() != "v8") {
     return;
   }
@@ -306,6 +322,12 @@ TEST_P(WasmCommonTest, Segv) {
 }
 
 TEST_P(WasmCommonTest, DivByZero) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() != "v8") {
     return;
   }
@@ -358,6 +380,10 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
 
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -399,6 +425,10 @@ TEST_P(WasmCommonTest, Utilities) {
 
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -468,6 +498,10 @@ TEST_P(WasmCommonTest, Stats) {
 
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -519,6 +553,10 @@ TEST_P(WasmCommonTest, Foreign) {
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -564,6 +602,10 @@ TEST_P(WasmCommonTest, OnForeign) {
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -611,6 +653,10 @@ TEST_P(WasmCommonTest, WASI) {
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -660,13 +706,16 @@ TEST_P(WasmCommonTest, VmCache) {
           }));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
         absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
   } else {
@@ -726,6 +775,12 @@ TEST_P(WasmCommonTest, VmCache) {
 }
 
 TEST_P(WasmCommonTest, RemoteCode) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -754,7 +809,6 @@ TEST_P(WasmCommonTest, RemoteCode) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::BytesValue vm_configuration_bytes;
   vm_configuration_bytes.set_value(vm_configuration);
@@ -834,6 +888,12 @@ TEST_P(WasmCommonTest, RemoteCode) {
 }
 
 TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -862,7 +922,6 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
 
   auto vm_config = plugin_config.mutable_vm_config();
-  CapabilityRestrictionConfig cr_config;
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
   ProtobufWkt::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
@@ -956,6 +1015,12 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
 // test that wasm imports/exports do not work when ABI restriction is enforced
 TEST_P(WasmCommonTest, RestrictCapabilities) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -1009,6 +1074,12 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
 // test with proxy_on_vm_start allowed, but proxy_log restricted
 TEST_P(WasmCommonTest, AllowOnVmStart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -1064,6 +1135,12 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
 
 // test with both proxy_on_vm_start and proxy_log allowed, but WASI restricted
 TEST_P(WasmCommonTest, AllowLog) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -1116,6 +1193,12 @@ TEST_P(WasmCommonTest, AllowLog) {
 
 // test with both proxy_on_vm_start and fd_write allowed, but proxy_log restricted
 TEST_P(WasmCommonTest, AllowWASI) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -1168,6 +1251,12 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
 // test a different callback besides proxy_on_vm_start
 TEST_P(WasmCommonTest, AllowOnContextCreate) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -1222,6 +1311,12 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
 
 // test that a copy-constructed thread-local Wasm still enforces the same policy
 TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -1290,13 +1385,14 @@ public:
   WasmCommonContextTest() = default;
 
   void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
-    setupBase(
-        GetParam(), code,
-        [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-          return new TestContext(wasm, plugin);
-        },
-        root_id, vm_configuration);
+    setRootId(root_id);
+    setVmConfiguration(vm_configuration);
+    setupBase(GetParam(), code,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new TestContext(wasm, plugin);
+              });
   }
+
   void setupContext() {
     context_ = std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_);
     context_->onCreate();
@@ -1314,6 +1410,10 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
 TEST_P(WasmCommonContextTest, OnDnsResolve) {
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
   } else {
@@ -1363,6 +1463,10 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
 TEST_P(WasmCommonContextTest, EmptyContext) {
   std::string code;
   if (GetParam() != "null") {
+#if defined(__aarch64__)
+    // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+    return;
+#endif
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
   } else {
