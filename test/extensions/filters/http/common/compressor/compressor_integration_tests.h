@@ -9,8 +9,8 @@
 namespace Envoy {
 
 /*
- Integration test to make sure that new logic, which does not care about content-length header
-does not break websocket's upgrade method (by not adding any unexpected by remote side headers)
+Test verifying that we don't add any unexpecting headers when we are trying to upgrade connection
+to a websocket connection
 */
 class WebsocketWithCompressorIntegrationTest : public HttpProtocolIntegrationTest {
 public:
@@ -39,8 +39,7 @@ protected:
 };
 
 /*
- Integration test to make sure that new logic, which does not care about content-length header
-does not break proxying of connect method.
+Test verifying that we don't break proxying of CONNECT method when compressor filter is enabled
 */
 class CompressorProxyingConnectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
