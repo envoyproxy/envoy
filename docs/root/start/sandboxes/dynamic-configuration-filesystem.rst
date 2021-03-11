@@ -82,7 +82,7 @@ The example setup provides Envoy with two dynamic configuration files:
 - :download:`configs/cds.yaml <_include/dynamic-config-fs/configs/cds.yaml>` to provide a :ref:`Cluster
   discovery service (CDS) <config_cluster_manager_cds>`.
 - :download:`configs/lds.yaml <_include/dynamic-config-fs/configs/lds.yaml>` to provide a :ref:`Listener
-  discovery service (CDS) <config_listeners_lds>`.
+  discovery service (LDS) <config_listeners_lds>`.
 
 Edit ``cds.yaml`` inside the container and change the cluster address
 from ``service1`` to ``service2``:

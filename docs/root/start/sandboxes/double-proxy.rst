@@ -146,7 +146,7 @@ Note the ``subjectAltName``. This is used for reciprocally matching and validati
 At this point you should have the necessary keys and certificates to secure the connection between
 the proxies.
 
-They keys and certificates are stored in the ``certs/`` directory.
+The keys and certificates are stored in the ``certs/`` directory.
 
 Step 5: Start all of our containers
 ***********************************
