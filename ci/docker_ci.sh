@@ -12,8 +12,8 @@ ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIR
 
 # Setting environments for buildx tools
 config_env() {
-  # Qemu configurations
-  docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+  # Install QEMU emulators
+  docker run --rm --privileged tonistiigi/binfmt --install all
 
   # Remove older build instance
   docker buildx rm multi-builder || :
