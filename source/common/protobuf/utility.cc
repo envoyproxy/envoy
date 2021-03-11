@@ -19,7 +19,6 @@
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
-#include "source/common/common/_virtual_includes/thread_lib/common/common/thread.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
 
@@ -434,7 +433,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                            : validation_visitor);
         }
         return;
-      } END_TRY
+      }
+      END_TRY
       catch (EnvoyException& ex) {
         if (message_version == MessageVersion::LatestVersion ||
             message_version == MessageVersion::LatestVersionValidate) {

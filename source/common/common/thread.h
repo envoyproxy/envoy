@@ -171,9 +171,7 @@ public:
 
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
-  bool inMainThread() const {
-    return main_thread_id_ == std::this_thread::get_id();
-  }
+  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
   bool inTestThread() const {
     return test_thread_id_.has_value() && (test_thread_id_.value() == std::this_thread::get_id());
   }
@@ -210,9 +208,9 @@ private:
   absl::optional<std::thread::id> test_thread_id_{};
 };
 
-
-// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code base. 
-// This macros uses main thread assertion to make sure that exceptions aren't thrown from worker thread.
+// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
+// base. This macros uses main thread assertion to make sure that exceptions aren't thrown from
+// worker thread.
 #define TRY_ASSERT_MAIN_THREAD                                                                     \
   try {                                                                                            \
     ASSERT(Thread::MainThread::isMainThread());
