@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.ip_tagging.v3;
 
 import "envoy/config/core/v3/address.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -17,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 // [#extension: envoy.filters.http.ip_tagging]
 
+// [#next-free-field: 6]
 message IPTagging {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ip_tagging.v2.IPTagging";
@@ -51,11 +53,25 @@ message IPTagging {
     repeated config.core.v3.CidrRange ip_list = 2;
   }
 
+  // Specifies the content of the IP tag file
+  message IPTagFile {
+    repeated IPTag ip_tags = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
   // The type of request the filter should apply to.
   RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Specifies the path to the IP tags file from filesystem.
+  string path = 5 [
+    (validate.rules).string = {min_bytes: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "path_list_specifier"
+  ];
 
   // [#comment:TODO(ccaraman): Extend functionality to load IP tags from file system.
   // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
-  repeated IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
+  repeated IPTag ip_tags = 4 [
+    (validate.rules).repeated = {min_items: 1},
+    (udpa.annotations.field_migrate).oneof_promotion = "path_list_specifier"
+  ];
 }
