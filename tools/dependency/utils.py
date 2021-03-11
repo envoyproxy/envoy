@@ -1,6 +1,5 @@
 # Utilities for reasoning about dependencies.
 
-import os
 from collections import namedtuple
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
@@ -15,16 +14,16 @@ def LoadModule(name, path):
   return module
 
 
+envoy_repository_locations = LoadModule('envoy_repository_locations',
+                                        'bazel/repository_locations.bzl')
+api_repository_locations = LoadModule('api_repository_locations',
+                                      'api/bazel/repository_locations.bzl')
+repository_locations_utils = LoadModule('repository_locations_utils',
+                                        'api/bazel/repository_locations_utils.bzl')
+
+
 # All repository location metadata in the Envoy repository.
 def RepositoryLocations():
-  api_path = os.getenv("API_PATH", "external/envoy_api_canonical")
-
-  envoy_repository_locations = LoadModule('envoy_repository_locations',
-                                          'bazel/repository_locations.bzl')
-  repository_locations_utils = LoadModule(
-      'repository_locations_utils', os.path.join(api_path, 'bazel/repository_locations_utils.bzl'))
-  api_repository_locations = LoadModule('api_repository_locations',
-                                        os.path.join(api_path, 'bazel/repository_locations.bzl'))
   spec_loader = repository_locations_utils.load_repository_locations_spec
   locations = spec_loader(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
   locations.update(spec_loader(api_repository_locations.REPOSITORY_LOCATIONS_SPEC))
