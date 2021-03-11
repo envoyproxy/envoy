@@ -172,18 +172,25 @@ public:
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
   bool inMainThread() const {
-    std::thread::id cur_id = std::this_thread::get_id();
-    return std::find(main_thread_id_.begin(), main_thread_id_.end(), cur_id) !=
-           main_thread_id_.end();
+    return main_thread_id_ == std::this_thread::get_id();
   }
-  void registerMainThread() { main_thread_id_.push_back(std::this_thread::get_id()); }
+  bool inTestThread() const {
+    return test_thread_id_.has_value() && (test_thread_id_.value() == std::this_thread::get_id());
+  }
+  void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
+  void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
   static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
-  static void init() {
+  static void initMainThread() {
     if (!initialized()) {
       MainThreadSingleton::initialize(new MainThread());
-    } else {
-      MainThreadSingleton::get().registerMainThread();
     }
+    MainThreadSingleton::get().registerMainThread();
+  }
+  static void initTestThread() {
+    if (!initialized()) {
+      MainThreadSingleton::initialize(new MainThread());
+    }
+    MainThreadSingleton::get().registerTestThread();
   }
   static void clear() {
     delete MainThreadSingleton::getExisting();
@@ -195,13 +202,17 @@ struct MainThread {
       return true;
     }
     // When threading is on, compare thread id with main thread id.
-    return MainThreadSingleton::get().inMainThread();
+    return MainThreadSingleton::get().inMainThread() || MainThreadSingleton::get().inTestThread();
   }
 
 private:
-  std::vector<std::thread::id> main_thread_id_{std::this_thread::get_id()};
+  std::thread::id main_thread_id_;
+  absl::optional<std::thread::id> test_thread_id_{};
 };
 
+
+// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code base. 
+// This macros uses main thread assertion to make sure that exceptions aren't thrown from worker thread.
 #define TRY_ASSERT_MAIN_THREAD                                                                     \
   try {                                                                                            \
     ASSERT(Thread::MainThread::isMainThread());

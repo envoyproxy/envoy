@@ -19,6 +19,7 @@
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "source/common/common/_virtual_includes/thread_lib/common/common/thread.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
 
@@ -425,7 +426,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
-      TRY_NEEDS_AUDIT {
+      TRY_ASSERT_MAIN_THREAD {
         if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(
               message, message_version == MessageVersion::LatestVersionValidate
@@ -433,7 +434,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                            : validation_visitor);
         }
         return;
-      }
+      } END_TRY
       catch (EnvoyException& ex) {
         if (message_version == MessageVersion::LatestVersion ||
             message_version == MessageVersion::LatestVersionValidate) {
