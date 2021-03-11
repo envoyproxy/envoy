@@ -1,6 +1,7 @@
 #include "extensions/matching/generic_inputs/environment/input.h"
 
 #include "test/test_common/environment.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
