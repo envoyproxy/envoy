@@ -2,8 +2,6 @@
 
 import os
 from collections import namedtuple
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import SourceFileLoader
 
 from exports import (
   api_repository_locations, envoy_repository_locations, repository_locations_utils)

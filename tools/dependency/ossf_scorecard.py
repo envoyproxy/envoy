@@ -24,6 +24,7 @@ import os
 import subprocess as sp
 import sys
 
+import exports
 import utils
 
 Scorecard = namedtuple('Scorecard', [
@@ -133,8 +134,8 @@ if __name__ == '__main__':
   path = sys.argv[1]
   scorecard_path = sys.argv[2]
   csv_output_path = sys.argv[3]
-  spec_loader = utils.repository_locations_utils.load_repository_locations_spec
-  path_module = utils.LoadModule('repository_locations', path)
+  spec_loader = exports.repository_locations_utils.load_repository_locations_spec
+  path_module = exports.LoadModule('repository_locations', path)
   try:
     results = Score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
     PrintCsvResults(csv_output_path, results)

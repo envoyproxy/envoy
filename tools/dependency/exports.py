@@ -1,6 +1,8 @@
 # Modules exported from bazel
 
 import os
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
 
 
 # Shared Starlark/Python files must have a .bzl suffix for Starlark import, so
@@ -11,6 +13,9 @@ def LoadModule(name, path):
   spec.loader.exec_module(module)
   return module
 
+# this is the relative path in a bazel build
+# to call this module outside of a bazel build set the API_PATH first,
+# for example, to api/ if running from the envoy repo root
 api_path = os.getenv("API_PATH", "external/envoy_api_canonical")
 
 # Modules
