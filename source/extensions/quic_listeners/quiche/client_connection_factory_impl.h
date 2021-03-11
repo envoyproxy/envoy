@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Quic {
 
-// Information which can be shared across connections, though not across threadds.
+// Information which can be shared across connections, though not across threads.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
                          Network::TransportSocketFactory& transport_socket_factory,
