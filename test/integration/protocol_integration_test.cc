@@ -501,6 +501,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
   } else if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+    // TODO(alyssawilk) http3 stats.
     Stats::CounterSharedPtr counter =
         TestUtility::findCounter(stats, "cluster.cluster_0.upstream_rq_tx_reset");
     ASSERT_NE(nullptr, counter);
