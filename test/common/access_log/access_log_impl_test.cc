@@ -30,6 +30,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -1041,17 +1042,9 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-      ProtoValidationException,
-      "Proto constraint validation failed (AccessLogValidationError.Filter: embedded message "
-      "failed validation | caused by AccessLogFilterValidationError.ResponseFlagFilter: embedded "
-      "message failed validation | caused by ResponseFlagFilterValidationError.Flags[0]: value "
-      "must be in list [LH UH UT LR UR UF UC UO NR DI FI RL UAEX RLSE DC URX SI IH DPE UMSDR RFCF "
-      "NFCF DT]): name: \"accesslog\"\nfilter {\n  response_flag_filter {\n    flags: "
-      "\"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
-      "\"/dev/null\"\n  }\n}\n");
+  EXPECT_THAT_THROWS_MESSAGE(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                             ProtoValidationException,
+                             HasSubstr("Proto constraint validation failed"));
 }
 
 TEST_F(AccessLogImplTest, ValidateTypedConfig) {
@@ -1066,17 +1059,9 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-      ProtoValidationException,
-      "Proto constraint validation failed (AccessLogValidationError.Filter: embedded message "
-      "failed validation | caused by AccessLogFilterValidationError.ResponseFlagFilter: embedded "
-      "message failed validation | caused by ResponseFlagFilterValidationError.Flags[0]: value "
-      "must be in list [LH UH UT LR UR UF UC UO NR DI FI RL UAEX RLSE DC URX SI IH DPE UMSDR RFCF "
-      "NFCF DT]): name: \"accesslog\"\nfilter {\n  response_flag_filter {\n    flags: "
-      "\"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
-      "\"/dev/null\"\n  }\n}\n");
+  EXPECT_THAT_THROWS_MESSAGE(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                             ProtoValidationException,
+                             HasSubstr("Proto constraint validation failed"));
 }
 
 TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
