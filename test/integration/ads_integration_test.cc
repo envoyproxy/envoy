@@ -1231,9 +1231,9 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
 // Validate that Node message is well formed.
 TEST_P(AdsIntegrationTest, NodeMessage) {
   initialize();
-  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) sotw_request;
-  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_request;
-  const envoy::api::v2::core::Node* node = nullptr;
+  envoy::service::discovery::v3::DiscoveryRequest sotw_request;
+  envoy::service::discovery::v3::DeltaDiscoveryRequest delta_request;
+  const envoy::config::core::v3::Node* node = nullptr;
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, sotw_request));
     EXPECT_TRUE(sotw_request.has_node());
