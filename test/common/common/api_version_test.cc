@@ -7,8 +7,8 @@ namespace Envoy {
 
 // Verify assumptions about oldest version vs latest version.
 TEST(ApiVersionTest, OldestLatestVersionsAssumptions) {
-  const auto& latest_version = ApiVersionInfo::apiVersion();
-  const auto& oldest_version = ApiVersionInfo::oldestApiVersion();
+  constexpr auto& latest_version = ApiVersionInfo::apiVersion();
+  constexpr auto& oldest_version = ApiVersionInfo::oldestApiVersion();
   // Same major number, minor number difference is at most 1, and the oldest patch is 0.
   EXPECT_EQ(latest_version.major, oldest_version.major);
   EXPECT_TRUE(latest_version.minor >= oldest_version.minor &&

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include "common/version/api_version_struct.h"
 
 // Defines the ApiVersion current version (Envoy::api_version), and oldest
@@ -16,10 +14,10 @@ namespace Envoy {
 class ApiVersionInfo {
 public:
   // Returns the most recent API version that is supported by the client.
-  static const ApiVersion& apiVersion();
+  static constexpr ApiVersion const& apiVersion() { return api_version; }
 
   // Returns the oldest API version that is supported by the client.
-  static const ApiVersion& oldestApiVersion();
+  static constexpr ApiVersion const& oldestApiVersion() { return oldest_api_version; }
 };
 
 } // namespace Envoy

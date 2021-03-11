@@ -72,7 +72,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "api_version_includes",
     hdrs = [
-        "api_version.h",
         "api_version_struct.h",
         ":generate_api_version_number",
     ],
@@ -80,10 +79,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "api_version_lib",
-    srcs = ["api_version.cc"],
-    deps = [
-        ":api_version_includes",
-    ],
+    hdrs = ["api_version.h"],
+    deps = [":api_version_includes"],
 )
 
 envoy_basic_cc_library(
