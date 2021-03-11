@@ -3195,12 +3195,12 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   {
-    Http::TestRequestHeaderMapImpl reqeust_headers = genHeaders("www.lyft.com", "/", "GET");
-    reqeust_headers.addCopy(Http::LowerCaseString("reqeust_to"), "dynamic_grpc_service");
+    Http::TestRequestHeaderMapImpl request_headers = genHeaders("www.lyft.com", "/", "GET");
+    request_headers.addCopy(Http::LowerCaseString("request_to"), "dynamic_grpc_service");
     EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(20)),
-              config.route(reqeust_headers, 0)->routeEntry()->grpcTimeoutOffset());
+              config.route(request_headers, 0)->routeEntry()->grpcTimeoutOffset());
     EXPECT_EQ(absl::make_optional(std::chrono::milliseconds(200)),
-              config.route(reqeust_headers, 0)->routeEntry()->maxGrpcTimeout());
+              config.route(request_headers, 0)->routeEntry()->maxGrpcTimeout());
   }
   {
 
