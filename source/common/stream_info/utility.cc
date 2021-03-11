@@ -42,7 +42,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x400000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x800000, "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
