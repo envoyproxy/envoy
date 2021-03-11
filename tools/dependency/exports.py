@@ -13,6 +13,7 @@ def LoadModule(name, path):
   spec.loader.exec_module(module)
   return module
 
+
 # this is the relative path in a bazel build
 # to call this module outside of a bazel build set the API_PATH first,
 # for example, to api/ if running from the envoy repo root

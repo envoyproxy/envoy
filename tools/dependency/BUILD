@@ -17,7 +17,10 @@ py_binary(
 
 py_binary(
     name = "generate_external_dep_rst",
-    srcs = ["generate_external_dep_rst.py", "utils.py"],
+    srcs = [
+        "generate_external_dep_rst.py",
+        "utils.py",
+    ],
     data = [
         ":exports",
     ],
@@ -25,7 +28,10 @@ py_binary(
 
 py_binary(
     name = "cve_scan",
-    srcs = ["cve_scan.py", "utils.py"],
+    srcs = [
+        "cve_scan.py",
+        "utils.py",
+    ],
     data = [
         ":exports",
     ],
