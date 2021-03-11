@@ -49,8 +49,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                            "trusted CA is insecure and not allowed");
     }
     if (allow_expired_certificate_) {
-      throw EnvoyException(
-          "Certificate validity period is always ignored without trusted         CA");
+      throw EnvoyException("Certificate validity period is always ignored without trusted CA");
     }
   }
 }
