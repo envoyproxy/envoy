@@ -409,6 +409,8 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfig) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.extension_config_discovery.foo.config_conflict",
+                                 0);
 }
 
 TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfigInvalid) {
@@ -446,6 +448,8 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfigInvalid) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_conflict",
+                                 1);
 }
 
 TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {

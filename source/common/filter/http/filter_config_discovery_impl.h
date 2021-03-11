@@ -69,7 +69,8 @@ private:
  */
 #define ALL_EXTENSION_CONFIG_DISCOVERY_STATS(COUNTER)                                              \
   COUNTER(config_reload)                                                                           \
-  COUNTER(config_fail)
+  COUNTER(config_fail)                                                                             \
+  COUNTER(config_conflict)
 
 /**
  * Struct definition for all extension config discovery stats. @see stats_macros.h
@@ -101,6 +102,7 @@ public:
   const absl::optional<Envoy::Http::FilterFactoryCb>& lastConfig() { return last_config_; }
   const std::string& lastTypeUrl() { return last_type_url_; }
   const std::string& lastVersionInfo() { return last_version_info_; }
+  void incrementConflictCounter();
 
 private:
   void start();

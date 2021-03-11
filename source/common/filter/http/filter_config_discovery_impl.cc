@@ -175,6 +175,8 @@ FilterConfigSubscription::~FilterConfigSubscription() {
   filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
 }
 
+void FilterConfigSubscription::incrementConflictCounter() { stats_.config_conflict_.inc(); }
+
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
@@ -222,21 +224,24 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   }
 
   // If the subscription already received a config, attempt to apply it.
-  bool config_applied = false;
+  bool last_config_valid = false;
   if (subscription->lastConfig().has_value()) {
     try {
       provider->validateTypeUrl(subscription->lastTypeUrl());
-      provider->onConfigUpdate(subscription->lastConfig().value(), subscription->lastVersionInfo(),
-                               nullptr);
-      config_applied = true;
+      last_config_valid = true;
     } catch (const EnvoyException& e) {
       ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
                 filter_config_name, e.what());
+      subscription->incrementConflictCounter();
+    }
+    if (last_config_valid) {
+      provider->onConfigUpdate(subscription->lastConfig().value(), subscription->lastVersionInfo(),
+                               nullptr);
     }
   }
 
   // Apply the default config if none has been applied.
-  if (config_source.has_default_config() && !config_applied) {
+  if (config_source.has_default_config() && !last_config_valid) {
     auto* default_factory =
         Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
             config_source.default_config());
