@@ -39,7 +39,7 @@ static_resources:
                       exact_match_map:
                           # Note this additional indirection; this is a workaround for Protobuf oneof limitations.
                           map:
-                              skip_filter: # This is the header value we're trying to match against.
+                              some_value_to_match_on: # This is the header value we're trying to match against.
                                   action:
                                       name: skip
                                       typed_config:

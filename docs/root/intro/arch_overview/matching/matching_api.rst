@@ -19,10 +19,11 @@ instantiate a matching filter associated with the wrapped structure:
 
 The above example wraps a HTTP filter (the
 :ref:`HTTPFault <envoy_v3_api_msg_extensions.filters.http.fault.v3.HttpFault>` filter) in an
-ExtensionWithMatcher, allowing us to define a match tree to be evaluated in conjunction with
-evaluation of the wrapped filter. Prior to data being made available to the filter, it will be
-provided to the match tree, which will then attempt to evaluate the matching rules with the
-provided data, triggering an action if match evaluation completes in an action.
+:ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`,
+allowing us to define a match tree to be evaluated in conjunction with evaluation of the wrapped
+filter. Prior to data being made available to the filter, it will be provided to the match tree,
+which will then attempt to evaluate the matching rules with the provided data, triggering an
+action if match evaluation completes in an action.
 
 In the above example, we are specifying that we want to match on the incoming request header `some-header` by setting the `input` to
 :ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>` and configuring the header key to use.
@@ -50,10 +51,15 @@ Currently the match evaluation for HTTP filters does not impact control flow at 
 callbacks will be sent to the associated filter as normal. Once sufficient data is available to match an action, this is provided to the filter.
 A consequence of this is that if the filter wishes to gate some behavior on a match result, it has to manage stopping the iteration on its own.
 
-When it comes to actions such as SkipFilter, this means that if the skip condition is based on anything but the request headers, the filter might
-get partially applied until the match result is ready. This might result in surprising beahvior. An example of this would be to have a matching
-tree that attempts to skip the gRPC-Web filter based on response headers: since the gRPC-Web filter will transform incoming requests into gRPC proper,
-clients will generally assume that the gRPC -> gRPC-Web transformation will happen on the encoding side. By causing the filter to once the response
-headers are parsed, the result will be that the response is passed through without being converted back to gRPC-Web, likely causing client errors
-as it receives an unexpected response format. If instead the skip action was resolved on trailers, the same gRPC-Web filter would consume all the
-data but never write them back out (as this happens when it receives the trailers), resulting in an gRPC-Web response with an empty body.
+When it comes to actions such as
+:ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>`,
+this means that if the skip condition is based on anything but the request headers, the filter might
+get partially applied, which might result in surprising beahvior. An example of this would be to
+have a matching tree that attempts to skip the gRPC-Web filter based on response headers: clients
+assume that if they send a gRPC-Web request to Envoy, the filter will transform that into a gRPC
+request before proxying it upstream, then back into a gRPC-Web response on the encoding path. By
+skipping the filter based on response headers, the forward transformation will happen (the upstream
+receives a gRPC request), but the response is never converted back to gRPC-Web. As a result, the
+client will receive an invalid response back from Envoy. If the skip action was instead resolved on
+trailers, the same gRPC-Web filter would consume all the data but never write it back out (as this
+happens when it sees the trailers), resulting in a gRPC-Web response with an empty body.
