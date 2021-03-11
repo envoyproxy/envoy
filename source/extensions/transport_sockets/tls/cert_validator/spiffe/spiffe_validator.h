@@ -54,6 +54,9 @@ public:
   std::string getCaFileName() const override { return ca_file_name_; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
+  // Callback for allow_expired_certificate option
+  static int ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx);
+
   // Utility functions
   X509_STORE* getTrustBundleStore(X509* leaf_cert);
   static std::string extractTrustDomain(const std::string& san);
@@ -63,6 +66,7 @@ public:
   };
 
 private:
+  bool allow_expired_certificate_{false};
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
   std::string ca_file_name_;
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;

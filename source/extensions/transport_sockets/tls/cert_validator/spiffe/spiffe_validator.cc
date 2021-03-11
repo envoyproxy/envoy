@@ -43,6 +43,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  SslStats& stats, TimeSource& time_source)
     : stats_(stats), time_source_(time_source) {
   ASSERT(config != nullptr);
+  allow_expired_certificate_ = config->allowExpiredCertificate();
 
   SPIFFEConfig message;
   Config::Utility::translateOpaqueConfig(config->customValidatorConfig().value().typed_config(),
@@ -159,6 +160,9 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
 
   // Set the trust bundle's certificate store on the context, and do the verification.
   store_ctx->ctx = trust_bundle;
+  if (allow_expired_certificate_) {
+    X509_STORE_CTX_set_verify_cb(store_ctx, SPIFFEValidator::ignoreCertificateExpirationCallback);
+  }
   auto ret = X509_verify_cert(store_ctx);
   if (ssl_extended_info) {
     ssl_extended_info->setCertificateValidationStatus(
@@ -169,6 +173,16 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     stats_.fail_verify_error_.inc();
   }
   return ret;
+}
+
+int SPIFFEValidator::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx) {
+  if (!ok) {
+    int err = X509_STORE_CTX_get_error(store_ctx);
+    if (err == X509_V_ERR_CERT_HAS_EXPIRED || err == X509_V_ERR_CERT_NOT_YET_VALID) {
+      return 1;
+    }
+  }
+  return ok;
 }
 
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
