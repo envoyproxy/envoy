@@ -113,9 +113,13 @@ public:
                                       const std::chrono::milliseconds timeout);
 
   /**
-   * Set the :scheme header based on whether the underline transport is secure.
+   * Set the :scheme header using the best information available. In order this is
+   * - existing scheme header if valid
+   * - x-forwarded-proto header if valid
+   * - security of downstream connection
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+                                bool upstream_secure);
 
   /**
    * Determine whether a request should be shadowed.
