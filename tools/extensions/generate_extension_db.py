@@ -127,5 +127,11 @@ if __name__ == '__main__':
   extension_db['envoy.request_id.uuid'] = GetExtensionMetadata(
       '//source/extensions/request_id/uuid:config')
 
+  extension_db['envoy.listener.quic'] = GetExtensionMetadata(
+      '//source/extensions/quic_listeners/quiche:quic_factory_lib')
+  extension_db['envoy.transport_sockets.quic'] = GetExtensionMetadata(
+      '//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib')
+
+
   pathlib.Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
   pathlib.Path(output_path).write_text(json.dumps(extension_db))
