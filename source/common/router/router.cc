@@ -39,7 +39,6 @@
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -80,8 +79,23 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport) {
-  if (use_secure_transport) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+                                      bool upstream_secure) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")) {
+    if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+      return;
+    }
+    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
+      headers.setScheme(headers.getForwardedProtoValue());
+      return;
+    }
+  }
+  const bool transport_secure =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")
+          ? downstream_secure
+          : upstream_secure;
+
+  if (transport_secure) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -118,28 +132,30 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   // the configured maximum gRPC timeout (which may also be infinity, represented by a 0 value),
   // or the default from the route config otherwise.
   TimeoutData timeout;
-  if (grpc_request && route.maxGrpcTimeout()) {
-    const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
-    auto header_timeout = Grpc::Common::getGrpcTimeout(request_headers);
-    std::chrono::milliseconds grpc_timeout =
-        header_timeout ? header_timeout.value() : std::chrono::milliseconds(0);
-    if (route.grpcTimeoutOffset()) {
-      // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
-      // setting it to 0 means infinity and a negative timeout makes no sense.
-      const auto offset = *route.grpcTimeoutOffset();
-      if (offset < grpc_timeout) {
-        grpc_timeout -= offset;
+  if (!route.usingNewTimeouts()) {
+    if (grpc_request && route.maxGrpcTimeout()) {
+      const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
+      auto header_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+      std::chrono::milliseconds grpc_timeout =
+          header_timeout ? header_timeout.value() : std::chrono::milliseconds(0);
+      if (route.grpcTimeoutOffset()) {
+        // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
+        // setting it to 0 means infinity and a negative timeout makes no sense.
+        const auto offset = *route.grpcTimeoutOffset();
+        if (offset < grpc_timeout) {
+          grpc_timeout -= offset;
+        }
       }
-    }
 
-    // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
-    if (max_grpc_timeout != std::chrono::milliseconds(0) &&
-        (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
-      grpc_timeout = max_grpc_timeout;
+      // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
+      if (max_grpc_timeout != std::chrono::milliseconds(0) &&
+          (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
+        grpc_timeout = max_grpc_timeout;
+      }
+      timeout.global_timeout_ = grpc_timeout;
+    } else {
+      timeout.global_timeout_ = route.timeout();
     }
-    timeout.global_timeout_ = grpc_timeout;
-  } else {
-    timeout.global_timeout_ = route.timeout();
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
@@ -200,7 +216,8 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   // the expected timeout. This ensures that the optional per try timeout is reflected
   // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
   // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
-  if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
+  if (grpc_request && !route.usingNewTimeouts() && route.maxGrpcTimeout() &&
+      expected_timeout != 0) {
     Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout), request_headers);
   }
 
@@ -589,6 +606,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers,
+                                   callbacks_->streamInfo().downstreamSslConnection() != nullptr,
                                    host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.

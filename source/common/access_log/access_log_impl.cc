@@ -92,11 +92,9 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
-                                      const Http::RequestHeaderMap& request_headers,
-                                      const Http::ResponseHeaderMap&,
+                                      const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                       const Http::ResponseTrailerMap&) const {
-  Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
-
+  const Tracing::Decision decision = Tracing::HttpTracerUtility::shouldTraceRequest(info);
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
@@ -130,13 +128,21 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap&,
                              const Http::ResponseTrailerMap&) const {
-  auto rid_extension = stream_info.getRequestIDExtension();
+  // This code is verbose to avoid preallocating a random number that is not needed.
   uint64_t random_value;
-  if (use_independent_randomness_ ||
-      !rid_extension->modBy(
-          request_headers, random_value,
-          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
+  if (use_independent_randomness_) {
     random_value = random_.random();
+  } else if (stream_info.getRequestIDProvider() == nullptr) {
+    random_value = random_.random();
+  } else {
+    const auto rid_to_integer = stream_info.getRequestIDProvider()->toInteger(request_headers);
+    if (!rid_to_integer.has_value()) {
+      random_value = random_.random();
+    } else {
+      random_value =
+          rid_to_integer.value() %
+          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator());
+    }
   }
 
   return runtime_.snapshot().featureEnabled(
