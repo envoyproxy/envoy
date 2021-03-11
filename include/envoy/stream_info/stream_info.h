@@ -82,8 +82,10 @@ enum ResponseFlag {
   NoFilterConfigFound = 0x200000,
   // Request or connection exceeded the downstream connection duration.
   DurationTimeout = 0x400000,
+  // No cluster found for a given request.
+  NoClusterFound = 0x800000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DurationTimeout
+  LastFlag = NoClusterFound
 };
 
 /**

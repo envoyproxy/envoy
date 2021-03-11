@@ -29,6 +29,7 @@ const std::string ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED = "UMS
 const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
 const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
 const std::string ResponseFlagUtils::DURATION_TIMEOUT = "DT";
+const std::string ResponseFlagUtils::NO_CLUSTER_FOUND = "NC";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -165,6 +166,7 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
       {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
       {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
+      {ResponseFlagUtils::NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {
