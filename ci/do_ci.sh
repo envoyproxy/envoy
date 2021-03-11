@@ -4,6 +4,7 @@
 
 set -e
 
+# add a non-changing change: 1
 
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
