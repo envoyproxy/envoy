@@ -31,9 +31,9 @@ class UpstreamStartTlsSocketFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public BaseStartTlsSocketFactory {
 public:
-  Network::TransportSocketFactoryPtr
-  createTransportSocketFactory(const Protobuf::Message& config,
-                               Server::Configuration::TransportSocketFactoryContext& context) override;
+  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+      const Protobuf::Message& config,
+      Server::Configuration::TransportSocketFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(DownstreamStartTlsSocketFactory);

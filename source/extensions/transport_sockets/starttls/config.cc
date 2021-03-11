@@ -41,7 +41,8 @@ Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransp
 }
 
 Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTransportSocketFactory(
-    const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message,
+    Server::Configuration::TransportSocketFactoryContext& context) {
 
   const auto& outer_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
@@ -52,14 +53,15 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
       TransportSocketNames::get().RawBuffer);
 
   auto& tls_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(
-      TransportSocketNames::get().Tls);
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(TransportSocketNames::get().Tls);
 
   Network::TransportSocketFactoryPtr raw_socket_factory =
-      raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(), context);
+      raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(),
+                                                             context);
 
   Network::TransportSocketFactoryPtr tls_socket_factory =
-      tls_socket_config_factory.createTransportSocketFactory(outer_config.upstream_tls_socket_config(), context);
+      tls_socket_config_factory.createTransportSocketFactory(
+          outer_config.upstream_tls_socket_config(), context);
 
   return std::make_unique<StartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
                                                  std::move(tls_socket_factory));
