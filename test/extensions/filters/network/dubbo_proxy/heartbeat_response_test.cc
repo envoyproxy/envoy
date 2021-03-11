@@ -21,7 +21,10 @@ namespace {
 
 class HeartbeatResponseTestWithMock : public testing::Test {
 public:
-  HeartbeatResponseTestWithMock() : metadata_(std::make_shared<MessageMetadata>()) {}
+  HeartbeatResponseTestWithMock() : metadata_(std::make_shared<MessageMetadata>()) {
+    metadata_->setResponseStatus(ResponseStatus::Ok);
+    metadata_->setMessageType(MessageType::HeartbeatResponse);
+  }
 
   NiceMock<MockProtocol> mock_protocol_;
   MessageMetadataSharedPtr metadata_;
@@ -39,7 +42,6 @@ TEST_F(HeartbeatResponseTestWithMock, HeartbeatResponseTestWithMock) {
     EXPECT_THROW_WITH_MESSAGE(heartbeat_response.encode(*metadata_, mock_protocol_, buffer),
                               EnvoyException, "failed to encode heartbeat message");
   }
-
   {
     std::string mock_message("MOCK_MESSAGE");
     HeartbeatResponse heartbeat_response;
