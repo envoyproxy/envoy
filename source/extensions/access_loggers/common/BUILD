@@ -38,3 +38,15 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "file_access_log_lib",
+    srcs = ["file_access_log_impl.cc"],
+    hdrs = ["file_access_log_impl.h"],
+    # The file based access logger is core code.
+    visibility = ["//visibility:public"],
+    deps = [
+        ":access_log_base",
+    ],
+)
+

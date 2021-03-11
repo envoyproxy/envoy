@@ -16,6 +16,10 @@ public:
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
                           Server::Configuration::FactoryContext& context) override;
 
+  AccessLog::InstanceSharedPtr
+  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+                          Server::Configuration::ServerFactoryContext& context) override;
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() const override;

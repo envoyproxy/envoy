@@ -16,6 +16,10 @@ class AccessLogNameValues {
 public:
   // File access log
   const std::string File = "envoy.access_loggers.file";
+  // Stdout access log
+  const std::string Stdout = "envoy.access_loggers.stdout";
+  // Stderr access log
+  const std::string Stderr = "envoy.access_loggers.stderr";
   // HTTP gRPC access log
   const std::string HttpGrpc = "envoy.access_loggers.http_grpc";
   // TCP gRPC access log

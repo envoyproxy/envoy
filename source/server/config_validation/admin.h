@@ -21,6 +21,7 @@ public:
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
   void startHttpListener(const Filesystem::FilePathAndType& file_info,
+                         const std::vector<AccessLog::InstanceSharedPtr>& access_logs,
                          const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
                          const Network::Socket::OptionsSharedPtr&,

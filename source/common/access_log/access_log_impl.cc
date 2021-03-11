@@ -319,5 +319,22 @@ InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3
   return factory.createAccessLogInstance(*message, std::move(filter), context);
 }
 
+InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                                              Server::Configuration::ServerFactoryContext& context) {
+  FilterPtr filter;
+  if (config.has_filter()) {
+    filter = FilterFactory::fromProto(config.filter(), context.runtime(),
+                                      context.api().randomGenerator(),
+                                      context.messageValidationVisitor());
+  }
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(config);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      config, context.messageValidationVisitor(), factory);
+
+  return factory.createAccessLogInstance(*message, std::move(filter), context);
+}
+
 } // namespace AccessLog
 } // namespace Envoy

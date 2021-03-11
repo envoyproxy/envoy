@@ -14,7 +14,9 @@ const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED_GCOVR_EXCL_LI
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; }
 
-void ValidationAdmin::startHttpListener(const Filesystem::FilePathAndType&, const std::string&,
+void ValidationAdmin::startHttpListener(const Filesystem::FilePathAndType&,
+                                        const std::vector<AccessLog::InstanceSharedPtr>&,
+                                        const std::string&,
                                         Network::Address::InstanceConstSharedPtr,
                                         const Network::Socket::OptionsSharedPtr&,
                                         Stats::ScopePtr&&) {

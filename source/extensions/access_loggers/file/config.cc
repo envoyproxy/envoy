@@ -13,7 +13,7 @@
 #include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
@@ -62,19 +62,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
     break;
   }
-  Filesystem::FilePathAndType file_info{Config::Utility::filesystemDestinationTypeFromProtoConfig(
-                                            fal_config.access_log_destination()),
-                                        fal_config.path()};
-
-  if (file_info.path_.empty() && file_info.file_type_ == Filesystem::DestinationType::File) {
-    throw EnvoyException(
-        "access_log_path in acess_logger cannot be empty if access_log_destination is a file");
-  }
-
-  if (!file_info.path_.empty() && file_info.file_type_ != Filesystem::DestinationType::File) {
-    throw EnvoyException("access_log_path needs to be empty if access_log_destination is not file");
-  }
-
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
   return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
                                          context.accessLogManager());
 }

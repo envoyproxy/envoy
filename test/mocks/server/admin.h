@@ -28,7 +28,7 @@ public:
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
   MOCK_METHOD(void, startHttpListener,
-              (const Filesystem::FilePathAndType& file_info, const std::string& address_out_path,
+              (const std::vector<AccessLog::InstanceSharedPtr>& access_logs, const std::string& address_out_path,
                Network::Address::InstanceConstSharedPtr address,
                const Network::Socket::OptionsSharedPtr& socket_options,
                Stats::ScopePtr&& listener_scope));

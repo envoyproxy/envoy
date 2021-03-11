@@ -38,6 +38,8 @@ proto_library(
         "//envoy/data/tap/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
+        "//envoy/extensions/access_loggers/stderr/v3:pkg",
+        "//envoy/extensions/access_loggers/stdout/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",

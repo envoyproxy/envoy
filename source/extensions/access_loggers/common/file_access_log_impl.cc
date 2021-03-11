@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -37,7 +37,6 @@
 #include "server/admin/utils.h"
 #include "server/listener_impl.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
 #include "extensions/request_id/uuid/config.h"
 
 #include "absl/strings/str_join.h"
@@ -121,16 +120,15 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const Filesystem::FilePathAndType& file_info,
+void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   const Network::Socket::OptionsSharedPtr& socket_options,
                                   Stats::ScopePtr&& listener_scope) {
-  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
-  // hard dependency here.
-  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-      server_.accessLogManager()));
+  for (const auto& access_log : access_logs) {
+    access_logs_.emplace_back(access_log);
+  }
+
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);

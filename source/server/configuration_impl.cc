@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "common/access_log/access_log_impl.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
@@ -191,12 +193,24 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options)
+                         const Options& options, Instance& server)
     : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
-  admin_.access_log_file_info_ = Filesystem::FilePathAndType{
-      Config::Utility::filesystemDestinationTypeFromProtoConfig(admin.access_log_destination()),
-      admin.access_log_path()};
+
+  for (const auto& access_log : admin.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+    admin_.access_logs_.emplace_back(current_access_log);
+  }
+
+  if (!admin.access_log_path().empty()) {
+    auto file_info =
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, admin.access_log_path()};
+    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        server.accessLogManager()));
+  }
+
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
