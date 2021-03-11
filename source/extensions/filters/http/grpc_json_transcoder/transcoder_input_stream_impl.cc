@@ -9,7 +9,7 @@ int64_t TranscoderInputStreamImpl::BytesAvailable() const { return buffer_->leng
 
 bool TranscoderInputStreamImpl::Finished() const { return finished_; }
 
-int64_t TranscoderInputStreamImpl::bytesStored() const { return buffer_->length(); }
+uint64_t TranscoderInputStreamImpl::bytesStored() const { return buffer_->length(); }
 
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters
