@@ -28,6 +28,9 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/tracing/http_tracer_impl.h"
+#include "common/http/path_utility.h"
+
+
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -264,6 +267,8 @@ private:
   static const uint64_t RequestTimeoutMs = 0;
   // request header timeout is disabled by default
   static const uint64_t RequestHeaderTimeoutMs = 0;
+  Http::PathTransformer forwarding_path_transformer_;
+  Http::PathTransformer filter_path_transformer_;
 };
 
 /**

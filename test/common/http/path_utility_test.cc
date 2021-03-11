@@ -56,6 +56,15 @@ TEST_F(PathUtilityTest, InvalidPaths) {
   }
 }
 
+// Invalid paths are rejected.
+TEST(PathTransformationTest, InvalidPaths) {
+  const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
+                                               "/xyz/AAAAA%%0000/abc"};
+  for (const auto& path : invalid_paths) {
+    EXPECT_FALSE(PathTransformer::rfcNormalize(path).has_value()) << "original path: " << path;
+  }
+}
+
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeValidPaths) {
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{

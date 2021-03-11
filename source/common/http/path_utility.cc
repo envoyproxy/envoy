@@ -105,7 +105,9 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
           ? original_path
           : absl::string_view(original_path.data(), query_pos) // '?' is not included
   );
-
+  if (!normalized_path_opt.has_value()) {
+    return {};
+  }
   auto& normalized_path = normalized_path_opt.value();
   const absl::string_view query_suffix =
       query_pos == original_path.npos

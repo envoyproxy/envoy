@@ -193,7 +193,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
     Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
-    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    :  context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -253,7 +253,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
+      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)), forwarding_path_transformer_(config.path_normalization_options().forwarding_transformation()),
+      filter_path_transformer_(config.path_normalization_options().http_filter_transformation()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
