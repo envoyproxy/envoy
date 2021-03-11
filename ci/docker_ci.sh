@@ -17,7 +17,7 @@ config_env() {
 
   # Remove older build instance
   docker buildx rm multi-builder || :
-  docker buildx create --use --name multi-builder
+  docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
 }
 
 build_platforms() {
