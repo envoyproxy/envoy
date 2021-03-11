@@ -1,5 +1,6 @@
 #include "extensions/matching/generic_inputs/environment/input.h"
 
+#include "test/test_common/environment.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -14,11 +15,11 @@ TEST(InputTest, BasicUsage) {
     EXPECT_FALSE(input.get().has_value());
   }
 
-  setenv("foo", "bar", true);
+  TestEnvironment::setEnvVar("foo", "bar", 1);
   Input input("foo");
   EXPECT_EQ("bar", input.get().value());
 
-  unsetenv("foo");
+  TestEnvironment::unsetEnvVar("foo");
 }
 } // namespace Environment
 } // namespace GenericInputs
