@@ -947,6 +947,11 @@ public:
   void rewritePathHeader(Http::RequestHeaderMap& headers,
                          bool insert_envoy_original_path) const override;
 
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+    return absl::optional<std::string>();
+  }
+
 private:
   std::string url_template_;
   Matchers::UrlTemplateMatcherConstPtr matcher_;
