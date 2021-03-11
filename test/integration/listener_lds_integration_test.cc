@@ -1,10 +1,10 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/version_converter.h"
@@ -151,7 +151,7 @@ protected:
 
   void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listener_configs,
                        const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
@@ -173,7 +173,7 @@ protected:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     const auto route_configuration =

@@ -8,12 +8,12 @@
 #include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -184,7 +184,7 @@ void BaseIntegrationTest::createEnvoy() {
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) lds;
+    envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();

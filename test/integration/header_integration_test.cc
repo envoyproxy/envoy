@@ -1,10 +1,10 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/endpoint.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/metadata.h"
@@ -379,11 +379,11 @@ public:
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        envoy::service::discovery::v3::DiscoveryRequest discovery_request;
         result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
         RELEASE_ASSERT(result, result.message());
 
-        API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+        envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
