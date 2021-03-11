@@ -6,8 +6,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 py_binary(
-    name = "utils",
-    srcs = ["utils.py"],
+    name = "exports",
+    srcs = ["exports.py"],
     data = [
         "//bazel:repository_locations.bzl",
         "@envoy_api_canonical//bazel:repository_locations.bzl",
@@ -17,17 +17,17 @@ py_binary(
 
 py_binary(
     name = "generate_external_dep_rst",
-    srcs = ["generate_external_dep_rst.py"],
+    srcs = ["generate_external_dep_rst.py", "utils.py"],
     data = [
-        ":utils",
+        ":exports",
     ],
 )
 
 py_binary(
     name = "cve_scan",
-    srcs = ["cve_scan.py"],
+    srcs = ["cve_scan.py", "utils.py"],
     data = [
-        ":utils",
+        ":exports",
     ],
 )
 
