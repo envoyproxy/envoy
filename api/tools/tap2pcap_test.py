@@ -16,7 +16,7 @@ if __name__ == '__main__':
   expected_path = os.path.join(srcdir, 'tools/data/tap2pcap_h2_ipv4.txt')
   pcap_path = os.path.join(os.getenv('TEST_TMPDIR'), 'generated.pcap')
 
-  tap2pcap.Tap2Pcap(tap_path, pcap_path)
+  tap2pcap.tap2pcap(tap_path, pcap_path)
   actual_output = sp.check_output(['tshark', '-r', pcap_path, '-d', 'tcp.port==10000,http2', '-P'])
   with open(expected_path, 'rb') as f:
     expected_output = f.read()
