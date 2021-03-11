@@ -1,8 +1,10 @@
+#include "envoy/http/metadata_interface.h"
 #include "extensions/filters/http/composite/filter.h"
 
 #include "test/mocks/http/mocks.h"
 
 #include "gtest/gtest.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -17,40 +19,54 @@ public:
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  // Templated since MockStreamFilter and MockStreamDecoder filter doesn't share a mock base class.
   template <class T> void expectDelegatedDecoding(T& filter_mock) {
     EXPECT_CALL(filter_mock, decodeHeaders(HeaderMapEqualRef(&default_request_headers_), false));
+    EXPECT_CALL(filter_mock, decodeMetadata(_));
     EXPECT_CALL(filter_mock, decodeData(_, false));
     EXPECT_CALL(filter_mock, decodeTrailers(HeaderMapEqualRef(&default_request_trailers_)));
+    EXPECT_CALL(filter_mock, decodeComplete());
   }
 
+  // Templated since MockStreamFilter and MockStreamEncoder filter doesn't share a mock base class.
   template <class T> void expectDelegatedEncoding(T& filter_mock) {
     EXPECT_CALL(filter_mock,
                 encode100ContinueHeaders(HeaderMapEqualRef(&default_response_headers_)));
     EXPECT_CALL(filter_mock, encodeHeaders(HeaderMapEqualRef(&default_response_headers_), false));
+    EXPECT_CALL(filter_mock, encodeMetadata(_));
     EXPECT_CALL(filter_mock, encodeData(_, false));
     EXPECT_CALL(filter_mock, encodeTrailers(HeaderMapEqualRef(&default_response_trailers_)));
+    EXPECT_CALL(filter_mock, encodeComplete());
   }
 
-  // Templated since MockStreamFilter and MockStreamDecoder filter doesn't share a mock base class.
   void doAllDecodingCallbacks() {
     filter_.decodeHeaders(default_request_headers_, false);
+
+    Http::MetadataMap metadata;
+    filter_.decodeMetadata(metadata);
 
     Buffer::OwnedImpl buffer("data");
     filter_.decodeData(buffer, false);
 
     filter_.decodeTrailers(default_request_trailers_);
+
+    filter_.decodeComplete();
   }
 
-  // Templated since MockStreamFilter and MockStreamEncoder filter doesn't share a mock base class.
   void doAllEncodingCallbacks() {
     filter_.encode100ContinueHeaders(default_response_headers_);
 
     filter_.encodeHeaders(default_response_headers_, false);
 
+    Http::MetadataMap metadata;
+    filter_.encodeMetadata(metadata);
+
     Buffer::OwnedImpl buffer("data");
     filter_.encodeData(buffer, false);
 
     filter_.encodeTrailers(default_response_trailers_);
+
+    filter_.encodeComplete();
   }
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
@@ -79,6 +95,8 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*stream_filter);
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onDestroy();
 }
 
 TEST_F(FilterTest, StreamDecoderFilterDelegation) {
@@ -95,6 +113,8 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   expectDelegatedDecoding(*stream_filter);
   doAllDecodingCallbacks();
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onDestroy();
 }
 
 TEST_F(FilterTest, StreamFilterDelegation) {
@@ -113,6 +133,8 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   doAllDecodingCallbacks();
   expectDelegatedEncoding(*stream_filter);
   doAllEncodingCallbacks();
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_.onDestroy();
 }
 
 } // namespace

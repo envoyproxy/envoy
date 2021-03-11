@@ -23,9 +23,11 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
+  void decodeComplete() override;
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
@@ -37,6 +39,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
+  void encodeComplete() override;
 
   // Http::StreamFilterBase
   void onDestroy() override {

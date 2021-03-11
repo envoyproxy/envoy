@@ -1,4 +1,5 @@
 #include "extensions/filters/http/composite/filter.h"
+#include "envoy/http/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,6 +33,17 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
                               Http::FilterTrailersStatus::Continue, trailers);
 }
 
+Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
+  return delegateFilterAction(delegated_filter_, &StreamDecoderFilter::decodeMetadata,
+                              Http::FilterMetadataStatus::Continue, metadata_map);
+}
+
+void Filter::decodeComplete() {
+  if (delegated_filter_) {
+    delegated_filter_->decodeComplete();
+  }
+}
+
 Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap& headers) {
   return delegateFilterAction(delegated_filter_, &StreamEncoderFilter::encode100ContinueHeaders,
                               Http::FilterHeadersStatus::Continue, headers);
@@ -52,6 +64,11 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap& metadata_map) {
   return delegateFilterAction(delegated_filter_, &StreamEncoderFilter::encodeMetadata,
                               Http::FilterMetadataStatus::Continue, metadata_map);
+}
+void Filter::encodeComplete() {
+  if (delegated_filter_) {
+    delegated_filter_->encodeComplete();
+  }
 }
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<CompositeAction>();
