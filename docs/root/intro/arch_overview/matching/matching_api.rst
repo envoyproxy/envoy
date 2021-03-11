@@ -25,31 +25,40 @@ filter. Prior to data being made available to the filter, it will be provided to
 which will then attempt to evaluate the matching rules with the provided data, triggering an
 action if match evaluation completes in an action.
 
-In the above example, we are specifying that we want to match on the incoming request header `some-header` by setting the `input` to
-:ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>` and configuring the header key to use.
-Using the value contained by this header, the provided `exact_match_map` specifies which values we care about: we've configured a single
-value (`skip_filter`) to match against. As a result, this config means that if we receive a request which contains `some-header: skip_filter`
-as a header, the :ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>` action will be resolved (causing
-the associated HTTP filter to be skipped). If no such header is present, no action will be resolved and the filter will be applied as usual.
+In the above example, we are specifying that we want to match on the incoming request header
+`some-header` by setting the `input` to
+:ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`
+and configuring the header key to use. Using the value contained by this header, the provided
+`exact_match_map` specifies which values we care about: we've configured a single value
+(`some_value_to_match_on`) to match against. As a result, this config means that if we
+receive a request which contains `some-header: some_value_to_match_on` as a header, the
+:ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>`
+action will be resolved (causing the associated HTTP filter to be skipped). If no such header is
+present, no action will be resolved and the filter will be applied as usual.
 
 .. literalinclude:: _include/complicated.yaml
     :language: yaml
 
-Above is a slightly more complicated example which combines a top level tree matcher with a linear matcher. While the tree matchers provide
-very efficient matching, they are not very expressive. The list matcher can be used to provide a much richer matching API, and can be combined
-with the tree matcher in an arbitrary order. The example describes the following match logic: skip the filter if `some-header: skip_filter`
-is present and `second-header` is set to *either* `foo` or `bar`.
+Above is a slightly more complicated example which combines a top level tree matcher with a
+linear matcher. While the tree matchers provide very efficient matching, they are not very
+expressive. The list matcher can be used to provide a much richer matching API, and can be combined
+with the tree matcher in an arbitrary order. The example describes the following match logic: skip
+the filter if `some-header: skip_filter` is present and `second-header` is set to *either* `foo` or
+`bar`.
 
 HTTP Filter Iteration Impact
 ============================
 
-The above example only demonstrates matching on request headers, which ends up being the simplest case due to it happening before the associated
-filter receives any data. Matching on other HTTP input sources is supported (e.g. response headers), but some discussion is warranted on how this
+The above example only demonstrates matching on request headers, which ends up being the simplest
+case due to it happening before the associated filter receives any data. Matching on other HTTP
+input sources is supported (e.g. response headers), but some discussion is warranted on how this
 works at a filter level. 
 
-Currently the match evaluation for HTTP filters does not impact control flow at all: if insufficient data is available to perform the match,
-callbacks will be sent to the associated filter as normal. Once sufficient data is available to match an action, this is provided to the filter.
-A consequence of this is that if the filter wishes to gate some behavior on a match result, it has to manage stopping the iteration on its own.
+Currently the match evaluation for HTTP filters does not impact control flow at all: if
+insufficient data is available to perform the match, callbacks will be sent to the associated
+filter as normal. Once sufficient data is available to match an action, this is provided to the
+filter. A consequence of this is that if the filter wishes to gate some behavior on a match result,
+it has to manage stopping the iteration on its own.
 
 When it comes to actions such as
 :ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>`,
