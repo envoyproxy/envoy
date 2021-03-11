@@ -30,7 +30,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::HasSubstr;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -1042,9 +1041,8 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THAT_THROWS_MESSAGE(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-                             ProtoValidationException,
-                             HasSubstr("Proto constraint validation failed"));
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          ProtoValidationException, "Proto constraint validation failed");
 }
 
 TEST_F(AccessLogImplTest, ValidateTypedConfig) {
@@ -1059,9 +1057,8 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THAT_THROWS_MESSAGE(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-                             ProtoValidationException,
-                             HasSubstr("Proto constraint validation failed"));
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          ProtoValidationException, "Proto constraint validation failed");
 }
 
 TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
