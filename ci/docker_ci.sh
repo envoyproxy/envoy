@@ -12,8 +12,6 @@ ENVOY_DOCKER_IMAGE_DIRECTORY="${ENVOY_DOCKER_IMAGE_DIRECTORY:-${BUILD_STAGINGDIR
 
 # Setting environments for buildx tools
 config_env() {
-  # QEMU regression causes arm64 detection flakiness - https://github.com/docker/buildx/issues/542
-  docker run --rm --privileged tonistiigi/binfmt --uninstall qemu-aarch64
   # Install QEMU emulators
   docker run --rm --privileged tonistiigi/binfmt --install all
 
