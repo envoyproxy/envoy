@@ -4,7 +4,8 @@
 #
 # Usage:
 #
-#   tools/dependency/ossf_scorecard.sh <path to repository_locations.bzl> \
+#   export API_PATH=api/
+#   tools/dependency/ossf_scorecard.py <path to repository_locations.bzl> \
 #       <path to scorecard binary> \
 #       <output CSV path>
 #
