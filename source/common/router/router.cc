@@ -79,8 +79,23 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport) {
-  if (use_secure_transport) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+                                      bool upstream_secure) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")) {
+    if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+      return;
+    }
+    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
+      headers.setScheme(headers.getForwardedProtoValue());
+      return;
+    }
+  }
+  const bool transport_secure =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")
+          ? downstream_secure
+          : upstream_secure;
+
+  if (transport_secure) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -591,6 +606,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers,
+                                   callbacks_->streamInfo().downstreamSslConnection() != nullptr,
                                    host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
