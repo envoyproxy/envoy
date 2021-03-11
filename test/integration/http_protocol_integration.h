@@ -31,8 +31,8 @@ class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTe
 public:
   // By default returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
-  // [HTTP2 upstream / HTTP  downstream] x [Ipv4, IPv6]
   // [HTTP  upstream / HTTP2 downstream] x [IPv4, Ipv6]
+  // [HTTP2 upstream / HTTP  downstream] x [Ipv4, IPv6]
   // [HTTP2 upstream / HTTP2 downstream] x [IPv4, Ipv6]
   //
   // Upstream and downstream protocols may be changed via the input vectors.

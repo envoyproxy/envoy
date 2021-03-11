@@ -13,8 +13,7 @@
 
 namespace Envoy {
 
-class TestPauseFilter;
-class RandomPauseFilter;
+class TestPauseFilterForQuic;
 
 namespace Quic {
 
@@ -127,8 +126,7 @@ protected:
   EnvoyQuicConnection* quic_connection_{nullptr};
 
 private:
-  friend class Envoy::RandomPauseFilter;
-  friend class Envoy::TestPauseFilter;
+  friend class Envoy::TestPauseFilterForQuic;
 
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();

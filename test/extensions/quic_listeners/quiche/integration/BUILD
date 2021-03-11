@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//test/integration:protocol_integration_test_lib",
+        "//test/integration/filters:pause_filter_for_quic_lib",
     ],
 )
 

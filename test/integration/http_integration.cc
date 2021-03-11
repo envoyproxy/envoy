@@ -46,18 +46,6 @@
 #include "base_integration_test.h"
 #include "gtest/gtest.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 namespace Envoy {
 namespace {
 
@@ -88,7 +76,6 @@ IntegrationCodecClient::IntegrationCodecClient(
     CodecClient::Type type)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
       dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
-  std::cerr << "=========== IntegrationCodecClient add connection callback " << &callbacks_ << "\n";
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -925,7 +912,6 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send the rest of the request.
-  std::cerr << "============== finish sendData";
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.
@@ -1058,11 +1044,13 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.addFilter(R"EOF(
-  name: pause-filter
+    config_helper_.addFilter(
+        fmt::format(R"EOF(
+  name: pause-filter{}
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
-  )EOF");
+  )EOF",
+                    downstreamProtocol() == Http::CodecClient::Type::HTTP3 ? "-for-quic" : ""));
   }
   initialize();
 

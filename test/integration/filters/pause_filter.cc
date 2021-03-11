@@ -5,7 +5,6 @@
 #include "common/network/connection_impl.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
@@ -30,9 +29,8 @@ public:
       number_of_decode_calls_ref_++;
       // If this is the second stream to decode headers and we're at high watermark. force low
       // watermark state
-      if (number_of_decode_calls_ref_ == 2 &&
-          decoder_callbacks_->connection()->aboveHighWatermark()) {
-        mockConnectionBelowLowWatermark();
+      if (number_of_decode_calls_ref_ == 2 && connection()->aboveHighWatermark()) {
+        connection()->onWriteBufferLowWatermark();
       }
     }
     return PassThroughFilter::decodeData(buf, end_stream);
@@ -44,46 +42,19 @@ public:
       number_of_encode_calls_ref_++;
       // If this is the first stream to encode headers and we're not at high watermark, force high
       // watermark state.
-      if (number_of_encode_calls_ref_ == 1 &&
-          !decoder_callbacks_->connection()->aboveHighWatermark()) {
-        mockConnectionAboveHighWatermark();
+      if (number_of_encode_calls_ref_ == 1 && !connection()->aboveHighWatermark()) {
+        connection()->onWriteBufferHighWatermark();
       }
     }
     return PassThroughFilter::encodeData(buf, end_stream);
   }
 
-  void mockConnectionAboveHighWatermark() {
+  Network::ConnectionImpl* connection() {
     // As long as we're doing horrible things let's do *all* the horrible things.
-    // Assert the connection we have is a ConnectionImpl or QuicFilterManagerConnectionImpl and
-    // const cast it so we can force watermark changes.
+    // Assert the connection we have is a ConnectionImpl and const cast it so we
+    // can force watermark changes.
     auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
-    if (conn_impl != nullptr) {
-      const_cast<Network::ConnectionImpl*>(conn_impl)->onWriteBufferHighWatermark();
-      return;
-    }
-    // If transport protocol is QUIC, simulate connection buffer above watermark differently.
-    auto quic_connection = const_cast<Quic::QuicFilterManagerConnectionImpl*>(
-        dynamic_cast<const Quic::QuicFilterManagerConnectionImpl*>(
-            decoder_callbacks_->connection()));
-    quic_connection->write_buffer_watermark_simulation_.checkHighWatermark(
-        quic_connection->write_buffer_watermark_simulation_.highWatermark() + 1u);
-  }
-
-  void mockConnectionBelowLowWatermark() {
-    // As long as we're doing horrible things let's do *all* the horrible things.
-    // Assert the connection we have is a ConnectionImpl or QuicFilterManagerConnectionImpl and
-    // const cast it so we can force watermark changes.
-    auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
-    if (conn_impl != nullptr) {
-      const_cast<Network::ConnectionImpl*>(conn_impl)->onWriteBufferHighWatermark();
-      return;
-    }
-    // If transport protocol is QUIC, simulate connection buffer below watermark differently.
-    auto quic_connection = const_cast<Quic::QuicFilterManagerConnectionImpl*>(
-        dynamic_cast<const Quic::QuicFilterManagerConnectionImpl*>(
-            decoder_callbacks_->connection()));
-    quic_connection->write_buffer_watermark_simulation_.checkLowWatermark(
-        quic_connection->write_buffer_watermark_simulation_.highWatermark() / 2 - 1u);
+    return const_cast<Network::ConnectionImpl*>(conn_impl);
   }
 
   absl::Mutex& encode_lock_;

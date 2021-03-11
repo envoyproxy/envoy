@@ -182,6 +182,19 @@ envoy_cc_test_library(
         "//include/envoy/registry",
         "//source/common/network:connection_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "pause_filter_for_quic_lib",
+    srcs = [
+        "pause_filter_for_quic.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/quic_listeners/quiche:quic_filter_manager_connection_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
