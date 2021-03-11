@@ -10,7 +10,7 @@ routing PRs, questions, etc. to the right place.
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * APIs, xDS, UDPA, gRPC, configuration, security, Python, and Bash.
+  * xDS APIs, configuration and control plane.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
