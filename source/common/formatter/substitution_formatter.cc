@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/thread.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -1294,8 +1295,7 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  TRY_ASSERT_MAIN_THREAD { MessageUtil::jsonConvertValue(*proto, val); }
-  END_TRY
+  TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
   catch (EnvoyException& ex) {
     return unspecifiedValue();
   }
