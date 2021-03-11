@@ -11,8 +11,6 @@ QuicClientConnectionFactoryImpl::createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr local_addr,
     Network::TransportSocketFactory& transport_socket_factory, Stats::Scope& stats_scope,
     Event::Dispatcher& dispatcher, TimeSource& time_source) {
-  // TODO(#14829): reject config if anything but QuicClientTransportSocketConfigFactory configured.
-  // raw buffer socket is configured.
   auto* quic_socket_factory =
       dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
   ASSERT(quic_socket_factory != nullptr);
