@@ -22,6 +22,9 @@ public:
   ~QuicClientConnectionFactory() override = default;
 
   // Allows thread-local creation of PersistentQuicInfo.
+  // Each (thread local) connection pool can call createNetworkConnectionInfo to create a
+  // PersistentQuicInfo, then use that PersistentQuicInfo. when calling createQuicNetworkConnection
+  // for all the connections in that pool.
   virtual std::unique_ptr<PersistentQuicInfo>
   createNetworkConnectionInfo(Event::Dispatcher& dispatcher,
                               Network::TransportSocketFactory& transport_socket_factory,
