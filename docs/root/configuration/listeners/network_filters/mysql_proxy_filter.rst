@@ -7,7 +7,7 @@ The MySQL proxy filter decodes the wire protocol between the MySQL client
 and server. It decodes the SQL queries in the payload (SQL99 format only).
 The decoded info is emitted as dynamic metadata that can be combined with
 access log filters to get detailed information on tables accessed as well
-as operations performed on each table. It's a transpaent filter, so it 
+as operations performed on each table. It's a transparent filter, so it 
 won't affect the normal progress of client and server.
 
 .. attention::

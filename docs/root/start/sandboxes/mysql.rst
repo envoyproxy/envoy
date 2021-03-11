@@ -49,7 +49,7 @@ Terminal 1
 
 .. code-block:: console
 
-  $ docker run --rm -it --network envoymesh mysql:5.7 mysql -h proxy -P 1999 -u root  --skip-ssl
+  $ docker run --rm -it --network envoymesh mysql:5.7 mysql -h proxy -P 1999 -u root --skip-ssl
   ... snip ...
 
   mysql> CREATE DATABASE test;
