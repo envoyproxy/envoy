@@ -11,6 +11,7 @@ namespace {
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
+using testing::HasSubstr;
 
 TEST(DependencyManagerTest, RegisterFilter) {
   DependencyManager manager;
@@ -27,7 +28,8 @@ TEST(DependencyManagerTest, RegisterFilterWithDependency) {
   provided->set_type(Dependency::FILTER_STATE_KEY);
   provided->set_name("potato");
   manager.registerFilter("ingredient", dependencies);
-  EXPECT_TRUE(manager.validDecodeDependencies());
+  auto result = manager.validDecodeDependencies();
+  EXPECT_TRUE(result.ok());
 }
 
 TEST(DependencyManagerTest, Valid) {
@@ -46,7 +48,8 @@ TEST(DependencyManagerTest, Valid) {
   manager.registerFilter("ingredient", d1);
   manager.registerFilter("chef", d2);
 
-  EXPECT_TRUE(manager.validDecodeDependencies());
+  auto result = manager.validDecodeDependencies();
+  EXPECT_TRUE(result.ok());
 }
 
 TEST(DependencyManagerTest, MissingProvidencyInvalid) {
@@ -57,7 +60,11 @@ TEST(DependencyManagerTest, MissingProvidencyInvalid) {
   required->set_type(Dependency::FILTER_STATE_KEY);
   required->set_name("potato");
   manager.registerFilter("chef", dependencies);
-  EXPECT_FALSE(manager.validDecodeDependencies());
+
+  auto result = manager.validDecodeDependencies();
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(),
+              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
 
 TEST(DependencyManagerTest, WrongProvidencyTypeInvalid) {
@@ -76,7 +83,10 @@ TEST(DependencyManagerTest, WrongProvidencyTypeInvalid) {
   manager.registerFilter("ingredient", d1);
   manager.registerFilter("chef", d2);
 
-  EXPECT_FALSE(manager.validDecodeDependencies());
+  auto result = manager.validDecodeDependencies();
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(),
+              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
 
 TEST(DependencyManagerTest, WrongProvidencyNameInvalid) {
@@ -95,7 +105,10 @@ TEST(DependencyManagerTest, WrongProvidencyNameInvalid) {
   manager.registerFilter("ingredient", d1);
   manager.registerFilter("chef", d2);
 
-  EXPECT_FALSE(manager.validDecodeDependencies());
+  auto result = manager.validDecodeDependencies();
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(),
+              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
 
 TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
@@ -114,7 +127,10 @@ TEST(DependencyManagerTest, MisorderedFiltersInvalid) {
   manager.registerFilter("chef", d2);
   manager.registerFilter("ingredient", d1);
 
-  EXPECT_FALSE(manager.validDecodeDependencies());
+  auto result = manager.validDecodeDependencies();
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.message(),
+              HasSubstr("filter 'chef' requires a FILTER_STATE_KEY named 'potato'"));
 }
 
 } // namespace

@@ -10,7 +10,7 @@ routing PRs, questions, etc. to the right place.
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * APIs, xDS, UDPA, gRPC, configuration, security, Python, and Bash.
+  * xDS APIs, configuration and control plane.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
@@ -57,13 +57,9 @@ routing PRs, questions, etc. to the right place.
 This section lists a few people that are not maintainers but typically help out with subject
 matter expert reviews. Feel free to loop them in as needed.
 
-* Shriram Rajagopalan ([rshriram](https://github.com/rshriram)) (shriram@us.ibm.com)
-  * Istio, APIs, HTTP routing, and WebSocket.
-* John Millikin ([jmillikin-stripe](https://github.com/jmillikin-stripe)) (jmillikin@stripe.com)
-  * Bazel/build.
-* Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
-  * Redis, Python, configuration/operational questions.
 * Yuchen Dai ([lambdai](https://github.com/lambdai)) (lambdai@google.com)
   * v2 xDS, listeners, filter chain discovery service.
 * Michael Payne ([moderation](https://github.com/moderation)) (m@m17e.org)
   * External dependencies, Envoy's supply chain and documentation.
+* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
+  * Scalability and performance.

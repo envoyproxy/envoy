@@ -62,6 +62,10 @@ typed_config:
     - user
     - openid
     - email
+    resources:
+    - oauth2-resource
+    - http://example.com
+    - https://example.com
 )EOF");
 
     // Add the OAuth cluster.

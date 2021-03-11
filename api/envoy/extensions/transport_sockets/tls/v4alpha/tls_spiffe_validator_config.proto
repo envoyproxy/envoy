@@ -4,7 +4,6 @@ package envoy.extensions.transport_sockets.tls.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
 
-import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -15,25 +14,26 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: SPIFFE Certificate Validator]
+// [#extension: envoy.tls.cert_validator.spiffe]
 
-// Configuration specific to the SPIFFE certificate validator provided at
-// :ref:`envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext.custom_validator_config<envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.custom_validator_config>`.
+// Configuration specific to the `SPIFFE <https://github.com/spiffe/spiffe>`_ certificate validator.
 //
 // Example:
 //
-// .. code-block:: yaml
+// .. validated-code-block:: yaml
+//   :type-name: envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext
 //
-//  custom_validator_config:
-//    name: envoy.tls.cert_validator.spiffe
-//    typed_config:
-//      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-//      trust_domains:
-//      - name: foo.com
-//        trust_bundle:
-//          filename: "foo.pem"
-//      - name: envoy.com
-//        trust_bundle:
-//          filename: "envoy.pem"
+//   custom_validator_config:
+//     name: envoy.tls.cert_validator.spiffe
+//     typed_config:
+//       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+//       trust_domains:
+//       - name: foo.com
+//         trust_bundle:
+//           filename: "foo.pem"
+//       - name: envoy.com
+//         trust_bundle:
+//           filename: "envoy.pem"
 //
 // In this example, a presented peer certificate whose SAN matches `spiffe//foo.com/**` is validated against
 // the "foo.pem" x.509 certificate. All the trust bundles are isolated from each other, so no trust domain can mint

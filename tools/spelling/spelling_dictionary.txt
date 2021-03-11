@@ -971,6 +971,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
@@ -1165,6 +1166,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain

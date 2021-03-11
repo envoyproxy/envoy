@@ -12,9 +12,18 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Stats {
+
+const std::vector<absl::string_view>& TagExtractionContext::tokens() {
+  if (tokens_.empty()) {
+    tokens_ = absl::StrSplit(name_, '.');
+  }
+  return tokens_;
+}
 
 namespace {
 
@@ -86,10 +95,11 @@ std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
   return tag.value_;
 }
 
-bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                           IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
+  absl::string_view stat_name = context.name();
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re-skip", name_);
     PERF_TAG_INC(skipped_);
@@ -128,10 +138,11 @@ TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_vi
                                          absl::string_view substr)
     : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
 
-bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
+  absl::string_view stat_name = context.name();
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re2-skip", name_);
     PERF_TAG_INC(skipped_);
@@ -167,6 +178,114 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
   PERF_RECORD(perf, "re2-miss", name_);
   PERF_TAG_INC(missed_);
   return false;
+}
+
+TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens)
+    : TagExtractorImplBase(name, tokens, ""), tokens_(absl::StrSplit(tokens, '.')),
+      match_index_(findMatchIndex(tokens_)) {
+  if (!tokens_.empty()) {
+    const absl::string_view first = tokens_[0];
+    if (first != "$" && first != "*" && first != "**") {
+      prefix_ = first;
+    }
+  }
+}
+
+uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
+  for (uint32_t i = 0; i < tokens.size(); ++i) {
+    if (tokens[i] == "$") {
+      return i;
+    }
+  }
+  ASSERT(false, absl::StrCat("did not find match in ", absl::StrJoin(tokens, ".")));
+  return 0;
+}
+
+bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
+                                        IntervalSet<size_t>& remove_characters) const {
+  PERF_OPERATION(perf);
+  const std::vector<absl::string_view>& input_tokens = context.tokens();
+  uint32_t match_input_index = input_tokens.size(), start = 0;
+  if (!searchTags(input_tokens, 0, 0, 0, start, match_input_index)) {
+    PERF_RECORD(perf, "tokens-miss", name_);
+    PERF_TAG_INC(missed_);
+    return false;
+  }
+  const absl::string_view tag_value = input_tokens[match_input_index];
+
+  // Given the starting character-index of the match token, we have to
+  // choose some character-bounds to remove from the elaborated stat-name
+  // in order to construct the tag-extracted name. There are 3 cases.
+  // Assume we are matching against "ab.cd.ef".
+  //                   char indexes 01234567
+  //
+  //   1. remove "ab." at the beginning:   remove char-indexes [0,2].
+  //   2. remove "cd." in the middle:      remove char-indexes [3,5].
+  //   3. remove ".ef" at the end:         remove char-indexes [5,7].
+  //
+  // Note that if two tag extractors matches on the last two tokens, we'll be
+  // left with a trailing dot in the tag-extracted name, e.g. "ab."  However we
+  // need this policy of removing the leading dot to work coherently with
+  // stat-names that match with a regexes that explicitly calls out the match
+  // scope, and in practice this does not occur, as usually the match comes
+  // right after a keyword, and we'll never want the keyword as a tag-value
+  // itself.
+  uint32_t end = start + tag_value.size();
+  if (match_input_index < (input_tokens.size() - 1)) {
+    ++end; // Remove dot leading to next token, e.g. "ab." or "cd."
+  } else if (start > 0) {
+    --start; // Remove the dot prior to the lat token, e.g. ".ef"
+  }
+  addTag(tags) = tag_value;
+  remove_characters.insert(start, end);
+
+  PERF_RECORD(perf, "tokens-match", name_);
+  PERF_TAG_INC(matched_);
+  return true;
+}
+
+bool TagExtractorTokensImpl::searchTags(const std::vector<absl::string_view>& input_tokens,
+                                        uint32_t input_index, uint32_t pattern_index,
+                                        uint32_t char_index, uint32_t& start,
+                                        uint32_t& match_input_index) const {
+  for (; input_index < input_tokens.size() && pattern_index < tokens_.size();
+       ++input_index, ++pattern_index) {
+    if (pattern_index == match_index_) {
+      start = char_index;
+      match_input_index = input_index;
+    } else {
+      const absl::string_view expected_token = tokens_[pattern_index];
+      if (expected_token == "**") {
+        if (pattern_index == tokens_.size() - 1) {
+          pattern_index = tokens_.size();
+          input_index = input_tokens.size();
+          break;
+        }
+
+        // A "**" in the pattern anywhere except the end means that we must find
+        // a match for the remainder of the pattern anywhere in the the
+        // input. Consider pattern "a.**.b.c.$" and input "a.x.b.b.c.d". We
+        // don't want to only match the "**" against "x" when it should match
+        // against "x.b". Thus we recurse looking for a complete match, starting
+        // from each possible suffix until we find a match.
+        ++pattern_index;
+        for (; input_index < input_tokens.size(); ++input_index) {
+          if (searchTags(input_tokens, input_index, pattern_index, char_index, start,
+                         match_input_index)) {
+            return true;
+          }
+          char_index += input_tokens[input_index].size() + 1;
+        }
+        return false;
+      }
+      const absl::string_view input_token = input_tokens[input_index];
+      if (expected_token != "*" && expected_token != input_token) {
+        return false;
+      }
+      char_index += input_token.size() + 1;
+    }
+  }
+  return pattern_index == tokens_.size() && input_index == input_tokens.size();
 }
 
 } // namespace Stats
