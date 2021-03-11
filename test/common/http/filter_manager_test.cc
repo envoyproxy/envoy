@@ -233,6 +233,7 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   EXPECT_CALL(*stream_filter, onDestroy());
   EXPECT_CALL(*stream_filter, decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*stream_filter, decodeComplete());
   EXPECT_CALL(*stream_filter, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
 
   auto decoder_filter = std::make_shared<NiceMock<Envoy::Http::MockStreamDecoderFilter>>();
@@ -314,6 +315,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   std::shared_ptr<MockStreamFilter> filter(new MockStreamFilter());
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
         ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
@@ -341,6 +343,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, onMatchCallback(_));
   filter_manager_->decodeHeaders(*grpc_headers, true);
