@@ -1,4 +1,5 @@
 #include "extensions/filters/http/composite/filter.h"
+
 #include "envoy/http/filter.h"
 
 namespace Envoy {

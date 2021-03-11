@@ -1,10 +1,12 @@
+#include <memory>
+
 #include "envoy/http/metadata_interface.h"
+
 #include "extensions/filters/http/composite/filter.h"
 
 #include "test/mocks/http/mocks.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
