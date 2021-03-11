@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "common/common/thread.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -14,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/grpc/common.h"
