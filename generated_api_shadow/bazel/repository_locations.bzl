@@ -18,7 +18,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "da5f32d925dd07b80a80769a06b0e0f632dff30a656fbd4ffacac2de4a306ffd",
         strip_prefix = "protoc-gen-validate-{version}",
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/{version}.tar.gz"],
-        release_date = "2021-03-09",
+        release_date = "2021-03-10",
         use_category = ["api"],
         implied_untracked_deps = [
             "com_github_iancoleman_strcase",
