@@ -21,6 +21,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
     ],
@@ -43,6 +44,25 @@ envoy_cc_benchmark_binary(
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "compressor_integration_tests",
+    srcs = [
+        "compressor_integration_tests.cc",
+        "compressor_integration_tests.h",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/compression/gzip/compressor:config",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/compressor:config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
