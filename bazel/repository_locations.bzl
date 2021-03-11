@@ -1,5 +1,4 @@
 # This should match the schema defined in external_deps.bzl.
-# MAKE IT FAIL!
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazel-compilation-database",
