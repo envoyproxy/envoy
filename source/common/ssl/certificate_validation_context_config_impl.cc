@@ -39,7 +39,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                     config.custom_validator_config())
               : absl::nullopt),
       api_(api) {
-  if (ca_cert_.empty()) {
+  if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
                                        certificateRevocationListPath()));
@@ -49,7 +49,8 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                            "trusted CA is insecure and not allowed");
     }
     if (allow_expired_certificate_) {
-      throw EnvoyException("Certificate validity period is always ignored without trusted CA");
+      throw EnvoyException(
+          "Certificate validity period is always ignored without trusted         CA");
     }
   }
 }
