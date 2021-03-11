@@ -106,6 +106,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
           reason = StreamResetReason::ProtocolError;
+          connection_->streamInfo().setResponseFlag(
+              StreamInfo::ResponseFlag::UpstreamProtocolError);
         }
       }
     }

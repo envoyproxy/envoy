@@ -128,6 +128,9 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DurationTimeout)) {
     common_access_log.mutable_response_flags()->set_duration_timeout(true);
   }
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+    common_access_log.mutable_response_flags()->set_upstream_protocol_error(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
