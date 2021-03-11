@@ -135,6 +135,10 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     appendString(result, DURATION_TIMEOUT);
   }
 
+  if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
+    appendString(result, NO_CLUSTER_FOUND);
+  }
+
   return result.empty() ? NONE : result;
 }
 
