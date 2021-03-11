@@ -82,7 +82,7 @@ typed_config:
   checkVerifyErrorCouter(0);
 }
 
-// Client certificate has expired but the config allowes expired certificates, so this case should
+// Client certificate has expired but the config allows expired certificates, so this case should
 // be accepted.
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorExpiredButAccepcepted) {
   auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
