@@ -4,6 +4,8 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/utility.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -63,8 +65,8 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
 Event::Dispatcher::CreateUdpListenerParams
 ActiveUdpListenerBase::configToUdpListenerParams(Network::ListenerConfig& config) {
   Event::Dispatcher::CreateUdpListenerParams params;
-  params.max_packet_size_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.udpListenerConfig()->config(), max_packet_size, 1500);
+  params.max_packet_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config.udpListenerConfig()->config(), max_packet_size, Network::DEFAULT_UDP_PACKET_SIZE);
   return params;
 }
 

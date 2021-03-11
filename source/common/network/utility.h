@@ -57,6 +57,8 @@ public:
   virtual uint64_t maxPacketSize() const PURE;
 };
 
+static const uint64_t DEFAULT_UDP_PACKET_SIZE = 1500;
+
 /**
  * Common network utility routines.
  */

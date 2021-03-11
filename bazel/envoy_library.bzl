@@ -94,7 +94,6 @@ EXTENSION_CATEGORIES = [
     "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream",
     "envoy.tls.cert_validator",
-    "envoy.udp_packet_writers",
     "envoy.upstreams",
     "envoy.wasm.runtime",
     "DELIBERATELY_OMITTED",

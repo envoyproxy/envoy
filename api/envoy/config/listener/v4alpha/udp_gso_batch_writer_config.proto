@@ -11,9 +11,11 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: UDP GSO Batch Writer]
-// [#extension: envoy.udp_packet_writers.udp_gso_batch_writer]
+// [#comment:#extension: envoy.udp_packet_writers.udp_gso_batch_writer]
 
 // Configuration specific to the UDP GSO Batch Writer.
+// [#not-implemented-hide:]
+// [#comment:TODO(mattklein123): Consider removing this as an extension point.]
 message UdpGsoBatchWriterOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.UdpGsoBatchWriterOptions";

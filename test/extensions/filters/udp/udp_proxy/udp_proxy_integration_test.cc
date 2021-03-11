@@ -70,10 +70,10 @@ typed_config:
     BaseIntegrationTest::initialize();
   }
 
-  void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
-                                          std::string request = "hello",
-                                          std::string response = "world1",
-                                          uint64_t max_packet_size = 1500) {
+  void
+  requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
+                                     std::string request = "hello", std::string response = "world1",
+                                     uint64_t max_packet_size = Network::DEFAULT_UDP_PACKET_SIZE) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_, max_packet_size);
     client.write(request, listener_address);

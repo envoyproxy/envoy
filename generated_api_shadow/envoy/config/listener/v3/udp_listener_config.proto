@@ -46,7 +46,9 @@ message UdpListenerConfig {
   // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
   // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the
   // actual UDP writer to create. If not specified the default UDP writer is used.
-  // [#extension-category: envoy.udp_packet_writers]
+  // [#comment:#extension-category: envoy.udp_packet_writers]
+  // [#not-implemented-hide:]
+  // [#comment:TODO(mattklein123): Consider removing this as an extension point.]
   core.v3.TypedExtensionConfig writer_config = 5;
 }
 

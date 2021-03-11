@@ -8,6 +8,8 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
+#include "common/network/utility.h"
+
 namespace Envoy {
 namespace Network {
 namespace Test {
@@ -179,14 +181,16 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  * instantiate the buffer returned in data.
  */
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data, uint64_t max_packet_size = 1500);
+                                       UdpRecvData& data,
+                                       uint64_t max_packet_size = Network::DEFAULT_UDP_PACKET_SIZE);
 
 /**
  * A synchronous UDP peer that can be used for testing.
  */
 class UdpSyncPeer {
 public:
-  UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_packet_size = 1500);
+  UdpSyncPeer(Network::Address::IpVersion version,
+              uint64_t max_packet_size = Network::DEFAULT_UDP_PACKET_SIZE);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);

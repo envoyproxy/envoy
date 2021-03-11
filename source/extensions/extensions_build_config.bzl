@@ -142,12 +142,6 @@ EXTENSIONS = {
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #
-    # UDP packet writers
-    #
-
-    "envoy.udp_packet_writers.udp_gso_batch_writer":    "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_config_lib",
-
-    #
     # Resource monitors
     #
 

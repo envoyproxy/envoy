@@ -13,7 +13,6 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/socket_interface.h"
 #include "common/network/socket_option_factory.h"
-#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/utility.h"
