@@ -13,7 +13,11 @@ A minimal fully static bootstrap config is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
+    access_log:
+    - name: envoy.access_loggers.file
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -66,7 +70,11 @@ on 127.0.0.1:5678 is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
+    access_log:
+    - name: envoy.access_loggers.file
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -174,7 +182,11 @@ below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
+    access_log:
+    - name: envoy.access_loggers.file
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
