@@ -26,27 +26,31 @@ void* safe_calloc(size_t count, size_t size) {
 
 void envoy_noop_release(void* context) { (void)context; }
 
-void release_envoy_headers(envoy_headers headers) {
-  for (envoy_header_size_t i = 0; i < headers.length; i++) {
-    envoy_header header = headers.headers[i];
-    header.key.release(header.key.context);
-    header.value.release(header.value.context);
+void release_envoy_data_map(envoy_map map) {
+  for (envoy_map_size_t i = 0; i < map.length; i++) {
+    envoy_map_entry entry = map.entries[i];
+    entry.key.release(entry.key.context);
+    entry.value.release(entry.value.context);
   }
-  free(headers.headers);
+  free(map.entries);
 }
 
-envoy_headers copy_envoy_headers(envoy_headers src) {
-  envoy_header* dst_header_array =
-      static_cast<envoy_header*>(safe_malloc(sizeof(envoy_header) * src.length));
-  for (envoy_header_size_t i = 0; i < src.length; i++) {
-    envoy_header new_header = {
-        copy_envoy_data(src.headers[i].key.length, src.headers[i].key.bytes),
-        copy_envoy_data(src.headers[i].value.length, src.headers[i].value.bytes)};
-    dst_header_array[i] = new_header;
+void release_envoy_headers(envoy_headers headers) { release_envoy_data_map(headers); }
+
+envoy_map copy_envoy_data_map(envoy_map src) {
+  envoy_map_entry* dst_entries =
+      static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * src.length));
+  for (envoy_map_size_t i = 0; i < src.length; i++) {
+    envoy_map_entry new_entry = {
+        copy_envoy_data(src.entries[i].key.length, src.entries[i].key.bytes),
+        copy_envoy_data(src.entries[i].value.length, src.entries[i].value.bytes)};
+    dst_entries[i] = new_entry;
   }
-  envoy_headers dst = {src.length, dst_header_array};
+  envoy_map dst = {src.length, dst_entries};
   return dst;
 }
+
+envoy_headers copy_envoy_headers(envoy_headers src) { return copy_envoy_data_map(src); }
 
 envoy_data copy_envoy_data(size_t length, const uint8_t* src_bytes) {
   uint8_t* dst_bytes = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * length));

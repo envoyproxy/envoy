@@ -36,17 +36,17 @@ static inline envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
     return envoy_noheaders;
   }
 
-  envoy_header_size_t length = 0;
+  envoy_map_size_t length = 0;
   for (NSString *headerKey in headers) {
     length += [headers[headerKey] count];
   }
-  envoy_header *header_array = (envoy_header *)safe_malloc(sizeof(envoy_header) * length);
-  envoy_header_size_t header_index = 0;
+  envoy_map_entry *header_array = (envoy_map_entry *)safe_malloc(sizeof(envoy_map_entry) * length);
+  envoy_map_size_t header_index = 0;
   for (id headerKey in headers) {
     NSArray *headerList = headers[headerKey];
     for (NSString *headerValue in headerList) {
-      envoy_header new_header = {toManagedNativeString(headerKey),
-                                 toManagedNativeString(headerValue)};
+      envoy_map_entry new_header = {toManagedNativeString(headerKey),
+                                    toManagedNativeString(headerValue)};
       header_array[header_index++] = new_header;
     }
   }
@@ -75,8 +75,8 @@ static inline NSData *to_ios_data(envoy_data data) {
 
 static inline EnvoyHeaders *to_ios_headers(envoy_headers headers) {
   NSMutableDictionary *headerDict = [NSMutableDictionary new];
-  for (envoy_header_size_t i = 0; i < headers.length; i++) {
-    envoy_header header = headers.headers[i];
+  for (envoy_map_size_t i = 0; i < headers.length; i++) {
+    envoy_map_entry header = headers.entries[i];
     NSString *headerKey = [[NSString alloc] initWithBytes:header.key.bytes
                                                    length:header.key.length
                                                  encoding:NSUTF8StringEncoding];
