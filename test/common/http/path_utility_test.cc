@@ -75,7 +75,9 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
       {"/a/..\\c", "/c"},           // "..\\" canonicalization
       {"/%c0%af", "/%c0%af"},       // 2 bytes unicode reserved characters
       {"/%5c%25", "/%5c%25"},       // reserved characters
-      {"/a/b/%2E%2E/c", "/a/c"}     // %2E escape
+      {"/a/b/%2E%2E/c", "/a/c"},    // %2E escape
+      {"/a/b/%2E./c", "/a/c"},      {"/a/b/%2E/c", "/a/b/c"}, {"..", "/"},
+      {"/a/b/%2E/c", "/a/b/c"},     {"/../a/b", "/a/b"},      {"/./a/b", "/a/b"},
   };
 
   for (const auto& path_pair : non_normal_pairs) {

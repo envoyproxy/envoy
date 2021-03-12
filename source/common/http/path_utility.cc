@@ -120,8 +120,8 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
 }
 
 PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_transformation) {
-  const Protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation> operations =
-      path_transformation.operations();
+  const Protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation>&
+      operations = path_transformation.operations();
   for (auto const& operation : operations) {
     if (operation.has_normalize_path_rfc_3986()) {
       transformations.emplace_back(PathTransformer::rfcNormalize);
@@ -133,10 +133,11 @@ PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_
 
 absl::optional<std::string> PathTransformer::transform(absl::string_view original) {
   std::string path = original.data();
-  for (Transformation transformation : transformations) {
+  for (Transformation const& transformation : transformations) {
     absl::optional<std::string> transformed = transformation(path).value();
-    if (!transformed.has_value())
+    if (!transformed.has_value()) {
       return {};
+    }
     path = transformed.value();
   }
   return path;
