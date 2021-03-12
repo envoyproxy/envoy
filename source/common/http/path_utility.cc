@@ -37,26 +37,11 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
-  // canonicalPath is supposed to apply on path component in URL instead of :path header
-  const auto query_pos = original_path.find('?');
-  auto normalized_path_opt = canonicalizePath(
-      query_pos == original_path.npos
-          ? original_path
-          : absl::string_view(original_path.data(), query_pos) // '?' is not included
-  );
-
-  if (!normalized_path_opt.has_value()) {
+  absl::optional<std::string> normalized_path = PathTransformer::rfcNormalize(original_path);
+  if (!normalized_path.has_value()) {
     return false;
   }
-  auto& normalized_path = normalized_path_opt.value();
-  const absl::string_view query_suffix =
-      query_pos == original_path.npos
-          ? absl::string_view{}
-          : absl::string_view{original_path.data() + query_pos, original_path.size() - query_pos};
-  if (!query_suffix.empty()) {
-    normalized_path.insert(normalized_path.end(), query_suffix.begin(), query_suffix.end());
-  }
-  headers.setPath(normalized_path);
+  headers.setPath(normalized_path.value());
   return true;
 }
 
