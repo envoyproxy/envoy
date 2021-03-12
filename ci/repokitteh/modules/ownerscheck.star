@@ -204,9 +204,9 @@ def _comment(config, results, assignees, sender, force=False):
         if assignee in members:
           api_assignee = assignee
           break
-      # Otherwise, pick at "random" (we just use timestamp).
+      # Otherwise, pick at random.
       if not api_assignee:
-        api_assignee = members[now().second % len(members)]
+        api_assignee = members[random.randint(1000000) % len(members)]
       lines.append('API shepherd assignee is @%s' % api_assignee)
       github.issue_assign(api_assignee)
 
