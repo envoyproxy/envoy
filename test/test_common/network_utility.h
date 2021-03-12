@@ -180,9 +180,9 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  * UdpRecvData without worrying about the packet processor interface. The function will
  * instantiate the buffer returned in data.
  */
-Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data,
-                                       uint64_t max_packet_size = Network::DEFAULT_UDP_PACKET_SIZE);
+Api::IoCallUint64Result
+readFromSocket(IoHandle& handle, const Address::Instance& local_address, UdpRecvData& data,
+               uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_DATAGRAM_SIZE);
 
 /**
  * A synchronous UDP peer that can be used for testing.
@@ -190,7 +190,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
 class UdpSyncPeer {
 public:
   UdpSyncPeer(Network::Address::IpVersion version,
-              uint64_t max_packet_size = Network::DEFAULT_UDP_PACKET_SIZE);
+              uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_DATAGRAM_SIZE);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);
@@ -205,7 +205,7 @@ public:
 
 private:
   const Network::SocketPtr socket_;
-  const uint64_t max_packet_size_;
+  const uint64_t max_rx_datagram_size_;
   std::list<Network::UdpRecvData> received_datagrams_;
 };
 

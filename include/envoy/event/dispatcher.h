@@ -235,8 +235,8 @@ public:
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   struct CreateUdpListenerParams {
-    // The maximum size packet to receive.
-    uint64_t max_packet_size_;
+    // The maximum size datagram to receive.
+    uint64_t max_rx_datagram_size_;
   };
   virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                                     Network::UdpListenerCallbacks& cb,

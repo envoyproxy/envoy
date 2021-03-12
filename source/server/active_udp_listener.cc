@@ -65,8 +65,9 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
 Event::Dispatcher::CreateUdpListenerParams
 ActiveUdpListenerBase::configToUdpListenerParams(Network::ListenerConfig& config) {
   Event::Dispatcher::CreateUdpListenerParams params;
-  params.max_packet_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config.udpListenerConfig()->config(), max_packet_size, Network::DEFAULT_UDP_PACKET_SIZE);
+  params.max_rx_datagram_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config.udpListenerConfig()->config(), max_downstream_rx_datagram_size,
+      Network::DEFAULT_UDP_DATAGRAM_SIZE);
   return params;
 }
 

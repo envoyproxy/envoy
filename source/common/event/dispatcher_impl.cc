@@ -210,7 +210,7 @@ Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedP
                                                           const CreateUdpListenerParams& params) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
-                                                    params.max_packet_size_);
+                                                    params.max_rx_datagram_size_);
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

@@ -9,6 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "UdpListenerConfigProto";
@@ -39,9 +40,11 @@ message UdpListenerConfig {
     google.protobuf.Any typed_config = 3;
   }
 
-  // The maximum size of received UDP packets. Using a larger size will cause Envoy to allocate
-  // more memory per listener. If not set defaults to 1500 bytes.
-  google.protobuf.UInt64Value max_packet_size = 4;
+  // The maximum size of received downstream UDP datagrams. Using a larger size will cause Envoy to allocate
+  // more memory per listener. Received datagrams above this size will be dropped. If not set
+  // defaults to 1500 bytes.
+  google.protobuf.UInt64Value max_downstream_rx_datagram_size = 4
+      [(validate.rules).uint64 = {lte: 65536}];
 
   // If the protocol in the listener socket address in :ref:`protocol
   // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP

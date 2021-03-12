@@ -92,16 +92,16 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
   }
 }
 
-Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
+Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::InstancePtr& buffer,
                                        IoHandle::RecvMsgOutput& output, IoHandle& handle,
                                        const Address::Instance& local_address) {
 
-  auto reservation = buffer->reserveSingleSlice(max_packet_size);
+  auto reservation = buffer->reserveSingleSlice(max_rx_datagram_size);
   Buffer::RawSlice slice = reservation.slice();
   Api::IoCallUint64Result result = handle.recvmsg(&slice, 1, local_address.ip()->port(), output);
 
   if (result.ok()) {
-    reservation.commit(std::min(max_packet_size, result.rc_));
+    reservation.commit(std::min(max_rx_datagram_size, result.rc_));
   }
 
   return result;
@@ -574,11 +574,11 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
-    const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
-    ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_packet_size_with_gro);
+    const uint64_t max_rx_datagram_size_with_gro = 16 * udp_packet_processor.maxDatagramSize();
+    ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_rx_datagram_size_with_gro);
 
     Api::IoCallUint64Result result =
-        receiveMessage(max_packet_size_with_gro, buffer, output, handle, local_address);
+        receiveMessage(max_rx_datagram_size_with_gro, buffer, output, handle, local_address);
 
     if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
       return result;
@@ -610,15 +610,15 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   }
 
   if (handle.supportsMmsg()) {
-    const auto max_packet_size = udp_packet_processor.maxPacketSize();
+    const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
 
     // Buffer::ReservationSingleSlice is always passed by value, and can only be constructed
     // by Buffer::Instance::reserve(), so this is needed to keep a fixed array
     // in which all elements are legally constructed.
     struct BufferAndReservation {
-      BufferAndReservation(uint64_t max_packet_size)
+      BufferAndReservation(uint64_t max_rx_datagram_size)
           : buffer_(std::make_unique<Buffer::OwnedImpl>()),
-            reservation_(buffer_->reserveSingleSlice(max_packet_size, true)) {}
+            reservation_(buffer_->reserveSingleSlice(max_rx_datagram_size, true)) {}
 
       Buffer::InstancePtr buffer_;
       Buffer::ReservationSingleSlice reservation_;
@@ -629,13 +629,13 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     RawSliceArrays slices(num_packets_per_mmsg_call,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
     for (uint32_t i = 0; i < num_packets_per_mmsg_call; i++) {
-      buffers.push_back(max_packet_size);
+      buffers.push_back(max_rx_datagram_size);
       slices[i][0] = buffers[i].reservation_.slice();
     }
 
     IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
     ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", num_packets_per_mmsg_call,
-                   max_packet_size);
+                   max_rx_datagram_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
     if (!result.ok()) {
       return result;
@@ -654,7 +654,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
                      output.msg_[i].peer_address_->asString());
 
-      buffers[i].reservation_.commit(std::min(max_packet_size, msg_len));
+      buffers[i].reservation_.commit(std::min(max_rx_datagram_size, msg_len));
 
       passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                              output.msg_[i].local_address_, udp_packet_processor, receive_time);
@@ -665,9 +665,9 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
-  ENVOY_LOG_MISC(trace, "starting recvmsg with max={}", udp_packet_processor.maxPacketSize());
+  ENVOY_LOG_MISC(trace, "starting recvmsg with max={}", udp_packet_processor.maxDatagramSize());
   Api::IoCallUint64Result result =
-      receiveMessage(udp_packet_processor.maxPacketSize(), buffer, output, handle, local_address);
+      receiveMessage(udp_packet_processor.maxDatagramSize(), buffer, output, handle, local_address);
 
   if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
     return result;

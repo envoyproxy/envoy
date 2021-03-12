@@ -23,7 +23,7 @@ class UdpListenerImpl : public BaseListenerImpl,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  UdpListenerCallbacks& cb, TimeSource& time_source, uint64_t max_packet_size);
+                  UdpListenerCallbacks& cb, TimeSource& time_source, uint64_t max_rx_datagram_size);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
 
@@ -43,7 +43,7 @@ public:
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
                      MonotonicTime receive_time) override;
 
-  uint64_t maxPacketSize() const override { return max_packet_size_; }
+  uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
 
 protected:
   void handleWriteCallback();
@@ -57,7 +57,7 @@ private:
   void disableEvent();
 
   TimeSource& time_source_;
-  const uint64_t max_packet_size_;
+  const uint64_t max_rx_datagram_size_;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

@@ -529,7 +529,7 @@ using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 struct FakeUpstreamConfig {
   struct UdpConfig {
-    absl::optional<uint64_t> max_packet_size_;
+    absl::optional<uint64_t> max_rx_datagram_size_;
   };
 
   FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {

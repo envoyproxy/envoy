@@ -30,9 +30,9 @@ namespace Network {
 
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source,
-                                 uint64_t max_packet_size)
+                                 uint64_t max_rx_datagram_size)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),
-      max_packet_size_(max_packet_size) {
+      max_rx_datagram_size_(max_rx_datagram_size) {
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);

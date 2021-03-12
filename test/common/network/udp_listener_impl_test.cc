@@ -64,7 +64,7 @@ public:
     }
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource(),
-        Network::DEFAULT_UDP_PACKET_SIZE);
+        Network::DEFAULT_UDP_DATAGRAM_SIZE);
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
@@ -87,7 +87,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
-                           dispatcherImpl().timeSource(), Network::DEFAULT_UDP_PACKET_SIZE);
+                           dispatcherImpl().timeSource(), Network::DEFAULT_UDP_DATAGRAM_SIZE);
 
 #ifdef SO_RXQ_OVFL
   // Verify that overflow detection is enabled.
