@@ -568,7 +568,7 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 // was deleted (e.g. connection dropped with the client) before the posted callback was executed. In
 // this case the CacheFilter should not be accessed after it was deleted, which is ensured by using
 // a weak_ptr to the CacheFilter in the posted callback.
-// This test may mistakenly pass (false positive) even if the the CacheFilter is accessed after
+// This test may mistakenly pass (false positive) even if the CacheFilter is accessed after
 // being deleted, as filter_state_ may be accessed and read as "FilterState::Destroyed" which will
 // result in a correct behavior. However, running the test with ASAN sanitizer enabled should
 // reliably fail if the CacheFilter is accessed after being deleted.

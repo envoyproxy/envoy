@@ -257,7 +257,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
 
   // Do not read from the socket and send request that causes autonomous upstream to respond
   // with the specified number of DATA frames. This pre-fills downstream outbound frame queue
-  // such the the next response triggers flood protection.
+  // such the next response triggers flood protection.
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
   // start to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
