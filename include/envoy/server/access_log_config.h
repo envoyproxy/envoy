@@ -31,7 +31,7 @@ public:
    */
   virtual AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
                                                                AccessLog::FilterPtr&& filter,
-                                                               FactoryContext& context) PURE;
+                                                               ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.access_loggers"; }
 };

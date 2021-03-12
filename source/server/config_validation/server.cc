@@ -88,14 +88,11 @@ void ValidationInstance::initialize(const Options& options,
       stats().symbolTable(), bootstrap.node(), bootstrap.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap, options);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
-  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      component_factory.createRuntime(*this, initial_config));
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -103,6 +100,9 @@ void ValidationInstance::initialize(const Options& options,
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
       grpc_context_, router_context_, accessLogManager(), singletonManager(), options);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
+  Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }

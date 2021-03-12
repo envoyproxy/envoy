@@ -429,7 +429,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (const auto& access_log : config.access_log()) {
     AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(access_log, context_);
+        AccessLog::AccessLogFactory::fromProto(access_log, context_.getServerFactoryContext());
     access_logs_.push_back(current_access_log);
   }
 

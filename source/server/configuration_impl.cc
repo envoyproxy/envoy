@@ -16,12 +16,15 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
+#include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/runtime_utility.h"
 #include "common/config/utility.h"
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/utility.h"
+
+#include "extensions/access_loggers/file/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -191,10 +194,23 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options)
+                         const Options& options, Instance& server)
     : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
-  admin_.access_log_path_ = admin.access_log_path();
+
+  for (const auto& access_log : admin.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+    admin_.access_logs_.emplace_back(current_access_log);
+  }
+
+  if (!admin.access_log_path().empty()) {
+    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+        admin.access_log_path(), {},
+        Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        server.accessLogManager()));
+  }
+
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {

@@ -20,10 +20,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-AccessLog::InstanceSharedPtr
-FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                              AccessLog::FilterPtr&& filter,
-                                              Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ServerFactoryContext& context) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());

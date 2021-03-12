@@ -10,7 +10,7 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 
 GrpcAccessLoggerCacheSharedPtr
-getGrpcAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context);
+getGrpcAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& context);
 
 } // namespace GrpcCommon
 } // namespace AccessLoggers

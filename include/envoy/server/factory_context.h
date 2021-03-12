@@ -152,6 +152,13 @@ public:
    * @return StatsConfig& the servers stats configuration.
    */
   virtual StatsConfig& statsConfig() PURE;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**

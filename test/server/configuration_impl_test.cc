@@ -95,7 +95,6 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   std::string json = R"EOF(
   {
     "stats_flush_interval": "0.500s",
-
     "admin": {
       "access_log_path": "/dev/null",
       "address": {
@@ -520,7 +519,8 @@ TEST(InitialImplTest, LayeredRuntime) {
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -532,7 +532,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -547,7 +548,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
 TEST(InitialImplTest, EmptyDeprecatedRuntime) {
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -576,7 +578,8 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -602,7 +605,8 @@ TEST(InitialImplTest, V2BootstrapRuntimeInjection) {
   NiceMock<MockOptions> options;
   absl::optional<uint32_t> version{2};
   EXPECT_CALL(options, bootstrapVersion()).WillOnce(ReturnRef(version));
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -650,7 +654,8 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);

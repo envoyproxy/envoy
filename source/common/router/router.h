@@ -197,7 +197,8 @@ public:
                      config.respect_expected_rq_timeout(), config.strict_check_headers(),
                      context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
-      upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
+      upstream_logs_.push_back(
+          AccessLog::AccessLogFactory::fromProto(upstream_log, context.getServerFactoryContext()));
     }
   }
   using HeaderVector = std::vector<Http::LowerCaseString>;
