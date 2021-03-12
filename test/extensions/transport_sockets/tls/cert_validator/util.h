@@ -31,7 +31,7 @@ class TestCertificateValidationContextConfig
     : public Envoy::Ssl::CertificateValidationContextConfig {
 public:
   TestCertificateValidationContextConfig(envoy::config::core::v3::TypedExtensionConfig config,
-                                         bool allow_expired_certificate)
+                                         bool allow_expired_certificate = false)
       : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
         custom_validator_config_(config){};
   TestCertificateValidationContextConfig()
