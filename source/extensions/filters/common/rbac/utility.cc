@@ -10,9 +10,11 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+RoleBasedAccessControlFilterStats
+generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + "rbac.";
-  return {ALL_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  return {ENFORCE_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))
+              SHADOW_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix + shadow_prefix))};
 }
 
 std::string responseDetail(const std::string& policy_id) {

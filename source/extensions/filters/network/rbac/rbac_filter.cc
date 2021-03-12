@@ -15,7 +15,8 @@ namespace RBACFilter {
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
-    : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
+    : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(),
+                                                  proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),

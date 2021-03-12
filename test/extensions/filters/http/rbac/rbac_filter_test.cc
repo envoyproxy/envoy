@@ -128,6 +128,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
@@ -146,6 +150,10 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
@@ -183,6 +191,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, true));
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
   EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
@@ -222,6 +234,10 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
@@ -241,6 +257,10 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
