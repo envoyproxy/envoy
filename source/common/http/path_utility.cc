@@ -135,7 +135,8 @@ absl::optional<std::string> PathTransformer::transform(absl::string_view origina
   std::string path = original.data();
   for (Transformation transformation : transformations) {
     absl::optional<std::string> transformed = transformation(path).value();
-    if (!transformed.has_value()) return {};
+    if (!transformed.has_value())
+      return {};
     path = transformed.value();
   }
   return path;

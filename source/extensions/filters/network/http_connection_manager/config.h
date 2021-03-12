@@ -23,14 +23,12 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_stats.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/path_utility.h"
 #include "common/json/json_loader.h"
 #include "common/local_reply/local_reply.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/tracing/http_tracer_impl.h"
-#include "common/http/path_utility.h"
-
-
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
