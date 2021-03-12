@@ -88,7 +88,7 @@ typed_config:
                             EnvoyException, "Failed to load trusted CA certificate for hello.com");
 }
 
-// Mutiple trust bundles are given for the same trust domain.
+// Multiple trust bundles are given for the same trust domain.
 TEST_F(TestSPIFFEValidator, Constructor) {
   EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
