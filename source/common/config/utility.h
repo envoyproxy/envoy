@@ -24,8 +24,6 @@
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -496,21 +494,6 @@ public:
                                                                   random);
     }
     return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
-  }
-
-  /**
-   * Return the hash_key value inside the envoy.lb metadata filter value.
-   * @param metadata the metadata filters.
-   * @throws EnvoyException if there the value is not empty or a string type.
-   */
-  static std::string getHashKeyMetadataValue(const envoy::config::core::v3::Metadata* metadata) {
-    const ProtobufWkt::Value& val = Metadata::metadataValue(
-        metadata, MetadataFilters::get().ENVOY_LB, MetadataEnvoyLbKeys::get().HASH_KEY);
-    if (val.kind_case() != val.kStringValue && val.kind_case() != val.KIND_NOT_SET) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("hash_key must be string type, got: {}", val.kind_case()));
-    }
-    return val.string_value();
   }
 };
 
