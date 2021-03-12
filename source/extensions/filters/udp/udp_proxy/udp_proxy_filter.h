@@ -170,7 +170,7 @@ private:
                        Network::Address::InstanceConstSharedPtr peer_address,
                        Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
     uint64_t maxDatagramSize() const override {
-      return cluster_.filter_.config_->maxDatagramSize();
+      return cluster_.filter_.config_->maxUpstreamDatagramSize();
     }
 
     ClusterInfo& cluster_;
