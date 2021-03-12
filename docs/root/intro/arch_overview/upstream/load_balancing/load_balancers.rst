@@ -74,6 +74,7 @@ hashing, and like all hash-based load balancers, it is only effective when proto
 that specifies a value to hash on. If you want something other than the host's address to be used
 as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it 
 in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: 
+
 .. validated-code-block:: yaml
   :type-name: envoy.config.core.v3.Metadata
 
@@ -114,6 +115,7 @@ hashing load balancer is only effective when protocol routing is used that speci
 hash on. If you want something other than the host's address to be used as the hash key (e.g. the 
 semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the ``"envoy.lb"``
 :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: 
+
 .. validated-code-block:: yaml
   :type-name: envoy.config.core.v3.Metadata
 
