@@ -1,6 +1,6 @@
 #include "extensions/filters/http/cache/config.h"
-
 #include "extensions/filters/http/cache/cache_filter.h"
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 namespace Envoy {
 namespace Extensions {
