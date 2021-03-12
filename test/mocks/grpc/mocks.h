@@ -107,7 +107,7 @@ public:
 
   MOCK_METHOD(AsyncClientFactoryPtr, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               AsyncClientFactoryClusterChecks checks));
+               bool skip_cluster_check));
 };
 
 MATCHER_P(ProtoBufferEq, expected, "") {
