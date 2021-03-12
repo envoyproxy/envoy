@@ -144,7 +144,7 @@ static void pass_headers(const char* method, envoy_headers headers, jobject j_co
   jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmCallbackContext, method, "([B[BZ)V");
   jboolean start_headers = JNI_TRUE;
 
-  for (envoy_header_size_t i = 0; i < headers.length; i++) {
+  for (envoy_map_size_t i = 0; i < headers.length; i++) {
     // Note this is just an initial implementation, and we will pass a more optimized structure in
     // the future.
 
@@ -152,21 +152,21 @@ static void pass_headers(const char* method, envoy_headers headers, jobject j_co
     // requires a null-terminated *modified* UTF-8 string.
 
     // Create platform byte array for header key
-    jbyteArray key = env->NewByteArray(headers.headers[i].key.length);
+    jbyteArray key = env->NewByteArray(headers.entries[i].key.length);
     // TODO: check if copied via isCopy.
     // TODO: check for NULL.
     // https://github.com/lyft/envoy-mobile/issues/758
     void* critical_key = env->GetPrimitiveArrayCritical(key, nullptr);
-    memcpy(critical_key, headers.headers[i].key.bytes, headers.headers[i].key.length);
+    memcpy(critical_key, headers.entries[i].key.bytes, headers.entries[i].key.length);
     // Here '0' (for which there is no named constant) indicates we want to commit the changes back
     // to the JVM and free the c array, where applicable.
     env->ReleasePrimitiveArrayCritical(key, critical_key, 0);
 
     // Create platform byte array for header value
-    jbyteArray value = env->NewByteArray(headers.headers[i].value.length);
+    jbyteArray value = env->NewByteArray(headers.entries[i].value.length);
     // TODO: check for NULL.
     void* critical_value = env->GetPrimitiveArrayCritical(value, nullptr);
-    memcpy(critical_value, headers.headers[i].value.bytes, headers.headers[i].value.length);
+    memcpy(critical_value, headers.entries[i].value.bytes, headers.entries[i].value.length);
     env->ReleasePrimitiveArrayCritical(value, critical_value, 0);
 
     // Pass this header pair to the platform

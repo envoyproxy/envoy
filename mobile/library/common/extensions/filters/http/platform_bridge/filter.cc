@@ -19,11 +19,12 @@ namespace HttpFilters {
 namespace PlatformBridge {
 
 namespace {
+// TODO: https://github.com/envoyproxy/envoy-mobile/issues/1287
 void replaceHeaders(Http::HeaderMap& headers, envoy_headers c_headers) {
   headers.clear();
-  for (envoy_header_size_t i = 0; i < c_headers.length; i++) {
-    headers.addCopy(Http::LowerCaseString(Http::Utility::convertToString(c_headers.headers[i].key)),
-                    Http::Utility::convertToString(c_headers.headers[i].value));
+  for (envoy_map_size_t i = 0; i < c_headers.length; i++) {
+    headers.addCopy(Http::LowerCaseString(Http::Utility::convertToString(c_headers.entries[i].key)),
+                    Http::Utility::convertToString(c_headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(c_headers);
@@ -172,7 +173,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   case kEnvoyFilterHeadersStatusStopIteration:
     pending_headers_ = &headers;
     iteration_state_ = IterationState::Stopped;
-    ASSERT(result.headers.length == 0 && result.headers.headers == NULL);
+    ASSERT(result.headers.length == 0 && result.headers.entries == NULL);
     return Http::FilterHeadersStatus::StopIteration;
 
   default:
@@ -298,7 +299,7 @@ Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::He
   case kEnvoyFilterTrailersStatusStopIteration:
     pending_trailers_ = &trailers;
     iteration_state_ = IterationState::Stopped;
-    ASSERT(result.trailers.length == 0 && result.trailers.headers == NULL);
+    ASSERT(result.trailers.length == 0 && result.trailers.entries == NULL);
     return Http::FilterTrailersStatus::StopIteration;
 
   // Resume previously-stopped iteration, possibly forwarding headers and data if iteration was
