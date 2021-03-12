@@ -41,6 +41,19 @@ namespace Http2 {
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 
+class ReceivedSettingsImpl : public ReceivedSettings {
+public:
+  explicit ReceivedSettingsImpl(const nghttp2_settings& settings);
+
+  // ReceivedSettings
+  const absl::optional<uint32_t>& maxConcurrentStreams() const override {
+    return concurrent_stream_limit_;
+  }
+
+private:
+  absl::optional<uint32_t> concurrent_stream_limit_{};
+};
+
 class Utility {
 public:
   /**
@@ -431,6 +444,7 @@ protected:
   // NOTE: Always use non debug nullptr checks against the return value of this function. There are
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
+  const StreamImpl* getStream(int32_t stream_id) const;
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 
@@ -458,8 +472,10 @@ protected:
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
-  // NOTE: This is only used for tests.
-  virtual void onSettingsForTest(const nghttp2_settings&) {}
+  virtual void onSettings(const nghttp2_settings& settings) {
+    ReceivedSettingsImpl received_settings(settings);
+    callbacks().onSettings(received_settings);
+  }
 
   /**
    * Check if header name contains underscore character.
@@ -489,6 +505,9 @@ protected:
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
+  // Tracks the stream id of the current stream we're processing.
+  // This should only be set while we're in the context of dispatching to nghttp2.
+  absl::optional<int32_t> current_stream_id_;
   nghttp2_session* session_{};
   CodecStats& stats_;
   Network::Connection& connection_;
@@ -522,6 +541,9 @@ protected:
   // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
   // flag.
   const bool skip_encoding_empty_trailers_;
+
+  // dumpState helper method.
+  virtual void dumpStreams(std::ostream& os, int indent_level) const;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
@@ -590,7 +612,10 @@ private:
   ProtocolConstraints::ReleasorProc trackOutboundFrames(bool) override;
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
 
+  void dumpStreams(std::ostream& os, int indent_level) const override;
   Http::ConnectionCallbacks& callbacks_;
+  // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
+  bool enable_upstream_http2_flood_checks_;
 };
 
 /**

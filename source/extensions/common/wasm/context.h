@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/filters/common/expr/cel_state.h"
 #include "extensions/filters/common/expr/evaluator.h"
 
@@ -98,22 +99,6 @@ private:
   const ::Envoy::Buffer::Instance* const_buffer_instance_{};
   ::Envoy::Buffer::Instance* buffer_instance_{};
 };
-
-// Plugin contains the information for a filter/service.
-struct Plugin : public PluginBase {
-  Plugin(absl::string_view name, absl::string_view root_id, absl::string_view vm_id,
-         absl::string_view runtime, absl::string_view plugin_configuration, bool fail_open,
-         envoy::config::core::v3::TrafficDirection direction,
-         const LocalInfo::LocalInfo& local_info,
-         const envoy::config::core::v3::Metadata* listener_metadata)
-      : PluginBase(name, root_id, vm_id, runtime, plugin_configuration, fail_open),
-        direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata) {}
-
-  envoy::config::core::v3::TrafficDirection direction_;
-  const LocalInfo::LocalInfo& local_info_;
-  const envoy::config::core::v3::Metadata* listener_metadata_;
-};
-using PluginSharedPtr = std::shared_ptr<Plugin>;
 
 // A context which will be the target of callbacks for a particular session
 // e.g. a handler of a stream.

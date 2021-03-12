@@ -25,6 +25,7 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/common/wasm/well_known_names.h"
 #include "extensions/filters/common/expr/context.h"
@@ -148,7 +149,7 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, absl::string_view data)
 Context::Context() = default;
 Context::Context(Wasm* wasm) : ContextBase(wasm) {}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
-  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->local_info_;
+  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin)
     : ContextBase(wasm, root_context_id, plugin) {}
@@ -493,7 +494,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     if (root_local_info_) {
       return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->local_info_.node(), arena);
+      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
     }
     break;
   case PropertyToken::SOURCE:
@@ -510,12 +511,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::LISTENER_DIRECTION:
     if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction_);
+      return CelValue::CreateInt64(plugin()->direction());
     }
     break;
   case PropertyToken::LISTENER_METADATA:
     if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listener_metadata_, arena);
+      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
     }
     break;
   case PropertyToken::CLUSTER_NAME:
@@ -951,6 +952,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
 
   uint32_t token = nextHttpCallToken();
   auto& handler = http_request_[token];
+  handler.context_ = this;
+  handler.token_ = token;
 
   // set default hash policy to be based on :authority to enable consistent hash
   Http::AsyncClient::RequestOptions options;
@@ -964,8 +967,6 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     http_request_.erase(token);
     return WasmResult::InternalFailure;
   }
-  handler.context_ = this;
-  handler.token_ = token;
   handler.request_ = http_request;
   *token_ptr = token;
   return WasmResult::Ok;
@@ -1752,12 +1753,16 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
     });
     return;
   }
+  auto handler = http_request_.find(token);
+  if (handler == http_request_.end()) {
+    return;
+  }
   http_call_response_ = &response;
   uint32_t body_size = response->body().length();
   onHttpCallResponse(token, response->headers().size(), body_size,
                      headerSize(response->trailers()));
   http_call_response_ = nullptr;
-  http_request_.erase(token);
+  http_request_.erase(handler);
 }
 
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
@@ -1766,13 +1771,17 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     wasm()->addAfterVmCallAction([this, token, reason] { onHttpCallFailure(token, reason); });
     return;
   }
+  auto handler = http_request_.find(token);
+  if (handler == http_request_.end()) {
+    return;
+  }
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
   // This is the only value currently.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   status_message_ = "reset";
   onHttpCallResponse(token, 0, 0, 0);
   status_message_ = "";
-  http_request_.erase(token);
+  http_request_.erase(handler);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {

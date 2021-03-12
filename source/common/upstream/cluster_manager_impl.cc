@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,6 +27,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/http3/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -66,20 +66,12 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   Cluster& cluster = cm_cluster.cluster();
   if (cluster.initializePhase() == Cluster::InitializePhase::Primary) {
     // Remove the previous cluster before the cluster object is destroyed.
-    primary_init_clusters_.remove_if(
-        [name_to_remove = cluster.info()->name()](ClusterManagerCluster* cluster_iter) {
-          return cluster_iter->cluster().info()->name() == name_to_remove;
-        });
-    primary_init_clusters_.push_back(&cm_cluster);
+    primary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
     cluster.initialize(initialize_cb);
   } else {
     ASSERT(cluster.initializePhase() == Cluster::InitializePhase::Secondary);
     // Remove the previous cluster before the cluster object is destroyed.
-    secondary_init_clusters_.remove_if(
-        [name_to_remove = cluster.info()->name()](ClusterManagerCluster* cluster_iter) {
-          return cluster_iter->cluster().info()->name() == name_to_remove;
-        });
-    secondary_init_clusters_.push_back(&cm_cluster);
+    secondary_init_clusters_.insert_or_assign(cm_cluster.cluster().info()->name(), &cm_cluster);
     if (started_secondary_initialize_) {
       // This can happen if we get a second CDS update that adds new clusters after we have
       // already started secondary init. In this case, just immediately initialize.
@@ -104,17 +96,22 @@ void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
 
   // There is a remote edge case where we can remove a cluster via CDS that has not yet been
   // initialized. When called via the remove cluster API this code catches that case.
-  std::list<ClusterManagerCluster*>* cluster_list;
+  absl::flat_hash_map<std::string, ClusterManagerCluster*>* cluster_map;
   if (cluster.cluster().initializePhase() == Cluster::InitializePhase::Primary) {
-    cluster_list = &primary_init_clusters_;
+    cluster_map = &primary_init_clusters_;
   } else {
     ASSERT(cluster.cluster().initializePhase() == Cluster::InitializePhase::Secondary);
-    cluster_list = &secondary_init_clusters_;
+    cluster_map = &secondary_init_clusters_;
   }
 
   // It is possible that the cluster we are removing has already been initialized, and is not
-  // present in the initializer list. If so, this is fine.
-  cluster_list->remove(&cluster);
+  // present in the initializer map. If so, this is fine as a CDS update may happen for a
+  // cluster with the same name. See the case "UpdateAlreadyInitialized" of the
+  // target //test/common/upstream:cluster_manager_impl_test.
+  auto iter = cluster_map->find(cluster.cluster().info()->name());
+  if (iter != cluster_map->end() && iter->second == &cluster) {
+    cluster_map->erase(iter);
+  }
   ENVOY_LOG(debug, "cm init: init complete: cluster={} primary={} secondary={}",
             cluster.cluster().info()->name(), primary_init_clusters_.size(),
             secondary_init_clusters_.size());
@@ -123,13 +120,13 @@ void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
 
 void ClusterManagerInitHelper::initializeSecondaryClusters() {
   started_secondary_initialize_ = true;
-  // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
+  // Cluster::initialize() method can modify the map of secondary_init_clusters_ to remove
   // the item currently being initialized, so we eschew range-based-for and do this complicated
   // dance to increment the iterator before calling initialize.
   for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
-    ClusterManagerCluster* cluster = *iter;
+    ClusterManagerCluster* cluster = iter->second;
+    ENVOY_LOG(debug, "initializing secondary cluster {}", iter->first);
     ++iter;
-    ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->cluster().info()->name());
     cluster->cluster().initialize([cluster, this] { onClusterInit(*cluster); });
   }
 }
@@ -617,10 +614,17 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
-  if ((existing_active_cluster != active_clusters_.end() &&
-       existing_active_cluster->second->blockUpdate(new_hash)) ||
-      (existing_warming_cluster != warming_clusters_.end() &&
-       existing_warming_cluster->second->blockUpdate(new_hash))) {
+  if (existing_warming_cluster != warming_clusters_.end()) {
+    // If the cluster is the same as the warming cluster of the same name, block the update.
+    if (existing_warming_cluster->second->blockUpdate(new_hash)) {
+      return false;
+    }
+    // NB: https://github.com/envoyproxy/envoy/issues/14598
+    // Always proceed if the cluster is different from the existing warming cluster.
+  } else if (existing_active_cluster != active_clusters_.end() &&
+             existing_active_cluster->second->blockUpdate(new_hash)) {
+    // If there's no warming cluster of the same name, and if the cluster is the same as the active
+    // cluster of the same name, block the update.
     return false;
   }
 
@@ -1421,7 +1425,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.cluster_manager_state_);
+            parent_.parent_.time_source_, parent_.cluster_manager_state_);
       });
 
   if (pool.has_value()) {
@@ -1490,7 +1494,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     std::vector<Http::Protocol>& protocols,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
     ClusterConnectivityState& state) {
   if (protocols.size() == 2) {
     ASSERT((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
@@ -1504,6 +1508,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state);
+  }
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
+      runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+    return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
+                                         options, transport_socket_options, state, source);
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,

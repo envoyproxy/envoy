@@ -130,6 +130,7 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // of propagating original reset reason. In QUICHE if a stream stops reading
     // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
     StopReading();
+    runResetCallbacks(Http::StreamResetReason::LocalReset);
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
   }
@@ -244,6 +245,15 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
+}
+
+bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
+  bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
+  if (read_side_closed()) {
+    // Treat this as a remote reset, since the stream will be closed in both directions.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
+  }
+  return ret;
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
