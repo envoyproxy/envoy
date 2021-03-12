@@ -3,6 +3,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -30,11 +31,13 @@ public:
     virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
     const std::string hashKey(HostConstSharedPtr host, bool use_hostname) {
-      std::string hash_key = Config::Metadata::metadataValue(
-                                 host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
-                                 Config::MetadataEnvoyLbKeys::get().HASH_KEY)
-                                 .string_value();
-
+      const ProtobufWkt::Value& val = Config::Metadata::metadataValue(
+          host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
+          Config::MetadataEnvoyLbKeys::get().HASH_KEY);
+      if (val.kind_case() != val.kStringValue && val.kind_case() != val.KIND_NOT_SET) {
+        FANCY_LOG(debug, "hash_key must be string type, got: {}", val.kind_case());
+      }
+      std::string hash_key = val.string_value();
       if (hash_key.empty()) {
         hash_key = use_hostname ? host->hostname() : host->address()->asString();
       }
