@@ -14,10 +14,10 @@ namespace Envoy {
 class ApiVersionInfo {
 public:
   // Returns the most recent API version that is supported by the client.
-  static constexpr ApiVersion const& apiVersion() { return api_version; }
+  static constexpr ApiVersion apiVersion() { return api_version; }
 
   // Returns the oldest API version that is supported by the client.
-  static constexpr ApiVersion const& oldestApiVersion() { return oldest_api_version; }
+  static constexpr ApiVersion oldestApiVersion() { return oldest_api_version; }
 };
 
 } // namespace Envoy
