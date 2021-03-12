@@ -115,6 +115,135 @@ public:
         .WillOnce(testing::ReturnRef(metadata_));
   }
 
+  // Set asynchronous to false to make the filter wait for `httpCall()`'s response. This is the
+  // default behavior and set `sampled` to false to set `request_options.sampled_` to false to skip
+  // a span to be sampled. See: AsyncRequestImpl constructor in async_client_impl.cc for more
+  // details.
+  struct TestBasicHttpCallOptions {
+    bool empty_{true};
+    bool asynchronous_{false};
+    bool sampled_{true};
+    int timeout_ms_{5000};
+
+    // This wraps the asynchronous, sampled flags, and timeout as a table. For example,
+    // {
+    //   ["asynchronous"]: false,
+    //   ["sampled"]: false,
+    //   ["timeout_ms"]: 5000
+    // }
+    bool as_table_{false};
+  };
+
+  void testBasicHttpCall(const TestBasicHttpCallOptions& call_options) {
+    // `last_arg` is the last argument of `httpCall()`. By default it is timeout_ms.
+    std::string last_arg = fmt::format("{}", call_options.timeout_ms_);
+
+    // When setting `last_arg` with an empty string, the default behavior is to wait for
+    // `httpCall()` to finish and the span is always sampled.
+    if (!call_options.empty_) {
+      if (call_options.as_table_) {
+        last_arg = fmt::format(
+            "{{ [\"asynchronous\"] = {}, [\"sampled\"] = {}, [\"timeout_ms\"] = {} }}",
+            call_options.asynchronous_, call_options.sampled_, call_options.timeout_ms_);
+      } else {
+        last_arg = fmt::format(call_options.asynchronous_ ? "{}, true" : "{}, false",
+                               call_options.timeout_ms_);
+      }
+    }
+
+    // Prepend a "," for a non-empty `last_arg`.
+    last_arg = last_arg.empty() ? EMPTY_STRING : ("," + last_arg);
+
+    const std::string log_trace_script = R"EOF(
+      for key, value in pairs(headers) do
+        request_handle:logTrace(key .. " " .. value)
+      end
+      request_handle:logTrace(body)
+    )EOF";
+
+    const std::string script =
+        fmt::format(R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {{
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = {{ "flavor=chocolate; Path=/", "variant=chewy; Path=/" }}
+        }},
+        "hello world"
+        {})
+      {}
+    end)EOF",
+                    last_arg, call_options.asynchronous_ ? EMPTY_STRING : log_trace_script);
+
+    InSequence s;
+    setup(script);
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+    Http::AsyncClient::Callbacks* callbacks;
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+    EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+    EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+        .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                             const Http::AsyncClient::RequestOptions& request_options)
+                             -> Http::AsyncClient::Request* {
+          if (call_options.empty_ || call_options.sampled_) {
+            // The span will be sampled.
+            EXPECT_TRUE(request_options.sampled_);
+          } else {
+            // The span will NOT be sampled.
+            EXPECT_FALSE(request_options.sampled_);
+          }
+
+          // The final request_options should have the same timeout value as the provided one.
+          EXPECT_EQ(std::chrono::milliseconds(call_options.timeout_ms_),
+                    request_options.timeout.value());
+
+          const Http::TestRequestHeaderMapImpl expected_headers{
+              {":path", "/"},
+              {":method", "POST"},
+              {":authority", "foo"},
+              {"set-cookie", "flavor=chocolate; Path=/"},
+              {"set-cookie", "variant=chewy; Path=/"},
+              {"content-length", "11"}};
+          EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+          callbacks = &cb;
+          return &request;
+        }));
+
+    if (call_options.asynchronous_) {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->decodeHeaders(request_headers, false));
+
+      Buffer::OwnedImpl data("hello");
+      EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+
+      Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+    } else {
+      EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+                filter_->decodeHeaders(request_headers, false));
+
+      Buffer::OwnedImpl data("hello");
+      EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+
+      Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+      EXPECT_EQ(Http::FilterTrailersStatus::StopIteration,
+                filter_->decodeTrailers(request_trailers));
+
+      Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+          Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+      response_message->body().add("response");
+      EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
+      EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
+      EXPECT_CALL(decoder_callbacks_, continueDecoding());
+      callbacks->onSuccess(request, std::move(response_message));
+    }
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -122,8 +251,8 @@ public:
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<FilterConfigPerRoute> per_route_config_;
   std::unique_ptr<TestFilter> filter_;
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_{};
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_{};
   envoy::config::core::v3::Metadata metadata_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
@@ -212,7 +341,7 @@ public:
       request_handle:headers():add("hello", "world")
     end
   )EOF"};
-};
+}; // namespace
 
 // Bad code in initial config.
 TEST(LuaHttpFilterConfigTest, BadCode) {
@@ -846,119 +975,59 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   callbacks->onSuccess(request, std::move(response_message));
 }
 
+// Call `httpCall()` with empty asynchronous flag.
+TEST_F(LuaHttpFilterTest, HttpCallSynchronous) {
+  // This generates: httpCall("cluster", headers, body, timeout).
+  testBasicHttpCall(TestBasicHttpCallOptions{});
+}
+
 // Basic HTTP request flow. Asynchronous flag set to false.
 TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
-  const std::string SCRIPT{R"EOF(
-    function envoy_on_request(request_handle)
-      local headers, body = request_handle:httpCall(
-        "cluster",
-        {
-          [":method"] = "POST",
-          [":path"] = "/",
-          [":authority"] = "foo",
-          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
-        },
-        "hello world",
-        5000,
-        false)
-      for key, value in pairs(headers) do
-        request_handle:logTrace(key .. " " .. value)
-      end
-      request_handle:logTrace(body)
-    end
-  )EOF"};
+  TestBasicHttpCallOptions options;
+  options.empty_ = false;
+  options.asynchronous_ = false;
 
-  InSequence s;
-  setup(SCRIPT);
+  // This generates: httpCall("cluster", headers, body, timeout_ms, false).
+  testBasicHttpCall(options);
+}
 
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-  Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+// The asynchronous flag is set to false using a field table.
+TEST_F(LuaHttpFilterTest, HttpCallSyncBySettingFlagInTableToFalse) {
+  TestBasicHttpCallOptions options;
+  options.empty_ = false;
+  options.as_table_ = true;
+  options.asynchronous_ = false;
+  options.timeout_ms_ = 1000;
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
+  // This generates:
+  // httpCall("cluster", headers, body,
+  //   {["asynchronous"]: false, ["timeout_ms"]: 1000})
+  testBasicHttpCall(options);
+}
 
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+// The sampled flag is set to false using a field in a table.
+TEST_F(LuaHttpFilterTest, HttpCallSyncTracingSamplingFalse) {
+  TestBasicHttpCallOptions options;
+  options.empty_ = false;
+  options.as_table_ = true;
+  options.asynchronous_ = false;
+  options.sampled_ = false;
 
-  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
-
-  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  response_message->body().add("response");
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onSuccess(request, std::move(response_message));
+  // This generates:
+  // httpCall("cluster", headers, body,
+  //   {["asynchronous"]: false, ["sampled"]: false, ["timeout_ms"]: 5000}).
+  testBasicHttpCall(options);
 }
 
 // Basic asynchronous, fire-and-forget HTTP request flow.
 TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
-  const std::string SCRIPT{R"EOF(
-        function envoy_on_request(request_handle)
-          local headers, body = request_handle:httpCall(
-            "cluster",
-            {
-              [":method"] = "POST",
-              [":path"] = "/",
-              [":authority"] = "foo",
-              ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
-            },
-            "hello world",
-            5000,
-            true)
-        end
-      )EOF"};
+  TestBasicHttpCallOptions options;
+  options.empty_ = false;
+  // The asynchronous flag is set to true.
+  options.asynchronous_ = true;
 
-  InSequence s;
-  setup(SCRIPT);
-
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-  Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-
-  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  // This generates: httpCall("cluster", headers, body, timeout_ms, true).
+  testBasicHttpCall(options);
 }
 
 // Double HTTP call. Responses before request body.
@@ -1436,7 +1505,86 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlag) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err, StrEq("[string \"...\"]:3: http call asynchronous flag "
-                                                  "must be 'true', 'false', or empty")));
+                                                  "must be 'true', 'false', a table or empty")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+// Invalid HTTP call asynchronous flag table entries.
+TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlagTable) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
+        "hello world",
+        {["potato"] = true})
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(
+      *filter_,
+      scriptLog(spdlog::level::err,
+                StrEq("[string \"...\"]:3: \"potato\" is not a valid key for httpCall() options")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidTimeoutInATable) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
+        "hello world",
+        {["timeout_ms"] = "invalid_timeout"})
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(
+      *filter_,
+      scriptLog(
+          spdlog::level::err,
+          StrEq(
+              "[string \"...\"]:3: bad argument #7 to 'httpCall' (number expected, got string)")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidTimeoutInATableLowerThanZero) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
+        "hello world",
+        {["timeout_ms"] = -1})
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
+                                  StrEq("[string \"...\"]:3: http call timeout must be >= 0")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 

@@ -277,8 +277,10 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaBase64Escape);
 
-  int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
-  int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
+  int doSynchronousHttpCall(lua_State* state, Tracing::Span& span,
+                            Http::AsyncClient::RequestOptions& request_options);
+  int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span,
+                             Http::AsyncClient::RequestOptions& request_options);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {

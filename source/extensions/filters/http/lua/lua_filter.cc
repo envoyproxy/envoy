@@ -21,6 +21,11 @@ namespace Lua {
 
 namespace {
 
+constexpr int AsyncFlagIndex = 6;
+constexpr absl::string_view Sampled{"sampled"};
+constexpr absl::string_view TimeoutMs{"timeout_ms"};
+constexpr absl::string_view Asynchronous{"asynchronous"};
+
 struct HttpResponseCodeDetailValues {
   const absl::string_view LuaResponse = "lua_response";
 };
@@ -108,21 +113,55 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
   }
 }
 
+struct RequestOptions {
+  Http::AsyncClient::RequestOptions async_client_request_options_;
+  bool is_async_{false};
+};
+
+// Parse request options by inspecting the provided table.
+RequestOptions parseRequestOptionsFromTable(lua_State* state, int table_index) {
+  RequestOptions request_options;
+  lua_pushnil(state);
+  while (lua_next(state, table_index) != 0) {
+    // Uses 'key' (at index -2) and 'value' (at index -1). We only care for string keys.
+    const char* key = luaL_checkstring(state, -2);
+
+    // Handle the case when the table has: {["sampled"] = <boolean>} entry.
+    if (key == Sampled) {
+      const bool sampled = lua_toboolean(state, -1);
+      request_options.async_client_request_options_.setSampled(sampled);
+    } else if (key == TimeoutMs) {
+      // Handle the case when the table has: {["timeout_ms"] = <int>} entry.
+      const int timeout_ms = luaL_checkint(state, -1);
+      if (timeout_ms < 0) {
+        luaL_error(state, "http call timeout must be >= 0");
+      } else {
+        request_options.async_client_request_options_.setTimeout(
+            std::chrono::milliseconds(timeout_ms));
+      }
+    } else if (key == Asynchronous) {
+      // Handle the case when the table has: {["asynchronous"] = <boolean>} entry.
+      request_options.is_async_ = lua_toboolean(state, -1);
+    } else {
+      luaL_error(state,
+                 fmt::format("\"{}\" is not a valid key for httpCall() options", key).c_str());
+    }
+    lua_pop(state, 1);
+  }
+  return request_options;
+}
+
 Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
                                          Tracing::Span& parent_span,
+                                         Http::AsyncClient::RequestOptions& request_options,
                                          Http::AsyncClient::Callbacks& callbacks) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
-  size_t body_size;
-  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
-  int timeout_ms = luaL_checkint(state, 5);
-  if (timeout_ms < 0) {
-    luaL_error(state, "http call timeout must be >= 0");
-  }
 
   const auto thread_local_cluster = filter.clusterManager().getThreadLocalCluster(cluster);
   if (thread_local_cluster == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
+    return nullptr;
   }
 
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -133,20 +172,19 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
       message->headers().Host() == nullptr) {
     luaL_error(state, "http call headers must include ':path', ':method', and ':authority'");
+    return nullptr;
   }
 
+  size_t body_size;
+  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
   if (body != nullptr) {
     message->body().add(body, body_size);
     message->headers().setContentLength(body_size);
   }
 
-  absl::optional<std::chrono::milliseconds> timeout;
-  if (timeout_ms > 0) {
-    timeout = std::chrono::milliseconds(timeout_ms);
-  }
-
-  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
-  return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
+  request_options.setParentSpan(parent_span);
+  return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks,
+                                                      request_options);
 }
 } // namespace
 
@@ -300,21 +338,42 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  const int async_flag_index = 6;
-  if (!lua_isnone(state, async_flag_index) && !lua_isboolean(state, async_flag_index)) {
-    luaL_error(state, "http call asynchronous flag must be 'true', 'false', or empty");
+  // Check if the last argument is a table. For example:
+  // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
+  const bool async_flag_is_table = lua_istable(state, AsyncFlagIndex - 1);
+  if (!lua_isnone(state, AsyncFlagIndex) && !lua_isboolean(state, AsyncFlagIndex) &&
+      !async_flag_is_table) {
+    luaL_error(state, "http call asynchronous flag must be 'true', 'false', a table or empty");
   }
 
-  if (lua_toboolean(state, async_flag_index)) {
-    return doAsynchronousHttpCall(state, callbacks_.activeSpan());
+  RequestOptions request_options;
+  if (async_flag_is_table) {
+    // The given options table from user may contains "asynchronous" entry that dictates whether the
+    // HTTP call should be done asynchronously or synchronously.
+    request_options = parseRequestOptionsFromTable(state, AsyncFlagIndex - 1);
   } else {
-    return doSynchronousHttpCall(state, callbacks_.activeSpan());
+    // When the last argument is not a table, the timeout value is provided at the 5th index.
+    int timeout_ms = luaL_checkint(state, 5);
+    if (timeout_ms < 0) {
+      luaL_error(state, "http call timeout must be >= 0");
+    }
+    request_options.async_client_request_options_.setTimeout(std::chrono::milliseconds(timeout_ms));
+    request_options.is_async_ = lua_toboolean(state, AsyncFlagIndex);
   }
+
+  if (request_options.is_async_) {
+    return doAsynchronousHttpCall(state, callbacks_.activeSpan(),
+                                  request_options.async_client_request_options_);
+  }
+
+  return doSynchronousHttpCall(state, callbacks_.activeSpan(),
+                               request_options.async_client_request_options_);
 }
 
-int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span) {
-  http_request_ = makeHttpCall(state, filter_, span, *this);
-  if (http_request_) {
+int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span,
+                                               Http::AsyncClient::RequestOptions& request_options) {
+  http_request_ = makeHttpCall(state, filter_, span, request_options, *this);
+  if (http_request_ != nullptr) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
   } else {
@@ -324,8 +383,9 @@ int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& 
   }
 }
 
-int StreamHandleWrapper::doAsynchronousHttpCall(lua_State* state, Tracing::Span& span) {
-  makeHttpCall(state, filter_, span, noopCallbacks());
+int StreamHandleWrapper::doAsynchronousHttpCall(
+    lua_State* state, Tracing::Span& span, Http::AsyncClient::RequestOptions& request_options) {
+  makeHttpCall(state, filter_, span, request_options, noopCallbacks());
   return 0;
 }
 
