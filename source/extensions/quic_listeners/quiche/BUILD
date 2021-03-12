@@ -404,8 +404,7 @@ envoy_cc_extension(
 envoy_cc_extension(
     name = "quic_factory_lib",
     category = (
-        "envoy.transport_sockets.downstream",
-        "envoy.transport_sockets.upstream",
+        "envoy.udp_listeners",
     ),
     security_posture = "unknown",
     tags = ["nofips"],

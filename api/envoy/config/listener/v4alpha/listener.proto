@@ -219,10 +219,8 @@ message Listener {
 
   // If the protocol in the listener socket address in :ref:`protocol
   // <envoy_api_field_config.core.v4alpha.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_api_enum_value_config.core.v4alpha.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
-  // listener to create, i.e. :ref:`udp_listener_name
-  // <envoy_api_field_config.listener.v4alpha.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
-  // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
+  // <envoy_api_enum_value_config.core.v4alpha.SocketAddress.Protocol.UDP>`, this field specifies UDP
+  // listener specific configuration.
   UdpListenerConfig udp_listener_config = 18;
 
   // Used to represent an API listener, which is used in non-proxy clients. The type of API

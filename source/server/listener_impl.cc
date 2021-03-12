@@ -30,7 +30,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
-#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -394,15 +393,16 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                          "set concurrency = 1.");
   }
   auto udp_config = config_.udp_listener_config();
-  if (udp_config.udp_listener_name().empty()) {
-    udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
+  if (udp_config.listener_config().typed_config().type_url().empty()) {
+    const std::string default_type_url =
+        "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
+    udp_config.mutable_listener_config()->mutable_typed_config()->set_type_url(default_type_url);
   }
 
   auto& listener_config_factory =
-      Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(
-          udp_config.udp_listener_name());
-  ProtobufTypes::MessagePtr listener_typed_config = Config::Utility::translateToFactoryConfig(
-      udp_config, validation_visitor_, listener_config_factory);
+      Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(udp_config.listener_config());
+  ProtobufTypes::MessagePtr listener_typed_config = Config::Utility::translateAnyToFactoryConfig(
+      udp_config.listener_config().typed_config(), validation_visitor_, listener_config_factory);
 
   udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
   udp_listener_config_->listener_factory_ =

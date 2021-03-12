@@ -53,9 +53,10 @@ filter_chains:
             - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  udp_listener_name: "quiche_quic_listener"
+  config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
   writer_config:
-    name: "udp_gso_batch_writer"
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
   )EOF",
@@ -158,9 +159,10 @@ filter_chains:
           - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  udp_listener_name: "quiche_quic_listener"
+  config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
   writer_config:
-    name: "udp_gso_batch_writer"
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
   )EOF",
