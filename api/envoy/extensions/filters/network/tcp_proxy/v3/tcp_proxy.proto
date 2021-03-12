@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -153,4 +153,9 @@ message TcpProxy {
   // is reached the connection will be closed. Duration must be at least 1ms.
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // The maximum duration tcp_proxy waits for the active cluster. The duration is counted since the tcp_proxy starts to process the connection.
+  // If the timeout is not set or is reached, and the upstream cluster is not active yet, the tcp_proxy closes the downstream connection with error flag NC.
+  // [#not-implemented-hide:]
+  google.protobuf.Duration cluster_timeout = 14;
 }
