@@ -763,7 +763,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "value": {
               "path": "/dev/null"

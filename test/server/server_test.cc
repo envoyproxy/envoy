@@ -1181,7 +1181,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
 TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/node_bootstrap_without_access_log.yaml"),
-      EnvoyException, "An admin access log path is required for a listening server.");
+      EnvoyException, "An admin access logger is required for a listening server.");
 }
 
 namespace {
