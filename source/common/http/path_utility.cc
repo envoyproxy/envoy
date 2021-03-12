@@ -7,6 +7,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
+#include "envoy/common/exception.h"
 #include "url/url_canon.h"
 #include "url/url_canon_stdstring.h"
 
@@ -113,7 +114,12 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
 
 PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_transformation) {
   const auto& operations = path_transformation.operations();
+  std::vector<int> operation_hashes;
   for (auto const& operation : operations) {
+    uint64_t operation_hash = MessageUtil::hash(operation);
+    if (find(operation_hashes.begin(), operation_hashes.end(), operation_hash) != operation_hashes.end()) {
+      throw EnvoyException("Duplicate path transformation");
+    }
     if (operation.has_normalize_path_rfc_3986()) {
       transformations_.emplace_back(PathTransformer::rfcNormalize);
     } else if (operation.has_merge_slashes()) {

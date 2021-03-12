@@ -442,6 +442,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
+        "//source/common/protobuf:utility_lib",
         "@com_googlesource_googleurl//url:envoy_url",
         "@envoy_api//envoy/type/http/v3:pkg_cc_proto",
     ],

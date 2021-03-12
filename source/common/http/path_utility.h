@@ -6,6 +6,7 @@
 #include "envoy/type/http/v3/path_transformation.pb.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/strings/string_view.h"
 
