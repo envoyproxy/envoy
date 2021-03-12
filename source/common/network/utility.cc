@@ -706,10 +706,11 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
               : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
                  1);
       // TODO(danzh) add stats for this.
-      ENVOY_LOG_MISC(debug,
-                     "Kernel dropped {} packet(s). Consider increasing receive buffer size and/or "
-                     "max packet size.",
-                     delta);
+      ENVOY_LOG_MISC(
+          debug,
+          "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
+          "max datagram size.",
+          delta);
     }
   } while (true);
 }
