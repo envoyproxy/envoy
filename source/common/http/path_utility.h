@@ -42,7 +42,7 @@ public:
   static absl::optional<std::string> rfcNormalize(absl::string_view original_path);
 
 private:
-  std::list<Transformation> transformations;
+  std::list<Transformation> transformations_;
 };
 
 } // namespace Http

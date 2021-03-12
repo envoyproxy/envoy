@@ -120,27 +120,27 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
 }
 
 PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_transformation) {
-  const Protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation>&
-      operations = path_transformation.operations();
+  const auto& operations = path_transformation.operations();
   for (auto const& operation : operations) {
     if (operation.has_normalize_path_rfc_3986()) {
-      transformations.emplace_back(PathTransformer::rfcNormalize);
+      transformations_.emplace_back(PathTransformer::rfcNormalize);
     } else if (operation.has_merge_slashes()) {
-      transformations.emplace_back(PathTransformer::mergeSlashes);
+      transformations_.emplace_back(PathTransformer::mergeSlashes);
     }
   }
 }
 
 absl::optional<std::string> PathTransformer::transform(absl::string_view original) {
-  std::string path = original.data();
-  for (Transformation const& transformation : transformations) {
-    absl::optional<std::string> transformed = transformation(path).value();
-    if (!transformed.has_value()) {
+  absl::optional<std::string> path_string;
+  absl::string_view path_string_view = original;
+  for (Transformation const& transformation : transformations_) {
+    path_string = transformation(path_string_view);
+    if (!path_string.has_value()) {
       return {};
     }
-    path = transformed.value();
+    path_string_view = path_string.value();
   }
-  return path;
+  return path_string;
 }
 
 } // namespace Http
