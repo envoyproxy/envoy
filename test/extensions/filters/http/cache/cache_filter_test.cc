@@ -62,7 +62,7 @@ protected:
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
+                                              HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
                                true));
 
     // The filter should not encode any data as the response has no body.
@@ -88,7 +88,7 @@ protected:
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
+                                              HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
                                false));
 
     // The filter should encode cached data.
@@ -422,7 +422,7 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
+                                              HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
                                false));
 
     EXPECT_CALL(
@@ -471,7 +471,7 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
+                                              HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
                                false));
 
     EXPECT_CALL(
@@ -523,7 +523,7 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
+                                              HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
                                true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData

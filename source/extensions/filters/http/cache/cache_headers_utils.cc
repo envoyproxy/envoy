@@ -245,7 +245,7 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
   }
 
   std::vector<std::string> varied_headers =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
 
   for (const std::string& header : varied_headers) {
     bool valid = false;
@@ -273,7 +273,7 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
 
 bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
   // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
-  const auto vary_header = headers.get(Http::Headers::get().Vary);
+  const auto vary_header = headers.get(Http::CustomHeaders::get().Vary);
   return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 

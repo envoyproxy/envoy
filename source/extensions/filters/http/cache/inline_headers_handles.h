@@ -45,10 +45,10 @@ inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::
     etag_handle(Http::CustomHeaders::get().Etag);
 
 inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    age_handle(Http::Headers::get().Age);
+    age_handle(Http::CustomHeaders::get().Age);
 
 inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    expires_handle(Http::Headers::get().Expires);
+    expires_handle(Http::CustomHeaders::get().Expires);
 
 } // namespace Cache
 } // namespace HttpFilters
