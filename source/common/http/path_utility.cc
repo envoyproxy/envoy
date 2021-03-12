@@ -61,18 +61,10 @@ bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
 void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
-  // Only operate on path component in URL.
-  const absl::string_view::size_type query_start = original_path.find('?');
-  const absl::string_view path = original_path.substr(0, query_start);
-  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
-  if (path.find("//") == absl::string_view::npos) {
-    return;
+  absl::optional<std::string> normalized = PathTransformer::mergeSlashes(original_path).value();
+  if (normalized.has_value()) {
+    headers.setPath(normalized.value());
   }
-  const absl::string_view path_prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
-  const absl::string_view path_suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
-  headers.setPath(absl::StrCat(path_prefix,
-                               absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
-                               path_suffix, query));
 }
 
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
@@ -90,7 +82,7 @@ absl::optional<std::string> PathTransformer::mergeSlashes(absl::string_view orig
   const absl::string_view path = original_path.substr(0, query_start);
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
   if (path.find("//") == absl::string_view::npos) {
-    return original_path.data();
+    return std::string(original_path);
   }
   const absl::string_view path_prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
   const absl::string_view path_suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
