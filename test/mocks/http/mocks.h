@@ -65,14 +65,21 @@ public:
   MOCK_METHOD(void, encodeMetadata, (MetadataMapVector&));
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
   MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
-  MOCK_METHOD(void, setContinueHeaders, (ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, setContinueHeaders_, (ResponseHeaderMap&));
+  void setContinueHeaders(ResponseHeaderMapPtr&& continue_headers) override {
+    continue_headers_ = std::move(continue_headers);
+    setContinueHeaders_(*continue_headers_);
+  }
   MOCK_METHOD(void, setResponseHeaders_, (ResponseHeaderMap&));
   void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) override {
-    // TODO(snowp): Repeat this pattern for all setters.
     response_headers_ = std::move(response_headers);
     setResponseHeaders_(*response_headers_);
   }
-  MOCK_METHOD(void, setResponseTrailers, (ResponseTrailerMapPtr &&));
+  MOCK_METHOD(void, setResponseTrailers_, (ResponseTrailerMap&));
+  void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) override {
+    response_trailers_ = std::move(response_trailers);
+    setResponseTrailers_(*response_trailers_);
+  }
   MOCK_METHOD(RequestHeaderMapOptRef, requestHeaders, ());
   MOCK_METHOD(RequestTrailerMapOptRef, requestTrailers, ());
   MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, ());
@@ -100,7 +107,9 @@ public:
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
 
+  ResponseHeaderMapPtr continue_headers_;
   ResponseHeaderMapPtr response_headers_;
+  ResponseTrailerMapPtr response_trailers_;
 };
 
 class MockServerConnectionCallbacks : public ServerConnectionCallbacks,
