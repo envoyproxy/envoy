@@ -1,0 +1,157 @@
+#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
+
+#include "extensions/filters/network/http_connection_manager/config.h"
+
+#include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
+#include "test/mocks/config/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using envoy::extensions::filters::common::dependency::v3::Dependency;
+using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
+using testing::_;
+using testing::Eq;
+using testing::Return;
+using Envoy::Server::Configuration::FilterDependenciesPtr;
+using Envoy::Server::Configuration::NamedHttpFilterConfigFactory;
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace HttpConnectionManager {
+namespace {
+
+const std::string ConfigTemplate = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+)EOF";
+
+Dependency potato() {
+  Dependency d;
+  d.set_name("potato");
+  d.set_type(Dependency::FILTER_STATE_KEY);
+  return d;
+}
+
+// Test filter that provides a potato.
+class PantryFilterFactory : public PassThroughFilterFactory {
+public:
+  PantryFilterFactory() : PassThroughFilterFactory("test.pantry") {}
+
+  FilterDependenciesPtr dependencies() override {
+    FilterDependencies d;
+    *d.add_decode_provided() = potato();
+    return std::make_unique<FilterDependencies>(d);
+  }
+};
+
+// Test filter that requires a potato.
+class ChefFilterFactory : public PassThroughFilterFactory {
+public:
+  ChefFilterFactory() : PassThroughFilterFactory("test.chef") {}
+
+  FilterDependenciesPtr dependencies() override {
+    FilterDependencies d;
+    *d.add_decode_required() = potato();
+    return std::make_unique<FilterDependencies>(d);
+  }
+};
+
+TEST_F(HttpConnectionManagerConfigTest, NoPantry) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  hcm_config.add_http_filters()->set_name("test.pantry");
+  hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException, "Didn't find a registered implementation for name: 'test.pantry'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DependenciesSatisfied) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  hcm_config.add_http_filters()->set_name("test.pantry");
+  hcm_config.add_http_filters()->set_name("test.chef");
+  hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
+
+  PantryFilterFactory pf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_, http_tracer_manager_,
+                              filter_config_provider_manager_);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnneededProvidencyOk) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  hcm_config.add_http_filters()->set_name("test.pantry");
+  hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
+
+  PantryFilterFactory pf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
+
+  HttpConnectionManagerConfig(hcm_config, context_, date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_, http_tracer_manager_,
+                              filter_config_provider_manager_);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyErrorMissingProvidency) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  hcm_config.add_http_filters()->set_name("test.chef");
+  hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
+
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException, "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyErrorMisordered) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  hcm_config.add_http_filters()->set_name("test.chef");
+  hcm_config.add_http_filters()->set_name("test.pantry");
+  hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
+
+  // Registration order does not matter.
+  PantryFilterFactory pf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException, "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+}
+
+} // namespace
+} // namespace HttpConnectionManager
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

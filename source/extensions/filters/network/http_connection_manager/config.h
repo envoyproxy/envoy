@@ -16,6 +16,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
+#include "extensions/filters/network/http_connection_manager/dependency_manager.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_config.h"
@@ -185,8 +186,9 @@ private:
   void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
-                int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                const char* filter_chain_type, bool last_filter_in_current_config);
+                int i, absl::string_view prefix, const char* filter_chain_type,
+                bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
+                DependencyManager& dependency_manager);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
