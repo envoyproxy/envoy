@@ -11,7 +11,7 @@ QuicClientConnectionFactoryImpl::createQuicNetworkConnection(
     Network::Address::InstanceConstSharedPtr local_addr,
     Network::TransportSocketFactory& transport_socket_factory, Stats::Scope& stats_scope,
     Event::Dispatcher& dispatcher, TimeSource& time_source) {
-  // This flag fix a QUICHE issue which may crashe Envoy during connection close.
+  // This flag fix a QUICHE issue which may crash Envoy during connection close.
   SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
 
   // TODO(#14829): reject config if anything but QuicClientTransportSocketConfigFactory configured.

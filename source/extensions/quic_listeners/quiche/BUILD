@@ -386,10 +386,10 @@ envoy_cc_extension(
     # Needed to verify that a quic specific configuration is used for quic transport socket.
     extra_visibility = [
         "//source/server:__subpackages__",
+        "//test:__subpackages__",
     ],
     security_posture = "unknown",
     tags = ["nofips"],
-    visibility = ["//test:__subpackages__"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:transport_socket_config_interface",

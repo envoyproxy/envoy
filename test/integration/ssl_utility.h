@@ -16,8 +16,8 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
-  ClientSslTransportOptions& setSan(bool san) {
-    san_ = san;
+  ClientSslTransportOptions& setSan(absl::string_view san) {
+    san_ = std::string(san);
     return *this;
   }
 
@@ -48,7 +48,7 @@ struct ClientSslTransportOptions {
   }
 
   bool alpn_{};
-  bool san_{};
+  std::string san_;
   bool client_ecdsa_cert_{};
   std::vector<std::string> cipher_suites_{};
   std::string sigalgs_;
@@ -57,8 +57,12 @@ struct ClientSslTransportOptions {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
 };
 
+void initializeUpstreamTlsContextConfig(
+    const ClientSslTransportOptions& options,
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
+
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
+createClientSslTransportSocketFactory(ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api);
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,

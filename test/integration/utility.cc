@@ -22,6 +22,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/integration/ssl_utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/stats/mocks.h"
@@ -112,27 +113,12 @@ struct ConnectionCallbacks : public Network::ConnectionCallbacks {
 Network::TransportSocketFactoryPtr IntegrationUtil::createQuicClientTransportSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const std::string& san_to_match) {
-  std::string yaml_plain = R"EOF(
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
-)EOF";
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), *tls_context);
-  auto* common_context = tls_context->mutable_common_tls_context();
-
-  common_context->add_alpn_protocols("h3");
-  common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
-      san_to_match);
-  tls_context->set_sni("lyft.com");
-
-  common_context->mutable_tls_params()->set_tls_minimum_protocol_version(
-      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO);
-  common_context->mutable_tls_params()->set_tls_maximum_protocol_version(
-      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO);
+  initializeUpstreamTlsContextConfig(
+      Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
+      *tls_context);
 
   envoy::config::core::v3::TransportSocket message;
   message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
