@@ -45,7 +45,9 @@ void SotwSubscriptionState::updateSubscriptionInterest(
 
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
-bool SotwSubscriptionState::subscriptionUpdatePending() const { return update_pending_ || dynamicContextChanged(); }
+bool SotwSubscriptionState::subscriptionUpdatePending() const {
+  return update_pending_ || dynamicContextChanged();
+}
 
 void SotwSubscriptionState::markStreamFresh() {
   last_good_version_info_ = absl::nullopt;

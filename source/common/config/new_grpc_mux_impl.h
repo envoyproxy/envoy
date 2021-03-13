@@ -87,7 +87,7 @@ public:
     return subscriptions_;
   }
 
-  // unified GrpcMux interface, not implemented by legacy muxes
+  // unified GrpcMux interface, not implemented by legacy multiplexors
   Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
                   SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
                   const bool) override {
