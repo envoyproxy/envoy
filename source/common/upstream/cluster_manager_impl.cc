@@ -693,7 +693,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     init_helper_.removeCluster(*existing_active_cluster->second);
     active_clusters_.erase(existing_active_cluster);
 
-    ENVOY_LOG(info, "removing cluster {}", cluster_name);
+    ENVOY_LOG(debug, "removing cluster {}", cluster_name);
     tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
       ASSERT(cluster_manager->thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
