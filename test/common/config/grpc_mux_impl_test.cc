@@ -185,7 +185,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   grpc_mux_->start();
 
   // Send another message for foo so that the node is cleared in the cached request.
-  // This is to test that the the node is set again in the first message below.
+  // This is to test that the node is set again in the first message below.
   expectSendMessage("foo", {"z", "x", "y"}, "");
   auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_);
 
