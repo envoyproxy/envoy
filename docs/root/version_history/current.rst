@@ -81,6 +81,7 @@ Bug Fixes
 * http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
 * jwt_authn: reject requests with a proper error if JWT has the wrong issuer when allow_missing is used. Before this change, the requests are accepted.
 * listener: prevent crashing when an unknown listener config proto is received and debug logging is enabled.
+* mysql_filter: improve the codec ability of mysql filter at connection phase, it can now decode MySQL5.7+ connection phase protocol packet.
 * overload: fix a bug that can cause use-after-free when one scaled timer disables another one with the same duration.
 * sni: as the server name in sni should be case-insensitive, envoy will convert the server name as lower case first before any other process inside envoy.
 * tls: fix the subject alternative name of the presented certificate matches the specified matchers as the case-insensitive way when it uses DNS name.
