@@ -29,8 +29,7 @@ message UdpListenerConfig {
 
   // Used to create a specific UDP listener factory. If not specified the default UDP listener is
   // used.
-  // [#comment:#extension-category: envoy.udp_listeners]
-  // [#not-implemented-hide:]
+  // [#extension-category: envoy.udp_listeners]
   // [#comment:TODO(mattklein123): Consider removing this as an extension point.]
   core.v3.TypedExtensionConfig listener_config = 4;
 

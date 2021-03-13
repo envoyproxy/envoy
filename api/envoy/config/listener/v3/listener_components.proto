@@ -338,10 +338,7 @@ message ListenerFilter {
   oneof config_type {
     // Filter specific configuration which depends on the filter being
     // instantiated. See the supported filters for further documentation.
-    // TCP filters:
-    // [#extension-category: envoy.filters.listener]
-    // UDP filters:
-    // [#extension-category: envoy.filters.udp_listener]
+    // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
     google.protobuf.Any typed_config = 3;
   }
 

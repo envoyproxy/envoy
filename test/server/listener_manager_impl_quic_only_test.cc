@@ -53,7 +53,7 @@ filter_chains:
             - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  config:
+  listener_config:
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
   writer_config:
@@ -159,7 +159,7 @@ filter_chains:
           - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  config:
+  listener_config:
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
   writer_config:

@@ -214,6 +214,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
             name: route_config_0
     udp_listener_config:
       listener_config:
+        name: quic_listener_config
         typed_config:
           "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
 )EOF",

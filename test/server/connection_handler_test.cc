@@ -82,11 +82,12 @@ public:
           init_manager_(nullptr) {
       envoy::config::listener::v3::UdpListenerConfig udp_config;
       const std::string default_type_url =
-        "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
-      udp_config.mutable_config()->mutable_typed_config()->set_type_url(default_type_url);
+          "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
+      udp_config.mutable_listener_config()->mutable_typed_config()->set_type_url(default_type_url);
       udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
       udp_listener_config_->listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(udp_config.config())
+          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+              udp_config.listener_config())
               .createActiveUdpListenerFactory(udp_config, /*concurrency=*/1);
       udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));

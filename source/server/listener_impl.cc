@@ -400,7 +400,8 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   }
 
   auto& listener_config_factory =
-      Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(udp_config.listener_config());
+      Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+          udp_config.listener_config());
   ProtobufTypes::MessagePtr listener_typed_config = Config::Utility::translateAnyToFactoryConfig(
       udp_config.listener_config().typed_config(), validation_visitor_, listener_config_factory);
 

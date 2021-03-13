@@ -181,7 +181,7 @@ EXTENSIONS = {
     # Listener
     #
 
-    "envoy.udp_listeners":                              "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+    "envoy.udp_listeners.quiche_quic_listener":         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
 
     #
     # Transport sockets
