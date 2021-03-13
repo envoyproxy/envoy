@@ -1,3 +1,5 @@
+#include "common/buffer/buffer_impl.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
@@ -75,8 +77,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41OkTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
@@ -110,8 +111,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41PartialMessagesTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(*greet_data_part_2, false));
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
 
   Buffer::InstancePtr client_login_data_part_1(
       new Buffer::OwnedImpl(clogin_data.substr(0, clogin_data.length() / 2)));
@@ -166,8 +166,7 @@ TEST_F(MySQLFilterTest, MySqlFallbackPartialMessagesTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(*greet_data_part_2, false));
   EXPECT_EQ(MySQLSession::State::Init, filter_->getSession().getState());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
 
   Buffer::InstancePtr client_login_data_part_1(
       new Buffer::OwnedImpl(clogin_data.substr(0, clogin_data.length() / 2)));
@@ -214,8 +213,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41ErrTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
@@ -226,6 +224,35 @@ TEST_F(MySQLFilterTest, MySqlHandshake41ErrTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
   EXPECT_EQ(1UL, config_->stats().login_failures_.value());
   EXPECT_EQ(MySQLSession::State::Error, filter_->getSession().getState());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 41
+ * Server responds with Error
+ * SM: greeting(p=10) -> challenge-req(v41) -> serv-resp-more
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake41AuthMoreTest) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp41, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_MORE);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
 /**
@@ -254,6 +281,34 @@ TEST_F(MySQLFilterTest, MySqlHandshake320OkTest) {
   Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
   EXPECT_EQ(MySQLSession::State::Req, filter_->getSession().getState());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 320
+ * SM: greeting(p=10) -> challenge-req(v320) -> incomplete response code
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320OkTestIncomplete) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeMessage(0);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
 /**
@@ -303,18 +358,17 @@ TEST_F(MySQLFilterTest, MySqlHandshakeSSLTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
 
-  std::string clogin_data = encodeClientLogin(MYSQL_CLIENT_CAPAB_SSL | MYSQL_CLIENT_CAPAB_41VS320,
-                                              "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data =
+      encodeClientLogin(CLIENT_SSL | CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
   EXPECT_EQ(1UL, config_->stats().upgraded_to_ssl_.value());
   EXPECT_EQ(MySQLSession::State::SslPt, filter_->getSession().getState());
 
-  std::string encr_data = "!@#$encr$#@!";
-  std::string mysql_ssl_msg = BufferHelper::encodeHdr(encr_data, 2);
-  Buffer::InstancePtr query_create_index(new Buffer::OwnedImpl(mysql_ssl_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*query_create_index, false));
+  Buffer::OwnedImpl query_create_index("!@#$encr$#@!");
+  BufferHelper::encodeHdr(query_create_index, 2);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(query_create_index, false));
   EXPECT_EQ(MySQLSession::State::SslPt, filter_->getSession().getState());
 }
 
@@ -359,6 +413,45 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchTest) {
 
 /**
  * Test MySQL Handshake with protocol version 320
+ * Server responds with Auth Switch
+ * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
+ * -> auth_switch_resp -> serv-resp-auth-switch[error state]
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchAuthSwitchTest) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+
+  std::string auth_switch_resp = encodeAuthSwitchResp();
+  Buffer::InstancePtr client_switch_resp(new Buffer::OwnedImpl(auth_switch_resp));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_switch_resp, false));
+  EXPECT_EQ(MySQLSession::State::AuthSwitchMore, filter_->getSession().getState());
+
+  std::string srv_resp_ok_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH, 1);
+  Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 320
  * Server responds with Auth Switch and error
  * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
  * -> auth_switch_resp -> serv-resp-err
@@ -399,12 +492,52 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchErrTest) {
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   std::string query = "CREATE DATABASE mysqldb";
   mysql_cmd_encode.setData(query);
-  std::string query_data = mysql_cmd_encode.encode();
-  std::string mysql_msg = BufferHelper::encodeHdr(query_data, 0);
-  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+  Buffer::OwnedImpl client_query_data;
+
+  mysql_cmd_encode.encode(client_query_data);
+  BufferHelper::encodeHdr(client_query_data, 0);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(client_query_data, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(1UL, config_->stats().queries_parsed_.value());
+}
+
+/**
+ * Test MySQL Handshake with protocol version 320
+ * Server responds with Auth Switch and error
+ * SM: greeting(p=10) -> challenge-req(v320) -> serv-resp-auth-switch ->
+ * -> auth_switch_resp -> incomplete response code
+ */
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchIncompleteRespcode) {
+  initialize();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1UL, config_->stats().sessions_.value());
+
+  std::string greeting_data = encodeServerGreeting(MYSQL_PROTOCOL_10);
+  Buffer::InstancePtr greet_data(new Buffer::OwnedImpl(greeting_data));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
+  EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
+
+  std::string clogin_data = encodeClientLogin(0, "user1", CHALLENGE_SEQ_NUM);
+  Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
+  EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
+  EXPECT_EQ(MySQLSession::State::ChallengeResp320, filter_->getSession().getState());
+
+  std::string srv_resp_data = encodeClientLoginResp(MYSQL_RESP_AUTH_SWITCH);
+  Buffer::InstancePtr server_resp_data(new Buffer::OwnedImpl(srv_resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_data, false));
+
+  std::string auth_switch_resp = encodeAuthSwitchResp();
+  Buffer::InstancePtr client_switch_resp(new Buffer::OwnedImpl(auth_switch_resp));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_switch_resp, false));
+  EXPECT_EQ(MySQLSession::State::AuthSwitchMore, filter_->getSession().getState());
+
+  std::string srv_resp_ok_data = encodeMessage(0, 1);
+  Buffer::InstancePtr server_resp_ok_data(new Buffer::OwnedImpl(srv_resp_ok_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
+  EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
 /**
@@ -449,10 +582,10 @@ TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchErrFailResync) {
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   std::string query = "CREATE DATABASE mysqldb";
   mysql_cmd_encode.setData(query);
-  std::string query_data = mysql_cmd_encode.encode();
-  std::string mysql_msg = BufferHelper::encodeHdr(query_data, 5);
-  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+  Buffer::OwnedImpl client_query_data;
+  mysql_cmd_encode.encode(client_query_data);
+  BufferHelper::encodeHdr(client_query_data, 5);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(client_query_data, false));
   EXPECT_EQ(MySQLSession::State::Resync, filter_->getSession().getState());
 }
 
@@ -557,8 +690,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41Ok2GreetTest) {
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
   EXPECT_EQ(1UL, config_->stats().protocol_errors_.value());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(2UL, config_->stats().login_attempts_.value());
@@ -588,15 +720,13 @@ TEST_F(MySQLFilterTest, MySqlHandshake41Ok2CloginTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
   EXPECT_EQ(MySQLSession::State::ChallengeResp41, filter_->getSession().getState());
 
-  std::string clogin_data2 =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data2 = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data2(new Buffer::OwnedImpl(clogin_data2));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data2, false));
   EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
@@ -622,8 +752,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41OkOOOLoginTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
   EXPECT_EQ(1UL, config_->stats().sessions_.value());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(MySQLSession::State::Init, filter_->getSession().getState());
@@ -649,8 +778,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake41OkOOOFullLoginTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
   EXPECT_EQ(1UL, config_->stats().sessions_.value());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(MySQLSession::State::Init, filter_->getSession().getState());
@@ -723,7 +851,7 @@ TEST_F(MySQLFilterTest, MySqlHandshake320WrongCloginSeqTest) {
  * -> expect filter to ignore auth-switch message
  *    because of wrong seq.
  */
-TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchWromgSeqTest) {
+TEST_F(MySQLFilterTest, MySqlHandshake320AuthSwitchWrongSeqTest) {
   initialize();
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -786,10 +914,9 @@ TEST_F(MySQLFilterTest, MySqlHandshake320WrongServerRespCode) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
   EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 
-  std::string msg_data;
-  std::string mysql_msg = BufferHelper::encodeHdr(msg_data, 3);
-  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+  Buffer::OwnedImpl client_query_data;
+  BufferHelper::encodeHdr(client_query_data, 3);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(client_query_data, false));
   EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
@@ -821,11 +948,8 @@ TEST_F(MySQLFilterTest, MySqlWrongHdrPkt) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*server_resp_ok_data, false));
   EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 
-  Command mysql_cmd_encode{};
-  std::string query_data = mysql_cmd_encode.encode();
-  std::string mysql_msg = "123";
-  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+  Buffer::OwnedImpl client_query_data("123");
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(client_query_data, false));
   EXPECT_EQ(MySQLSession::State::NotHandled, filter_->getSession().getState());
 }
 
@@ -847,8 +971,7 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*greet_data, false));
   EXPECT_EQ(MySQLSession::State::ChallengeReq, filter_->getSession().getState());
 
-  std::string clogin_data =
-      encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, "user1", CHALLENGE_SEQ_NUM);
+  std::string clogin_data = encodeClientLogin(CLIENT_PROTOCOL_41, "user1", CHALLENGE_SEQ_NUM);
   Buffer::InstancePtr client_login_data(new Buffer::OwnedImpl(clogin_data));
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_login_data, false));
   EXPECT_EQ(1UL, config_->stats().login_attempts_.value());
@@ -863,10 +986,11 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   std::string query = "CREATE DATABASE mysqldb";
   mysql_cmd_encode.setData(query);
-  std::string query_data = mysql_cmd_encode.encode();
-  std::string mysql_msg = BufferHelper::encodeHdr(query_data, 0);
-  Buffer::InstancePtr client_query_data(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*client_query_data, false));
+
+  Buffer::OwnedImpl client_query_data;
+  mysql_cmd_encode.encode(client_query_data);
+  BufferHelper::encodeHdr(client_query_data, 0);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(client_query_data, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(1UL, config_->stats().queries_parsed_.value());
 
@@ -878,10 +1002,11 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   query = "show databases";
   mysql_cmd_encode.setData(query);
-  query_data = mysql_cmd_encode.encode();
-  mysql_msg = BufferHelper::encodeHdr(query_data, 0);
-  Buffer::InstancePtr query_show(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*query_show, false));
+
+  Buffer::OwnedImpl query_show;
+  mysql_cmd_encode.encode(query_show);
+  BufferHelper::encodeHdr(query_show, 0);
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(query_show, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(2UL, config_->stats().queries_parsed_.value());
 
@@ -893,10 +1018,12 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   query = "CREATE TABLE students (name TEXT, student_number INTEGER, city TEXT)";
   mysql_cmd_encode.setData(query);
-  query_data = mysql_cmd_encode.encode();
-  mysql_msg = BufferHelper::encodeHdr(query_data, 0);
-  Buffer::InstancePtr query_create(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*query_create, false));
+
+  Buffer::OwnedImpl query_create;
+  mysql_cmd_encode.encode(query_create);
+  BufferHelper::encodeHdr(query_create, 0);
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(query_create, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(3UL, config_->stats().queries_parsed_.value());
 
@@ -908,10 +1035,12 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   mysql_cmd_encode.setCmd(Command::Cmd::Query);
   query = "CREATE index index1";
   mysql_cmd_encode.setData(query);
-  query_data = mysql_cmd_encode.encode();
-  mysql_msg = BufferHelper::encodeHdr(query_data, 0);
-  Buffer::InstancePtr query_create_index(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*query_create_index, false));
+
+  Buffer::OwnedImpl query_create_index;
+  mysql_cmd_encode.encode(query_create_index);
+  BufferHelper::encodeHdr(query_create_index, 0);
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(query_create_index, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(3UL, config_->stats().queries_parsed_.value());
 
@@ -924,10 +1053,12 @@ TEST_F(MySQLFilterTest, MySqlLoginAndQueryTest) {
   mysql_cmd_encode.setCmd(Command::Cmd::FieldList);
   query = "";
   mysql_cmd_encode.setData(query);
-  query_data = mysql_cmd_encode.encode();
-  mysql_msg = BufferHelper::encodeHdr(query_data, 0);
-  Buffer::InstancePtr cmd_field_list(new Buffer::OwnedImpl(mysql_msg));
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*cmd_field_list, false));
+
+  Buffer::OwnedImpl cmd_field_list;
+  mysql_cmd_encode.encode(cmd_field_list);
+  BufferHelper::encodeHdr(cmd_field_list, 0);
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(cmd_field_list, false));
   EXPECT_EQ(MySQLSession::State::ReqResp, filter_->getSession().getState());
   EXPECT_EQ(3UL, config_->stats().queries_parsed_.value());
 

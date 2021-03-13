@@ -42,14 +42,14 @@ Step 2: Issue commands using mysql
 
 Use ``mysql`` to issue some commands and verify they are routed via Envoy. Note
 that the current implementation of the protocol filter was tested with MySQL
-v5.5. It may, however, not work with other versions of MySQL due to differences
-in the protocol implementation.
+v5.7. It may, however, not work with other versions of MySQL due to differences
+in the protocol implementation, but it won't affect normal progress of client-server communication.
 
 Terminal 1
 
 .. code-block:: console
 
-  $ docker run --rm -it --network envoymesh mysql:5.5 mysql -h proxy -P 1999 -u root
+  $ docker run --rm -it --network envoymesh mysql:5.7 mysql -h proxy -P 1999 -u root --skip-ssl
   ... snip ...
 
   mysql> CREATE DATABASE test;
@@ -91,16 +91,17 @@ Terminal 1
 
 .. code-block:: console
 
-  $ curl -s http://localhost:8001/stats?filter=egress_mysql
+  $ curl -s "http://localhost:8001/stats?filter=egress_mysql"
   mysql.egress_mysql.auth_switch_request: 0
   mysql.egress_mysql.decoder_errors: 0
   mysql.egress_mysql.login_attempts: 1
   mysql.egress_mysql.login_failures: 0
-  mysql.egress_mysql.protocol_errors: 0
-  mysql.egress_mysql.queries_parse_error: 0
+  mysql.egress_mysql.protocol_errors: 21
+  mysql.egress_mysql.queries_parse_error: 2
   mysql.egress_mysql.queries_parsed: 7
   mysql.egress_mysql.sessions: 1
   mysql.egress_mysql.upgraded_to_ssl: 0
+
 
 Step 4: Check TCP stats
 ***********************
@@ -111,18 +112,20 @@ Terminal 1
 
 .. code-block:: console
 
-  $ curl -s http://localhost:8001/stats?filter=mysql_tcp
+  $ curl -s "http://localhost:8001/stats?filter=mysql_tcp"
   tcp.mysql_tcp.downstream_cx_no_route: 0
   tcp.mysql_tcp.downstream_cx_rx_bytes_buffered: 0
-  tcp.mysql_tcp.downstream_cx_rx_bytes_total: 347
+  tcp.mysql_tcp.downstream_cx_rx_bytes_total: 446
   tcp.mysql_tcp.downstream_cx_total: 1
   tcp.mysql_tcp.downstream_cx_tx_bytes_buffered: 0
-  tcp.mysql_tcp.downstream_cx_tx_bytes_total: 702
+  tcp.mysql_tcp.downstream_cx_tx_bytes_total: 677
   tcp.mysql_tcp.downstream_flow_control_paused_reading_total: 0
   tcp.mysql_tcp.downstream_flow_control_resumed_reading_total: 0
   tcp.mysql_tcp.idle_timeout: 0
+  tcp.mysql_tcp.max_downstream_connection_duration: 0
   tcp.mysql_tcp.upstream_flush_active: 0
   tcp.mysql_tcp.upstream_flush_total: 0
+
 
 .. seealso::
 

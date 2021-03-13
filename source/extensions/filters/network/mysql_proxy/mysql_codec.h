@@ -1,5 +1,4 @@
 #pragma once
-#include <cstdint>
 
 #include "envoy/common/platform.h"
 
@@ -28,6 +27,7 @@ constexpr uint16_t MAX_MYSQL_USER_STRING = 256;
 constexpr uint8_t MIN_RESPONSE_PAYLOAD = 5;
 constexpr uint8_t MYSQL_MAX_USER_LEN = 32;
 constexpr uint8_t MYSQL_MAX_PASSWD_LEN = 32;
+
 constexpr uint8_t MYSQL_RESP_OK = 0x00;
 constexpr uint8_t MYSQL_RESP_MORE = 0x01;
 constexpr uint8_t MYSQL_RESP_AUTH_SWITCH = 0xfe;
@@ -69,26 +69,35 @@ constexpr uint16_t MYSQL_SERVER_CAPAB = 0x0101;
 constexpr uint8_t MYSQL_SERVER_LANGUAGE = 0x21;
 constexpr uint16_t MYSQL_SERVER_STATUS = 0x0200;
 constexpr uint16_t MYSQL_SERVER_EXT_CAPAB = 0x0200;
-constexpr uint8_t MYSQL_AUTHPLGIN = 0x00;
-constexpr uint8_t MYSQL_UNSET = 0x00;
-constexpr uint8_t MYSQL_UNSET_SIZE = 10;
-constexpr uint16_t MYSQL_CLIENT_CONNECT_WITH_DB = 0x0008;
-constexpr uint16_t MYSQL_CLIENT_CAPAB_41VS320 = 0x0200;
-constexpr uint16_t MYSQL_CLIENT_CAPAB_SSL = 0x0800;
 constexpr uint16_t MYSQL_EXT_CLIENT_CAPAB = 0x0300;
-constexpr uint16_t MYSQL_EXT_CL_PLG_AUTH_CL_DATA = 0x0020;
-constexpr uint16_t MYSQL_EXT_CL_SECURE_CONNECTION = 0x8000;
+
+constexpr uint32_t CLIENT_PLUGIN_AUTH = 0x00080000;
+constexpr uint32_t CLIENT_SECURE_CONNECTION = 0x8000;
+constexpr uint32_t CLIENT_PROTOCOL_41 = 0x00000200;
+constexpr uint32_t CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA = 0x00200000;
+constexpr uint32_t CLIENT_CONNECT_WITH_DB = 0x00000008;
+constexpr uint32_t CLIENT_CONNECT_ATTRS = 0x00100000;
+constexpr uint32_t CLIENT_SSL = 0x00000800;
+constexpr uint16_t MYSQL_EXT_CL_PLUGIN_AUTH = 0x8;
 constexpr uint32_t MYSQL_MAX_PACKET = 0x00000001;
 constexpr uint8_t MYSQL_CHARSET = 0x21;
+
+constexpr uint8_t MYSQL_SQL_STATE_LEN = 5;
 
 constexpr uint8_t LENENCODINT_1BYTE = 0xfb;
 constexpr uint8_t LENENCODINT_2BYTES = 0xfc;
 constexpr uint8_t LENENCODINT_3BYTES = 0xfd;
 constexpr uint8_t LENENCODINT_8BYTES = 0xfe;
 
-constexpr int MYSQL_SUCCESS = 0;
-constexpr int MYSQL_FAILURE = -1;
 constexpr char MYSQL_STR_END = '\0';
+
+enum class DecodeStatus : uint8_t {
+  Success = 0,
+  Failure = 1,
+};
+
+// error code
+constexpr uint16_t MYSQL_CR_AUTH_PLUGIN_ERR = 2061;
 
 class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -99,15 +108,15 @@ public:
 
   virtual ~MySQLCodec() = default;
 
-  int decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {
+  DecodeStatus decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {
     seq_ = seq;
     return parseMessage(data, len);
   }
 
-  virtual std::string encode() PURE;
+  virtual void encode(Buffer::Instance& out) const PURE;
 
 protected:
-  virtual int parseMessage(Buffer::Instance& data, uint32_t len) PURE;
+  virtual DecodeStatus parseMessage(Buffer::Instance& data, uint32_t len) PURE;
 
   uint8_t seq_;
 };
