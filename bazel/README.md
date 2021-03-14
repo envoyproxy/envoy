@@ -62,7 +62,8 @@ for how to update or override dependencies.
        ninja-build \
        curl \
        unzip \
-       virtualenv
+       virtualenv \
+       patch
     ```
 
     ### Fedora
