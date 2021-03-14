@@ -225,7 +225,9 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
     ProtobufWkt::Value val;
     val.set_bool_value(true);
-    (*static_layer->mutable_fields())["envoy.reloadable_features.enable_deprecated_v2_api"] = val;
+    (*static_layer
+          ->mutable_fields())["envoy.test_only.broken_in_production.enable_deprecated_v2_api"] =
+        val;
   }
 }
 

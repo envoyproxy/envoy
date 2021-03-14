@@ -38,7 +38,7 @@ Resource monitors
 
 The overload manager uses Envoy's :ref:`extension <extending>` framework for defining
 resource monitors. Envoy's builtin resource monitors are listed
-:ref:`here <config_resource_monitors>`.
+:ref:`here <v3_config_resource_monitors>`.
 
 .. _config_overload_manager_triggers:
 

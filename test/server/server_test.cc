@@ -856,7 +856,7 @@ TEST_P(ServerInstanceImplTest,
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
 TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromPbText)) {
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromPbText)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
@@ -872,7 +872,7 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapFrom
 
 // Validate that bootstrap v2 YAML with deprecated fields loads when --bootstrap-version is set.
 TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromYaml)) {
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromYaml)) {
   options_.bootstrap_version_ = 2;
   EXPECT_LOG_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
@@ -889,7 +889,7 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailsToLoadV2BootstrapFro
 }
 
 // Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
+TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromPbText) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_THROW_WITH_REGEX(
@@ -898,7 +898,7 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromPbText) {
 }
 
 // Validate that bootstrap v3 YAML with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromYaml) {
+TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromYaml) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_THROW_WITH_REGEX(
@@ -907,7 +907,8 @@ TEST_P(ServerInstanceImplTest, FailToLoadV3ConfigWhenV2SelectedFromYaml) {
 }
 
 // Validate that we correctly parse a V2 pb_text file when configured to do so.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromPbText)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromPbText)) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_LOG_CONTAINS(
@@ -917,7 +918,8 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2Select
 }
 
 // Validate that we correctly parse a V2 YAML file when configured to do so.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2ConfigWhenV2SelectedFromYaml)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromYaml)) {
   options_.bootstrap_version_ = 2;
 
   EXPECT_LOG_CONTAINS(
@@ -977,19 +979,22 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3S
 }
 
 // Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2TransportWithoutExplicitVersion)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2TransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/dynamic_v2.yaml");
 }
 
 // Validate that bootstrap with v2 ADS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2AdsTransportWithoutExplicitVersion)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2AdsTransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/ads_v2.yaml");
 }
 
 // Validate that bootstrap with v2 HDS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2HdsTransportWithoutExplicitVersion)) {
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2HdsTransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/hds_v2.yaml");
 }
@@ -1008,6 +1013,15 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       EnvoyException, "Unknown bootstrap version 1.");
+}
+
+// Validate that we always reject v2.
+TEST_P(ServerInstanceImplTest, InvalidV2Bootstrap) {
+  options_.bootstrap_version_ = 2;
+
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "v2 bootstrap is deprecated and no longer supported.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
@@ -1083,7 +1097,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
                           EnvoyException, "Unknown gRPC client cluster");
 }
 
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_InvalidLegacyBootstrapRuntime)) {
   options_.bootstrap_version_ = 2;
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
@@ -1349,7 +1363,7 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
               ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.bootstrap_version_ = 2;

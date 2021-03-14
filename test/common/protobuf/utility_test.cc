@@ -54,7 +54,7 @@ public:
                          Stats::Gauge::ImportMode::NeverImport)) {
     if (allow_deprecated_v2_api) {
       Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
           {"envoy.features.enable_all_deprecated_features", "true"},
       });
     }

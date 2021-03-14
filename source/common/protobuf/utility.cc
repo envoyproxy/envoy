@@ -292,7 +292,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
   throw ProtoValidationException(validation_error, message);
 }
 
-void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool reject) {
+void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool /*reject*/) {
   const std::string& warning_str =
       fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
                   "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
@@ -316,8 +316,8 @@ void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool rejec
   if (loader != nullptr) {
     loader->countDeprecatedFeatureUse();
   }
-  if (reject &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
     throw DeprecatedMajorVersionException(fmt::format(
         "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
         "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
