@@ -171,4 +171,9 @@ rsync -av \
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
 
+# build clutter - copies the clutter bin to /usr/local/bin/clutter
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //docs:copy_clutter_bin_to_path
+
+clutter version
+
 sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"

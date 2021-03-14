@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +9,16 @@ licenses(["notice"])  # Apache 2
 exports_files(["protodoc_manifest.yaml"])
 
 envoy_package()
+
+py_binary(
+    name = "copy_clutter_bin_to_path",
+    srcs = ["copy_clutter_bin_to_path.py"],
+    args = ["$(location @com_github_cluttercode_clutter//:clutter)"],
+    data = [
+        "@com_github_cluttercode_clutter//:clutter",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 filegroup(
     name = "configs",
