@@ -17,7 +17,7 @@ option java_outer_classname = "UdpListenerConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: UDP Listener Config]
+// [#protodoc-title: UDP listener config]
 // Listener :ref:`configuration overview <config_listeners>`
 
 // [#next-free-field: 7]
@@ -29,8 +29,9 @@ message UdpListenerConfig {
 
   // Used to create a specific UDP listener factory. If not specified the default UDP listener is
   // used.
-  // [#extension-category: envoy.udp_listeners]
-  // [#comment:TODO(mattklein123): Consider removing this as an extension point.]
+  // [#comment:#extension-category: envoy.udp_listeners]
+  // [#not-implemented-hide:]
+  // [#comment:TODO(mattklein123): Remove this as an extension point.]
   core.v3.TypedExtensionConfig listener_config = 4;
 
   // The maximum size of received downstream UDP datagrams. Using a larger size will cause Envoy to allocate
@@ -45,7 +46,7 @@ message UdpListenerConfig {
   // actual UDP writer to create. If not specified the default UDP writer is used.
   // [#comment:#extension-category: envoy.udp_packet_writers]
   // [#not-implemented-hide:]
-  // [#comment:TODO(mattklein123): Consider removing this as an extension point.]
+  // [#comment:TODO(mattklein123): Remove this as an extension point.]
   core.v3.TypedExtensionConfig writer_config = 6;
 
   oneof config_type {
