@@ -1032,21 +1032,19 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
   // so is not worth it since the DNS resolver should handle it for us.
   bool is_ip_address = false;
-  try {
-    absl::string_view potential_ip_address = host_to_resolve;
-    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
-    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
-    // now, just do all the trimming here, but in the future we should consider whether we can
-    // have unified [] handling as low as possible in the stack.
-    if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
-        potential_ip_address.back() == ']') {
-      potential_ip_address.remove_prefix(1);
-      potential_ip_address.remove_suffix(1);
-    }
-    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+  absl::string_view potential_ip_address = host_to_resolve;
+  // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+  // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+  // now, just do all the trimming here, but in the future we should consider whether we can
+  // have unified [] handling as low as possible in the stack.
+  if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
+      potential_ip_address.back() == ']') {
+    potential_ip_address.remove_prefix(1);
+    potential_ip_address.remove_suffix(1);
+  }
+  if (Network::Utility::parseInternetAddressNoThrow(std::string(potential_ip_address)) != nullptr) {
     is_ip_address = true;
     host_to_resolve = potential_ip_address;
-  } catch (const EnvoyException&) {
   }
 
   return {is_ip_address, host_to_resolve, port};
