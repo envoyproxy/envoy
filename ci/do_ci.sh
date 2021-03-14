@@ -451,16 +451,18 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Validate dependency relationships between core/extensions and external deps.
   ./tools/dependency/validate_test.py
   ./tools/dependency/validate.py
+
   # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
   # presubmits, but cve_scan only runs async.
-  python3.8 tools/dependency/cve_scan_test.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+
   # Validate repository metadata.
   ./ci/check_repository_locations.sh
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
-  python3.8 tools/dependency/cve_scan_test.py
-  python3.8 tools/dependency/cve_scan.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc
