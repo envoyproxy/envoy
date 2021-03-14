@@ -131,10 +131,22 @@ public:
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
-   * @return pointer to the Instance, or nullptr if unable to parse the address.
+   * @return pointer to the Instance.
+   * @throw EnvoyException in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr
   parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+
+  /**
+   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
+   * not include a port number. Throws EnvoyException if unable to parse the address.
+   * @param ip_address string to be parsed as an internet address.
+   * @param port optional port to include in Instance created from ip_address, 0 by default.
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @return pointer to the Instance, or nullptr if unable to parse the address.
+   */
+  static Address::InstanceConstSharedPtr
+  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws

@@ -107,7 +107,7 @@ constexpr const char* runtime_features[] = {
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
     // v2 is fatal-by-default.
-    "envoy.reloadable_features.enable_deprecated_v2_api",
+    "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
