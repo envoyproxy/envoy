@@ -113,15 +113,36 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_THROW(Utility::parseInternetAddress("[::]"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("[::1]:1"), EnvoyException);
 
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow(""));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("1.2.3"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("1.2.3.4.5"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("1.2.3.256"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("foo"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("0:0:0:0"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fffff::"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("/foo"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::]"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::1]:1"));
+
   EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddress("1.2.3.4")->asString());
   EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddress("0.0.0.0")->asString());
   EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddress("127.0.0.1")->asString());
+
+  EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddressNoThrow("1.2.3.4")->asString());
+  EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressNoThrow("0.0.0.0")->asString());
+  EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressNoThrow("127.0.0.1")->asString());
 
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddress("::1")->asString());
   EXPECT_EQ("[::]:0", Utility::parseInternetAddress("::")->asString());
   EXPECT_EQ("[1::2:3]:0", Utility::parseInternetAddress("1::2:3")->asString());
   EXPECT_EQ("[a::1]:0", Utility::parseInternetAddress("a::1")->asString());
   EXPECT_EQ("[a:b:c:d::]:0", Utility::parseInternetAddress("a:b:c:d::")->asString());
+
+  EXPECT_EQ("[::1]:0", Utility::parseInternetAddressNoThrow("::1")->asString());
+  EXPECT_EQ("[::]:0", Utility::parseInternetAddressNoThrow("::")->asString());
+  EXPECT_EQ("[1::2:3]:0", Utility::parseInternetAddressNoThrow("1::2:3")->asString());
+  EXPECT_EQ("[a::1]:0", Utility::parseInternetAddressNoThrow("a::1")->asString());
+  EXPECT_EQ("[a:b:c:d::]:0", Utility::parseInternetAddressNoThrow("a:b:c:d::")->asString());
 }
 
 TEST(NetworkUtility, ParseInternetAddressAndPort) {
@@ -136,10 +157,26 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:65536"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("1.2.3.4:8008/"), EnvoyException);
 
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4::1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:-1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow(":1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow(" :1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3:1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4]:2"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:65536"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:8008/"));
+
   EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressAndPort("0.0.0.0:0")->asString());
   EXPECT_EQ("255.255.255.255:65535",
             Utility::parseInternetAddressAndPort("255.255.255.255:65535")->asString());
   EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressAndPort("127.0.0.1:0")->asString());
+
+  EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddressAndPortNoThrow("0.0.0.0:0")->asString());
+  EXPECT_EQ("255.255.255.255:65535",
+            Utility::parseInternetAddressAndPortNoThrow("255.255.255.255:65535")->asString());
+  EXPECT_EQ("127.0.0.1:0", Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:0")->asString());
 
   EXPECT_THROW(Utility::parseInternetAddressAndPort(""), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("::1"), EnvoyException);
@@ -154,9 +191,27 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_THROW(Utility::parseInternetAddressAndPort("[::]:bogus"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("[1::1]:65536"), EnvoyException);
 
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow(""));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[[::]]:1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:1]:2"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("]:[::1]:2"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[1.2.3.4:0"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[1.2.3.4]:0"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:-1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:bogus"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[1::1]:65536"));
+
   EXPECT_EQ("[::]:0", Utility::parseInternetAddressAndPort("[::]:0")->asString());
   EXPECT_EQ("[1::1]:65535", Utility::parseInternetAddressAndPort("[1::1]:65535")->asString());
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPort("[::1]:0")->asString());
+
+  EXPECT_EQ("[::]:0", Utility::parseInternetAddressAndPortNoThrow("[::]:0")->asString());
+  EXPECT_EQ("[1::1]:65535",
+            Utility::parseInternetAddressAndPortNoThrow("[1::1]:65535")->asString());
+  EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPortNoThrow("[::1]:0")->asString());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
