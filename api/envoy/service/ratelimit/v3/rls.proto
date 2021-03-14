@@ -7,6 +7,7 @@ import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -51,7 +52,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -118,6 +119,17 @@ message RateLimitResponse {
     google.protobuf.Duration duration_until_reset = 4;
   }
 
+  // Cacheable quota for responses, see documentation for the :ref:`quota
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.quota>` field.
+  // [#not-implemented-hide:]
+  message Quota {
+    // Number of matching requests granted in quota.
+    uint32 requests = 1;
+
+    // Point in time at which the quota expires.
+    google.protobuf.Timestamp valid_until = 2;
+  }
+
   // The overall response code which takes into account all of the descriptors that were passed
   // in the RateLimitRequest message.
   Code overall_code = 1;
@@ -144,4 +156,16 @@ message RateLimitResponse {
   // - :ref:`envoy.filters.network.ratelimit <config_network_filters_ratelimit_dynamic_metadata>` for network filter.
   // - :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit_dynamic_metadata>` for Thrift filter.
   google.protobuf.Struct dynamic_metadata = 6;
+
+  // Quota granted for the combined descriptor sets. This is a certain number of requests over a
+  // period of time. The client may cache this result and apply the effective RateLimitResponse to
+  // future matching requests with the same descriptor set.
+  //
+  // If quota is available, a RLS request will not be made and the quota will be reduced by 1.
+  //
+  // If there is not sufficient quota, a RLS request will be made. When the result is returned,
+  // a single unit will be consumed from the quota. When quota expires due to timeout, a new RLS
+  // request will also be made.
+  // [#not-implemented-hide:]
+  Quota quota = 7;
 }
