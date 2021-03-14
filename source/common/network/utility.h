@@ -132,6 +132,7 @@ public:
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
    * @return pointer to the Instance.
+   * @throw EnvoyException in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr
   parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
