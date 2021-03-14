@@ -68,6 +68,7 @@ protected:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     Network::Connection& connection() override { return connection_; }
+    const Network::Socket& socket() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
     // Synthetic class that acts as a stub for the connection backing the
     // Network::ReadFilterCallbacks.
