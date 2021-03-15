@@ -36,7 +36,7 @@ class PathTransformer {
 public:
   PathTransformer(envoy::type::http::v3::PathTransformation operations);
 
-  absl::optional<std::string> transform(const absl::string_view original_path);
+  absl::optional<std::string> transform(const absl::string_view original_path) const;
 
   static absl::optional<std::string> mergeSlashes(absl::string_view original_path);
 

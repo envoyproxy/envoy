@@ -90,7 +90,7 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
 }
 
 // Already normalized path don't change.
-TEST(PathTransformerTest, NormalizeValidPaths) {
+TEST(PathTransformationTest, NormalizeValidPaths) {
 
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/a/b/../c", "/a/c"},        // parent dir
@@ -134,7 +134,7 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 }
 
 // Paths that are valid get normalized.
-TEST(PathTransformerTest, NormalizeCasePath) {
+TEST(PathTransformationTest, NormalizeCasePath) {
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/A/B/C", "/A/B/C"},           // not normalize to lower case
       {"/a/b/%2E%2E/c", "/a/c"},      // %2E can be normalized to .
@@ -176,7 +176,7 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/?b", mergeSlashes("//a/?b"));             // ends with slash + query
 }
 
-TEST(PathTransformerTest, MergeSlashes) {
+TEST(PathTransformationTest, MergeSlashes) {
   EXPECT_EQ("", PathTransformer::mergeSlashes("").value());                // empty
   EXPECT_EQ("a/b/c", PathTransformer::mergeSlashes("a//b/c").value());     // relative
   EXPECT_EQ("/a/b/c/", PathTransformer::mergeSlashes("/a//b/c/").value()); // ends with slash
@@ -213,6 +213,40 @@ TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?#fragment"));
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#"));
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#fragment"));
+}
+
+class PathTransformerTest : public testing::Test {
+public:
+  void setPathTransformer(std::vector<std::string> transformations_config) {
+    envoy::type::http::v3::PathTransformation path_transformation_config;
+    Protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation>* operations =
+        path_transformation_config.mutable_operations();
+    for (std::string const& transformation : transformations_config) {
+      auto* operation = operations->Add();
+      if (transformation == "NormalizePathRFC3986") {
+        operation->mutable_normalize_path_rfc_3986();
+      } else if (transformation == "MergeSlashes") {
+        operation->mutable_merge_slashes();
+      }
+    }
+    path_transformer_.reset(new PathTransformer(path_transformation_config));
+  }
+  const PathTransformer& pathTransformer() { return *path_transformer_; }
+
+  std::unique_ptr<PathTransformer> path_transformer_;
+};
+
+TEST_F(PathTransformerTest, MergeSlashes) {
+  setPathTransformer({"MergeSlashes"});
+  PathTransformer const& path_transformer = pathTransformer();
+  EXPECT_EQ("", path_transformer.transform("").value());                // empty
+  EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c").value());     // relative
+  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a//b/c/").value()); // ends with slash
+  EXPECT_EQ("a/b/c/", path_transformer.transform("a//b/c/").value());   // relative ends with slash
+}
+
+TEST_F(PathTransformerTest, DuplicateTransformation) {
+  EXPECT_THROW(setPathTransformer({"MergeSlashes", "MergeSlashes"}), EnvoyException);
 }
 
 } // namespace Http

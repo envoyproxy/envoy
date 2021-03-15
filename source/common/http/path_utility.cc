@@ -112,10 +112,11 @@ PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_
     } else if (operation.has_merge_slashes()) {
       transformations_.emplace_back(PathTransformer::mergeSlashes);
     }
+    operation_hashes.push_back(operation_hash);
   }
 }
 
-absl::optional<std::string> PathTransformer::transform(absl::string_view original) {
+absl::optional<std::string> PathTransformer::transform(absl::string_view original) const {
   absl::optional<std::string> path_string;
   absl::string_view path_string_view = original;
   for (Transformation const& transformation : transformations_) {
