@@ -66,7 +66,7 @@ build:release-android --config=android
 build:release-android --config=release-common
 build:release-android --compilation_mode=opt
 
-# Instrument Envoy Mobile's c++ code for coverage
+# Instrument Envoy Mobile's C++ code for coverage
 build:coverage --instrumentation_filter="//library/common[/:]"
 build:coverage --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build:coverage --javabase=@bazel_tools//tools/jdk:remote_jdk11
