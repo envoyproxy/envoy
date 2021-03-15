@@ -87,18 +87,6 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   return {access, creation};
 }
 
-Api::IoCallBoolResult ConsoleFileImplWin32::open(FlagSet) {
-  FlagsAndMode flags;
-  flags.access_ = GENERIC_WRITE | GENERIC_READ;
-  flags.creation_ = OPEN_EXISTING;
-  fd_ = CreateFileA(path().c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
-                    flags.creation_, 0, NULL);
-  if (fd_ == INVALID_HANDLE) {
-    return resultFailure(false, ::GetLastError());
-  }
-  return resultSuccess(true);
-}
-
 FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   switch (file_info.file_type_) {
   case DestinationType::File:
