@@ -1,9 +1,12 @@
 #include "common/http/hash_policy.h"
 
+#include <string>
+
 #include "envoy/config/route/v3/route_components.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/common/regex.h"
+#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -39,14 +42,15 @@ public:
                                     const StreamInfo::FilterStateSharedPtr) const override {
     absl::optional<uint64_t> hash;
 
-    // TODO(mattklein123): Potentially hash on all headers.
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
+      auto values_str = HeaderUtility::getAllOfHeaderAsString(header, "");
+
       if (regex_rewrite_ != nullptr) {
-        hash = HashUtil::xxHash64(regex_rewrite_->replaceAll(header[0]->value().getStringView(),
-                                                             regex_rewrite_substitution_));
+        hash = HashUtil::xxHash64(
+            regex_rewrite_->replaceAll(values_str.result().value(), regex_rewrite_substitution_));
       } else {
-        hash = HashUtil::xxHash64(header[0]->value().getStringView());
+        hash = HashUtil::xxHash64(values_str.result().value());
       }
     }
     return hash;

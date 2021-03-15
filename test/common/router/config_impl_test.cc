@@ -2405,6 +2405,16 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
                                                                 nullptr));
   }
   {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("foo_header", "bar");
+    headers.addCopy("foo_header", "foo");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    // ensure multiple values streams as single string
+    auto expected_hash_value = HashUtil::xxHash64("barfoo");
+    EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
+                                       nullptr, headers, add_cookie_nop_, nullptr));
+  }
+  {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     EXPECT_EQ(nullptr, route->routeEntry()->hashPolicy());
