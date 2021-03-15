@@ -745,12 +745,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
       std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(default_route->route_entry_, clusterName())
       .Times(1)
-      .WillOnce(ReturnRef(default_cluster_name));
+      .WillRepeatedly(ReturnRef(default_cluster_name));
 
   // RouteConstSharedPtr of DelegatingRoute for foo
   // Initialization separate from declaration to be in scope for both filters
   std::shared_ptr<const ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
 
+  // TODO why does this get called more than once?
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .WillOnce(Return(default_route));
 
@@ -792,17 +793,17 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         // Since cached_route_ has a value set, route() will return cached_route_ with no other
         // route calculations / method calls.
-        EXPECT_EQ(foo_route_override, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->route());
         // Note: The route filter determines the finalized route's upstream cluster name via
         // routeEntry()->clusterName(), so that's the key piece to check.
         // This should directly call the ExampleDerivedDelegatingRouteEntry overridden
         // clusterName() method.
         EXPECT_EQ(foo_cluster_name,
-                  decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
+                  decoder_filters_[1]->callbacks_->route()->routeEntry()->clusterName());
         EXPECT_EQ(foo_route_override->routeEntry(),
-                  decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+                  decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
         // Tests that setRoute correctly sets cached_cluster_info_
-        EXPECT_EQ(foo_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(foo_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
         return FilterHeadersStatus::StopIteration;
       }));
