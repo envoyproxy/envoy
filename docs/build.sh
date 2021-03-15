@@ -168,12 +168,19 @@ rsync -av \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
 
-# To speed up validate_fragment invocations in validating_code_block
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
+# TODO(phlax): re/move this when sphinx build job is moved to bazel
+CLUTTER_BIN_DIR="$(pwd)/clutterbin"
+mkdir -p "$CLUTTER_BIN_DIR"
+export PATH="${PATH}:${CLUTTER_BIN_DIR}"
 
 # build clutter - copies the clutter bin to /usr/local/bin/clutter
+export CLUTTER_BIN="${CLUTTER_BIN_DIR}/clutter"
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //docs:copy_clutter_bin_to_path
 
+# TODO(itayd): add clutter
 clutter version
+
+# To speed up validate_fragment invocations in validating_code_block
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
 
 sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"
