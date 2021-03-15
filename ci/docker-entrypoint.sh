@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 set -e
 
+loglevel="${loglevel:-}"
+USERID=$(id -u)
+
 # if the first argument look like a parameter (i.e. start with '-'), run Envoy
 if [ "${1#-}" != "$1" ]; then
 	set -- envoy "$@"
@@ -13,7 +16,7 @@ if [ "$1" = 'envoy' ]; then
 	fi
 fi
 
-if [ "$ENVOY_UID" != "0" ]; then
+if [ "$ENVOY_UID" != "0" ] && [ "$USERID" = 0 ]; then
     if [ -n "$ENVOY_UID" ]; then
 	usermod -u "$ENVOY_UID" envoy
     fi
