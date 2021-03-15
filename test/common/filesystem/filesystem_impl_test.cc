@@ -224,6 +224,34 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #endif
 }
 
+TEST_F(FileSystemImplTest, ConstructedFile) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_EQ(file->path(), new_file_path);
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::File);
+}
+
+TEST_F(FileSystemImplTest, ConstructedStdErrFile) {
+  FilePathAndType new_file_info{Filesystem::DestinationType::Stderr, ""};
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stderr);
+  EXPECT_EQ(file->path(), "/dev/stderr");
+}
+
+TEST_F(FileSystemImplTest, ConstructedStdOutFile) {
+  FilePathAndType new_file_info{Filesystem::DestinationType::Stdout, ""};
+
+  FilePtr file = file_system_.createFile(new_file_info);
+  EXPECT_FALSE(file->isOpen());
+  EXPECT_EQ(file->destinationType(), Filesystem::DestinationType::Stdout);
+  EXPECT_EQ(file->path(), "/dev/stdout");
+}
+
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
@@ -312,6 +340,43 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
   auto contents = TestEnvironment::readFileToStringForTest(new_file_path);
   EXPECT_EQ(" new data", contents);
 }
+
+TEST_F(FileSystemImplTest, StdOut) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.rc_);
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.rc_) << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+TEST_F(FileSystemImplTest, StdErr) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stderr, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_->getErrorDetails());
+  EXPECT_TRUE(file->isOpen());
+  std::string data(" new data\n");
+  const Api::IoCallSizeResult result = file->write(data);
+  EXPECT_EQ(data.length(), result.rc_) << fmt::format("{}", result.err_->getErrorDetails());
+}
+
+#ifdef WIN32
+TEST_F(FileSystemImplTest, Win32InvalidHandleThrows) {
+  FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+  FilePtr file = file_system_.createFile(file_info);
+  // We need to flush just to make sure that the write has been completed.
+  auto hh = GetStdHandle(STD_OUTPUT_HANDLE);
+  FlushFileBuffers(hh);
+  auto original_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, NULL));
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_FALSE(result.rc_);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, original_handle));
+}
+#endif
 
 TEST_F(FileSystemImplTest, Close) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");

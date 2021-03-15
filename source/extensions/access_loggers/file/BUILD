@@ -12,17 +12,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_library(
-    name = "file_access_log_lib",
-    srcs = ["file_access_log_impl.cc"],
-    hdrs = ["file_access_log_impl.h"],
-    # The file based access logger is core code.
-    visibility = ["//visibility:public"],
-    deps = [
-        "//source/extensions/access_loggers/common:access_log_base",
-    ],
-)
-
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
@@ -34,10 +23,11 @@ envoy_cc_extension(
     ],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
-        ":file_access_log_lib",
         "//include/envoy/registry",
+        "//source/common/config:config_provider_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",
+        "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/access_loggers:well_known_names",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],

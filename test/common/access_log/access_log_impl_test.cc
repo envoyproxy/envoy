@@ -30,6 +30,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
@@ -50,7 +51,11 @@ public:
   AccessLogImplTest() : file_(new MockAccessLogFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
-    ON_CALL(log_manager_, createAccessLog(_)).WillByDefault(Return(file_));
+    ON_CALL(log_manager_, createAccessLog(testing::Matcher<const std::string&>(_)))
+        .WillByDefault(Return(file_));
+    ON_CALL(log_manager_,
+            createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+        .WillByDefault(Return(file_));
     ON_CALL(*file_, write(_)).WillByDefault(SaveArg<0>(&output_));
   }
 
@@ -1085,6 +1090,47 @@ typed_config:
       "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
       "\"/dev/null\"\n  "
       "}\n}\n");
+}
+
+TEST_F(AccessLogImplTest, Stdout) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stdout.v3.StdoutAccessLog
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_,
+              createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+      .WillOnce(Invoke(
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
+
+            return file_;
+          }));
+  EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
+}
+
+TEST_F(AccessLogImplTest, Stderr) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stderr.v3.StdErrorAccessLog
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_,
+              createAccessLog(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
+      .WillOnce(Invoke(
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
+            return file_;
+          }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
 TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {

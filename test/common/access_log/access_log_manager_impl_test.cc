@@ -34,7 +34,17 @@ protected:
         access_log_manager_(timeout_40ms_, api_, dispatcher_, lock_, store_) {
     EXPECT_CALL(file_system_, createFile("foo"))
         .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file_))));
-
+    EXPECT_CALL(file_system_,
+                createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
+                    Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})))
+        .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file_))))
+        .WillRepeatedly(
+            Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
+              NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
+              EXPECT_CALL(*file, path()).WillRepeatedly(Return("foo"));
+              return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
+            }));
+    EXPECT_CALL(*file_, path()).WillRepeatedly(Return("foo"));
     EXPECT_CALL(api_, fileSystem()).WillRepeatedly(ReturnRef(file_system_));
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
   }
@@ -452,6 +462,16 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
   AccessLogFileSharedPtr log = access_log_manager_.createAccessLog("foo");
 
   NiceMock<Filesystem::MockFile>* file2 = new NiceMock<Filesystem::MockFile>;
+  EXPECT_CALL(*file2, path()).WillRepeatedly(Return("bar"));
+  EXPECT_CALL(file_system_,
+              createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
+                  Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"})))
+      .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))))
+      .WillRepeatedly(Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
+        NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
+        EXPECT_CALL(*file, path()).WillRepeatedly(Return("bar"));
+        return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
+      }));
   EXPECT_CALL(file_system_, createFile("bar"))
       .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))));
 
