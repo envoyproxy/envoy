@@ -725,11 +725,12 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_update_cb_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
-  priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) -> void {
-    if (slow_start_enabled_) {
-      recalculateHostsInSlowStart(hosts_added);
-    }
-  });
+  member_update_cb_ = priority_set.addMemberUpdateCb(
+      [this](const HostVector& hosts_added, const HostVector&) -> void {
+        if (slow_start_enabled_) {
+          recalculateHostsInSlowStart(hosts_added);
+        }
+      });
 }
 
 void EdfLoadBalancerBase::initialize() {

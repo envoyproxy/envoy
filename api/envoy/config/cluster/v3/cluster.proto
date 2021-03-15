@@ -511,8 +511,6 @@ message Cluster {
     message SlowStartConfig {
       // Endpoint warming policy defines additional condition (apart from condition that endpoint creation duration should be within slow start window)
       // for endpoint to enter slow start mode.
-      // Refer to :ref:`endpoint warming policy types <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>`
-      // for an explanation on each policy type.
       enum EndpointWarmingPolicy {
         // Endpoint would enter slow start immediately.
         NO_WAIT = 0;
@@ -522,7 +520,7 @@ message Cluster {
       }
 
       // Size of slow start window in seconds, defaults to 0.
-      // If set to value greater than 0, the newly created host remains in slow start mode starting from it's creation time
+      // If set to value greater than 0, the newly created host remains in slow start mode starting from its creation time
       // for the duration of slow start window.
       uint32 slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
 

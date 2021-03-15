@@ -51,21 +51,3 @@ Endpoint E1 has statically configured initial weight of X and endpoint E2 weight
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
 | 23          | LB select endpoint |     NO     |     NO     |    X      |    Y     |     E2      | 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+
-
-
-.. _arch_overview_load_balancing_slow_start_endpoint_warming_policy_types:
-
-Endpoint warming policy types
------------------------------
-
-Endpoint warming policy defines conditions for host to enter slow start mode.
-
-No Wait
-^^^^^^^
-
-If configured, endpoint would enter slow start immediately.
-
-Wait For First Passing Healthcheck
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If configured, endpoint would enter slow start upon having passed an active healthcheck.
