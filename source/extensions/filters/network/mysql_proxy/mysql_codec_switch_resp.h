@@ -1,4 +1,5 @@
 #pragma once
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
@@ -11,10 +12,13 @@ namespace MySQLProxy {
 class ClientSwitchResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  std::string encode() override;
+  DecodeStatus parseMessage(Buffer::Instance& buffer, uint32_t len) override;
+  void encode(Buffer::Instance&) const override;
 
-  void setAuthPluginResp(std::string& auth_swith_resp);
+  void setAuthPluginResp(const std::string& auth_plugin_resp) {
+    auth_plugin_resp_ = auth_plugin_resp;
+  }
+  const std::string& getAuthPluginResp() const { return auth_plugin_resp_; }
 
 private:
   std::string auth_plugin_resp_;

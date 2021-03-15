@@ -7,7 +7,8 @@ The MySQL proxy filter decodes the wire protocol between the MySQL client
 and server. It decodes the SQL queries in the payload (SQL99 format only).
 The decoded info is emitted as dynamic metadata that can be combined with
 access log filters to get detailed information on tables accessed as well
-as operations performed on each table.
+as operations performed on each table. It's a transparent filter, so it 
+won't affect the normal progress of client and server.
 
 .. attention::
 
@@ -17,8 +18,9 @@ as operations performed on each table.
 
 .. warning::
 
-   The mysql_proxy filter was tested with MySQL v5.5. The filter may not work
-   with other versions of MySQL due to differences in the protocol implementation.
+   The mysql_proxy filter was tested with MySQL v5.7. The filter may not work
+   with other versions of MySQL due to differences in the protocol implementation. 
+   The filter won't work when client turns on ssl communication.
 
 .. _config_network_filters_mysql_proxy_config:
 

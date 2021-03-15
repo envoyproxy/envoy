@@ -312,7 +312,6 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -374,8 +373,6 @@ envoy_cc_library(
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
@@ -560,7 +557,7 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -569,6 +566,6 @@ envoy_cc_library(
     hdrs = ["filter_chain_factory_context_callback.h"],
     deps = [
         "//include/envoy/server:filter_config_interface",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

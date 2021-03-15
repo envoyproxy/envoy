@@ -336,6 +336,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
 
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
+  EXCLUDE_UPSTREAM_HTTP3; // buffer bug.
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
@@ -368,6 +369,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
+  EXCLUDE_UPSTREAM_HTTP3; // buffer bug.
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -499,6 +501,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
     ASSERT_NE(nullptr, counter);
     EXPECT_EQ(1L, counter->value());
   } else if (upstreamProtocol() == FakeHttpConnection::Type::HTTP3) {
+    // TODO(alyssawilk) http3 stats.
     Stats::CounterSharedPtr counter =
         TestUtility::findCounter(stats, "cluster.cluster_0.upstream_rq_tx_reset");
     ASSERT_NE(nullptr, counter);
@@ -1502,6 +1505,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
+  EXCLUDE_UPSTREAM_HTTP3; // buffer bug.
   // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -1574,6 +1578,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  EXCLUDE_UPSTREAM_HTTP3; // TODO(danzh) QuicMemSliceImpl flake
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(66, 60);
 }
@@ -1933,6 +1938,7 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  EXCLUDE_UPSTREAM_HTTP3; // TODO(danzh) QuicMemSliceImpl flake
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
 

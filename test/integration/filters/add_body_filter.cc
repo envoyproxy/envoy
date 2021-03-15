@@ -13,7 +13,7 @@
 
 namespace Envoy {
 
-// A test filter that inserts body to a header only request/response.
+// A test filter that adds body data to a request/response without body payload.
 class AddBodyStreamFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "add-body-filter";
@@ -32,7 +32,9 @@ public:
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    // For HTTP/3, there's no headers-only streams so the data will be added here.
+    // Ensure that encodeData is only called for HTTP/3 (where protocol is set at the
+    // connection level). In HTTP/3 the FIN arrives separately so we will get
+    // encodeData() with an empty body.
     ASSERT(end_stream == false || decoder_callbacks_->connection()->streamInfo().protocol());
     data.add("body");
     return Http::FilterDataStatus::Continue;
