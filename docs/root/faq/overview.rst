@@ -11,6 +11,7 @@ Build
 
   build/binaries
   build/boringssl
+  build/speed
 
 API
 ---
