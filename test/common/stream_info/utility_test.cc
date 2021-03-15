@@ -97,8 +97,8 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("RFCF", ResponseFlag::ResponseFromCacheFilter),
       std::make_pair("NFCF", ResponseFlag::NoFilterConfigFound),
       std::make_pair("DT", ResponseFlag::DurationTimeout),
-      std::make_pair("UPE", ResponseFlag::UpstreamProtocolError)
-          std::make_pair("NC", ResponseFlag::NoClusterFound),
+      std::make_pair("UPE", ResponseFlag::UpstreamProtocolError),
+      std::make_pair("NC", ResponseFlag::NoClusterFound),
   };
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());

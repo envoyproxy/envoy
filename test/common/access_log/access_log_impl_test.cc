@@ -1023,17 +1023,16 @@ typed_config:
       StreamInfo::ResponseFlag::UpstreamProtocolError,
       StreamInfo::ResponseFlag::NoClusterFound,
   };
-};
 
-InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-for (const auto response_flag : all_response_flags) {
-  TestStreamInfo stream_info;
-  stream_info.setResponseFlag(response_flag);
-  EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+  for (const auto response_flag : all_response_flags) {
+    TestStreamInfo stream_info;
+    stream_info.setResponseFlag(response_flag);
+    EXPECT_CALL(*file_, write(_));
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+  }
 }
-} // namespace
 
 TEST_F(AccessLogImplTest, ResponseFlagFilterUnsupportedFlag) {
   const std::string yaml = R"EOF(
@@ -1645,6 +1644,6 @@ TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)
   }
 }
 
+} // namespace
 } // namespace AccessLog
-} // namespace Envoy
 } // namespace Envoy
