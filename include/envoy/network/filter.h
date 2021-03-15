@@ -20,6 +20,7 @@ namespace Network {
 
 class Connection;
 class ConnectionSocket;
+class Socket;
 class UdpListener;
 struct UdpRecvData;
 
@@ -44,6 +45,11 @@ public:
    * @return the connection that owns this filter.
    */
   virtual Connection& connection() PURE;
+
+  /**
+   * @return Socket the socket the filter is operating on.
+   */
+  virtual const Socket& socket() PURE;
 };
 
 /**
