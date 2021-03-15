@@ -124,6 +124,7 @@ def envoy_dependencies(skip_targets = []):
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_github_c_ares_c_ares()
+    _com_github_cluttercode_clutter()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
@@ -216,6 +217,12 @@ def _boringssl_fips():
         genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel/external:boringssl_fips.patch"],
+    )
+
+def _com_github_cluttercode_clutter():
+    external_http_archive(
+        name = "com_github_cluttercode_clutter",
+        build_file = "@envoy//bazel/external:clutter.BUILD",
     )
 
 def _com_github_circonus_labs_libcircllhist():

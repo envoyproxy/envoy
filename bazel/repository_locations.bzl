@@ -45,6 +45,21 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-10-10",
         use_category = ["build"],
     ),
+    com_github_cluttercode_clutter = dict(
+        project_name = "Clutter",
+        project_desc = "Clutter facilitates an unintrusive way to link textual content in a source tree. Think ctags for comments.",
+        project_url = "https://github.com/cluttercode/clutter",
+        version = "0.3.1",
+        sha256 = "95fbbd01b8d2232f82856f9248cefcc9e8e79f279cbd0269aea057058092642d",
+        strip_prefix = "clutter-{version}",
+        urls = ["https://github.com/cluttercode/clutter/archive/{version}.tar.gz"],
+        release_date = "2021-03-11",
+        use_category = ["other"],
+        implied_untracked_deps = [
+            "com_github_urfave_cli",
+        ],
+        cpe = "N/A",
+    ),
     rules_fuzzing = dict(
         project_name = "Fuzzing Rules for Bazel",
         project_desc = "Bazel rules for fuzz tests",
