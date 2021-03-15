@@ -1,5 +1,7 @@
 #include "extensions/matching/generic_inputs/environment/config.h"
 
+#include <memory>
+
 #include "envoy/matcher/matcher.h"
 
 namespace Envoy {
@@ -15,7 +17,14 @@ Config::createGenericDataInput(const Protobuf::Message& config,
       const envoy::extensions::matching::generic_inputs::environment::v3::Environment&>(
       config, factory_context.messageValidationVisitor());
 
-  return std::make_unique<Input>(environment_config.name());
+  // We read the env variable at construction time to avoid repeat lookups.
+  // This assumes that the environment remains stable during the process lifetime.
+  auto* value = getenv(environment_config.name().data());
+  if (value != nullptr) {
+    return std::make_unique<Input>(std::string(value));
+  }
+
+  return std::make_unique<Input>(absl::nullopt);
 }
 
 /**

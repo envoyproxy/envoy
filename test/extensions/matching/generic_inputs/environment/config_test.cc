@@ -3,6 +3,7 @@
 #include "extensions/matching/generic_inputs/environment/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
@@ -28,8 +29,21 @@ TEST(ConfigTest, TestConfig) {
   Config factory;
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  auto matcher = factory.createGenericDataInput(*message, context);
-  EXPECT_NE(nullptr, matcher);
+
+  {
+    auto input = factory.createGenericDataInput(*message, context);
+    EXPECT_NE(nullptr, input);
+    EXPECT_EQ(input->get(), absl::nullopt);
+  }
+
+  TestEnvironment::setEnvVar("foo", "bar", 1);
+  {
+    auto input = factory.createGenericDataInput(*message, context);
+    EXPECT_NE(nullptr, input);
+    EXPECT_EQ(input->get(), absl::make_optional("bar"));
+  }
+
+  TestEnvironment::unsetEnvVar("foo");
 }
 
 } // namespace Environment
