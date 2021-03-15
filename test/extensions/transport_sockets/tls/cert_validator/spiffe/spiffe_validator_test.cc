@@ -10,7 +10,7 @@
 #include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 #include "extensions/transport_sockets/tls/stats.h"
 
-#include "test/extensions/transport_sockets/tls/cert_validator/util.h"
+#include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -231,7 +231,7 @@ typed_config:
 
   X509StorePtr ssl_ctx = X509_STORE_new();
 
-  // Trust domain match so should be accepted.
+  // Trust domain matches so should be accepted.
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -273,7 +273,7 @@ typed_config:
 
   X509StorePtr ssl_ctx = X509_STORE_new();
 
-  // Trust domain match so should be accepted.
+  // Trust domain matches so should be accepted.
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -286,7 +286,7 @@ typed_config:
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   EXPECT_TRUE(validator().doVerifyCertChain(store_ctx.get(), nullptr, *cert, nullptr));
 
-  // Trust domain match so but it has expired.
+  // Trust domain matches but it has expired.
   cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"));
@@ -319,7 +319,7 @@ typed_config:
 
   X509StorePtr ssl_ctx = X509_STORE_new();
 
-  // Trust domain match and it has expired but ignoreCertificateExpirationCallback is set, so this
+  // Trust domain matches and it has expired but allow_expired_certificate is true, so this
   // should be accepted.
   auto cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir "
@@ -441,30 +441,6 @@ typed_config:
   bssl::ScopedEVP_MD_CTX md;
   EVP_DigestInit(md.get(), EVP_sha256());
   validator().updateDigestForSessionId(md, hash_buffer, SHA256_DIGEST_LENGTH);
-}
-
-TEST(SPIFFEValidator, ignoreCertificateExpirationCallback) {
-  // If ok = true, then true should be returned.
-  EXPECT_TRUE(SPIFFEValidator::ignoreCertificateExpirationCallback(true, nullptr));
-
-  // Expired case.
-  {
-    X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
-    X509_STORE_CTX_set_error(store_ctx.get(), X509_V_ERR_CERT_HAS_EXPIRED);
-    EXPECT_TRUE(SPIFFEValidator::ignoreCertificateExpirationCallback(false, store_ctx.get()));
-  }
-  // Yet valid case.
-  {
-    X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
-    X509_STORE_CTX_set_error(store_ctx.get(), X509_V_ERR_CERT_NOT_YET_VALID);
-    EXPECT_TRUE(SPIFFEValidator::ignoreCertificateExpirationCallback(false, store_ctx.get()));
-  }
-  // Other error
-  {
-    X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
-    X509_STORE_CTX_set_error(store_ctx.get(), X509_V_ERR_CERT_REVOKED);
-    EXPECT_FALSE(SPIFFEValidator::ignoreCertificateExpirationCallback(false, store_ctx.get()));
-  }
 }
 
 } // namespace Tls

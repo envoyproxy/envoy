@@ -1,30 +1,18 @@
 #include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <deque>
-#include <functional>
-#include <string>
-#include <vector>
-
-#include "envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
-#include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
-#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/common/matchers.h"
-#include "common/common/regex.h"
 #include "common/config/datasource.h"
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
@@ -161,7 +149,7 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
   // Set the trust bundle's certificate store on the context, and do the verification.
   store_ctx->ctx = trust_bundle;
   if (allow_expired_certificate_) {
-    X509_STORE_CTX_set_verify_cb(store_ctx, SPIFFEValidator::ignoreCertificateExpirationCallback);
+    X509_STORE_CTX_set_verify_cb(store_ctx, CertValidatorUtil::ignoreCertificateExpirationCallback);
   }
   auto ret = X509_verify_cert(store_ctx);
   if (ssl_extended_info) {
@@ -173,16 +161,6 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx,
     stats_.fail_verify_error_.inc();
   }
   return ret;
-}
-
-int SPIFFEValidator::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx) {
-  if (!ok) {
-    int err = X509_STORE_CTX_get_error(store_ctx);
-    if (err == X509_V_ERR_CERT_HAS_EXPIRED || err == X509_V_ERR_CERT_NOT_YET_VALID) {
-      return 1;
-    }
-  }
-  return ok;
 }
 
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
