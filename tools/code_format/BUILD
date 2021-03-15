@@ -14,8 +14,8 @@ exports_files([
 ])
 
 py_binary(
-    name = "pylint",
-    srcs = ["pylint.py"],
+    name = "python_flake8",
+    srcs = ["python_flake8.py"],
     data = [":flake8.conf"],
     visibility = ["//visibility:public"],
     deps = [
