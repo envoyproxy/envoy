@@ -30,7 +30,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @htuch
+/*/extensions/filters/http/ext_proc @gbrail @snowp
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
@@ -119,7 +119,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/listener/tls_inspector @piotrsikora @htuch @asraa
+/*/extensions/filters/listener/tls_inspector @ggreenway @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao

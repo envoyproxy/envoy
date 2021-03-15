@@ -11,6 +11,7 @@ exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
+    "repository_locations.bzl",
 ])
 
 genrule(
@@ -443,6 +444,11 @@ config_setting(
 config_setting(
     name = "darwin_x86_64",
     values = {"cpu": "darwin_x86_64"},
+)
+
+config_setting(
+    name = "darwin_arm64",
+    values = {"cpu": "darwin_arm64"},
 )
 
 config_setting(
