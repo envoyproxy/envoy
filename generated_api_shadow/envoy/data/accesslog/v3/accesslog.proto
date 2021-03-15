@@ -186,7 +186,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -275,6 +275,9 @@ message ResponseFlags {
 
   // Indicates that request or connection exceeded the downstream connection duration.
   bool duration_timeout = 23;
+
+  // Indicates there was an HTTP protocol error in the upstream response.
+  bool upstream_protocol_error = 24;
 }
 
 // Properties of a negotiated TLS connection.

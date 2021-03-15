@@ -201,7 +201,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
              StreamInfo::ResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
-      stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+      if (stream.filter_manager_.streamInfo().hasResponseFlag(
+              StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+      }
     }
     reset_stream = true;
   }
