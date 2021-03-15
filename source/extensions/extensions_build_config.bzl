@@ -54,7 +54,7 @@ EXTENSIONS = {
     # Generic Inputs
     #
 
-    "envoy.matching.generic_inputs.environment":       "//source/extensions/matching/generic_inputs/environment:config",
+    "envoy.matching.generic_inputs.environment_variable":       "//source/extensions/matching/generic_inputs/environment_variable:config",
 
     #
     # HTTP filters

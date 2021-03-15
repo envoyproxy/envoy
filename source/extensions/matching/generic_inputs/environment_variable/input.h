@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Matching {
 namespace GenericInputs {
-namespace Environment {
+namespace EnvironmentVariable {
 
 class Input : public Envoy::Matcher::GenericDataInput {
 public:

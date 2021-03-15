@@ -1,4 +1,4 @@
-#include "extensions/matching/generic_inputs/environment/input.h"
+#include "extensions/matching/generic_inputs/environment_variable/input.h"
 
 #include "gtest/gtest.h"
 
@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Matching {
 namespace GenericInputs {
-namespace Environment {
+namespace EnvironmentVariable {
 
 TEST(InputTest, BasicUsage) {
   {

@@ -1,4 +1,4 @@
-#include "extensions/matching/generic_inputs/environment/config.h"
+#include "extensions/matching/generic_inputs/environment_variable/config.h"
 
 #include <memory>
 
@@ -8,13 +8,13 @@ namespace Envoy {
 namespace Extensions {
 namespace Matching {
 namespace GenericInputs {
-namespace Environment {
+namespace EnvironmentVariable {
 
 Envoy::Matcher::GenericDataInputPtr
 Config::createGenericDataInput(const Protobuf::Message& config,
                                Server::Configuration::FactoryContext& factory_context) {
   const auto& environment_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::matching::generic_inputs::environment::v3::Environment&>(
+      const envoy::extensions::matching::generic_inputs::environment_variable::v3::Config&>(
       config, factory_context.messageValidationVisitor());
 
   // We read the env variable at construction time to avoid repeat lookups.

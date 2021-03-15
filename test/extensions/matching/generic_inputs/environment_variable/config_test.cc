@@ -1,6 +1,6 @@
 #include "common/config/utility.h"
 
-#include "extensions/matching/generic_inputs/environment/config.h"
+#include "extensions/matching/generic_inputs/environment_variable/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Matching {
 namespace GenericInputs {
-namespace Environment {
+namespace EnvironmentVariable {
 
 TEST(ConfigTest, TestConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -19,7 +19,7 @@ TEST(ConfigTest, TestConfig) {
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.generic_inputs.environment.v3.Environment
+        "@type": type.googleapis.com/envoy.extensions.matching.generic_inputs.environment_variable.v3.Config
         name: foo
 )EOF";
 
