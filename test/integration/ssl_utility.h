@@ -62,7 +62,7 @@ void initializeUpstreamTlsContextConfig(
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
 
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(ClientSslTransportOptions& options,
+createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api);
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
