@@ -986,6 +986,7 @@ filter:
       - RFCF
       - NFCF
       - DT
+      - UPE
       - NC
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
@@ -1019,18 +1020,20 @@ typed_config:
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
       StreamInfo::ResponseFlag::NoFilterConfigFound,
       StreamInfo::ResponseFlag::DurationTimeout,
+      StreamInfo::ResponseFlag::UpstreamProtocolError,
       StreamInfo::ResponseFlag::NoClusterFound,
   };
+};
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto response_flag : all_response_flags) {
-    TestStreamInfo stream_info;
-    stream_info.setResponseFlag(response_flag);
-    EXPECT_CALL(*file_, write(_));
-    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
-  }
+for (const auto response_flag : all_response_flags) {
+  TestStreamInfo stream_info;
+  stream_info.setResponseFlag(response_flag);
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }
+} // namespace
 
 TEST_F(AccessLogImplTest, ResponseFlagFilterUnsupportedFlag) {
   const std::string yaml = R"EOF(
@@ -1052,7 +1055,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"NC\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\" \"NC\"]]): "
+      "name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
@@ -1081,8 +1085,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"NC\"]]): name: "
-      "\"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\" \"NC\"]]): "
+      "name: \"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "
@@ -1641,6 +1645,6 @@ TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)
   }
 }
 
-} // namespace
 } // namespace AccessLog
+} // namespace Envoy
 } // namespace Envoy

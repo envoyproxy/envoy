@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -156,7 +157,12 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   const auto& request_config = config_->requestDirectionConfig();
-  if (!end_stream && request_config.compressionEnabled() &&
+  const bool is_not_upgrade =
+      !Http::Utility::isUpgrade(headers) ||
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_without_content_length_header");
+
+  if (!end_stream && request_config.compressionEnabled() && is_not_upgrade &&
       request_config.isMinimumContentLength(headers) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
@@ -221,7 +227,12 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const auto& config = config_->responseDirectionConfig();
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
-  const bool isCompressible = isEnabledAndContentLengthBigEnough &&
+  const bool is_not_upgrade =
+      !Http::Utility::isUpgrade(headers) ||
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_without_content_length_header");
+
+  const bool isCompressible = isEnabledAndContentLengthBigEnough && is_not_upgrade &&
                               config.isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
                               !headers.getInline(response_content_encoding_handle.handle());
@@ -506,7 +517,11 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     }
     return is_minimum_content_length;
   }
-
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_without_content_length_header")) {
+    // return true to ignore the minimum length configuration if no content-length header is present
+    return true;
+  }
   return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
                                    Http::Headers::get().TransferEncodingValues.Chunked);
 }

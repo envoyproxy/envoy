@@ -14,6 +14,6 @@ The Envoy documentation is composed of a few major sections:
   line interface, hot restart wrapper, administration interface, a general statistics overview,
   etc.
 * :ref:`Extending Envoy <extending>`: Information on how to write custom filters for Envoy.
-* :ref:`API reference <envoy_api_reference>`: Envoy API detailed reference.
+* :ref:`API reference <envoy_v3_api_reference>`: Envoy API detailed reference.
 * :ref:`Envoy FAQ <faq_overview>`: Have questions? We have answers. Hopefully.
 * :ref:`Version history <version_history>`: Per-version release notes.

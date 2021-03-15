@@ -561,7 +561,7 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   EXPECT_THAT(response_->body(), Not(HasSubstr("server.")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeRequests)) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeRequests)) {
   v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
       ".*requests.*");
@@ -577,7 +577,7 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
   EXPECT_THAT(response_->body(), Not(HasSubstr("server.concurrency")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeMultipleExact)) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeMultipleExact)) {
   v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(

@@ -16,6 +16,7 @@ import sys
 
 import github
 
+import exports
 import utils
 
 
@@ -97,8 +98,8 @@ if __name__ == '__main__':
     print('Missing GITHUB_TOKEN')
     sys.exit(1)
   path = sys.argv[1]
-  spec_loader = utils.repository_locations_utils.load_repository_locations_spec
-  path_module = utils.LoadModule('repository_locations', path)
+  spec_loader = exports.repository_locations_utils.load_repository_locations_spec
+  path_module = exports.LoadModule('repository_locations', path)
   try:
     VerifyAndPrintReleaseDates(spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC),
                                github.Github(access_token))

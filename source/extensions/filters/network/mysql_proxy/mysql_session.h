@@ -1,6 +1,4 @@
 #pragma once
-#include <cstdint>
-
 #include "common/common/logger.h"
 
 namespace Envoy {
