@@ -11,6 +11,8 @@ exports_files(["protodoc_manifest.yaml"])
 envoy_package()
 
 py_binary(
+    # TODO(phlax): replace this with a clutter index job
+    #   and make the clutter binary available to the sphinx job
     name = "copy_clutter_bin_to_path",
     srcs = ["copy_clutter_bin_to_path.py"],
     args = ["$(location @com_github_cluttercode_clutter//:clutter)"],
