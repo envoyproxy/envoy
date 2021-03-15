@@ -16,38 +16,38 @@
 namespace Envoy {
 namespace Quic {
 
-// TODO(#14829) we should avoid creating this per-connection.
-// Figure out what goes in per-cluster data, and what is per-connection and clean up.
-struct QuicUpstreamData {
-  QuicUpstreamData(Event::Dispatcher& dispatcher, const Envoy::Ssl::ClientContextConfig& config,
-                   Network::Address::InstanceConstSharedPtr server_addr)
-      : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
-        server_id_{config.serverNameIndication(), static_cast<uint16_t>(server_addr->ip()->port()),
-                   false} {}
+// Information which can be shared across connections, though not across threads.
+struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
+  PersistentQuicInfoImpl(Event::Dispatcher& dispatcher,
+                         Network::TransportSocketFactory& transport_socket_factory,
+                         Stats::Scope& stats_scope, TimeSource& time_source,
+                         Network::Address::InstanceConstSharedPtr server_addr);
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
+  // server-id and server address can change over the lifetime of Envoy but will be consistent for a
+  // given connection pool.
   quic::QuicServerId server_id_;
-  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
-};
-
-class EnvoyQuicClientSessionWithExtras : public EnvoyQuicClientSession {
-public:
-  using EnvoyQuicClientSession::EnvoyQuicClientSession;
-
-  std::unique_ptr<QuicUpstreamData> quic_upstream_data_;
+  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
 };
 
 // A factory to create EnvoyQuicClientConnection instance for QUIC
 class QuicClientConnectionFactoryImpl : public Http::QuicClientConnectionFactory {
 public:
-  std::unique_ptr<Network::ClientConnection>
-  createQuicNetworkConnection(Network::Address::InstanceConstSharedPtr server_addr,
-                              Network::Address::InstanceConstSharedPtr local_addr,
+  std::unique_ptr<Http::PersistentQuicInfo>
+  createNetworkConnectionInfo(Event::Dispatcher& dispatcher,
                               Network::TransportSocketFactory& transport_socket_factory,
-                              Stats::Scope& stats_scope, Event::Dispatcher& dispatcher,
-                              TimeSource& time_source) override;
+                              Stats::Scope& stats_scope, TimeSource& time_source,
+                              Network::Address::InstanceConstSharedPtr server_addr) override {
+    return std::make_unique<PersistentQuicInfoImpl>(dispatcher, transport_socket_factory,
+                                                    stats_scope, time_source, server_addr);
+  }
+
+  std::unique_ptr<Network::ClientConnection>
+  createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
+                              Network::Address::InstanceConstSharedPtr server_addr,
+                              Network::Address::InstanceConstSharedPtr local_addr) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
 
