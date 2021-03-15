@@ -32,20 +32,12 @@ void Filter::openStream() {
   }
 }
 
-void Filter::startRequestMessageTimer() {
-  if (!request_message_timer_) {
-    request_message_timer_ =
+void Filter::startMessageTimer(Event::TimerPtr& timer) {
+  if (!timer) {
+    timer =
         decoder_callbacks_->dispatcher().createTimer(std::bind(&Filter::onMessageTimeout, this));
   }
-  request_message_timer_->enableTimer(config_->messageTimeout());
-}
-
-void Filter::startResponseMessageTimer() {
-  if (!response_message_timer_) {
-    response_message_timer_ =
-        decoder_callbacks_->dispatcher().createTimer(std::bind(&Filter::onMessageTimeout, this));
-  }
-  response_message_timer_->enableTimer(config_->messageTimeout());
+  timer->enableTimer(config_->messageTimeout());
 }
 
 void Filter::onDestroy() {
@@ -76,7 +68,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   request_state_ = FilterState::Headers;
-  startRequestMessageTimer();
+  startMessageTimer(request_message_timer_);
   ENVOY_LOG(debug, "Sending request_headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -100,7 +92,7 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
       decoder_callbacks_->addDecodedData(data, false);
       // The body has been buffered and we need to send the buffer
       request_state_ = FilterState::BufferedBody;
-      startRequestMessageTimer();
+      startMessageTimer(request_message_timer_);
       sendBodyChunk(true, *decoder_callbacks_->decodingBuffer(), true);
     } else {
       ENVOY_LOG(trace, "decodeData: Buffering");
@@ -134,7 +126,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   response_state_ = FilterState::Headers;
-  startResponseMessageTimer();
+  startMessageTimer(response_message_timer_);
   ENVOY_LOG(debug, "Sending response_headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -155,7 +147,7 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
       ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on response path");
       encoder_callbacks_->addEncodedData(data, false);
       response_state_ = FilterState::BufferedBody;
-      startResponseMessageTimer();
+      startMessageTimer(response_message_timer_);
       sendBodyChunk(false, *encoder_callbacks_->encodingBuffer(), true);
     } else {
       ENVOY_LOG(trace, "encodeData: Buffering");
@@ -189,8 +181,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     return;
   }
 
-  // We got *a* message, so the current timeout
-
   auto response = std::move(r);
   bool message_handled = false;
 
@@ -216,7 +206,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     message_handled = handleResponseBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    // We won't be sending anything more to the stream after that
+    // We won't be sending anything more to the stream after we
+    // receive this message.
     processing_complete_ = true;
     sendImmediateResponse(response->immediate_response());
     message_handled = true;
@@ -311,7 +302,9 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
-    cancelTimers();
+    // Since the stream failed, there is no need to handle timeouts, so
+    // make sure that they do not fire now.
+    cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
@@ -363,10 +356,12 @@ void Filter::clearAsyncState() {
     response_state_ = FilterState::Idle;
     encoder_callbacks_->continueEncoding();
   }
-  cancelTimers();
+  cleanUpTimers();
 }
 
-void Filter::cancelTimers() {
+// Regardless of the current state, ensure that the timers won't fire
+// again.
+void Filter::cleanUpTimers() {
   if (request_message_timer_ && request_message_timer_->enabled()) {
     request_message_timer_->disableTimer();
   }

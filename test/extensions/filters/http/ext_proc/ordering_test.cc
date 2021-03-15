@@ -602,8 +602,6 @@ TEST_F(OrderingTest, GrpcErrorAfterTimeout) {
   sendGrpcError();
 }
 
-// *** Additional timeout tests ***
-
 // Allow the timeout to expire before the response body response can be sent
 TEST_F(OrderingTest, TimeoutOnResponseBody) {
   initialize([](ExternalProcessor& cfg) {

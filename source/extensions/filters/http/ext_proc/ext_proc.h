@@ -121,10 +121,9 @@ public:
 
 private:
   void openStream();
-  void startRequestMessageTimer();
-  void startResponseMessageTimer();
+  void startMessageTimer(Event::TimerPtr& timer);
   void onMessageTimeout();
-  void cancelTimers();
+  void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
@@ -169,7 +168,7 @@ private:
 
   // The timers that are used to manage per-message timeouts. Since the
   // request and response paths run in parallel and can theoretically overlap,
-  // we need two timers
+  // we need two timers.
   Event::TimerPtr request_message_timer_;
   Event::TimerPtr response_message_timer_;
 };

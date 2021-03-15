@@ -157,10 +157,7 @@ protected:
     }
     ProcessingResponse response;
     auto* headers = response.mutable_request_headers();
-    bool sendReply = true;
-    if (cb) {
-      sendReply = (*cb)(request.request_headers(), *headers);
-    }
+    const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
     if (sendReply) {
       processor_stream_->sendGrpcMessage(response);
     }
@@ -182,10 +179,7 @@ protected:
     }
     ProcessingResponse response;
     auto* headers = response.mutable_response_headers();
-    bool sendReply = true;
-    if (cb) {
-      sendReply = (*cb)(request.response_headers(), *headers);
-    }
+    const bool sendReply = !cb || (*cb)(request.response_headers(), *headers);
     if (sendReply) {
       processor_stream_->sendGrpcMessage(response);
     }
@@ -206,10 +200,7 @@ protected:
     }
     ProcessingResponse response;
     auto* body = response.mutable_request_body();
-    bool sendReply = true;
-    if (cb) {
-      sendReply = (*cb)(request.request_body(), *body);
-    }
+    const bool sendReply = !cb || (*cb)(request.request_body(), *body);
     if (sendReply) {
       processor_stream_->sendGrpcMessage(response);
     }
@@ -230,10 +221,7 @@ protected:
     }
     ProcessingResponse response;
     auto* body = response.mutable_response_body();
-    bool sendReply = true;
-    if (cb) {
-      sendReply = (*cb)(request.response_body(), *body);
-    }
+    const bool sendReply = !cb || (*cb)(request.response_body(), *body);
     if (sendReply) {
       processor_stream_->sendGrpcMessage(response);
     }
