@@ -732,7 +732,7 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
 }
 
 void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
+  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 

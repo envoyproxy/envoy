@@ -2933,11 +2933,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  // Now trigger a 502 in response to the first request.
+  // Now trigger a 503 in response to the first request.
   Http::ResponseHeaderMapPtr bad_response_headers2(
-      new Http::TestResponseHeaderMapImpl{{":status", "502"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(502));
+              putHttpResponseCode(503));
 
   // We should not call shouldRetryHeaders() because you never retry the same
   // request twice.
@@ -2945,7 +2945,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value(), "502");
+        EXPECT_EQ(headers.Status()->value(), "503");
       }));
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
@@ -5424,14 +5424,58 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 }
 
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
+  TestScopedRuntime scoped_runtime;
+
+  // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With invalid x-forwarded-proto, still use scheme.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto("foo");
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // Use valid x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Trust scheme over x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setScheme(Http::Headers::get().SchemeValues.Https);
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, false, false);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // New logic uses downstream crypto
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Legacy logic uses upstream crypto
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }

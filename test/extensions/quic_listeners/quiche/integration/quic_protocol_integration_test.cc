@@ -16,6 +16,12 @@ INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, ProtocolIntegrationTest,
                              {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(UpstreamProtocols, DownstreamProtocolIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 // This will run with HTTP/1 and HTTP/2 downstream, and HTTP/3 upstream.
 INSTANTIATE_TEST_SUITE_P(UpstreamProtocols, ProtocolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

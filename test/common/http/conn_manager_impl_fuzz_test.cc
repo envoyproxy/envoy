@@ -20,7 +20,6 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -75,7 +74,7 @@ public:
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
-    request_id_extension_ = RequestIDExtensionFactory::defaultInstance(random_);
+    request_id_extension_ = Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_);
     forward_client_cert_ = fromClientCert(forward_client_cert);
   }
 
@@ -129,8 +128,7 @@ public:
   }
 
   // Http::ConnectionManagerConfig
-
-  RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {

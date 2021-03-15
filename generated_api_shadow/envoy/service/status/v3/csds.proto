@@ -8,7 +8,6 @@ import "envoy/type/matcher/v3/node.proto";
 
 import "google/api/annotations.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 

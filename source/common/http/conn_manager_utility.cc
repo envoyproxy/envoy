@@ -152,8 +152,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   }
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
-  // X-Forwarded-Proto and :scheme may still differ, especially in the case of L2
-  // Envoys, where :scheme is set based on transport security.
+  // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
   if (!request_headers.Scheme() &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
     request_headers.setScheme(
@@ -254,20 +253,21 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   return final_remote_address;
 }
 
-void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& request_headers,
-                                                          Runtime::Loader& runtime,
-                                                          ConnectionManagerConfig& config,
-                                                          const Router::Route* route) {
+Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
+    RequestHeaderMap& request_headers, Runtime::Loader& runtime, ConnectionManagerConfig& config,
+    const Router::Route* route) {
+  Tracing::Reason final_reason = Tracing::Reason::NotTraceable;
   if (!config.tracingConfig()) {
-    return;
+    return final_reason;
   }
 
   auto rid_extension = config.requestIDExtension();
-  uint64_t result;
+  const auto rid_to_integer = rid_extension->toInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
-  if (!rid_extension->modBy(request_headers, result, 10000)) {
-    return;
+  if (!rid_to_integer.has_value()) {
+    return final_reason;
   }
+  const uint64_t result = rid_to_integer.value() % 10000;
 
   const envoy::type::v3::FractionalPercent* client_sampling =
       &config.tracingConfig()->client_sampling_;
@@ -283,21 +283,29 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   }
 
   // Do not apply tracing transformations if we are currently tracing.
-  if (TraceStatus::NoTrace == rid_extension->getTraceStatus(request_headers)) {
+  final_reason = rid_extension->getTraceReason(request_headers);
+  if (Tracing::Reason::NotTraceable == final_reason) {
     if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
-      rid_extension->setTraceStatus(request_headers, TraceStatus::Client);
+      final_reason = Tracing::Reason::ClientForced;
+      rid_extension->setTraceReason(request_headers, final_reason);
     } else if (request_headers.EnvoyForceTrace()) {
-      rid_extension->setTraceStatus(request_headers, TraceStatus::Forced);
+      final_reason = Tracing::Reason::ServiceForced;
+      rid_extension->setTraceReason(request_headers, final_reason);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
-      rid_extension->setTraceStatus(request_headers, TraceStatus::Sampled);
+      final_reason = Tracing::Reason::Sampling;
+      rid_extension->setTraceReason(request_headers, final_reason);
     }
   }
 
-  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
-    rid_extension->setTraceStatus(request_headers, TraceStatus::NoTrace);
+  if (final_reason != Tracing::Reason::NotTraceable &&
+      !runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
+    final_reason = Tracing::Reason::NotTraceable;
+    rid_extension->setTraceReason(request_headers, final_reason);
   }
+
+  return final_reason;
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,

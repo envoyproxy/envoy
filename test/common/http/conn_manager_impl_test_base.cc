@@ -1,5 +1,7 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
+#include "extensions/request_id/uuid/config.h"
+
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
@@ -20,7 +22,8 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
              "", fake_stats_),
 
       listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
-      request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
+      request_id_extension_(
+          Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_)),
       local_reply_(LocalReply::Factory::createDefault()) {
 
   ON_CALL(route_config_provider_, lastUpdated())
@@ -90,11 +93,11 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
   // scope.
   for (int i = 0; i < num_decoder_filters * num_requests; i++) {
-    decoder_filters_.push_back(new MockStreamDecoderFilter());
+    decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   }
 
   for (int i = 0; i < num_encoder_filters * num_requests; i++) {
-    encoder_filters_.push_back(new MockStreamEncoderFilter());
+    encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
   }
 
   InSequence s;

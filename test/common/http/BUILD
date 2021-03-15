@@ -178,13 +178,11 @@ envoy_cc_fuzz_test(
     corpus = "conn_manager_impl_corpus",
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
-        "//include/envoy/http:request_id_extension_interface",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_utility_lib",
-        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/server:drain_manager_lib",
@@ -218,6 +216,7 @@ envoy_cc_test(
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
@@ -237,14 +236,14 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
-        "//include/envoy/http:request_id_extension_interface",
+        "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/request_id/uuid:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -387,17 +386,6 @@ envoy_cc_test(
     srcs = ["path_utility_test.cc"],
     args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_forked_chromium_url"],
     deps = PATH_UTILITY_TEST_DEPS,
-)
-
-envoy_cc_test(
-    name = "request_id_extension_uuid_impl_test",
-    srcs = ["request_id_extension_uuid_impl_test.cc"],
-    deps = [
-        "//source/common/http:request_id_extension_lib",
-        "//source/common/runtime:runtime_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:utility_lib",
-    ],
 )
 
 envoy_cc_test(

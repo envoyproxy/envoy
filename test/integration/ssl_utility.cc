@@ -76,7 +76,7 @@ void initializeUpstreamTlsContextConfig(
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api) {
-ClientSslTransportOptions options_with_san = options;
+  ClientSslTransportOptions options_with_san = options;
   if (options.san_.empty()) {
     options_with_san.setSan("spiffe://lyft.com/backend-team");
   }
