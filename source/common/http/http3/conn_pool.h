@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/codec_client.h"
+#include "common/http/conn_pool.h"
 
 namespace Envoy {
 namespace Http {
