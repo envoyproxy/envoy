@@ -402,6 +402,9 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  ASSERT_NE(nullptr, *result.host_info_);
+  EXPECT_EQ(nullptr, (*result.host_info_)->address());
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -445,6 +448,9 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  ASSERT_NE(nullptr, *result.host_info_);
+  EXPECT_EQ(nullptr, (*result.host_info_)->address());
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -484,6 +490,9 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  ASSERT_NE(nullptr, *result.host_info_);
+  EXPECT_EQ(nullptr, (*result.host_info_)->address());
 
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
@@ -622,6 +631,8 @@ TEST_F(DnsCacheImplTest, CacheHit) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("10.0.0.1:80", "foo.com", false));
 }
 
 // Make sure we destroy active queries if the cache goes away.
