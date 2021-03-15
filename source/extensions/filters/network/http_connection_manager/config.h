@@ -180,6 +180,21 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  void normalizePath(Http::RequestHeaderMap& request_headers) const override {
+    const auto original_path = request_headers.getPathValue();
+    absl::optional<std::string> forwarding_path =
+        forwarding_path_transformer_.transform(original_path);
+    absl::optional<std::string> filter_path;
+    if (forwarding_path.has_value()) {
+      filter_path = filter_path_transformer_.transform(forwarding_path.value());
+    }
+    if (forwarding_path.has_value()) {
+      request_headers.setForwaringPath(forwarding_path.value());
+    }
+    if (filter_path.has_value()) {
+      request_headers.setFilterPath(filter_path.value());
+    }
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };

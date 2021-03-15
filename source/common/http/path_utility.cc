@@ -37,7 +37,7 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
-  absl::optional<std::string> normalized_path = PathTransformer::rfcNormalize(original_path);
+  const absl::optional<std::string> normalized_path = PathTransformer::rfcNormalize(original_path);
   if (!normalized_path.has_value()) {
     return false;
   }
@@ -48,7 +48,8 @@ bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
 void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
-  absl::optional<std::string> normalized = PathTransformer::mergeSlashes(original_path).value();
+  const absl::optional<std::string> normalized =
+      PathTransformer::mergeSlashes(original_path).value();
   if (normalized.has_value()) {
     headers.setPath(normalized.value());
   }

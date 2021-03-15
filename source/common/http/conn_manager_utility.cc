@@ -440,6 +440,7 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
     return true; // It's as valid as it is going to get.
   }
   bool is_valid_path = true;
+  config.normalizePath(request_headers);
   if (config.shouldNormalizePath()) {
     is_valid_path = PathUtil::canonicalPath(request_headers);
   }

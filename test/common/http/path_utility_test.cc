@@ -229,7 +229,7 @@ public:
         operation->mutable_merge_slashes();
       }
     }
-    path_transformer_.reset(new PathTransformer(path_transformation_config));
+    path_transformer_ = std::make_unique<PathTransformer>(path_transformation_config);
   }
   const PathTransformer& pathTransformer() { return *path_transformer_; }
 
@@ -243,10 +243,49 @@ TEST_F(PathTransformerTest, MergeSlashes) {
   EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c").value());     // relative
   EXPECT_EQ("/a/b/c/", path_transformer.transform("/a//b/c/").value()); // ends with slash
   EXPECT_EQ("a/b/c/", path_transformer.transform("a//b/c/").value());   // relative ends with slash
+  EXPECT_EQ("/a", path_transformer.transform("/a").value());            // no-op
+  EXPECT_EQ("/a/b/c", path_transformer.transform("//a/b/c").value());   // double / start
+  EXPECT_EQ("/a/b/c", path_transformer.transform("/a//b/c").value());   // double / in the middle
+  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a/b/c//").value()); // double / end
+  EXPECT_EQ("/a/b/c", path_transformer.transform("/a///b/c").value());  // triple / in the middle
+  EXPECT_EQ("/a/b/c",
+            path_transformer.transform("/a////b/c").value()); // quadruple / in the middle
+  EXPECT_EQ("/a/b?a=///c",
+            path_transformer.transform("/a//b?a=///c").value()); // slashes in the query are ignored
+  EXPECT_EQ("/a/b?", path_transformer.transform("/a//b?").value()); // empty query
+  EXPECT_EQ("/a/?b", path_transformer.transform("//a/?b").value()); // ends with slash + query
+}
+
+TEST_F(PathTransformerTest, RfcNormalize) {
+  setPathTransformer({"NormalizePathRFC3986"});
+  PathTransformer const& path_transformer = pathTransformer();
+  EXPECT_EQ("/x/y/z",
+            path_transformer.transform("/x/y/z").value()); // Already normalized path don't change.
+
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c").value());         // parent dir
+  EXPECT_EQ("/a/b/c", path_transformer.transform("/a/b/./c").value());       // current dir
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c").value());         // non / start
+  EXPECT_EQ("/c", path_transformer.transform("/a/b/../../../../c").value()); // out number parent
+  EXPECT_EQ("/c", path_transformer.transform("/a/..\\c").value()); // "..\\" canonicalization
+  EXPECT_EQ("/%c0%af",
+            path_transformer.transform("/%c0%af").value()); // 2 bytes unicode reserved characters
+  EXPECT_EQ("/%5c%25", path_transformer.transform("/%5c%25").value());    // reserved characters
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c").value()); // %2E escape
+
+  EXPECT_EQ("/A/B/C", path_transformer.transform("/A/B/C").value());      // empty
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c").value()); // relative
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2e%2e/c").value()); // ends with slash
+  EXPECT_EQ("/a/%2F%2f/c",
+            path_transformer.transform("/a/%2F%2f/c").value()); // relative ends with slash
 }
 
 TEST_F(PathTransformerTest, DuplicateTransformation) {
   EXPECT_THROW(setPathTransformer({"MergeSlashes", "MergeSlashes"}), EnvoyException);
+  EXPECT_THROW(setPathTransformer({"MergeSlashes", "NormalizePathRFC3986", "MergeSlashes"}),
+               EnvoyException);
+  EXPECT_THROW(setPathTransformer({"NormalizePathRFC3986", "MergeSlashes", "NormalizePathRFC3986"}),
+               EnvoyException);
+  EXPECT_NO_THROW(setPathTransformer({"MergeSlashes", "NormalizePathRFC3986"}));
 }
 
 } // namespace Http

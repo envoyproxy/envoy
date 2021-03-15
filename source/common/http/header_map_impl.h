@@ -462,6 +462,11 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
+  void setForwaringPath(absl::string_view path) override { forwarding_path_ = path; }
+  absl::string_view getForwardingPath() override { return forwarding_path_; }
+  void setFilterPath(absl::string_view path) override { filter_path_ = path; }
+  absl::string_view getFilterPath() override { return filter_path_; }
+
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the
   // most derived class. This forces the definition of the following three functions to also be
@@ -480,7 +485,8 @@ private:
   };
 
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
-
+  std::string forwarding_path_;
+  std::string filter_path_;
   RequestHeaderMapImpl() { clearInline(); }
 
   HeaderEntryImpl* inline_headers_[];
