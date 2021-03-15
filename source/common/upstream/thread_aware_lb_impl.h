@@ -8,6 +8,7 @@
 #include "common/config/well_known_names.h"
 #include "common/upstream/load_balancer_impl.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -30,14 +31,14 @@ public:
   public:
     virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
-    const std::string hashKey(HostConstSharedPtr host, bool use_hostname) {
+    const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) {
       const ProtobufWkt::Value& val = Config::Metadata::metadataValue(
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
           Config::MetadataEnvoyLbKeys::get().HASH_KEY);
       if (val.kind_case() != val.kStringValue && val.kind_case() != val.KIND_NOT_SET) {
         FANCY_LOG(debug, "hash_key must be string type, got: {}", val.kind_case());
       }
-      std::string hash_key = val.string_value();
+      absl::string_view hash_key = val.string_value();
       if (hash_key.empty()) {
         hash_key = use_hostname ? host->hostname() : host->address()->asString();
       }
