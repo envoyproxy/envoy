@@ -55,7 +55,7 @@ Further reading
   sink.
 
 Stdout
-****
+******
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
   threads.
@@ -65,7 +65,7 @@ Stdout
 
 
 Stderr
-****
+******
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
   threads.
