@@ -205,7 +205,8 @@ public:
           "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
         throw DeprecatedMajorVersionException(warning);
       }
     }

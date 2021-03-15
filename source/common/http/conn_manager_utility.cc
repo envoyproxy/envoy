@@ -152,8 +152,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   }
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
-  // X-Forwarded-Proto and :scheme may still differ, especially in the case of L2
-  // Envoys, where :scheme is set based on transport security.
+  // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
   if (!request_headers.Scheme() &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
     request_headers.setScheme(
