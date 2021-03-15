@@ -19,7 +19,7 @@ TEST(InputTest, BasicUsage) {
   ASSERT_TRUE(input.get().has_value());
   EXPECT_EQ(input.get().value(), "foo");
 }
-} // namespace Environment
+} // namespace EnvironmentVariable
 } // namespace GenericInputs
 } // namespace Matching
 } // namespace Extensions

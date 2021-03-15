@@ -28,7 +28,7 @@ public:
         envoy::extensions::matching::generic_inputs::environment_variable::v3::Config>();
   }
 };
-} // namespace Environment
+} // namespace EnvironmentVariable
 } // namespace GenericInputs
 } // namespace Matching
 } // namespace Extensions

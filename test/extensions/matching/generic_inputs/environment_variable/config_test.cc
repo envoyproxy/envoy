@@ -46,7 +46,7 @@ TEST(ConfigTest, TestConfig) {
   TestEnvironment::unsetEnvVar("foo");
 }
 
-} // namespace Environment
+} // namespace EnvironmentVariable
 } // namespace GenericInputs
 } // namespace Matching
 } // namespace Extensions

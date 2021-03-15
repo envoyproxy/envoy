@@ -32,7 +32,7 @@ Config::createGenericDataInput(const Protobuf::Message& config,
  */
 REGISTER_FACTORY(Config, Envoy::Matcher::GenericDataInputFactory);
 
-} // namespace Environment
+} // namespace EnvironmentVariable
 } // namespace GenericInputs
 } // namespace Matching
 } // namespace Extensions

@@ -17,7 +17,7 @@ public:
 private:
   const absl::optional<std::string> storage_;
 };
-} // namespace Environment
+} // namespace EnvironmentVariable
 } // namespace GenericInputs
 } // namespace Matching
 } // namespace Extensions
