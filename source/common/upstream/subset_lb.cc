@@ -102,8 +102,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
 }
 
 SubsetLoadBalancer::~SubsetLoadBalancer() {
-  original_priority_set_callback_handle_->remove();
-
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
     if (entry->active()) {
@@ -128,6 +126,9 @@ void SubsetLoadBalancer::rebuildSingle() {
   for (const auto& host_set : original_priority_set_.hostSetsPerPriority()) {
     for (const auto& host : host_set->hosts()) {
       MetadataConstSharedPtr metadata = host->metadata();
+      if (metadata == nullptr) {
+        continue;
+      }
       const auto& filter_metadata = metadata->filter_metadata();
       auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
       if (filter_it != filter_metadata.end()) {

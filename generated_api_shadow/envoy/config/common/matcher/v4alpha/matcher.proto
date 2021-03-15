@@ -75,6 +75,7 @@ message Matcher {
           type.matcher.v4alpha.StringMatcher value_match = 2;
 
           // Extension for custom matching logic.
+          // [#extension-category: envoy.matching.input_matchers]
           core.v4alpha.TypedExtensionConfig custom_match = 3;
         }
       }

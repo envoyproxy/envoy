@@ -181,6 +181,8 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
@@ -457,18 +459,14 @@ envoy_cc_library(
     name = "request_id_extension_lib",
     srcs = [
         "request_id_extension_impl.cc",
-        "request_id_extension_uuid_impl.cc",
     ],
     hdrs = [
         "request_id_extension_impl.h",
-        "request_id_extension_uuid_impl.h",
     ],
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/server:request_id_extension_config_interface",
-        "//source/common/common:random_generator_lib",
         "//source/common/config:utility_lib",
-        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

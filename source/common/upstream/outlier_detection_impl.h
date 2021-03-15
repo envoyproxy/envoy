@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
@@ -460,6 +461,7 @@ private:
   std::list<ChangeStateCb> callbacks_;
   absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
+  Common::CallbackHandlePtr member_update_cb_;
 
   // EjectionPair for external and local origin events.
   // When external/local origin events are not split, external_origin_sr_num_ are used for
