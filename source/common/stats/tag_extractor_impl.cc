@@ -263,7 +263,7 @@ bool TagExtractorTokensImpl::searchTags(const std::vector<absl::string_view>& in
         }
 
         // A "**" in the pattern anywhere except the end means that we must find
-        // a match for the remainder of the pattern anywhere in the the
+        // a match for the remainder of the pattern anywhere in the
         // input. Consider pattern "a.**.b.c.$" and input "a.x.b.b.c.d". We
         // don't want to only match the "**" against "x" when it should match
         // against "x.b". Thus we recurse looking for a complete match, starting
