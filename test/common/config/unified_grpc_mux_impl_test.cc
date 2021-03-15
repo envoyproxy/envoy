@@ -44,7 +44,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Config {
-namespace UnfiedMux {
+namespace UnifiedMux {
 namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
@@ -1117,6 +1117,6 @@ TEST_F(GrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
 }
 
 } // namespace
-} // namespace UnfiedMux
+} // namespace UnifiedMux
 } // namespace Config
 } // namespace Envoy
