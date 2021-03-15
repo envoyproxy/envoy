@@ -54,7 +54,7 @@ public:
                          Stats::Gauge::ImportMode::NeverImport)) {
     if (allow_deprecated_v2_api) {
       Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
           {"envoy.features.enable_all_deprecated_features", "true"},
       });
     }
@@ -1259,7 +1259,7 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
   }
   {
     ProtobufWkt::BytesValue source;
-    source.set_value({0x01, 0x02, 0x03});
+    source.set_value("\x01\x02\x03");
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
