@@ -1,5 +1,6 @@
 #include <chrono>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/event/timer.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -24,9 +25,14 @@ public:
   ScopeTrackingDispatcher(DispatcherPtr dispatcher)
       : WrappedDispatcher(*dispatcher), dispatcher_(std::move(dispatcher)) {}
 
-  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
+  void pushTrackedObject(const ScopeTrackedObject* object) override {
     scope_ = object;
-    return impl_.setTrackedObject(object);
+    return impl_.pushTrackedObject(object);
+  }
+
+  void popTrackedObject(const ScopeTrackedObject* expected_object) override {
+    scope_ = nullptr;
+    return impl_.popTrackedObject(expected_object);
   }
 
   const ScopeTrackedObject* scope_{nullptr};

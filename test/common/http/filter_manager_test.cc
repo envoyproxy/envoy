@@ -198,7 +198,8 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionDecodingHeaders) {
 TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   initialize();
 
-  EXPECT_CALL(dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
 
   // This stream filter will skip further callbacks once it sees both the request and response
   // header. As such, it should see the decoding callbacks but none of the encoding callbacks.

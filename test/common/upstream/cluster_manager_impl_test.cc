@@ -869,8 +869,10 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
+  EXPECT_CALL(factory_.dispatcher_, deleteInDispatcherThread(_));
   create(parseBootstrapFromV3Yaml(yaml));
   factory_.tls_.shutdownThread();
+  factory_.dispatcher_.to_delete_.clear();
 }
 
 TEST_F(ClusterManagerImplTest, UnknownCluster) {

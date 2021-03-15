@@ -20,8 +20,15 @@
 #include "common/event/libevent_scheduler.h"
 #include "common/signal/fatal_error_handler.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Event {
+
+// The tracked object stack likely won't grow larger than this initial
+// reservation; this should make appends constant time since the stack
+// shouldn't have to grow larger.
+inline constexpr size_t ExpectedMaxTrackedObjectStackDepth = 10;
 
 /**
  * libevent implementation of Event::Dispatcher.
@@ -72,27 +79,17 @@ public:
   void exit() override;
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
+  void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
-  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
-    const ScopeTrackedObject* return_object = current_object_;
-    current_object_ = object;
-    return return_object;
-  }
+  void pushTrackedObject(const ScopeTrackedObject* object) override;
+  void popTrackedObject(const ScopeTrackedObject* expected_object) override;
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
+  void shutdown() override;
 
   // FatalErrorInterface
-  void onFatalError(std::ostream& os) const override {
-    // Dump the state of the tracked object if it is in the current thread. This generally results
-    // in dumping the active state only for the thread which caused the fatal error.
-    if (isThreadSafe()) {
-      if (current_object_) {
-        current_object_->dumpState(os);
-      }
-    }
-  }
-
+  void onFatalError(std::ostream& os) const override;
   void
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
 
@@ -125,6 +122,8 @@ private:
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
+  void runThreadLocalDelete();
+
   // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
   void touchWatchdog();
 
@@ -143,14 +142,26 @@ private:
   Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
+
+  SchedulableCallbackPtr thread_local_delete_cb_;
+  Thread::MutexBasicLockable thread_local_deletable_lock_;
+  // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.
+  std::list<DispatcherThreadDeletableConstPtr>
+      deletables_in_dispatcher_thread_ ABSL_GUARDED_BY(thread_local_deletable_lock_);
+  bool shutdown_called_{false};
+
   SchedulableCallbackPtr deferred_delete_cb_;
+
   SchedulableCallbackPtr post_cb_;
+  Thread::MutexBasicLockable post_lock_;
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
-  Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
-  const ScopeTrackedObject* current_object_{};
+
+  absl::InlinedVector<const ScopeTrackedObject*, ExpectedMaxTrackedObjectStackDepth>
+      tracked_object_stack_;
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;
