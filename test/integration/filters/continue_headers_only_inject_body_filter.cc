@@ -28,17 +28,42 @@ public:
     return Http::FilterHeadersStatus::ContinueAndDontEndStream;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override {
     headers.setContentLength(body_.length());
-    encoder_callbacks_->dispatcher().post([this]() -> void {
+    encoder_callbacks_->dispatcher().post([this, end_stream]() -> void {
+      posted_ = true;
       Buffer::OwnedImpl buffer(body_);
-      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, true);
+      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, end_stream);
+      if (encoded_) {
+        encoder_callbacks_->continueEncoding();
+      }
     });
-    return Http::FilterHeadersStatus::ContinueAndDontEndStream;
+    if (end_stream) {
+      return Http::FilterHeadersStatus::ContinueAndDontEndStream;
+    } else {
+      return Http::FilterHeadersStatus::Continue;
+    }
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    encoded_ = true;
+    if (!posted_) {
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
+    return Http::FilterDataStatus::Continue;
   }
 
 private:
   constexpr static absl::string_view body_ = "body";
+  // For HTTP/3 upstream, the headers and fin will arrive separately.
+  // Make sure that the body is added, and then continue encoding occurs once.
+  // If encodeData hits before the post, encodeData will stop iteration to ensure
+  // the fin is not passed on, and when the post happens it will resume
+  // encoding.
+  // If the post happens first, encodeData can simply continue.
+  bool posted_{};
+  bool encoded_{};
 };
 
 static Registry::RegisterFactory<SimpleFilterConfig<ContinueHeadersOnlyInjectBodyFilter>,

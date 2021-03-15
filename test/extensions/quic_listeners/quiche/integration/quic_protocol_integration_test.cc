@@ -2,8 +2,11 @@
 
 namespace Envoy {
 
-// We do not yet run QUIC downstream tests.
-GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(DownstreamProtocolIntegrationTest);
+// TODO(danzh) this should run with QUIC downstream instead of HTTP2.
+INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // This will run with HTTP/1 and HTTP/2 downstream, and HTTP/3 upstream.
 INSTANTIATE_TEST_SUITE_P(Protocols, ProtocolIntegrationTest,
