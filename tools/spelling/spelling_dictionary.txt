@@ -38,6 +38,7 @@ STATNAME
 SkyWalking
 TIDs
 WASI
+Writeable
 ceil
 CCM
 CHACHA
