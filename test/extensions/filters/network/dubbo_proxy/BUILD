@@ -174,18 +174,6 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "buffer_helper_test",
-    srcs = ["buffer_helper_test.cc"],
-    extension_name = "envoy.filters.network.dubbo_proxy",
-    deps = [
-        "//include/envoy/common:base_includes",
-        "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/network/dubbo_proxy:buffer_helper_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "router_filter_config_test",
     srcs = ["router_filter_config_test.cc"],
     extension_name = "envoy.filters.network.dubbo_proxy",

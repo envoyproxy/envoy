@@ -26,10 +26,9 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   auto service_version = decoder.decode<std::string>();
   auto method_name = decoder.decode<std::string>();
 
-  size_t total_size = decoder.offset();
-  if (static_cast<uint64_t>(context->bodySize()) < decoder.offset()) {
-    throw EnvoyException(fmt::format("RpcInvocation size({}) large than body size({})", total_size,
-                                     context->bodySize()));
+  if (context->bodySize() < decoder.offset()) {
+    throw EnvoyException(fmt::format("RpcInvocation size({}) larger than body size({})",
+                                     decoder.offset(), context->bodySize()));
   }
 
   if (dubbo_version == nullptr || service_name == nullptr || service_version == nullptr ||
@@ -66,12 +65,11 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   invo->setAttachmentLazyCallback([delayed_decoder]() -> RpcInvocationImpl::AttachmentPtr {
     auto result = delayed_decoder->decode<Hessian2::Object>();
     if (result != nullptr && result->type() == Hessian2::Object::Type::UntypedMap) {
-      return std::make_unique<RpcInvocationImpl::Attachment>(
-          RpcInvocationImpl::Attachment::MapObjectPtr{
-              dynamic_cast<RpcInvocationImpl::Attachment::MapObject*>(result.release())});
+      return std::make_unique<RpcInvocationImpl::Attachment>(RpcInvocationImpl::Attachment::MapPtr{
+          dynamic_cast<RpcInvocationImpl::Attachment::Map*>(result.release())});
     } else {
       return std::make_unique<RpcInvocationImpl::Attachment>(
-          std::make_unique<RpcInvocationImpl::Attachment::MapObject>());
+          std::make_unique<RpcInvocationImpl::Attachment::Map>());
     }
   });
 

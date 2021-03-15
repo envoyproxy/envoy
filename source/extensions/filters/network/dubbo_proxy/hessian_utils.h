@@ -1,11 +1,10 @@
 #pragma once
 
-#include <chrono>
-#include <map>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
 
+#include "absl/strings/string_view.h"
 #include "hessian2/basic_codec/object_codec.hpp"
 #include "hessian2/codec.hpp"
 #include "hessian2/object.hpp"
@@ -17,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-class HessianUtils : public Logger::Loggable<Logger::Id::dubbo> {
+class HessianUtils {
 public:
   static uint32_t getParametersNumber(const std::string& parameters_type);
 };

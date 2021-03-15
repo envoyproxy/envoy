@@ -59,12 +59,13 @@ public:
 
   class Attachment {
   public:
-    using MapObject = Hessian2::UntypedMapObject;
-    using MapObjectPtr = std::unique_ptr<Hessian2::UntypedMapObject>;
+    using Map = Hessian2::UntypedMapObject;
+    using MapPtr = std::unique_ptr<Hessian2::UntypedMapObject>;
+    using String = Hessian2::StringObject;
 
-    Attachment(MapObjectPtr&& value);
+    Attachment(MapPtr&& value);
 
-    const MapObject& attachment() const { return *attachment_; }
+    const Map& attachment() const { return *attachment_; }
 
     void insert(const std::string& key, const std::string& value);
     void remove(const std::string& key);
@@ -78,7 +79,7 @@ public:
 
   private:
     bool attachment_updated_{false};
-    MapObjectPtr attachment_;
+    MapPtr attachment_;
 
     // To reuse the HeaderMatcher API and related tools provided by Envoy, we store the key/value
     // pair of the string type in the attachment in the Http::HeaderMap. This introduces additional
@@ -106,15 +107,17 @@ public:
     attachment_lazy_callback_ = std::move(callback);
   }
 
+  const absl::optional<std::string>& serviceGroup() const override;
+
 private:
-  void assignParametersIfNeed();
-  void assignAttachmentIfNeed();
+  void assignParametersIfNeed() const;
+  void assignAttachmentIfNeed() const;
 
   AttachmentLazyCallback attachment_lazy_callback_;
   ParametersLazyCallback parameters_lazy_callback_;
 
-  ParametersPtr parameters_{};
-  AttachmentPtr attachment_{}; // attachment
+  mutable ParametersPtr parameters_{};
+  mutable AttachmentPtr attachment_{};
 };
 
 class RpcResultImpl : public RpcResult {

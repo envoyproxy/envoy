@@ -29,7 +29,7 @@ TEST(ContextImplTest, ContextImplTest) {
 }
 
 TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
-  auto map = std::make_unique<RpcInvocationImpl::Attachment::MapObject>();
+  auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
 
   map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
                                       std::make_unique<Hessian2::StringObject>("fake_group"));
@@ -103,7 +103,7 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
   });
 
   invo.setAttachmentLazyCallback([&set_attachment]() -> RpcInvocationImpl::AttachmentPtr {
-    auto map = std::make_unique<RpcInvocationImpl::Attachment::MapObject>();
+    auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
 
     map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
                                         std::make_unique<Hessian2::StringObject>("new_fake_group"));

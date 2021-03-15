@@ -7,7 +7,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-RpcInvocationImpl::Attachment::Attachment(MapObjectPtr&& value) : attachment_(std::move(value)) {
+RpcInvocationImpl::Attachment::Attachment(MapPtr&& value) : attachment_(std::move(value)) {
   headers_ = Http::RequestHeaderMapImpl::create();
 
   ASSERT(attachment_);
@@ -28,8 +28,8 @@ void RpcInvocationImpl::Attachment::insert(const std::string& key, const std::st
 
   ASSERT(attachment_->toMutableUntypedMap());
 
-  attachment_->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>(key),
-                                              std::make_unique<Hessian2::StringObject>(value));
+  attachment_->toMutableUntypedMap()->emplace(std::make_unique<String>(key),
+                                              std::make_unique<String>(value));
 
   auto lowcase_key = Http::LowerCaseString(key);
   headers_->remove(lowcase_key);
@@ -41,7 +41,7 @@ void RpcInvocationImpl::Attachment::remove(const std::string& key) {
 
   ASSERT(attachment_->toMutableUntypedMap());
 
-  attachment_->toMutableUntypedMap()->erase(std::make_unique<Hessian2::StringObject>(key));
+  attachment_->toMutableUntypedMap()->erase(std::make_unique<String>(key));
   headers_->remove(Http::LowerCaseString(key));
 }
 
@@ -49,15 +49,41 @@ const std::string* RpcInvocationImpl::Attachment::lookup(const std::string& key)
   ASSERT(attachment_->toMutableUntypedMap());
 
   auto map = attachment_->toMutableUntypedMap();
-  auto result = map->find(std::make_unique<Hessian2::StringObject>(key));
+  auto result = map->find(std::make_unique<String>(key));
   if (result != map->end() && result->second->toString().has_value()) {
     return result->second->toString().value();
   }
   return nullptr;
 }
 
+void RpcInvocationImpl::assignParametersIfNeed() const {
+  ASSERT(parameters_lazy_callback_ != nullptr);
+  if (parameters_ == nullptr) {
+    parameters_ = parameters_lazy_callback_();
+  }
+}
+
+void RpcInvocationImpl::assignAttachmentIfNeed() const {
+  ASSERT(attachment_lazy_callback_ != nullptr);
+  if (attachment_ != nullptr) {
+    return;
+  }
+
+  assignParametersIfNeed();
+  attachment_ = attachment_lazy_callback_();
+
+  if (auto g = attachment_->lookup("group"); g != nullptr) {
+    const_cast<RpcInvocationImpl*>(this)->group_ = *g;
+  }
+}
+
+const absl::optional<std::string>& RpcInvocationImpl::serviceGroup() const {
+  assignAttachmentIfNeed();
+  return group_;
+}
+
 const RpcInvocationImpl::Attachment& RpcInvocationImpl::attachment() const {
-  ASSERT(attachment_ != nullptr);
+  assignAttachmentIfNeed();
   return *attachment_;
 }
 
@@ -67,35 +93,13 @@ RpcInvocationImpl::AttachmentPtr& RpcInvocationImpl::mutableAttachment() {
 }
 
 const RpcInvocationImpl::Parameters& RpcInvocationImpl::parameters() const {
-  ASSERT(parameters_ != nullptr);
+  assignParametersIfNeed();
   return *parameters_;
 }
 
 RpcInvocationImpl::ParametersPtr& RpcInvocationImpl::mutableParameters() {
   assignParametersIfNeed();
   return parameters_;
-}
-
-void RpcInvocationImpl::assignParametersIfNeed() {
-  ASSERT(parameters_lazy_callback_ != nullptr);
-  if (parameters_ == nullptr) {
-    parameters_ = parameters_lazy_callback_();
-  }
-}
-
-void RpcInvocationImpl::assignAttachmentIfNeed() {
-  ASSERT(attachment_lazy_callback_ != nullptr);
-  if (attachment_ != nullptr) {
-    return;
-  }
-
-  assignParametersIfNeed();
-  attachment_ = attachment_lazy_callback_();
-
-  ASSERT(attachment_ != nullptr);
-  if (auto g = attachment_->lookup("group"); g) {
-    setServiceGroup(*g);
-  }
 }
 
 } // namespace DubboProxy

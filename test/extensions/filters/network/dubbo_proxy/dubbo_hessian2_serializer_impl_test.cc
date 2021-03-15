@@ -75,8 +75,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
 }
 
 TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
-  RpcInvocationImpl::Attachment attach(
-      std::make_unique<RpcInvocationImpl::Attachment::MapObject>());
+  RpcInvocationImpl::Attachment attach(std::make_unique<RpcInvocationImpl::Attachment::Map>());
   attach.insert("test1", "test_value1");
   attach.insert("test2", "test_value2");
   attach.insert("test3", "test_value3");

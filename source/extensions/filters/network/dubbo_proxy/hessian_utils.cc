@@ -1,15 +1,5 @@
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
 
-#include <iostream>
-#include <type_traits>
-
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/dubbo_proxy/buffer_helper.h"
-
-#include "absl/strings/str_cat.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

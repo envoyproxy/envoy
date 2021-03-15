@@ -42,7 +42,7 @@ void setDefaultInvocationCallback(RpcInvocationImpl& invo) {
   });
 
   invo.setAttachmentLazyCallback([]() -> RpcInvocationImpl::AttachmentPtr {
-    auto map = std::make_unique<RpcInvocationImpl::Attachment::MapObject>();
+    auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
     return std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
   });
 }

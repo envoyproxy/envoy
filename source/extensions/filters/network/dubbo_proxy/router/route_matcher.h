@@ -48,7 +48,7 @@ public:
 
 protected:
   RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
-  bool headersMatch(RpcInvocationImpl& invocation) const;
+  bool headersMatch(const RpcInvocationImpl& invocation) const;
 
 private:
   class WeightedClusterEntry : public RouteEntry, public Route {
@@ -145,9 +145,9 @@ public:
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
-  bool matchServiceName(RpcInvocationImpl& invocation) const;
-  bool matchServiceVersion(RpcInvocationImpl& invocation) const;
-  bool matchServiceGroup(RpcInvocationImpl& invocation) const;
+  bool matchServiceName(const RpcInvocationImpl& invocation) const;
+  bool matchServiceVersion(const RpcInvocationImpl& invocation) const;
+  bool matchServiceGroup(const RpcInvocationImpl& invocation) const;
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   const InterfaceMatcher interface_matcher_;
