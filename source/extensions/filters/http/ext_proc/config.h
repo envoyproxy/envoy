@@ -22,7 +22,6 @@ public:
 
 private:
   static constexpr uint64_t kDefaultMessageTimeoutMs = 200;
-  static constexpr uint64_t kDefaultConversationTimeoutMs = 10 * 1000;
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& proto_config,

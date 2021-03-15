@@ -632,23 +632,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   response->waitForReset();
 }
 
-// Send a request and get a response, but then wait longer than the
-// "conversation timeout" before sending the response headers message to the
-// processor. This should trigger the conversation timeout and a 500 error.
-TEST_P(ExtProcIntegrationTest, ConversationTimeout) {
-  proto_config_.mutable_conversation_timeout()->set_seconds(1);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(true, absl::nullopt);
-  handleUpstreamRequest();
-
-  // Simulate a delay of two seconds, after which conversation timeout
-  // should have expired.
-  timeSystem().advanceTimeWaitImpl(2s);
-  verifyDownstreamResponse(*response, 500);
-}
-
 // Send a request, but wait longer than the "message timeout" before sending a response
 // from the external processor. This should trigger the timeout and result
 // in a 500 error.

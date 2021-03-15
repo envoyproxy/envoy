@@ -50,7 +50,7 @@ protected:
 
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
 
@@ -59,7 +59,7 @@ protected:
     if (cb) {
       (*cb)(proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, kMessageTimeout, 10s, stats_store_, ""));
+    config_.reset(new FilterConfig(proto_config, kMessageTimeout, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -68,8 +68,7 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const std::chrono::milliseconds&) {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));

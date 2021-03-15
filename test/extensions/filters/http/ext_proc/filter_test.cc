@@ -49,7 +49,7 @@ class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
 
@@ -57,16 +57,14 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms, 10s, stats_store_, ""));
+    config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const std::chrono::milliseconds& timeout) {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
     stream_callbacks_ = &callbacks;
-    stream_timeout_ = timeout;
 
     auto stream = std::make_unique<MockStream>();
     // We never send with the "close" flag set
@@ -179,7 +177,6 @@ protected:
   ProcessingRequest last_request_;
   bool last_request_processed_ = true;
   bool server_closed_stream_ = false;
-  std::chrono::milliseconds stream_timeout_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;

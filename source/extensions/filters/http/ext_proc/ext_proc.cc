@@ -27,7 +27,7 @@ static const std::string kErrorPrefix = "ext_proc error";
 void Filter::openStream() {
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_->conversationTimeout());
+    stream_ = client_->start(*this);
     stats_.streams_started_.inc();
   }
 }
