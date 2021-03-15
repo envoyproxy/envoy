@@ -540,7 +540,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
 
   if (method_->request_type_is_http_body_) {
     request_data_.move(data);
-    if (checkIfDecoderBufferLimitReached(request_data_.length())) {
+    if (decoderBufferLimitReached(request_data_.length())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -553,7 +553,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     }
   } else {
     request_in_.move(data);
-    if (checkIfDecoderBufferLimitReached(request_in_.bytesStored())) {
+    if (decoderBufferLimitReached(request_in_.bytesStored())) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -653,7 +653,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   response_in_.move(data);
-  if (checkIfEncoderBufferLimitReached(response_in_.bytesStored())) {
+  if (encoderBufferLimitReached(response_in_.bytesStored())) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -900,7 +900,7 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   return true;
 }
 
-bool JsonTranscoderFilter::checkIfDecoderBufferLimitReached(uint64_t buffer_length) {
+bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
   if (!Runtime::runtimeFeatureEnabled(buffer_limits_runtime_feature)) {
     return false;
   }
@@ -922,7 +922,7 @@ bool JsonTranscoderFilter::checkIfDecoderBufferLimitReached(uint64_t buffer_leng
   return false;
 }
 
-bool JsonTranscoderFilter::checkIfEncoderBufferLimitReached(uint64_t buffer_length) {
+bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
   if (!Runtime::runtimeFeatureEnabled(buffer_limits_runtime_feature)) {
     return false;
   }

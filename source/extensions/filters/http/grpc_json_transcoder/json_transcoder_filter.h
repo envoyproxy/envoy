@@ -190,8 +190,8 @@ private:
   void initPerRouteConfig();
 
   // Helpers for flow control.
-  bool checkIfDecoderBufferLimitReached(uint64_t buffer_length);
-  bool checkIfEncoderBufferLimitReached(uint64_t buffer_length);
+  bool decoderBufferLimitReached(uint64_t buffer_length);
+  bool encoderBufferLimitReached(uint64_t buffer_length);
 
   JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};
