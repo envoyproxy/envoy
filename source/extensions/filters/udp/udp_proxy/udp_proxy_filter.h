@@ -51,6 +51,7 @@ struct UdpProxyDownstreamStats {
  */
 #define ALL_UDP_PROXY_UPSTREAM_STATS(COUNTER)                                                      \
   COUNTER(sess_rx_datagrams)                                                                       \
+  COUNTER(sess_rx_datagrams_dropped)                                                               \
   COUNTER(sess_rx_errors)                                                                          \
   COUNTER(sess_tx_datagrams)                                                                       \
   COUNTER(sess_tx_errors)
@@ -171,6 +172,9 @@ private:
                        Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
     uint64_t maxDatagramSize() const override {
       return cluster_.filter_.config_->maxUpstreamDatagramSize();
+    }
+    void onDatagramsDropped(uint32_t dropped) override {
+      cluster_.cluster_stats_.sess_rx_datagrams_dropped_.add(dropped);
     }
 
     ClusterInfo& cluster_;
