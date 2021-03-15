@@ -282,9 +282,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ContinueAfterLocalReply) {
         EXPECT_TRUE(response->complete());
         EXPECT_EQ("200", response->headers().getStatusValue());
       },
-      "envoy bug failure: !state_.local_complete_ || status == "
-      "FilterHeadersStatus::StopIteration. Details: Filters should return "
-      "FilterHeadersStatus::StopIteration after sending a local reply.");
+      "envoy bug failure: !state_.local_complete_ || status == FilterHeadersStatus::StopIteration "
+      "|| status == FilterHeadersStatus::StopAllIterationAndBuffer || status == "
+      "FilterHeadersStatus::StopAllIterationAndWatermark. Details: Filters should return "
+      "FilterHeadersStatus::{StopIteration,StopAllIterationAndBuffer,StopAllIterationAndWatermark} "
+      "after sending a local reply.");
 }
 
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
