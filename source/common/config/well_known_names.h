@@ -43,6 +43,8 @@ class MetadataEnvoyLbKeyValues {
 public:
   // Key in envoy.lb filter namespace for endpoint canary bool value.
   const std::string CANARY = "canary";
+  // Key in envoy.lb filter namespace for the key to use to hash an endpoint.
+  const std::string HASH_KEY = "hash_key";
 };
 
 using MetadataEnvoyLbKeys = ConstSingleton<MetadataEnvoyLbKeyValues>;
