@@ -32,6 +32,9 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
 
 protected:
+  static Event::Dispatcher::CreateUdpListenerParams
+  configToUdpListenerParams(Network::ListenerConfig& config);
+
   uint32_t destination(const Network::UdpRecvData& /*data*/) const override {
     // By default, route to the current worker.
     return worker_index_;

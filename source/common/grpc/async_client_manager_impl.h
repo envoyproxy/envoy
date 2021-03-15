@@ -17,7 +17,7 @@ class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                          const envoy::config::core::v3::GrpcService& config,
-                         AsyncClientFactoryClusterChecks check, TimeSource& time_source);
+                         bool skip_cluster_check, TimeSource& time_source);
 
   RawAsyncClientPtr create() override;
 
@@ -53,7 +53,7 @@ public:
   // Grpc::AsyncClientManager
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
-                                              AsyncClientFactoryClusterChecks checks) override;
+                                              bool skip_cluster_check) override;
 
 private:
   Upstream::ClusterManager& cm_;
