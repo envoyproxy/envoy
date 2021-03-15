@@ -80,15 +80,36 @@ public:
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
           init_manager_(nullptr) {
-      envoy::config::listener::v3::UdpListenerConfig dummy;
-      std::string listener_name("raw_udp_listener");
-      dummy.set_udp_listener_name(listener_name);
-      udp_listener_factory_ =
-          Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(listener_name)
-              .createActiveUdpListenerFactory(dummy, /*concurrency=*/1);
-      udp_writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
+      envoy::config::listener::v3::UdpListenerConfig udp_config;
+      const std::string default_type_url =
+          "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
+      udp_config.mutable_listener_config()->mutable_typed_config()->set_type_url(default_type_url);
+      udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
+      udp_listener_config_->listener_factory_ =
+          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+              udp_config.listener_config())
+              .createActiveUdpListenerFactory(udp_config, /*concurrency=*/1);
+      udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
+
+    struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
+      UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig& config)
+          : config_(config) {}
+
+      // Network::UdpListenerConfig
+      Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
+      Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+      Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
+        return *listener_worker_router_;
+      }
+      const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+
+      const envoy::config::listener::v3::UdpListenerConfig config_;
+      std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
+      std::unique_ptr<Network::UdpPacketWriterFactory> writer_factory_;
+      Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+    };
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override {
@@ -111,21 +132,11 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      return udp_listener_factory_.get();
-    }
-    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-      return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
-    }
-    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-      return *udp_listener_worker_router_;
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
     envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
-
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
-
     Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return access_logs_;
@@ -133,7 +144,6 @@ public:
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     Init::Manager& initManager() override { return *init_manager_; }
-
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
     }
@@ -149,9 +159,7 @@ public:
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
-    std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
-    std::unique_ptr<Network::UdpPacketWriterFactory> udp_writer_factory_;
-    Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
+    std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
     Network::ConnectionBalancerSharedPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> access_logs_;
@@ -233,12 +241,13 @@ public:
             return listener;
           }));
     } else {
-      EXPECT_CALL(dispatcher_, createUdpListener_(_, _))
-          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&,
-                                      Network::UdpListenerCallbacks&) -> Network::UdpListener* {
+      EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
+          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
+                                      const Event::Dispatcher::CreateUdpListenerParams&)
+                               -> Network::UdpListener* {
             return dynamic_cast<Network::UdpListener*>(listener);
           }));
-      listeners_.back()->udp_listener_worker_router_ =
+      listeners_.back()->udp_listener_config_->listener_worker_router_ =
           std::make_unique<Network::UdpListenerWorkerRouterImpl>(1);
     }
 

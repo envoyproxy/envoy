@@ -17,7 +17,7 @@ Network::UdpPacketWriterFactoryPtr
 UdpGsoBatchWriterConfigFactory::createUdpPacketWriterFactory(const Protobuf::Message& /*message*/) {
   if (!Api::OsSysCallsSingleton::get().supportsUdpGso()) {
     throw EnvoyException("Error configuring batch writer on platform without support "
-                         "for UDP GSO. Reset udp_writer_config to default writer");
+                         "for UDP GSO. Reset writer_config to default writer");
   }
 
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT

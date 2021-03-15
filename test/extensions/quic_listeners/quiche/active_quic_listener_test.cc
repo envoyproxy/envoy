@@ -112,9 +112,10 @@ protected:
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
-    ON_CALL(listener_config_, udpPacketWriterFactory())
-        .WillByDefault(Return(
-            std::reference_wrapper<Network::UdpPacketWriterFactory>(udp_packet_writer_factory_)));
+    ON_CALL(listener_config_, udpListenerConfig())
+        .WillByDefault(Return(Network::UdpListenerConfigOptRef(udp_listener_config_)));
+    ON_CALL(udp_listener_config_, packetWriterFactory())
+        .WillByDefault(ReturnRef(udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
             [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
@@ -276,6 +277,7 @@ protected:
   Network::SocketPtr client_socket_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
+  NiceMock<Network::MockUdpListenerConfig> udp_listener_config_;
   NiceMock<Network::MockListenerConfig> listener_config_;
   NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   quic::QuicConfig quic_config_;

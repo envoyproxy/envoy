@@ -234,7 +234,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
         });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
-    setUdpFakeUpstream(true);
+    setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(false, true);
     config_helper_.addConfigModifier(

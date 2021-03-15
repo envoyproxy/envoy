@@ -62,6 +62,7 @@ envoy_cc_mock(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

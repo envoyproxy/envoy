@@ -15,11 +15,11 @@ option java_outer_classname = "QuicConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: QUIC listener Config]
-// [#extension: envoy.listener.quic]
+// [#protodoc-title: QUIC listener config]
+// [#comment:#extension: envoy.udp_listeners.quiche_quic_listener]
+// [#comment:TODO(#12829): Remove this as an extension point.]
 
-// Configuration specific to the QUIC protocol.
-// Next id: 5
+// Configuration specific to the UDP QUIC listener.
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";

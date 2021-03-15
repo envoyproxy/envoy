@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Network {
 
 /**
- * libevent implementation of Network::Listener for UDP.
+ * Implementation of Network::Listener for UDP.
  */
 class UdpListenerImpl : public BaseListenerImpl,
                         public virtual UdpListener,
@@ -23,7 +23,7 @@ class UdpListenerImpl : public BaseListenerImpl,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  UdpListenerCallbacks& cb, TimeSource& time_source);
+                  UdpListenerCallbacks& cb, TimeSource& time_source, uint64_t max_rx_datagram_size);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
 
@@ -43,10 +43,7 @@ public:
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
                      MonotonicTime receive_time) override;
 
-  uint64_t maxPacketSize() const override {
-    // TODO(danzh) make this variable configurable to support jumbo frames.
-    return MAX_UDP_PACKET_SIZE;
-  }
+  uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
 
 protected:
   void handleWriteCallback();
@@ -60,6 +57,7 @@ private:
   void disableEvent();
 
   TimeSource& time_source_;
+  const uint64_t max_rx_datagram_size_;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

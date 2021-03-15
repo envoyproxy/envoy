@@ -71,9 +71,9 @@ void EnvoyQuicClientConnection::processPacket(
                    envoyIpAddressToQuicSocketAddress(peer_address->ip()), packet);
 }
 
-uint64_t EnvoyQuicClientConnection::maxPacketSize() const {
+uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
   // TODO(danzh) make this variable configurable to support jumbo frames.
-  return Network::MAX_UDP_PACKET_SIZE;
+  return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
 }
 
 void EnvoyQuicClientConnection::setUpConnectionSocket() {

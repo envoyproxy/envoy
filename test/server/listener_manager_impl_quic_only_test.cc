@@ -53,11 +53,12 @@ filter_chains:
             - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  udp_listener_name: "quiche_quic_listener"
-udp_writer_config:
-  name: "udp_gso_batch_writer"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
+  listener_config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
+  writer_config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -100,13 +101,22 @@ udp_writer_config:
 
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
-  EXPECT_FALSE(manager_->listeners()[0].get().udpListenerFactory()->isTransportConnectionless());
+  EXPECT_FALSE(manager_->listeners()[0]
+                   .get()
+                   .udpListenerConfig()
+                   ->listenerFactory()
+                   .isTransportConnectionless());
   Network::SocketSharedPtr listen_socket =
       manager_->listeners().front().get().listenSocketFactory().getListenSocket();
 
   Network::UdpPacketWriterPtr udp_packet_writer =
-      manager_->listeners().front().get().udpPacketWriterFactory()->get().createUdpPacketWriter(
-          listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+      manager_->listeners()
+          .front()
+          .get()
+          .udpListenerConfig()
+          ->packetWriterFactory()
+          .createUdpPacketWriter(listen_socket->ioHandle(),
+                                 manager_->listeners()[0].get().listenerScope());
   EXPECT_EQ(udp_packet_writer->isBatchMode(), Api::OsSysCallsSingleton::get().supportsUdpGso());
 
   // No filter chain found with non-matching transport protocol.
@@ -149,11 +159,12 @@ filter_chains:
           - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
-  udp_listener_name: "quiche_quic_listener"
-udp_writer_config:
-  name: "udp_gso_batch_writer"
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
+  listener_config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
+  writer_config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
   )EOF",
                                                        Network::Address::IpVersion::v4);
 

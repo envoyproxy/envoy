@@ -364,7 +364,9 @@ public:
   }
 
 protected:
-  void setUdpFakeUpstream(bool value) { upstream_config_.udp_fake_upstream_ = value; }
+  void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
+    upstream_config_.udp_fake_upstream_ = config;
+  }
   bool initialized() const { return initialized_; }
 
   // Right now half-close is set globally, not separately for upstream and

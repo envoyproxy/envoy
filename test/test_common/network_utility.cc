@@ -5,6 +5,7 @@
 
 #include "envoy/common/platform.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -12,7 +13,6 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/socket_interface.h"
 #include "common/network/socket_option_factory.h"
-#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/utility.h"
@@ -199,7 +199,8 @@ const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets()
 
 namespace {
 struct SyncPacketProcessor : public Network::UdpPacketProcessor {
-  SyncPacketProcessor(std::list<Network::UdpRecvData>& data) : data_(data) {}
+  SyncPacketProcessor(std::list<Network::UdpRecvData>& data, uint64_t max_rx_datagram_size)
+      : data_(data), max_rx_datagram_size_(max_rx_datagram_size) {}
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
@@ -208,22 +209,25 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
         {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
     data_.push_back(std::move(datagram));
   }
-  uint64_t maxPacketSize() const override { return Network::MAX_UDP_PACKET_SIZE; }
+  uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
 
   std::list<Network::UdpRecvData>& data_;
+  const uint64_t max_rx_datagram_size_;
 };
 } // namespace
 
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       std::list<UdpRecvData>& data) {
-  SyncPacketProcessor processor(data);
+                                       std::list<UdpRecvData>& data,
+                                       uint64_t max_rx_datagram_size) {
+  SyncPacketProcessor processor(data, max_rx_datagram_size);
   return Network::Utility::readFromSocket(handle, local_address, processor,
                                           MonotonicTime(std::chrono::seconds(0)), nullptr);
 }
 
-UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
+UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)
     : socket_(
-          std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
+          std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)),
+      max_rx_datagram_size_(max_rx_datagram_size) {
   RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
 }
 
@@ -235,8 +239,9 @@ void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Insta
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
   if (received_datagrams_.empty()) {
-    const auto rc = Network::Test::readFromSocket(
-        socket_->ioHandle(), *socket_->addressProvider().localAddress(), received_datagrams_);
+    const auto rc = Network::Test::readFromSocket(socket_->ioHandle(),
+                                                  *socket_->addressProvider().localAddress(),
+                                                  received_datagrams_, max_rx_datagram_size_);
     ASSERT_TRUE(rc.ok());
   }
   datagram = std::move(received_datagrams_.front());

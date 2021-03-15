@@ -51,13 +51,15 @@ public:
                              Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
 
   /**
-   * The expected max size of the packet to be read. If it's smaller than
-   * actually packets received, the payload will be truncated.
+   * The expected max size of the datagram to be read. If it's smaller than
+   * the size of datagrams received, they will be dropped.
    */
-  virtual uint64_t maxPacketSize() const PURE;
+  virtual uint64_t maxDatagramSize() const PURE;
 };
 
-static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
+static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
+static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
 
 /**
  * Common network utility routines.

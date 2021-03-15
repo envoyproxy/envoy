@@ -11,21 +11,14 @@ namespace {
 class UdpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  UdpProxyIntegrationTest() : BaseIntegrationTest(GetParam(), configToUse()) {}
+  UdpProxyIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()) {}
 
-  static std::string configToUse() {
-    return absl::StrCat(ConfigHelper::baseUdpListenerConfig(), R"EOF(
-    listener_filters:
-      name: udp_proxy
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
-        stat_prefix: foo
-        cluster: cluster_0
-      )EOF");
-  }
-
-  void setup(uint32_t upstream_count) {
-    setUdpFakeUpstream(true);
+  void setup(uint32_t upstream_count,
+             absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt) {
+    FakeUpstreamConfig::UdpConfig config;
+    config.max_rx_datagram_size_ = max_rx_datagram_size;
+    setUdpFakeUpstream(config);
     if (upstream_count > 1) {
       setDeterministic();
       setUpstreamCount(upstream_count);
@@ -43,36 +36,73 @@ public:
             }
           });
     }
+
+    if (max_rx_datagram_size.has_value()) {
+      if (max_rx_datagram_size.has_value()) {
+        config_helper_.addConfigModifier(
+            [max_rx_datagram_size](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+              bootstrap.mutable_static_resources()
+                  ->mutable_listeners(0)
+                  ->mutable_udp_listener_config()
+                  ->mutable_max_downstream_rx_datagram_size()
+                  ->set_value(max_rx_datagram_size.value());
+            });
+      }
+
+      config_helper_.addListenerFilter(fmt::format(R"EOF(
+name: udp_proxy
+typed_config:
+  '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+  stat_prefix: foo
+  cluster: cluster_0
+  max_upstream_rx_datagram_size: {}
+)EOF",
+                                                   max_rx_datagram_size.value()));
+    } else {
+      config_helper_.addListenerFilter(R"EOF(
+name: udp_proxy
+typed_config:
+  '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+  stat_prefix: foo
+  cluster: cluster_0
+)EOF");
+    }
+
     BaseIntegrationTest::initialize();
   }
 
-  void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
+  void requestResponseWithListenerAddress(
+      const Network::Address::Instance& listener_address, std::string request = "hello",
+      std::string response = "world1",
+      uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE) {
     // Send datagram to be proxied.
-    Network::Test::UdpSyncPeer client(version_);
-    client.write("hello", listener_address);
+    Network::Test::UdpSyncPeer client(version_, max_rx_datagram_size);
+    client.write(request, listener_address);
 
     // Wait for the upstream datagram.
     Network::UdpRecvData request_datagram;
     ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
-    EXPECT_EQ("hello", request_datagram.buffer_->toString());
+    EXPECT_EQ(request, request_datagram.buffer_->toString());
 
     // Respond from the upstream.
-    fake_upstreams_[0]->sendUdpDatagram("world1", request_datagram.addresses_.peer_);
+    fake_upstreams_[0]->sendUdpDatagram(response, request_datagram.addresses_.peer_);
     Network::UdpRecvData response_datagram;
     client.recv(response_datagram);
-    EXPECT_EQ("world1", response_datagram.buffer_->toString());
+    EXPECT_EQ(response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    EXPECT_EQ(5, test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
+    EXPECT_EQ(request.size(), test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-    EXPECT_EQ(5, test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
+    EXPECT_EQ(request.size(),
+              test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 
-    EXPECT_EQ(6, test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
+    EXPECT_EQ(response.size(),
+              test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
     // The stat is incremented after the send so there is a race condition and we must wait for
     // the counter to be incremented.
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", 6);
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", response.size());
     test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
 
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
@@ -103,8 +133,23 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   requestResponseWithListenerAddress(*listener_address);
 }
 
-// Verifies calling sendmsg with a non-local address. Note that this test is only fully complete for
-// IPv4. See the comment below for more details.
+// Test with large packet sizes.
+TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
+  // The following tests large packets end to end. We use a size larger than
+  // the default GRO receive buffer size of
+  // DEFAULT_UDP_MAX_DATAGRAM_SIZE x NUM_DATAGRAMS_PER_GRO_RECEIVE.
+  const uint64_t max_rx_datagram_size =
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+  setup(1, max_rx_datagram_size);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  requestResponseWithListenerAddress(*listener_address, std::string(max_rx_datagram_size, 'a'),
+                                     std::string(max_rx_datagram_size, 'b'), max_rx_datagram_size);
+}
+
+// Verifies calling sendmsg with a non-local address. Note that this test is only fully complete
+// for IPv4. See the comment below for more details.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   setup(1);
   const uint32_t port = lookupPort("listener_0");

@@ -9,15 +9,10 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Interface to create udp listener according to
- * envoy::config::listener::v3::UdpListenerConfig.udp_listener_name.
+ * Interface to create UDP listener.
  */
-class ActiveUdpListenerConfigFactory : public Config::UntypedFactory {
+class ActiveUdpListenerConfigFactory : public Config::TypedFactory {
 public:
-  ~ActiveUdpListenerConfigFactory() override = default;
-
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
   /**
    * Create an ActiveUdpListenerFactory object according to given message.
    * @param message specifies QUIC protocol options in a protobuf.

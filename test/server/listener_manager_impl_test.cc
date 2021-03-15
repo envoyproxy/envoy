@@ -5029,8 +5029,13 @@ filter_chains:
   Network::SocketSharedPtr listen_socket =
       manager_->listeners().front().get().listenSocketFactory().getListenSocket();
   Network::UdpPacketWriterPtr udp_packet_writer =
-      manager_->listeners().front().get().udpPacketWriterFactory()->get().createUdpPacketWriter(
-          listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+      manager_->listeners()
+          .front()
+          .get()
+          .udpListenerConfig()
+          ->packetWriterFactory()
+          .createUdpPacketWriter(listen_socket->ioHandle(),
+                                 manager_->listeners()[0].get().listenerScope());
   EXPECT_FALSE(udp_packet_writer->isBatchMode());
 }
 

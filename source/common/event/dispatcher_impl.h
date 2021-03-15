@@ -76,7 +76,8 @@ public:
                                       Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                       uint32_t backlog_size) override;
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override;
+                                            Network::UdpListenerCallbacks& cb,
+                                            const CreateUdpListenerParams& params) override;
   TimerPtr createTimer(TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override;

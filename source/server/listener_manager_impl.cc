@@ -30,7 +30,6 @@
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
-#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
@@ -1009,8 +1008,9 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
   // The only connection oriented UDP transport protocol right now is QUIC.
-  const bool is_quic = listener_.udpListenerFactory() != nullptr &&
-                       !listener_.udpListenerFactory()->isTransportConnectionless();
+  const bool is_quic =
+      listener_.udpListenerConfig().has_value() &&
+      !listener_.udpListenerConfig()->listenerFactory().isTransportConnectionless();
   if (is_quic &&
       dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
     throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "

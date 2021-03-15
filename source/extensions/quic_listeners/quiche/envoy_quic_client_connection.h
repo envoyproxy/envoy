@@ -35,7 +35,7 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
-  uint64_t maxPacketSize() const override;
+  uint64_t maxDatagramSize() const override;
 
   // Register file event and apply socket options.
   void setUpConnectionSocket();
