@@ -74,7 +74,7 @@ public:
     return grpc_stream_;
   }
 
-  // unified GrpcMux interface, not implemented by legacy muxes
+  // unified GrpcMux interface, not implemented by legacy multiplexers
   Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
                   SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
                   const bool) override {
@@ -225,7 +225,7 @@ public:
   void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
                            ControlPlaneStats&) override {}
 
-  // unified GrpcMux interface, not implemented by legacy muxes
+  // unified GrpcMux interface, not implemented by legacy multiplexers
   Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
                   SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
                   const bool) override {
