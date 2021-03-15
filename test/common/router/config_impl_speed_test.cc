@@ -68,6 +68,10 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
       regex->set_regex(absl::StrCat("^/shelves/[^\\\\/]+/route_", i, "$"));
       break;
     }
+    case RouteMatch::PathSpecifierCase::kUrlTemplate: {
+      match->set_url_template(absl::StrCat("/shelves/{shelf_id}/route_", i));
+      break;
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -126,19 +130,37 @@ static void bmRouteTableSizeWithExactPathMatch(benchmark::State& state) {
 
 /**
  * Benchmark a route table with regex path matchers in the form of:
+ * - ^/shelves/[^\\/]+/route_1$
+ * - ^/shelves/[^\\/]+/route_2$
+ * - etc.
+ *
+ * This represents OpenAPI path templates represented by regex.
+ * https://swagger.io/docs/specification/paths-and-operations/
  * - /shelves/{shelf_id}/route_1
  * - /shelves/{shelf_id}/route_2
  * - etc.
- *
- * This represents common OpenAPI path templating.
  */
 static void bmRouteTableSizeWithRegexMatch(benchmark::State& state) {
   bmRouteTableSize(state, RouteMatch::PathSpecifierCase::kSafeRegex);
 }
 
+/**
+ * Benchmark a route table with URL template path matchers in the form of:
+ * - /shelves/{shelf_id}/route_1
+ * - /shelves/{shelf_id}/route_2
+ * - etc.
+ *
+ * This represents syntax supported by `google/api/http.proto`.
+ * https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
+ */
+static void bmRouteTableSizeWithUrlTemplateMatch(benchmark::State& state) {
+  bmRouteTableSize(state, RouteMatch::PathSpecifierCase::kUrlTemplate);
+}
+
 BENCHMARK(bmRouteTableSizeWithPathPrefixMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 BENCHMARK(bmRouteTableSizeWithExactPathMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 BENCHMARK(bmRouteTableSizeWithRegexMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
+BENCHMARK(bmRouteTableSizeWithUrlTemplateMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 
 } // namespace
 } // namespace Router
