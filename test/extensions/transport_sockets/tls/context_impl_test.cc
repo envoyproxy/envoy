@@ -661,11 +661,9 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   constexpr absl::string_view next_update = "Next Update: ";
 
   auto ocsp_text_details = absl::StrSplit(
-      TestEnvironment::readFileToStringForTest(
-          TestEnvironment::substitute(
-              "{{ test_rundir "
-              "}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp_details.txt"),
-          true),
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir "
+          "}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp_details.txt")),
       '\n');
   std::string valid_from, expiration;
   for (const auto& detail : ocsp_text_details) {
