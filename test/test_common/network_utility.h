@@ -182,7 +182,7 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  */
 Api::IoCallUint64Result
 readFromSocket(IoHandle& handle, const Address::Instance& local_address, UdpRecvData& data,
-               uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_DATAGRAM_SIZE);
+               uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
 /**
  * A synchronous UDP peer that can be used for testing.
@@ -190,7 +190,7 @@ readFromSocket(IoHandle& handle, const Address::Instance& local_address, UdpRecv
 class UdpSyncPeer {
 public:
   UdpSyncPeer(Network::Address::IpVersion version,
-              uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_DATAGRAM_SIZE);
+              uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);

@@ -74,7 +74,7 @@ typed_config:
   void requestResponseWithListenerAddress(
       const Network::Address::Instance& listener_address, std::string request = "hello",
       std::string response = "world1",
-      uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_DATAGRAM_SIZE) {
+      uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_, max_rx_datagram_size);
     client.write(request, listener_address);
@@ -135,9 +135,11 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
 
 // Test with large packet sizes.
 TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
-  // The following tests large packets end to end. We use a size of 32K as this is larger than
-  // the default GRO receive buffer size of 1500 x 16 = 24000 bytes.
-  const uint64_t max_rx_datagram_size = 32768;
+  // The following tests large packets end to end. We use a size larger than
+  // the default GRO receive buffer size of
+  // DEFAULT_UDP_MAX_DATAGRAM_SIZE x NUM_DATAGRAMS_PER_GRO_RECEIVE.
+  const uint64_t max_rx_datagram_size =
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
   setup(1, max_rx_datagram_size);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(

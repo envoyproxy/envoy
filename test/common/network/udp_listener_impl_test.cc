@@ -64,7 +64,7 @@ public:
     }
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource(),
-        Network::DEFAULT_UDP_DATAGRAM_SIZE);
+        Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
@@ -87,7 +87,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
-                           dispatcherImpl().timeSource(), Network::DEFAULT_UDP_DATAGRAM_SIZE);
+                           dispatcherImpl().timeSource(), Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
 #ifdef SO_RXQ_OVFL
   // Verify that overflow detection is enabled.
@@ -113,11 +113,15 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg()
+                                             ? NUM_DATAGRAMS_PER_MMSG_RECEIVE
+                                             : 1u);
         EXPECT_EQ(data.buffer_->toString(), first);
       }))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg()
+                                             ? NUM_DATAGRAMS_PER_MMSG_RECEIVE
+                                             : 1u);
         EXPECT_EQ(data.buffer_->toString(), second);
 
         dispatcher_->exit();
@@ -144,7 +148,8 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-    validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+    validateRecvCallbackParams(
+        data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u);
     EXPECT_EQ(data.buffer_->toString(), second);
 
     dispatcher_->exit();
@@ -169,7 +174,8 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-    validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+    validateRecvCallbackParams(
+        data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u);
     EXPECT_EQ(data.buffer_->toString(), second);
 
     dispatcher_->exit();
@@ -220,7 +226,9 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
   EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg()
+                                             ? NUM_DATAGRAMS_PER_MMSG_RECEIVE
+                                             : 1u);
 
         test_peer_address = data.addresses_.peer_;
 
@@ -230,7 +238,9 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         server_received_data.push_back(data_str);
       }))
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg()
+                                             ? NUM_DATAGRAMS_PER_MMSG_RECEIVE
+                                             : 1u);
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
@@ -306,7 +316,9 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
       .Times(2)
       .WillOnce(Return())
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
+        validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg()
+                                             ? NUM_DATAGRAMS_PER_MMSG_RECEIVE
+                                             : 1u);
 
         EXPECT_EQ(data.buffer_->toString(), second);
 

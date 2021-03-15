@@ -583,7 +583,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
-    const uint64_t max_rx_datagram_size_with_gro = 16 * udp_packet_processor.maxDatagramSize();
+    const uint64_t max_rx_datagram_size_with_gro =
+        NUM_DATAGRAMS_PER_GRO_RECEIVE * udp_packet_processor.maxDatagramSize();
     ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_rx_datagram_size_with_gro);
 
     Api::IoCallUint64Result result =
@@ -632,19 +633,18 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       Buffer::InstancePtr buffer_;
       Buffer::ReservationSingleSlice reservation_;
     };
-    constexpr uint32_t num_packets_per_mmsg_call = 16u;
     constexpr uint32_t num_slices_per_packet = 1u;
-    absl::InlinedVector<BufferAndReservation, num_packets_per_mmsg_call> buffers;
-    RawSliceArrays slices(num_packets_per_mmsg_call,
+    absl::InlinedVector<BufferAndReservation, NUM_DATAGRAMS_PER_MMSG_RECEIVE> buffers;
+    RawSliceArrays slices(NUM_DATAGRAMS_PER_MMSG_RECEIVE,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
-    for (uint32_t i = 0; i < num_packets_per_mmsg_call; i++) {
+    for (uint32_t i = 0; i < NUM_DATAGRAMS_PER_MMSG_RECEIVE; i++) {
       buffers.push_back(max_rx_datagram_size);
       slices[i][0] = buffers[i].reservation_.slice();
     }
 
-    IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
-    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", num_packets_per_mmsg_call,
-                   max_rx_datagram_size);
+    IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_MMSG_RECEIVE, packets_dropped);
+    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}",
+                   NUM_DATAGRAMS_PER_MMSG_RECEIVE, max_rx_datagram_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
     if (!result.ok()) {
       return result;

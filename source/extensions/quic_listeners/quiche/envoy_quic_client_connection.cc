@@ -73,7 +73,7 @@ void EnvoyQuicClientConnection::processPacket(
 
 uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
   // TODO(danzh) make this variable configurable to support jumbo frames.
-  return Network::DEFAULT_UDP_DATAGRAM_SIZE;
+  return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
 }
 
 void EnvoyQuicClientConnection::setUpConnectionSocket() {

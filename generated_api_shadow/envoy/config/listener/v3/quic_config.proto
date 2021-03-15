@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC listener config]
 // [#comment:#extension: envoy.udp_listeners.quiche_quic_listener]
-// [#comment:TODO(mattklein123): Remove this as an extension point.]
+// [#comment:TODO(#12829): Remove this as an extension point.]
 
 // Configuration specific to the UDP QUIC listener.
 message QuicProtocolOptions {

@@ -57,7 +57,9 @@ public:
   virtual uint64_t maxDatagramSize() const PURE;
 };
 
-static const uint64_t DEFAULT_UDP_DATAGRAM_SIZE = 1500;
+static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
+static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
+static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
 
 /**
  * Common network utility routines.

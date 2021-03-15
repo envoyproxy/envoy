@@ -227,6 +227,11 @@ public:
                                               Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                               uint32_t backlog_size) PURE;
 
+  struct CreateUdpListenerParams {
+    // The maximum size datagram to receive.
+    uint64_t max_rx_datagram_size_;
+  };
+
   /**
    * Creates a logical udp listener on a specific port.
    * @param socket supplies the socket to listen on.
@@ -234,10 +239,6 @@ public:
    * @param params supplies the listener creation params.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  struct CreateUdpListenerParams {
-    // The maximum size datagram to receive.
-    uint64_t max_rx_datagram_size_;
-  };
   virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                                     Network::UdpListenerCallbacks& cb,
                                                     const CreateUdpListenerParams& params) PURE;

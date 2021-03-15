@@ -74,5 +74,5 @@ message UdpProxyConfig {
   // more memory per listener. Received datagrams above this size will be dropped. If not set
   // defaults to 1500 bytes.
   google.protobuf.UInt64Value max_upstream_rx_datagram_size = 6
-      [(validate.rules).uint64 = {lte: 65536}];
+      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
 }

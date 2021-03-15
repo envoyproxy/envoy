@@ -67,7 +67,7 @@ ActiveUdpListenerBase::configToUdpListenerParams(Network::ListenerConfig& config
   Event::Dispatcher::CreateUdpListenerParams params;
   params.max_rx_datagram_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config.udpListenerConfig()->config(), max_downstream_rx_datagram_size,
-      Network::DEFAULT_UDP_DATAGRAM_SIZE);
+      Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
   return params;
 }
 
