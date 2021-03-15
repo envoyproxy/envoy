@@ -224,6 +224,10 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   }
 
   // If the subscription already received a config, attempt to apply it.
+  // It is possible that the received extension config fails to satisfy the listener
+  // type URL constraints. This may happen if ECDS and LDS updates are racing, and tne LDS
+  // update arrives first. In this case, use the default config, increment a metric,
+  // and the applied config eventually converges once ECDS update arrives.
   bool last_config_valid = false;
   if (subscription->lastConfig().has_value()) {
     try {

@@ -382,6 +382,11 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicDefaultMatcher) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Validate that a listener update reuses the extension configuration. Prior
+// to https://github.com/envoyproxy/envoy/pull/15371, the updated listener
+// would not use the subscribed extension configuration and would not trigger a
+// fresh xDS request. See issue
+// https://github.com/envoyproxy/envoy/issues/14934.
 TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfig) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", false);
@@ -413,6 +418,8 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfig) {
                                  0);
 }
 
+// Validate that a listener update falls back to the default extension configuration
+// if the subscribed extension configuration fails to satisfy the type URL constraint.
 TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfigInvalid) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", false);
