@@ -249,8 +249,6 @@ protected:
   Status onMessageBegin() override;
   virtual Status onMessageBeginBase() PURE;
 
-  StatusOr<ParserStatus> onHeadersCompleteStatus();
-
   /**
    * Get memory used to represent HTTP headers or trailers currently being parsed.
    * Computed by adding the partial header field and value that is currently being parsed and the
