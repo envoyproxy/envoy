@@ -59,6 +59,8 @@ public:
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
+  void setHeaderSize(size_t header_size_kb);
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:

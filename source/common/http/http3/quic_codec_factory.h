@@ -15,7 +15,9 @@ public:
   ~QuicHttpServerConnectionFactory() override = default;
 
   virtual std::unique_ptr<ServerConnection>
-  createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
+  createQuicServerConnection(size_t max_request_headers_kb,
+                             Network::Connection& connection,
+                             ConnectionCallbacks& callbacks) PURE;
 
   std::string category() const override { return "envoy.quic_client_codec"; }
 };

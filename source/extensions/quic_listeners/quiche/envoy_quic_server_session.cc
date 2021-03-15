@@ -128,5 +128,9 @@ void EnvoyQuicServerSession::maybeCreateNetworkFilters() {
   ASSERT(has_filter_initialized);
 }
 
+void EnvoyQuicServerSession::setHeaderSize(size_t header_size_kb) {
+    set_max_inbound_header_list_size(header_size_kb * 1000);
+}
+
 } // namespace Quic
 } // namespace Envoy

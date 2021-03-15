@@ -102,7 +102,9 @@ QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
 
 std::unique_ptr<Http::ServerConnection>
 QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
+    size_t max_request_headers_kb,
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
+  dynamic_cast<Quic::EnvoyQuicServerSession&>(connection).setHeaderSize(max_request_headers_kb);
   return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
       dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),
       dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));

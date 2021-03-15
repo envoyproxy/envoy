@@ -540,6 +540,10 @@ struct FakeUpstreamConfig {
   bool enable_half_close_{};
   bool udp_fake_upstream_{};
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+    headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
 };
 
 /**
@@ -575,11 +579,7 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult waitForHttpConnection(
       Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-      uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-      uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT,
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -782,6 +782,7 @@ private:
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
+  const FakeUpstreamConfig& config_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;

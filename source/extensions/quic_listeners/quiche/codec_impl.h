@@ -86,7 +86,7 @@ public:
 class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
 public:
   std::unique_ptr<Http::ServerConnection>
-  createQuicServerConnection(Network::Connection& connection,
+  createQuicServerConnection(size_t max_request_headers_kb, Network::Connection& connection,
                              Http::ConnectionCallbacks& callbacks) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Quiche; }

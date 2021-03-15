@@ -338,10 +338,11 @@ FakeHttpConnection::FakeHttpConnection(
   } else {
     ASSERT(type == Type::HTTP3);
     envoy::config::core::v3::Http3ProtocolOptions http3_options;
+        std::cerr << "Should set to " << max_request_headers_kb << "\n";
     codec_ = std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this));
+            .createQuicServerConnection(max_request_headers_kb, shared_connection_.connection(), *this));
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
@@ -516,7 +517,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)),
-      read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
+      config_(config), read_disable_on_new_connection_(true),
+      enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == FakeHttpConnection::Type::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
@@ -549,12 +551,13 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   // Normally we don't associate a logical network connection with a FakeHttpConnection  until
   // waitForHttpConnection is called, but QUIC needs to be set up as packets come in, so we do
   // not lazily create for HTTP/3
-  // TODO(#14829) handle the case where waitForHttpConnection is called with
-  // non-default arguments for max request headers and protocol options.
+  //
+  // We give max request headers kb some wiggle room as QUIC counts the hpak entry size in header
+  // calculations.
   if (http_type_ == FakeHttpConnection::Type::HTTP3) {
     quic_connections_.push_back(std::make_unique<FakeHttpConnection>(
-        *this, consumeConnection(), http_type_, time_system_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-        Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW));
+        *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_ * 2,
+                config_.max_request_headers_count_, config_.headers_with_underscores_action_));
     quic_connections_.back()->initialize();
   }
   return true;
@@ -580,10 +583,7 @@ void FakeUpstream::threadRoutine() {
 }
 
 AssertionResult FakeUpstream::waitForHttpConnection(
-    Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection, milliseconds timeout,
-    uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
-    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+    Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection, milliseconds timeout) {
   {
     absl::MutexLock lock(&lock_);
 
@@ -619,8 +619,8 @@ AssertionResult FakeUpstream::waitForHttpConnection(
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(&lock_);
     connection = std::make_unique<FakeHttpConnection>(
-        *this, consumeConnection(), http_type_, time_system_, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_,
+        config_.max_request_headers_count_, config_.headers_with_underscores_action_);
     connection->initialize();
     return AssertionSuccess();
   });
