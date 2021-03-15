@@ -56,9 +56,7 @@ public:
     config.mutable_typed_config()->PackFrom(fal_config);
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
-    Filesystem::FilePathAndType file_info{
-        Filesystem::DestinationType::File,
-        fal_config.path()};
+    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
     EXPECT_CALL(context_.access_log_manager_, createAccessLog(file_info)).WillOnce(Return(file));
 
     AccessLog::InstanceSharedPtr logger = AccessLog::AccessLogFactory::fromProto(config, context_);
