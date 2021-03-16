@@ -8,7 +8,7 @@ namespace AccessLoggers {
 namespace File {
 
 /**
- * Config registration for the file access log. @see AccessLogInstanceFactory.
+ * Config registration for the standard output access log. @see AccessLogInstanceFactory.
  */
 class StdoutAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
 public:

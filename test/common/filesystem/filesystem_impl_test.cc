@@ -256,7 +256,8 @@ TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_FALSE(file->isOpen());
 }
 
@@ -264,7 +265,8 @@ TEST_F(FileSystemImplTest, Open) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result = file->open(DefaultFlags);
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
@@ -276,7 +278,9 @@ TEST_F(FileSystemImplTest, OpenReadOnly) {
   static constexpr FlagSet ReadOnlyFlags{1 << Filesystem::File::Operation::Read |
                                          1 << Filesystem::File::Operation::Create |
                                          1 << Filesystem::File::Operation::Append};
-  FilePtr file = file_system_.createFile(new_file_path);
+
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result = file->open(ReadOnlyFlags);
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
@@ -286,7 +290,8 @@ TEST_F(FileSystemImplTest, OpenTwice) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   EXPECT_EQ(getFd(file.get()), INVALID_HANDLE);
 
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
@@ -302,7 +307,8 @@ TEST_F(FileSystemImplTest, OpenTwice) {
 }
 
 TEST_F(FileSystemImplTest, OpenBadFilePath) {
-  FilePtr file = file_system_.createFile("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, ""};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result = file->open(DefaultFlags);
   EXPECT_FALSE(result.rc_);
 }
@@ -312,7 +318,8 @@ TEST_F(FileSystemImplTest, ExistingFile) {
       TestEnvironment::writeStringToFileForTest("test_envoy", "existing file");
 
   {
-    FilePtr file = file_system_.createFile(file_path);
+    FilePathAndType new_file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(new_file_info);
     const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
@@ -329,7 +336,8 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
   ::unlink(new_file_path.c_str());
 
   {
-    FilePtr file = file_system_.createFile(new_file_path);
+    FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+    FilePtr file = file_system_.createFile(new_file_info);
     const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
@@ -382,7 +390,8 @@ TEST_F(FileSystemImplTest, Close) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
   EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
@@ -396,7 +405,8 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
   ::unlink(new_file_path.c_str());
 
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult bool_result1 = file->open(DefaultFlags);
   EXPECT_TRUE(bool_result1.rc_);
   const Api::IoCallBoolResult bool_result2 = file->close();
@@ -411,7 +421,8 @@ TEST_F(FileSystemImplTest, NonExistingFileAndReadOnly) {
   ::unlink(new_file_path.c_str());
 
   static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
-  FilePtr file = file_system_.createFile(new_file_path);
+  FilePathAndType new_file_info{Filesystem::DestinationType::File, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
   const Api::IoCallBoolResult open_result = file->open(flag);
   EXPECT_FALSE(open_result.rc_);
 }
@@ -422,7 +433,8 @@ TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
 
   {
     static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
-    FilePtr file = file_system_.createFile(file_path);
+    FilePathAndType new_file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(new_file_info);
     const Api::IoCallBoolResult open_result = file->open(flag);
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");

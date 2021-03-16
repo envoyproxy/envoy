@@ -64,7 +64,7 @@ Stdout
 * Writes to the standard output of the process. It works in all platforms.
 
 
-Stderr
+Stderror
 ******
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing

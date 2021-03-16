@@ -87,10 +87,6 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-FilePtr InstanceImplPosix::createFile(const std::string& path) {
-  return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::File, path});
-}
-
 bool InstanceImplPosix::fileExists(const std::string& path) {
   std::ifstream input_file(path);
   return input_file.is_open();

@@ -48,7 +48,9 @@ void quicRecordTestOutputToFile(const std::string& filename, absl::string_view d
       1 << Envoy::Filesystem::File::Operation::Create};
 
   const std::string output_path = output_dir + filename;
-  Envoy::Filesystem::FilePtr file = file_system.createFile(output_path);
+  Envoy::Filesystem::FilePathAndType new_file_info{Envoy::Filesystem::DestinationType::File,
+                                                   output_path};
+  Envoy::Filesystem::FilePtr file = file_system.createFile(new_file_info);
   if (!file->open(DefaultFlags).rc_) {
     QUIC_LOG(ERROR) << "Failed to open test output file: " << output_path;
     return;

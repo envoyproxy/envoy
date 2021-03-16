@@ -99,10 +99,6 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-FilePtr InstanceImplWin32::createFile(const std::string& path) {
-  return std::make_unique<FileImplWin32>(FilePathAndType{DestinationType::File, path});
-}
-
 bool InstanceImplWin32::fileExists(const std::string& path) {
   const DWORD attributes = ::GetFileAttributes(path.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES;

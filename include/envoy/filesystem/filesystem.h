@@ -103,12 +103,6 @@ public:
   virtual ~Instance() = default;
 
   /**
-   *  @param path The path of the File
-   *  @return a FilePtr. The file is not opened.
-   */
-  virtual FilePtr createFile(const std::string& path) PURE;
-
-  /**
    *  @param file_info The path and the type of the File
    *  @return a FilePtr. The file is not opened.
    */

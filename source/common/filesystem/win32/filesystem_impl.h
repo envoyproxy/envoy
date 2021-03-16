@@ -77,7 +77,6 @@ class InstanceImplWin32 : public Instance {
 public:
   // Filesystem::Instance
   FilePtr createFile(const FilePathAndType& file_info) override;
-  FilePtr createFile(const std::string& path) override;
   bool fileExists(const std::string& path) override;
   bool directoryExists(const std::string& path) override;
   ssize_t fileSize(const std::string& path) override;

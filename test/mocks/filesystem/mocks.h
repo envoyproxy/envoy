@@ -48,7 +48,6 @@ public:
   ~MockInstance() override;
 
   // Filesystem::Instance
-  MOCK_METHOD(FilePtr, createFile, (const std::string&));
   MOCK_METHOD(FilePtr, createFile, (const FilePathAndType&));
   MOCK_METHOD(bool, fileExists, (const std::string&));
   MOCK_METHOD(bool, directoryExists, (const std::string&));

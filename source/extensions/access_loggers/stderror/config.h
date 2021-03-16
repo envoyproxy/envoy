@@ -8,9 +8,9 @@ namespace AccessLoggers {
 namespace File {
 
 /**
- * Config registration for the file access log. @see AccessLogInstanceFactory.
+ * Config registration for the standard error access log. @see AccessLogInstanceFactory.
  */
-class StderrAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class StderrorAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
