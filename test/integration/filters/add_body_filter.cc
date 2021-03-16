@@ -35,8 +35,9 @@ public:
     // Ensure that decodeData is only called for HTTP/3 (where protocol is set at the
     // connection level). In HTTP/3 the FIN arrives separately so we will get
     // decodeData() with an empty body.
-    if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() && data.length() == 0u) {
-    data.add("body");
+    if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() &&
+        data.length() == 0u) {
+      data.add("body");
     }
     return Http::FilterDataStatus::Continue;
   }
