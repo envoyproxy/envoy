@@ -3,7 +3,6 @@
 # Reformat API protos to canonical proto style using protoxform.
 
 set -e
-set -x
 
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
