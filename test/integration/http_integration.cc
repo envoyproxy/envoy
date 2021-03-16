@@ -321,6 +321,7 @@ void HttpIntegrationTest::initialize() {
                                 *tls_context->mutable_common_tls_context());
     for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
       if (listener.udp_listener_config().udp_listener_name() == "quiche_quic_listener") {
+            //  if (listener.udp_listener_config().listener_config().typed_config().type_url() == "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
         auto* filter_chain = listener.mutable_filter_chains(0);
         auto* transport_socket = filter_chain->mutable_transport_socket();
         transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);

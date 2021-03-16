@@ -193,10 +193,6 @@ typed_config:
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // QUICHE can't guarantee headers and FIN to be delivered together, so
-  // headers-only request can't be detected at L7 filters.
-  EXCLUDE_DOWNSTREAM_HTTP3;
-
   // filters are prepended, so add them in reverse order
   config_helper_.addFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
@@ -1114,6 +1110,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     stat_name = "http2.dropped_headers_with_underscores";
     break;
   case Http::CodecClient::Type::HTTP3:
+    // TODO(danzh) add stats for H3.
     break;
   default:
     RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
@@ -1362,6 +1359,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
+  // TODO(danzh) Add content length validation.
   EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
 
@@ -1428,6 +1426,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+  // TODO(danzh) Add content length validation.
   EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1462,7 +1461,6 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
       });
 
   initialize();
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1512,7 +1510,6 @@ name: local-reply-during-encode
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
-  EXCLUDE_DOWNSTREAM_HTTP3
   // Send one 95 kB URL with limit 60 kB headers.
   testLargeRequestUrl(95, 60);
 }
@@ -1525,7 +1522,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
-  EXCLUDE_DOWNSTREAM_HTTP3
   // Send one 95 kB header with limit 60 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 60, 100);
 }
@@ -1731,8 +1727,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAll) {
-  // Enable after setting QUICHE stream initial flow control window from http2
-  // options.
+  // Enable after setting QUICHE stream initial flow control window from http3 options.
   EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: call-decodedata-once-filter
@@ -1785,6 +1780,7 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
+  // TODO(danzh) Re-enable after codec buffer can be set according to http3 options.
   EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
@@ -1844,8 +1840,7 @@ name: passthrough-filter
 
 // Test two filters that return StopAllIterationAndBuffer back-to-back.
 TEST_P(DownstreamProtocolIntegrationTest, TestTwoFiltersDecodeHeadersReturnsStopAll) {
-  // TODO(danzh) Re-enable after codec buffer can be set according to http2
-  // options.
+  // TODO(danzh) Re-enable after codec buffer can be set according to http3 options.
   EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
@@ -2172,7 +2167,6 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
-  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
