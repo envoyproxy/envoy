@@ -35,8 +35,8 @@ StderrAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(),
                                                                           context.api());
   } else if (fal_config.access_log_format_case() ==
-             envoy::extensions::access_loggers::stderror::v3::StdErrorAccessLog::AccessLogFormatCase::
-                 ACCESS_LOG_FORMAT_NOT_SET) {
+             envoy::extensions::access_loggers::stderror::v3::StdErrorAccessLog::
+                 AccessLogFormatCase::ACCESS_LOG_FORMAT_NOT_SET) {
     formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
   }
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::Stderr, ""};
