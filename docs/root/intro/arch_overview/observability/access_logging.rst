@@ -65,7 +65,7 @@ Stdout
 
 
 Stderror
-******
+********
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
   threads.
