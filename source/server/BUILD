@@ -61,6 +61,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
+        ":active_udp_listener",
         ":connection_handler_impl",
     ],
 )
@@ -92,6 +93,26 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_udp_listener",
+    srcs = ["active_udp_listener.cc"],
+    hdrs = [
+        "active_udp_listener.h",
+    ],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:exception_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/server:active_udp_listener_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//source/extensions/transport_sockets:well_known_names",
+        "//source/server:connection_handler_impl",
     ],
 )
 
@@ -291,7 +312,6 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -320,7 +340,6 @@ envoy_cc_library(
         ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
-        ":well_known_names_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:udp_packet_writer_config_interface",
@@ -353,8 +372,6 @@ envoy_cc_library(
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
@@ -525,21 +542,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "well_known_names_lib",
-    hdrs = ["well_known_names.h"],
-    deps = ["//source/common/singleton:const_singleton"],
-)
-
-envoy_cc_library(
     name = "active_raw_udp_listener_config",
     srcs = ["active_raw_udp_listener_config.cc"],
     hdrs = ["active_raw_udp_listener_config.h"],
     deps = [
         ":connection_handler_lib",
-        ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -548,6 +558,6 @@ envoy_cc_library(
     hdrs = ["filter_chain_factory_context_callback.h"],
     deps = [
         "//include/envoy/server:filter_config_interface",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

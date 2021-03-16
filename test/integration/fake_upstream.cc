@@ -330,11 +330,7 @@ FakeHttpConnection::FakeHttpConnection(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else if (type == Type::HTTP2) {
-    envoy::config::core::v3::Http2ProtocolOptions http2_options =
-        ::Envoy::Http2::Utility::initializeAndValidateOptions(
-            envoy::config::core::v3::Http2ProtocolOptions());
-    http2_options.set_allow_connect(true);
-    http2_options.set_allow_metadata(true);
+    envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
@@ -470,7 +466,8 @@ makeUdpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 static Network::SocketPtr
 makeListenSocket(const FakeUpstreamConfig& config,
                  const Network::Address::InstanceConstSharedPtr& address) {
-  return (config.udp_fake_upstream_ ? makeUdpListenSocket(address) : makeTcpListenSocket(address));
+  return (config.udp_fake_upstream_.has_value() ? makeUdpListenSocket(address)
+                                                : makeTcpListenSocket(address));
 }
 
 FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
@@ -480,14 +477,14 @@ FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& addre
   ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
             address->ip()->addressAsString(), address->ip()->port(),
             Network::Test::addressVersionAsString(address->ip()->version()),
-            config.udp_fake_upstream_);
+            config.udp_fake_upstream_.has_value());
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    makeTcpListenSocket(port, version), config) {
-  ASSERT(!config.udp_fake_upstream_);
+  ASSERT(!config.udp_fake_upstream_.has_value());
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
@@ -499,7 +496,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
   ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
             address->ip()->addressAsString(), address->ip()->port(),
             Network::Test::addressVersionAsString(address->ip()->version()),
-            config.udp_fake_upstream_);
+            config.udp_fake_upstream_.has_value());
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
@@ -507,14 +504,14 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version),
                    config) {
-  ASSERT(!config.udp_fake_upstream_);
+  ASSERT(!config.udp_fake_upstream_.has_value());
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
-    : http_type_(config.upstream_protocol_),
+    : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
@@ -523,6 +520,11 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == FakeHttpConnection::Type::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
+  if (config.udp_fake_upstream_.has_value() &&
+      config.udp_fake_upstream_->max_rx_datagram_size_.has_value()) {
+    listener_.udp_listener_config_.config_.mutable_max_downstream_rx_datagram_size()->set_value(
+        config.udp_fake_upstream_->max_rx_datagram_size_.value());
+  }
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
@@ -568,7 +570,7 @@ bool FakeUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { 
 
 void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                                 Network::UdpReadFilterCallbacks& callbacks) {
-  udp_listener.addReadFilter(std::make_unique<FakeUpstreamUdpFilter>(*this, callbacks));
+  udp_listener.addReadFilter(std::make_unique<FakeUdpFilter>(*this, callbacks));
 }
 
 void FakeUpstream::threadRoutine() {
