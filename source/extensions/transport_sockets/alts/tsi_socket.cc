@@ -183,10 +183,12 @@ Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
     ENVOY_CONN_LOG(debug, "TSI: unprotecting buffer size: {}", callbacks_->connection(),
                    raw_read_buffer_.length());
     tsi_result status = frame_protector_->unprotect(raw_read_buffer_, buffer);
+    if (status != TSI_OK) {
+      break;
+    }
     ENVOY_CONN_LOG(debug, "TSI: unprotected buffer left: {} result: {}", callbacks_->connection(),
                    raw_read_buffer_.length(), tsi_result_to_string(status));
     total_bytes_processed += buffer.length() - prev_size;
-
     if (result.action_ == Network::PostIoAction::Close) {
       break;
     }
