@@ -50,9 +50,7 @@ public:
   AccessLogImplTest() : file_(new MockAccessLogFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
-    ON_CALL(log_manager_,
-            createAccessLog(_))
-        .WillByDefault(Return(file_));
+    ON_CALL(log_manager_, createAccessLog(_)).WillByDefault(Return(file_));
     ON_CALL(*file_, write(_)).WillByDefault(SaveArg<0>(&output_));
   }
 
@@ -1100,8 +1098,7 @@ typed_config:
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
   ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
-  EXPECT_CALL(log_manager_,
-              createAccessLog(_))
+  EXPECT_CALL(log_manager_, createAccessLog(_))
       .WillOnce(Invoke(
           [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
             EXPECT_EQ(file_info.path_, "");
@@ -1121,8 +1118,7 @@ typed_config:
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
   ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
-  EXPECT_CALL(log_manager_,
-              createAccessLog(_))
+  EXPECT_CALL(log_manager_, createAccessLog(_))
       .WillOnce(Invoke(
           [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
             EXPECT_EQ(file_info.path_, "");

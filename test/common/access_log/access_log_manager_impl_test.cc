@@ -461,16 +461,14 @@ TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
 }
 
 TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
-  EXPECT_CALL(dispatcher_,
-  createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
 
   Sequence sq;
   EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log =
-  access_log_manager_.createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File,
-  "foo"});
+  AccessLogFileSharedPtr log = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"});
 
   NiceMock<Filesystem::MockFile>* file2 = new NiceMock<Filesystem::MockFile>;
   EXPECT_CALL(*file2, path()).WillRepeatedly(Return("bar"));
@@ -478,8 +476,7 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
               createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                   Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"})))
       .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))))
-      .WillRepeatedly(Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr
-      {
+      .WillRepeatedly(Invoke([](const Envoy::Filesystem::FilePathAndType&) -> Filesystem::FilePtr {
         NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
         EXPECT_CALL(*file, path()).WillRepeatedly(Return("bar"));
         return std::unique_ptr<NiceMock<Filesystem::MockFile>>(file);
@@ -489,16 +486,14 @@ TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
   EXPECT_CALL(*file2, open_(_))
       .InSequence(sq2)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  AccessLogFileSharedPtr log2 =
-  access_log_manager_.createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File,
-  "bar"});
+  AccessLogFileSharedPtr log2 = access_log_manager_.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"});
 
   // Make sure that getting the access log with the same name returns the same underlying file.
-  EXPECT_EQ(log,
-  access_log_manager_.createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File,
-  "foo"})); EXPECT_EQ(log2,
-  access_log_manager_.createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File,
-  "bar"}));
+  EXPECT_EQ(log, access_log_manager_.createAccessLog(
+                     Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
+  EXPECT_EQ(log2, access_log_manager_.createAccessLog(
+                      Filesystem::FilePathAndType{Filesystem::DestinationType::File, "bar"}));
 
   // Test that reopen reopens all of the files
   EXPECT_CALL(*file_, write_(_))
