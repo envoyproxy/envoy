@@ -1,0 +1,31 @@
+syntax = "proto3";
+package envoy.extensions.filters.http.ext_authz;
+
+import "envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto";
+import "test/fuzz/common.proto";
+import "envoy/config/core/v3/base.proto";
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+
+message Result {
+  oneof result_selector {
+    option (validate.required) = true;
+    // Authorization check status
+    google.protobuf.Empty error = 1;
+    google.protobuf.Empty denied = 2;
+    google.protobuf.Empty ok = 3;
+  }
+}
+
+// We only fuzz a single request per iteration.
+message ExtAuthzTestCase {
+  envoy.extensions.filters.http.ext_authz.v3.ExtAuthz config = 1
+      [(validate.rules).message = {required: true}];
+  // Request data.
+  test.fuzz.HttpData data = 2 [(validate.rules).message = {required: true}];
+  // Set default auth check result.
+  Result result = 3 [(validate.rules).message = {required: true}];
+  // Filter metadata.
+  envoy.config.core.v3.Metadata filter_metadata = 4;
+  // TODO: add response data and check against check result headers to add.
+}

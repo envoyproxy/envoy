@@ -56,6 +56,7 @@ public:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
+    ENVOY_LOG_MISC(info, "CONFIG \n {}", proto_config.DebugString());
     config_.reset(
         new FilterConfig(proto_config, stats_store_, runtime_, http_context_, "ext_authz_prefix"));
     client_ = new Filters::Common::ExtAuthz::MockClient();
@@ -1126,6 +1127,8 @@ TEST_F(HttpFilterTest, MetadataContext) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
                      const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+  ENVOY_LOG_MISC(info, "METADATA \n{}", metadata.DebugString());
+  ENVOY_LOG_MISC(info, "HEADERS \n{}", request_headers_);
 
   filter_->decodeHeaders(request_headers_, false);
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
