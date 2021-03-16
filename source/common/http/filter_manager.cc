@@ -189,6 +189,8 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
       ASSERT(end_stream_);
       bufferedData() = createBuffer();
     }
+    // If the stream is destroyed, no need to handle the data buffer or trailers.
+    // This can occur if the filter calls sendLocalReply.
 
     return false;
   }
