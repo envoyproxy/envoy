@@ -46,13 +46,6 @@ public:
 
   /**
    * Create a new access log file managed by the access log manager.
-   * @param file_name specifies the file to create/open.
-   * @return the opened file.
-   */
-  virtual AccessLogFileSharedPtr createAccessLog(const std::string& file_name) PURE;
-
-  /**
-   * Create a new access log file managed by the access log manager.
    * @param file_info specifies the file to create/open.
    * @return the opened file.
    */

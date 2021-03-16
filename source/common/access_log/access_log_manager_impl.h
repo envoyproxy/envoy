@@ -44,7 +44,6 @@ public:
 
   // AccessLog::AccessLogManager
   void reopen() override;
-  AccessLogFileSharedPtr createAccessLog(const std::string& file_name) override;
   AccessLogFileSharedPtr createAccessLog(const Filesystem::FilePathAndType& file_info) override;
 
 private:

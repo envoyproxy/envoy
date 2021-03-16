@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Matcher;
 using testing::Return;
 
 namespace Envoy {
@@ -17,9 +16,7 @@ MockFilter::MockFilter() = default;
 MockFilter::~MockFilter() = default;
 
 MockAccessLogManager::MockAccessLogManager() {
-  ON_CALL(*this, createAccessLog(Matcher<const std::string&>(_))).WillByDefault(Return(file_));
-  ON_CALL(*this, createAccessLog(Matcher<const Envoy::Filesystem::FilePathAndType&>(_)))
-      .WillByDefault(Return(file_));
+  ON_CALL(*this, createAccessLog(_)).WillByDefault(Return(file_));
 }
 
 MockAccessLogManager::~MockAccessLogManager() = default;
