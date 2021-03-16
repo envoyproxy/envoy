@@ -41,7 +41,9 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::ResponseFromCacheFilter, "RFCF"),
       std::make_pair(ResponseFlag::NoFilterConfigFound, "NFCF"),
       std::make_pair(ResponseFlag::DurationTimeout, "DT"),
-      std::make_pair(ResponseFlag::UpstreamProtocolError, "UPE")};
+      std::make_pair(ResponseFlag::UpstreamProtocolError, "UPE"),
+      std::make_pair(ResponseFlag::NoClusterFound, "NC"),
+  };
 
   for (const auto& test_case : expected) {
     NiceMock<MockStreamInfo> stream_info;
@@ -95,7 +97,9 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("RFCF", ResponseFlag::ResponseFromCacheFilter),
       std::make_pair("NFCF", ResponseFlag::NoFilterConfigFound),
       std::make_pair("DT", ResponseFlag::DurationTimeout),
-      std::make_pair("UPE", ResponseFlag::UpstreamProtocolError)};
+      std::make_pair("UPE", ResponseFlag::UpstreamProtocolError),
+      std::make_pair("NC", ResponseFlag::NoClusterFound),
+  };
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
 

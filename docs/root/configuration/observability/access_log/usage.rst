@@ -1,4 +1,4 @@
-.. _config_access_log:
+  .. _config_access_log:
 
 Access logging
 ==============
@@ -294,6 +294,7 @@ The following command operators are supported:
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
+    * **NC**: Upstream cluster not found.
   HTTP only
     * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.

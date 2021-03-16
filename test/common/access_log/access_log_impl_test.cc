@@ -987,6 +987,7 @@ filter:
       - NFCF
       - DT
       - UPE
+      - NC
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1019,7 +1020,9 @@ typed_config:
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
       StreamInfo::ResponseFlag::NoFilterConfigFound,
       StreamInfo::ResponseFlag::DurationTimeout,
-      StreamInfo::ResponseFlag::UpstreamProtocolError};
+      StreamInfo::ResponseFlag::UpstreamProtocolError,
+      StreamInfo::ResponseFlag::NoClusterFound,
+  };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
@@ -1051,7 +1054,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\" \"NC\"]]): "
+      "name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
@@ -1080,8 +1084,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\"]]): name: "
-      "\"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\" \"NC\"]]): "
+      "name: \"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "

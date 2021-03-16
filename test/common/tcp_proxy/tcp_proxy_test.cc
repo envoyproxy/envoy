@@ -126,6 +126,9 @@ public:
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
       filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
           filter_callbacks_.connection_.ssl());
+    }
+
+    if (connections > 0) {
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -451,9 +454,21 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
+TEST_F(TcpProxyTest, UpstreamClusterNotFound) {
+  setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
+
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_.value(), "NC");
+}
+
 TEST_F(TcpProxyTest, NoHost) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UH");
 }

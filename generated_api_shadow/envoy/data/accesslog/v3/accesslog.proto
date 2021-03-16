@@ -186,7 +186,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message ResponseFlags {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.ResponseFlags";
@@ -278,6 +278,9 @@ message ResponseFlags {
 
   // Indicates there was an HTTP protocol error in the upstream response.
   bool upstream_protocol_error = 24;
+
+  // Indicates no cluster was found for the request.
+  bool no_cluster_found = 25;
 }
 
 // Properties of a negotiated TLS connection.
