@@ -62,7 +62,7 @@ Checking the logs of the upstream server you should see the packets that you sen
    service-udp_1  | HELO
    service-udp_1  | OLEH
 
-Step 3: View the Envoy admin ``UDP`` stats
+Step 4: View the Envoy admin ``UDP`` stats
 ******************************************
 
 You can view the `UDP``-related admin stats provided by the Envoy admin endpoint.
