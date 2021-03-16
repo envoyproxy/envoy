@@ -336,6 +336,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
 
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
+  EXCLUDE_UPSTREAM_HTTP3; // tsan flake!
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
@@ -368,6 +369,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
+  EXCLUDE_UPSTREAM_HTTP3; // tsan flake!
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
