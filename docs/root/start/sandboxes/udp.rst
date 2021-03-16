@@ -67,7 +67,7 @@ Checking the logs of the upstream server you should see the packets that you sen
 Step 4: View the Envoy admin ``UDP`` stats
 ******************************************
 
-You can view the ``UDP``-related admin stats provided by the Envoy admin endpoint.
+You can view the ``UDP``-related stats provided by the Envoy admin endpoint.
 
 For example, to view the non-zero stats:
 
