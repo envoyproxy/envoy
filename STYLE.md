@@ -280,6 +280,10 @@ To be added.
 
 All python code is linted using flake8
 
+## automated fix suggestions
+
+...to be figured out...
+
 ## additional style guidelines
 
 For additional guidance on Python style please refer to the
