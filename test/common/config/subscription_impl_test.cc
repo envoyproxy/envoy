@@ -40,9 +40,7 @@ void PrintTo(const SubscriptionType sub, std::ostream* os) {
 
 class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
 public:
- static void SetUpTestSuite() {
-   Filesystem::fileSystemForTest().setUseMemfiles(false);
- }
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
 
   SubscriptionImplTest() : SubscriptionImplTest(std::chrono::milliseconds(0)) {}
   SubscriptionImplTest(std::chrono::milliseconds init_fetch_timeout) {

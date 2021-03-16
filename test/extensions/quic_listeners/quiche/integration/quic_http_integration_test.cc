@@ -120,9 +120,7 @@ public:
         file_updater_1_(injected_resource_filename_1_),
         file_updater_2_(injected_resource_filename_2_) {}
 
- static void SetUpTestSuite() {
-         Filesystem::fileSystemForTest().setUseMemfiles(false);
-                }
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();

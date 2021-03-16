@@ -46,9 +46,7 @@ const envoy::service::secret::v3::SdsDummy _sds_dummy;
 class SdsDynamicIntegrationBaseTest : public Grpc::GrpcClientIntegrationParamTest,
                                       public HttpIntegrationTest {
 public:
- static void SetUpTestSuite() {
-   Filesystem::fileSystemForTest().setUseMemfiles(false);
- }
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
         server_cert_("server_cert"), validation_secret_("validation_secret"),

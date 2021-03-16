@@ -21,12 +21,10 @@ namespace {
 class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
- static void SetUpTestSuite() { 
-   Filesystem::fileSystemForTest().setUseMemfiles(false);
- }
- EdsIntegrationTest()
-     : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
-     codec_client_type_(envoy::type::v3::HTTP1) {}
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
+  EdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+        codec_client_type_(envoy::type::v3::HTTP1) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.

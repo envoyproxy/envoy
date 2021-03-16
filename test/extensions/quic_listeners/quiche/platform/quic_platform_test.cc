@@ -80,10 +80,7 @@ protected:
     GetLogger().set_level(ERROR);
   }
 
- static void SetUpTestSuite() {
-   Envoy::Filesystem::fileSystemForTest().setUseMemfiles(false);
-                }
-
+  static void SetUpTestSuite() { Envoy::Filesystem::fileSystemForTest().setUseMemfiles(false); }
 
   ~QuicPlatformTest() override {
     SetVerbosityLogThreshold(verbosity_log_threshold_);

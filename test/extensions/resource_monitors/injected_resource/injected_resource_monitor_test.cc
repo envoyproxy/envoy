@@ -48,9 +48,7 @@ public:
 
 class InjectedResourceMonitorTest : public testing::Test {
 protected:
-  static void SetUpTestSuite() {
-       Filesystem::fileSystemForTest().setUseMemfiles(false);
-        }
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
 
   InjectedResourceMonitorTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),

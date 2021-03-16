@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/filesystem/filesystem.h"
+
 #include "common/filesystem/file_shared_impl.h"
+
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -15,8 +17,8 @@ struct MemFileInfo {
 
 class MemfileImpl : public FileSharedImpl {
 public:
-  MemfileImpl(const std::string& path, std::shared_ptr<MemFileInfo>& info) : FileSharedImpl(path), info_(info) {
-  }
+  MemfileImpl(const std::string& path, std::shared_ptr<MemFileInfo>& info)
+      : FileSharedImpl(path), info_(info) {}
 
 protected:
   Api::IoCallBoolResult open(FlagSet flag) override {
@@ -52,23 +54,22 @@ public:
   MemfileInstanceImpl();
 
   FilePtr createFile(const std::string& path) override {
-    //absl::MutexLock m(&lock_);
-    //if (file_system_->fileExists(path) || !use_memfiles_) {
+    absl::MutexLock m(&lock_);
+    if (file_system_->fileExists(path) || !use_memfiles_) {
       return file_system_->createFile(path);
-    /*}
+    }
     auto it = files_.find(path);
     if (it == files_.end()) {
       it = files_.emplace(path, std::make_shared<MemFileInfo>()).first;
     }
     std::shared_ptr<MemFileInfo> info = it->second;
-    return FilePtr{new MemfileImpl(path, info)};*/
+    return FilePtr{new MemfileImpl(path, info)};
   }
 
   bool fileExists(const std::string& path) override {
-    return file_system_->fileExists(path);
-/*    absl::MutexLock m(&lock_);
+    absl::MutexLock m(&lock_);
     auto it = files_.find(path);
-    return (it != files_.end() || file_system_->fileExists(path));*/
+    return (it != files_.end() || file_system_->fileExists(path));
   }
 
   bool directoryExists(const std::string& path) override {
@@ -76,7 +77,7 @@ public:
   }
 
   ssize_t fileSize(const std::string& path) override {
-/*    {
+    {
       absl::MutexLock m(&lock_);
       auto it = files_.find(path);
       if (it != files_.end()) {
@@ -84,12 +85,12 @@ public:
         absl::MutexLock n(&it->second->lock_);
         return it->second->data_.size();
       }
-    }*/
+    }
     return file_system_->fileSize(path);
   }
 
   std::string fileReadToEnd(const std::string& path) override {
-/*    {
+    {
       absl::MutexLock m(&lock_);
       auto it = files_.find(path);
       if (it != files_.end()) {
@@ -97,7 +98,7 @@ public:
         ASSERT(use_memfiles_);
         return it->second->data_;
       }
-    }*/
+    }
     return file_system_->fileReadToEnd(path);
   }
 
@@ -105,13 +106,11 @@ public:
     return file_system_->splitPathFromFilename(path);
   }
 
-  bool illegalPath(const std::string& path) override {
-    return file_system_->illegalPath(path);
-  }
+  bool illegalPath(const std::string& path) override { return file_system_->illegalPath(path); }
 
   void renameFile(const std::string& old_name, const std::string& new_name);
   void setUseMemfiles(bool value) {
-      absl::MutexLock m(&lock_);
+    absl::MutexLock m(&lock_);
     use_memfiles_ = value;
   }
 

@@ -19,12 +19,9 @@ namespace {
 
 class FilesystemSubscriptionImplTest : public testing::Test,
                                        public FilesystemSubscriptionTestHarness {
-                                        public:
- static void SetUpTestSuite() {
-      Filesystem::fileSystemForTest().setUseMemfiles(false);
-       }
-
-                                       };
+public:
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
+};
 
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {

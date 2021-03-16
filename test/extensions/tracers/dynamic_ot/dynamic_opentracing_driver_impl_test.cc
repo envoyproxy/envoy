@@ -25,9 +25,7 @@ public:
     driver_ = std::make_unique<DynamicOpenTracingDriver>(stats_, library, tracer_config);
   }
 
- static void SetUpTestSuite() {
-         Filesystem::fileSystemForTest().setUseMemfiles(false);
-                }
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
 
   void setupValidDriver() { setup(library_path_, tracer_config_); }
 

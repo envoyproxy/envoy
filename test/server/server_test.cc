@@ -102,6 +102,8 @@ TEST(ServerInstanceUtil, flushHelper) {
 
 class RunHelperTest : public testing::Test {
 public:
+  static void SetUpTestSuite() { Filesystem::fileSystemForTest().setUseMemfiles(false); }
+
   RunHelperTest() {
     InSequence s;
 
