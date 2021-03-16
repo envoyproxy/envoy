@@ -424,7 +424,7 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    std::string contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
       return contents.substr(index);

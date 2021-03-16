@@ -21,7 +21,6 @@
 #include "common/common/fmt.h"
 #include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
-#include "common/http/http3/quic_client_connection_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -229,8 +228,8 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       Network::Test::getCanonicalLoopbackAddress(version_);
   return Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
              Http::QuicCodecNames::get().Quiche)
-      .createQuicNetworkConnection(server_addr, local_addr, *quic_transport_socket_factory_,
-                                   stats_store_, *dispatcher_, timeSystem());
+      .createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_, server_addr,
+                                   local_addr);
 }
 
 IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port) {
@@ -313,6 +312,7 @@ void HttpIntegrationTest::initialize() {
 
   quic_transport_socket_factory_ =
       IntegrationUtil::createQuicClientTransportSocketFactory(mock_factory_ctx, san_to_match_);
+
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
         quic_transport_socket_config;
@@ -340,6 +340,14 @@ void HttpIntegrationTest::initialize() {
       });
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"});
+
+  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
+      "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
+  quic_connection_persistent_info_ =
+      Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+          Http::QuicCodecNames::get().Quiche)
+          .createNetworkConnectionInfo(*dispatcher_, *quic_transport_socket_factory_, stats_store_,
+                                       timeSystem(), server_addr);
 }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {

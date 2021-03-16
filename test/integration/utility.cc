@@ -150,20 +150,23 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
   Network::TransportSocketFactoryPtr transport_socket_factory =
       createQuicClientTransportSocketFactory(mock_factory_ctx, "spiffe://lyft.com/backend-team");
-  Network::ClientConnectionPtr connection =
-      (type == Http::CodecClient::Type::HTTP3
-           ? Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-                 Http::QuicCodecNames::get().Quiche)
-                 .createQuicNetworkConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                              *transport_socket_factory, mock_stats_store,
-                                              *dispatcher, time_system)
-           : dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr));
+  std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
+  Network::ClientConnectionPtr connection;
   if (type == Http::CodecClient::Type::HTTP3) {
+    Http::QuicClientConnectionFactory& connection_factory =
+        Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche);
+    persistent_info = connection_factory.createNetworkConnectionInfo(
+        *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
+    connection = connection_factory.createQuicNetworkConnection(
+        *persistent_info, *dispatcher, addr, Network::Address::InstanceConstSharedPtr());
     connection->addConnectionCallbacks(connection_callbacks);
+  } else {
+    connection =
+        dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
+                                           Network::Test::createRawBufferSocket(), nullptr);
   }
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
-
   if (type == Http::CodecClient::Type::HTTP3) {
     // Quic connection needs to finish handshake.
     dispatcher->run(Event::Dispatcher::RunType::Block);

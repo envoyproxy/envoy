@@ -5,6 +5,7 @@
 #include <string>
 
 #include "common/http/codec_client.h"
+#include "common/http/http3/quic_client_connection_factory.h"
 #include "common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
@@ -269,6 +270,7 @@ protected:
 
   bool set_reuse_port_{false};
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
+  std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
   Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
 };
 

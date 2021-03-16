@@ -19,7 +19,8 @@ class ContinueHeadersOnlyInjectBodyFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "continue-headers-only-inject-body-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override {
     headers.setContentLength(body_.length());
     decoder_callbacks_->dispatcher().post([this]() -> void {
       request_injected_ = true;
@@ -30,9 +31,9 @@ public:
       }
     });
     if (end_stream) {
-    return Http::FilterHeadersStatus::ContinueAndDontEndStream;
+      return Http::FilterHeadersStatus::ContinueAndDontEndStream;
     } else {
-      return  Http::FilterHeadersStatus::Continue;
+      return Http::FilterHeadersStatus::Continue;
     }
   }
 
@@ -74,10 +75,9 @@ private:
   constexpr static absl::string_view body_ = "body";
   // For HTTP/3, the headers and fin will arrive separately.
   // Make sure that the body is added, and then continue encoding/decoding occurs once.
-  // If encodeData/decodeData hits before the post, encodeData/decodeData will stop iteration to ensure
-  // the fin is not passed on, and when the post happens it will resume
-  // encoding.
-  // If the post happens first, encodeData/decodeData can simply continue.
+  // If encodeData/decodeData hits before the post, encodeData/decodeData will stop iteration to
+  // ensure the fin is not passed on, and when the post happens it will resume encoding. If the post
+  // happens first, encodeData/decodeData can simply continue.
   bool request_injected_{};
   bool request_decoded_{};
   bool response_injected_{};
