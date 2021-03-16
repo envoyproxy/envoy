@@ -485,7 +485,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "http_pattern_matcher-{version}",
         urls = ["https://github.com/google/http_pattern_matcher/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-03-15",
+        release_date = "2021-03-16",
         cpe = "N/A",
     ),
     com_github_nodejs_http_parser = dict(
