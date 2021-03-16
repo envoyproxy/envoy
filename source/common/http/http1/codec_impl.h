@@ -241,12 +241,12 @@ protected:
                  MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter);
 
-  int setAndCheckCallbackStatus(Http::Status&& status) override;
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
-
   bool resetStreamCalled() { return reset_stream_called_; }
 
+  // ParserCallbacks.
+  // This must be protected because it is called through ServerConnectionImpl::sendProtocolError.
   Status onMessageBegin() override;
+  // Connection specific callback method.
   virtual Status onMessageBeginBase() PURE;
 
   /**
@@ -336,19 +336,24 @@ private:
    */
   Envoy::StatusOr<size_t> dispatchSlice(const char* slice, size_t len);
 
+  // ParserCallbacks.
+  Status onHeaderField(const char* data, size_t length) override;
+  Status onHeaderValue(const char* data, size_t length) override;
+  Envoy::StatusOr<ParserStatus> onHeadersComplete() override;
   void bufferBody(const char* data, size_t length) override;
+  StatusOr<ParserStatus> onMessageComplete() override;
+  int setAndCheckCallbackStatus(Http::Status&& status) override;
+  int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) override;
+
+  // Connection specific callback methods.
+  virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
+  virtual ParserStatus onMessageCompleteBase() PURE;
+  void onChunkHeader(bool is_final_chunk) override;
 
   /**
    * Push the accumulated body through the filter pipeline.
    */
   void dispatchBufferedBody();
-
-  Status onHeaderField(const char* data, size_t length) override;
-
-  Status onHeaderValue(const char* data, size_t length) override;
-
-  Envoy::StatusOr<ParserStatus> onHeadersComplete() override;
-  virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
 
   /**
    * Called to see if upgrade transition is allowed.
@@ -366,14 +371,6 @@ private:
    * @param data supplies the body data
    */
   virtual void onBody(Buffer::Instance& data) PURE;
-
-  StatusOr<ParserStatus> onMessageComplete() override;
-  virtual ParserStatus onMessageCompleteBase() PURE;
-
-  /**
-   * Called when accepting a chunk header.
-   */
-  void onChunkHeader(bool is_final_chunk) override;
 
   /**
    * @see onResetStreamBase().
@@ -464,12 +461,13 @@ private:
    * @return Status representing success or failure. This will fail if there is an invalid url in
    * the request line.
    */
-  Status handlePath(RequestHeaderMap& headers, unsigned int method);
+  Status handlePath(RequestHeaderMap& headers, absl::string_view method);
 
+  // ParserCallbacks.
+  Status onUrl(const char* data, size_t length) override;
   // ConnectionImpl
   void onEncodeComplete() override;
   Status onMessageBeginBase() override;
-  Status onUrl(const char* data, size_t length) override;
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
@@ -548,11 +546,12 @@ private:
 
   bool cannotHaveBody();
 
+  // ParserCallbacks.
+  Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   Status onMessageBeginBase() override { return okStatus(); }
-  Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;

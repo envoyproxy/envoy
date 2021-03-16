@@ -128,6 +128,7 @@ public:
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.
+  // TODO(asraa): Return Envoy::Http::Code.
   virtual uint16_t statusCode() const PURE;
 
   // Returns an integer representing the HTTP major version.
@@ -136,44 +137,23 @@ public:
   // Returns an integer representing the HTTP minor version.
   virtual int httpMinor() const PURE;
 
-  // Returns the number of bytes in the body. -1 if no Content-Length header
-  virtual uint64_t contentLength() const PURE;
+  // Returns the number of bytes in the body. absl::nullopt if no Content-Length header
+  virtual absl::optional<uint64_t> contentLength() const PURE;
 
-  // Returns parser flags (e.g. chunked).
-  virtual int flags() const PURE;
-
-  // Returns an integer representing the method. For requests only.
-  virtual uint16_t method() const PURE;
+  // Returns whether parser flags have chunked set.
+  virtual bool isChunked() const PURE;
 
   // Returns a textual representation of the method. For requests only.
-  virtual const char* methodName() const PURE;
-
-  // Returns a textual representation of the latest return error.
-  virtual const char* errnoName() PURE;
+  virtual absl::string_view methodName() const PURE;
 
   // Returns a textual representation of the given return code.
-  virtual const char* errnoName(int rc) const PURE;
+  virtual absl::string_view errnoName(int rc) const PURE;
 
   // Returns whether the Transfer-Encoding header is present.
-  virtual int usesTransferEncoding() const PURE;
-
-  // Returns whether the Content-Length header is present.
-  virtual bool seenContentLength() const PURE;
-
-  // Tells the parser that the Content-Length header is present.
-  virtual void setSeenContentLength(bool val) PURE;
+  virtual int hasTransferEncoding() const PURE;
 
   // Converts a ParserStatus code to the parsers' integer return code value.
   virtual int statusToInt(const ParserStatus code) const PURE;
-
-  // The value of the chunked flag.
-  virtual int flagsChunked() const PURE;
-};
-
-enum class Method {
-  Head = 2,
-  Connect = 5,
-  Options = 6,
 };
 
 using ParserPtr = std::unique_ptr<Parser>;

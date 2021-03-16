@@ -10,6 +10,8 @@ namespace Http {
 namespace Http1 {
 namespace {
 ParserStatus intToStatus(int rc) {
+  // See
+  // https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
   switch (rc) {
   case -1:
     return ParserStatus::Error;
@@ -105,24 +107,24 @@ public:
 
   int httpMinor() const { return parser_.http_minor; }
 
-  uint64_t contentLength() const { return parser_.content_length; }
-
-  int flags() const { return parser_.flags; }
-
-  uint16_t method() const { return parser_.method; }
-
-  const char* methodName() const {
-    return http_method_str(static_cast<http_method>(parser_.method));
-  }
-
-  int usesTransferEncoding() const { return parser_.uses_transfer_encoding; }
-
-  bool seenContentLength() const {
+  absl::optional<uint64_t> contentLength() const {
     // An unset content length will be have all bits set.
     // See
     // https://github.com/nodejs/http-parser/blob/ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d/http_parser.h#L311
-    return (parser_.content_length & (parser_.content_length & 1)) == 0;
+    if ((parser_.content_length & (parser_.content_length + 1)) == 0 &&
+        parser_.content_length != 0) {
+      return absl::nullopt;
+    }
+    return parser_.content_length;
   }
+
+  bool isChunked() const { return parser_.flags & F_CHUNKED; }
+
+  absl::string_view methodName() const {
+    return http_method_str(static_cast<http_method>(parser_.method));
+  }
+
+  int hasTransferEncoding() const { return parser_.uses_transfer_encoding; }
 
 private:
   http_parser parser_;
@@ -165,25 +167,19 @@ int LegacyHttpParserImpl::httpMajor() const { return impl_->httpMajor(); }
 
 int LegacyHttpParserImpl::httpMinor() const { return impl_->httpMinor(); }
 
-uint64_t LegacyHttpParserImpl::contentLength() const { return impl_->contentLength(); }
-
-int LegacyHttpParserImpl::flags() const { return impl_->flags(); }
-
-uint16_t LegacyHttpParserImpl::method() const { return impl_->method(); }
-
-const char* LegacyHttpParserImpl::methodName() const { return impl_->methodName(); }
-
-const char* LegacyHttpParserImpl::errnoName() {
-  return http_errno_name(static_cast<http_errno>(impl_->getErrno()));
+absl::optional<uint64_t> LegacyHttpParserImpl::contentLength() const {
+  return impl_->contentLength();
 }
 
-const char* LegacyHttpParserImpl::errnoName(int rc) const {
+bool LegacyHttpParserImpl::isChunked() const { return impl_->isChunked(); }
+
+absl::string_view LegacyHttpParserImpl::methodName() const { return impl_->methodName(); }
+
+absl::string_view LegacyHttpParserImpl::errnoName(int rc) const {
   return http_errno_name(static_cast<http_errno>(rc));
 }
 
-int LegacyHttpParserImpl::usesTransferEncoding() const { return impl_->usesTransferEncoding(); }
-
-bool LegacyHttpParserImpl::seenContentLength() const { return impl_->seenContentLength(); }
+int LegacyHttpParserImpl::hasTransferEncoding() const { return impl_->hasTransferEncoding(); }
 
 int LegacyHttpParserImpl::statusToInt(const ParserStatus code) const {
   // See

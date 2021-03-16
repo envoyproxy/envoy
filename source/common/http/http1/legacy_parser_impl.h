@@ -21,17 +21,12 @@ public:
   uint16_t statusCode() const override;
   int httpMajor() const override;
   int httpMinor() const override;
-  uint64_t contentLength() const override;
-  int flags() const override;
-  uint16_t method() const override;
-  const char* methodName() const override;
-  const char* errnoName() override;
-  const char* errnoName(int rc) const override;
-  int usesTransferEncoding() const override;
-  bool seenContentLength() const override;
-  void setSeenContentLength(bool) override{};
+  absl::optional<uint64_t> contentLength() const override;
+  bool isChunked() const override;
+  absl::string_view methodName() const override;
+  absl::string_view errnoName(int rc) const override;
+  int hasTransferEncoding() const override;
   int statusToInt(const ParserStatus code) const override;
-  int flagsChunked() const override { return 1; }
 
 private:
   class Impl;
