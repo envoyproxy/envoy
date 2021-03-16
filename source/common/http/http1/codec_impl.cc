@@ -945,13 +945,14 @@ void ServerConnectionImpl::onEncodeComplete() {
 Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_view method) {
   HeaderString path(Headers::get().Path);
 
-  bool is_connect = (method == "CONNECT");
+  bool is_connect = (method == Headers::get().MethodValues.Connect);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
   auto& active_request = active_request_.value();
   if (!is_connect && !active_request.request_url_.getStringView().empty() &&
       (active_request.request_url_.getStringView()[0] == '/' ||
-       (method == "OPTIONS" && active_request.request_url_.getStringView()[0] == '*'))) {
+       (method == Headers::get().MethodValues.Options &&
+        active_request.request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request.request_url_));
     return okStatus();
   }
@@ -1050,7 +1051,6 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
     // with message complete. This allows upper layers to behave like HTTP/2 and prevents a proxy
     // scenario where the higher layers stream through and implicitly switch to chunked transfer
     // encoding because end stream with zero body length has not yet been indicated.
-    ENVOY_LOG_MISC(info, "HAS CONTENT LENGTH {}", parser_->contentLength().has_value());
     if (parser_->isChunked() ||
         (parser_->contentLength().has_value() && parser_->contentLength().value() > 0) ||
         handling_upgrade_) {
