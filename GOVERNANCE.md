@@ -169,7 +169,7 @@ take on API shepherd review load and participate in meetings. They should be act
 and responsive to GitHub issues and PRs on which they are tagged.
 
 The API shepherds are distinct to the [UDPA working
-group](https://github.com/cncf/udpa/blob/main/README.md), which aims to evolve xDS directionally
+group](https://github.com/cncf/xds/blob/main/README.md), which aims to evolve xDS directionally
 towards a universal dataplane API. API shepherds are responsible for the execution of the xDS
 day-to-day and guiding xDS implementation changes. Proposals from UDPA-WG will be aligned with the
 xDS API shepherds to ensure that xDS is heading towards the UDPA goal. xDS API shepherds operate
