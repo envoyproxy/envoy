@@ -83,6 +83,7 @@ envoy_cc_library(
         "//include/envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/config:remote_data_fetcher_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

@@ -73,7 +73,7 @@ uint32_t feedBytesIntoBuffers(absl::string_view& data, DeserializerType& length_
   const uint32_t data_consumed = std::min<uint32_t>(required, data.size());
   const uint32_t written = data_buffer.size() - required;
   if (data_consumed > 0) {
-    memcpy(data_buffer.data() + written, data.data(), data_consumed);
+    memcpy(data_buffer.data() + written, data.data(), data_consumed); // NOLINT(safe-memcpy)
     required -= data_consumed;
     data = {data.data() + data_consumed, data.size() - data_consumed};
   }
@@ -167,7 +167,7 @@ feedCompactBytesIntoBuffers(absl::string_view& data, VarUInt32Deserializer& leng
   const uint32_t data_consumed = std::min<uint32_t>(required, data.size());
   const uint32_t written = data_buffer.size() - required;
   if (data_consumed > 0) {
-    memcpy(data_buffer.data() + written, data.data(), data_consumed);
+    memcpy(data_buffer.data() + written, data.data(), data_consumed); // NOLINT(safe-memcpy)
     required -= data_consumed;
     data = {data.data() + data_consumed, data.size() - data_consumed};
   }

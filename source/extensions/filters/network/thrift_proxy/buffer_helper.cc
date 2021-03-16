@@ -1,6 +1,7 @@
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "common/common/byte_order.h"
+#include "common/common/safe_memcpy.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +22,7 @@ double BufferHelper::drainBEDouble(Buffer::Instance& buffer) {
   // 4. Implementation of last resort is to manually copy from i to d via unsigned char*.
   uint64_t i = buffer.drainBEInt<uint64_t>();
   double d;
-  std::memcpy(&d, &i, 8);
+  safeMemcpy(&d, &i);
   return d;
 }
 
@@ -121,7 +122,7 @@ void BufferHelper::writeBEDouble(Buffer::Instance& buffer, double value) {
 
   // See drainDouble for implementation details.
   uint64_t i;
-  std::memcpy(&i, &value, 8);
+  safeMemcpy(&i, &value);
   buffer.writeBEInt<uint64_t>(i);
 }
 

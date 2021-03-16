@@ -625,7 +625,7 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
 
 InlineString::InlineString(const char* str, size_t size) : size_(size) {
   RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
-  memcpy(data_, str, size);
+  memcpy(data_, str, size); // NOLINT(safe-memcpy)
 }
 
 void ExceptionUtil::throwEnvoyException(const std::string& message) {

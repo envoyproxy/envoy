@@ -90,6 +90,11 @@ envoy_cc_library(
     hdrs = ["enum_to_int.h"],
 )
 
+envoy_cc_library(
+    name = "safe_memcpy_lib",
+    hdrs = ["safe_memcpy.h"],
+)
+
 # fmt_lib is automatically a dependency of all envoy_cc_library definitions.
 envoy_basic_cc_library(
     name = "fmt_lib",
@@ -107,6 +112,10 @@ envoy_cc_library(
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
+    deps = [
+        ":macros",
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(
