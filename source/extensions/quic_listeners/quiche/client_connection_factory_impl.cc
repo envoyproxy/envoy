@@ -7,8 +7,6 @@ namespace Quic {
 
 const Envoy::Ssl::ClientContextConfig&
 getConfig(Network::TransportSocketFactory& transport_socket_factory) {
-  // TODO(#14829): reject config if anything but QuicClientTransportSocketConfigFactory configured.
-  // raw buffer socket is configured.
   auto* quic_socket_factory =
       dynamic_cast<QuicClientTransportSocketFactory*>(&transport_socket_factory);
   ASSERT(quic_socket_factory != nullptr);
