@@ -243,6 +243,8 @@ message ResponseFlagFilter {
         in: "RFCF"
         in: "NFCF"
         in: "DT"
+        in: "UPE"
+        in: "NC"
       }
     }
   }];

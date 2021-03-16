@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -18,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -68,4 +69,10 @@ message UdpProxyConfig {
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
   repeated HashPolicy hash_policies = 5 [(validate.rules).repeated = {max_items: 1}];
+
+  // The maximum size of received upstream UDP datagrams. Using a larger size will cause Envoy to allocate
+  // more memory per listener. Received datagrams above this size will be dropped. If not set
+  // defaults to 1500 bytes.
+  google.protobuf.UInt64Value max_upstream_rx_datagram_size = 6
+      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
 }
