@@ -1,12 +1,12 @@
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/stderr/v3/stderr.pb.h"
+#include "envoy/extensions/access_loggers/stderror/v3/stderror.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/common/file_access_log_impl.h"
-#include "extensions/access_loggers/stderr/config.h"
+#include "extensions/access_loggers/stderror/config.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -23,12 +23,12 @@ namespace AccessLoggers {
 namespace File {
 namespace {
 
-class StderrAccessLogTest : public testing::Test {
+class StderrorAccessLogTest : public testing::Test {
 public:
-  StderrAccessLogTest() = default;
+  StderrorAccessLogTest() = default;
 
   void runTest(const std::string& yaml, absl::string_view expected, bool is_json) {
-    envoy::extensions::access_loggers::stderr::v3::StdErrorAccessLog fal_config;
+    envoy::extensions::access_loggers::stderror::v3::StdErrorAccessLog fal_config;
     TestUtility::loadFromYaml(yaml, fal_config);
 
     envoy::config::accesslog::v3::AccessLog config;
@@ -64,14 +64,14 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
-TEST_F(StderrAccessLogTest, EmptyFormat) {
+TEST_F(StderrorAccessLogTest, EmptyFormat) {
   runTest(
       "{}",
       "[2018-12-18T01:50:34.000Z] \"GET /bar/foo -\" 200 - 0 0 - - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
       false);
 }
 
-TEST_F(StderrAccessLogTest, LogFormatText) {
+TEST_F(StderrorAccessLogTest, LogFormatText) {
   runTest(
       R"(
   log_format:
@@ -81,7 +81,7 @@ TEST_F(StderrAccessLogTest, LogFormatText) {
       "plain_text - /bar/foo - 200", false);
 }
 
-TEST_F(StderrAccessLogTest, LogFormatJson) {
+TEST_F(StderrorAccessLogTest, LogFormatJson) {
   runTest(
       R"(
   log_format:

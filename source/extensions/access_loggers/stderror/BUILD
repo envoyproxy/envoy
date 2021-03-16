@@ -24,6 +24,6 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/common:file_access_log_lib",
-        "@envoy_api//envoy/extensions/access_loggers/stderr/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/stderror/v3:pkg_cc_proto",
     ],
 )

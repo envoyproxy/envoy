@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.access_loggers.stderr.v4alpha;
+package envoy.extensions.access_loggers.stderror.v4alpha;
 
 import "envoy/config/core/v4alpha/substitution_format_string.proto";
 
@@ -10,19 +10,19 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stderr.v4alpha";
-option java_outer_classname = "StderrProto";
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stderror.v4alpha";
+option java_outer_classname = "StderrorProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Standard Error access log]
-// [#extension: envoy.access_loggers.stderr]
+// [#extension: envoy.access_loggers.stderror]
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v4alpha.AccessLog>`
 // that writes log entries directly to a standard error.
 message StdErrorAccessLog {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.access_loggers.stderr.v3.StdErrorAccessLog";
+      "envoy.extensions.access_loggers.stderror.v3.StdErrorAccessLog";
 
   oneof access_log_format {
     // Configuration to form access log data and format.
