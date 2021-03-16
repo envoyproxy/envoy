@@ -31,7 +31,6 @@ using TestCertificateValidationContextConfigPtr =
     std::unique_ptr<TestCertificateValidationContextConfig>;
 using SPIFFEValidatorPtr = std::unique_ptr<SPIFFEValidator>;
 using ASN1IA5StringPtr = CSmartPtr<ASN1_IA5STRING, ASN1_IA5STRING_free>;
-using GeneralNamePtr = CSmartPtr<GENERAL_NAME, GENERAL_NAME_free>;
 using GeneralNamesPtr = CSmartPtr<GENERAL_NAMES, GENERAL_NAMES_free>;
 using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
 using X509Ptr = CSmartPtr<X509, X509_free>;
@@ -337,12 +336,12 @@ typed_config:
 
 void addIA5StringGenNameExt(X509* cert, int type, const std::string name) {
   GeneralNamesPtr gens = sk_GENERAL_NAME_new_null();
-  GeneralNamePtr gen = GENERAL_NAME_new();
+  GENERAL_NAME* gen = GENERAL_NAME_new(); // ownership taken by "gens"
   ASN1IA5StringPtr ia5 = ASN1_IA5STRING_new();
   EXPECT_TRUE(ASN1_STRING_set(ia5.get(), name.data(), name.length()));
-  GENERAL_NAME_set0_value(gen.get(), type, ia5.release());
-  sk_GENERAL_NAME_push(gens.get(), gen.get());
-  EXPECT_TRUE(X509_add1_ext_i2d(cert, NID_subject_alt_name, gens.release(), 0, X509V3_ADD_DEFAULT));
+  GENERAL_NAME_set0_value(gen, type, ia5.release());
+  sk_GENERAL_NAME_push(gens.get(), gen);
+  EXPECT_TRUE(X509_add1_ext_i2d(cert, NID_subject_alt_name, gens.get(), 0, X509V3_ADD_DEFAULT));
 }
 
 TEST_F(TestSPIFFEValidator, TestMatchSubjectAltNameWithURISan) {
