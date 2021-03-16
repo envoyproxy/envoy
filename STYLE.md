@@ -159,7 +159,7 @@ A few general notes on our error handling philosophy:
   continue seems ridiculous because *"this should never happen"*, it's a very good indication that
   the appropriate behavior is to terminate the process and not handle the error. When in doubt,
   please discuss.
-  
+
 # Macro Usage
 
 * The following macros are available:
@@ -175,7 +175,7 @@ A few general notes on our error handling philosophy:
   detectability on probable conditions or invariants.
 
 * Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
-  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios. 
+  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios.
 * Do not `ASSERT` on conditions imposed by the external environment. Either add error handling
   (potentially with an `ENVOY_BUG` for detectability) or `RELEASE_ASSERT` if the condition indicates
   that the process is unrecoverable.
@@ -246,8 +246,46 @@ such as the current time. Instead, mocks such as
 [`MockRandomGenerator`](test/mocks/runtime/mocks.h) and
 [`Mock*TimeSource`](test/mocks/common.h) should be used.
 
+# Python coding style
+
+## pep8
+
+All python code should meet the pep8/pycodestyle standard.
+
+The exception to this is for positioning of boolean operators in multiline conjunctions (W503/W504)
+
+For example the following code is valid:
+
+```python
+
+some_aggregate_condition = (
+    a_condition
+    and (a_sub_condition
+         or another_sub_condition))
+
+```
+
+In this example the line split occurs before the `and` and `or` which are placed at the
+*beginning* of the following line.
+
+## pyflakes
+
+All python code is statically checked for correctness using pyflakes.
+
+## mypy (python typing)
+
+To be added.
+
+## linting
+
+All python code is linted using flake8
+
+## additional style guidelines
+
+For additional guidance on Python style please refer to the
+[Google Python style guide](https://google.github.io/styleguide/pyguide.html)
+
 # Google style guides for other languages
 
-* [Python](https://google.github.io/styleguide/pyguide.html)
 * [Bash](https://google.github.io/styleguide/shell.xml)
 * [Bazel](https://bazel.build/versions/master/docs/skylark/build-style.html)
