@@ -88,7 +88,8 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(response_decoder->headers(), HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
+    EXPECT_THAT(response_decoder->headers(),
+                HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),

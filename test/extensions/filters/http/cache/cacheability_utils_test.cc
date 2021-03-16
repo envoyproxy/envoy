@@ -136,7 +136,8 @@ TEST_F(IsCacheableResponseTest, ValidationData) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
   // No cache control headers, but there is an expires header
   response_headers_.remove(Http::CustomHeaders::get().CacheControl);
-  response_headers_.setReferenceKey(Http::CustomHeaders::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
+  response_headers_.setReferenceKey(Http::CustomHeaders::get().Expires,
+                                    "Sun, 06 Nov 1994 09:49:37 GMT");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
 }
 
