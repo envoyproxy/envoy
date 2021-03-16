@@ -44,7 +44,7 @@ The following UDP statistics are available for UDP listeners and are rooted at
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   downstream_rx_datagram_dropped, Counter, Number of datagrams dropped due to overflow or truncation
+   downstream_rx_datagram_dropped, Counter, Number of datagrams dropped due to kernel overflow or truncation
 
 .. _config_listener_stats_per_handler:
 

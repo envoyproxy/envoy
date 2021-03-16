@@ -97,7 +97,7 @@ The UDP proxy filter also emits custom upstream cluster stats prefixed with
   :widths: 1, 1, 2
 
   sess_rx_datagrams, Counter, Number of datagrams received
-  sess_rx_datagrams_dropped, Counter, Number of datagrams dropped due to overflow or truncation
+  sess_rx_datagrams_dropped, Counter, Number of datagrams dropped due to kernel overflow or truncation
   sess_rx_errors, Counter, Number of datagram receive errors
   sess_tx_datagrams, Counter, Number of datagrams transmitted
   sess_tx_errors, Counter, Number of datagrams transmitted
