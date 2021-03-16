@@ -34,9 +34,11 @@ ActiveQuicListener::ActiveQuicListener(
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : Server::ActiveUdpListenerBase(worker_index, concurrency, parent, *listen_socket,
-                                    dispatcher.createUdpListener(listen_socket, *this),
-                                    &listener_config),
+    : Server::ActiveUdpListenerBase(
+          worker_index, concurrency, parent, *listen_socket,
+          dispatcher.createUdpListener(listen_socket, *this,
+                                       configToUdpListenerParams(listener_config)),
+          &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing) {
   if (Runtime::LoaderSingleton::getExisting()) {
@@ -74,7 +76,7 @@ ActiveQuicListener::ActiveQuicListener(
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
-      listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+      listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
   udp_packet_writer_ = udp_packet_writer.get();
 

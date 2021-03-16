@@ -166,8 +166,8 @@ def format_comment_with_annotations(comment, type_name=''):
     formatted_extension = format_extension(extension)
   formatted_extension_category = ''
   if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
-    formatted_extension_category = format_extension_category(
-        comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION])
+    for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
+      formatted_extension_category += format_extension_category(category)
   comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
   return comment + formatted_extension + formatted_extension_category
 

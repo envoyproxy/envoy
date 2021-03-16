@@ -17,15 +17,50 @@ namespace Envoy {
 namespace Http {
 namespace Http3 {
 
+// Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
+class Http3ConnPoolImpl : public FixedHttpConnPoolImpl {
+public:
+  Http3ConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+                    Event::Dispatcher& dispatcher,
+                    const Network::ConnectionSocket::OptionsSharedPtr& options,
+                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                    Random::RandomGenerator& random_generator,
+                    Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
+                    CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
+                    TimeSource& time_source)
+      : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
+                              random_generator, state, client_fn, codec_fn, protocol) {
+    auto source_address = host_->cluster().sourceAddress();
+    if (!source_address.get()) {
+      auto host_address = host->address();
+      source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
+    }
+    Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
+    quic_info_ =
+        Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche)
+            .createNetworkConnectionInfo(dispatcher, transport_socket_factory,
+                                         host->cluster().statsScope(), time_source, source_address);
+  }
+
+  // Make sure all connections are torn down before quic_info_ is deleted.
+  ~Http3ConnPoolImpl() override { destructAllConnections(); }
+
+  // Store quic helpers which can be shared between connections and must live
+  // beyond the lifetime of individual connections.
+  std::unique_ptr<PersistentQuicInfo> quic_info_;
+};
+
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source) {
-  return std::make_unique<FixedHttpConnPoolImpl>(
+  return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [&dispatcher, &time_source](HttpConnPoolImplBase* pool) {
+      [](HttpConnPoolImplBase* pool) {
+        Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
         Upstream::Host::CreateConnectionData data{};
         data.host_description_ = pool->host();
         auto host_address = data.host_description_->address();
@@ -33,14 +68,11 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         if (!source_address.get()) {
           source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
         }
-        Network::TransportSocketFactory& transport_socket_factory =
-            data.host_description_->transportSocketFactory();
         data.connection_ =
             Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
                 Http::QuicCodecNames::get().Quiche)
-                .createQuicNetworkConnection(host_address, source_address, transport_socket_factory,
-                                             data.host_description_->cluster().statsScope(),
-                                             dispatcher, time_source);
+                .createQuicNetworkConnection(*h3_pool->quic_info_, pool->dispatcher(), host_address,
+                                             source_address);
         return std::make_unique<ActiveClient>(*pool, data);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
@@ -49,7 +81,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3});
+      std::vector<Protocol>{Protocol::Http3}, time_source);
 }
 
 } // namespace Http3
