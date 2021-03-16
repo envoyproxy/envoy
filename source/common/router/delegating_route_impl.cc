@@ -24,6 +24,11 @@ void DelegatingRouteEntry::finalizeResponseHeaders(
   return base_route_->routeEntry()->finalizeResponseHeaders(headers, stream_info);
 }
 
+Http::HeaderTransforms
+DelegatingRouteEntry::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_->routeEntry()->responseHeaderTransforms(stream_info);
+}
+
 const std::string& DelegatingRouteEntry::clusterName() const {
   return base_route_->routeEntry()->clusterName();
 }
