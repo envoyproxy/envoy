@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "10000:10000/udp"
+      - "10001:10001"
 
   service-udp:
     image: mendhak/udp-listener
