@@ -10,11 +10,15 @@ User Datagram Protocol (``UDP``)
    :ref:`netcat <start_sandboxes_setup_netcat>`
 	Used to send ``UDP`` packets.
 
+This sandbox provides a very simple example of Envoy proxying ``UDP``.
+
 
 Step 1: Build the sandbox
 *************************
 
 Change directory to ``examples/udp`` in the Envoy repository.
+
+Start the Docker composition:
 
 .. code-block:: console
 
@@ -28,3 +32,28 @@ Change directory to ``examples/udp`` in the Envoy repository.
   ----------------------------------------------------------------------------------------------
   udp_service-udp_1   python -u /udplistener.py      Up      5005/tcp, 5005/udp
   udp_testing_1       /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:10000->10000/udp
+
+Envoy should be proxying ``UDP`` on port ``10000`` to an upstream listener server.
+
+Step 2: Send the ``UDP`` server some messages
+*********************************************
+
+You can use ``netcat`` to send some packets to the upstream server:
+
+.. code-block:: console
+
+   echo -n HELO | nc -4u -w1 127.0.0.1 10000
+   echo -n OLEH | nc -4u -w1 127.0.0.1 10000
+
+Step 3: Check the logs of the ``UDP`` listener server
+*****************************************************
+
+Checking the logs of the upstream server you should see the packets that you sent:
+
+.. code-block:: console
+
+   $ docker-compose logs service-udp
+   Attaching to udp_service-udp_1
+   service-udp_1  | Listening on UDP port 5005
+   service-udp_1  | HELO
+   service-udp_1  | OLEH
