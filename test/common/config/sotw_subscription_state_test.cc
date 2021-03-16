@@ -18,13 +18,12 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-const std::string TypeUrl = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-    envoy::config::core::v3::ApiVersion::V3);
-
 class SotwSubscriptionStateTest : public testing::Test {
 protected:
   SotwSubscriptionStateTest()
-      : state_(TypeUrl, callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
+      : state_(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+                   envoy::config::core::v3::ApiVersion::V3),
+               callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
@@ -40,7 +39,8 @@ protected:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version_info);
     response.set_nonce(nonce);
-    response.set_type_url(TypeUrl);
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        envoy::config::core::v3::ApiVersion::V3));
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& resource_name : resource_names) {
       envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
