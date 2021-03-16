@@ -523,8 +523,9 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   if (config.udp_fake_upstream_.has_value() &&
       config.udp_fake_upstream_->max_rx_datagram_size_.has_value()) {
-    listener_.udp_listener_config_.config_.mutable_max_downstream_rx_datagram_size()->set_value(
-        config.udp_fake_upstream_->max_rx_datagram_size_.value());
+    listener_.udp_listener_config_.config_.mutable_downstream_socket_config()
+        ->mutable_max_rx_datagram_size()
+        ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();

@@ -72,8 +72,9 @@ public:
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)),
-        max_upstream_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            config, max_upstream_rx_datagram_size, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE)) {
+        max_upstream_rx_datagram_size_(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_socket_config(), max_rx_datagram_size,
+                                            Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE)) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
