@@ -55,9 +55,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/cluttercode/clutter/archive/{version}.tar.gz"],
         release_date = "2021-03-11",
         use_category = ["other"],
-        implied_untracked_deps = [
-            "com_github_urfave_cli",
-        ],
         cpe = "N/A",
     ),
     rules_fuzzing = dict(
