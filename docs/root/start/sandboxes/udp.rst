@@ -34,25 +34,25 @@ Start the Docker composition:
 
       Name                 Command                   State      Ports
   -----------------------------------------------------------------------------------------------------------------------
+  udp_envoy-udp_1     /docker-entrypoint.sh /usr ... Up     10000/tcp, 0.0.0.0:10000->10000/udp, 0.0.0.0:10001->10001/tcp
   udp_service-udp_1   python -u /udplistener.py      Up     5005/tcp, 5005/udp
-  udp_testing_1       /docker-entrypoint.sh /usr ... Up     10000/tcp, 0.0.0.0:10000->10000/udp, 0.0.0.0:10001->10001/tcp
 
+Envoy should proxy ``UDP`` on port ``10000`` to an upstream server listening on port ``5005``.
 
-Envoy should proxy ``UDP`` on port ``10000`` to an upstream listener, and provide an admin
-interface on port ``10001``.
+Envoy also provides an admin endpoint listening on port ``10001``.
 
-Step 2: Send the ``UDP`` server some messages
-*********************************************
+Step 2: Send some ``UDP`` messages
+**********************************
 
-You can use ``netcat`` to send some packets to the upstream server:
+You can use ``netcat`` to send packets to the upstream server, proxied by Envoy:
 
 .. code-block:: console
 
    echo -n HELO | nc -4u -w1 127.0.0.1 10000
    echo -n OLEH | nc -4u -w1 127.0.0.1 10000
 
-Step 3: Check the logs of the ``UDP`` listener server
-*****************************************************
+Step 3: Check the logs of the upstream ``UDP`` listener server
+**************************************************************
 
 Checking the logs of the upstream server you should see the packets that you sent:
 
