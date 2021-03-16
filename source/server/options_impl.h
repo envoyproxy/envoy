@@ -200,7 +200,7 @@ private:
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
-  bool core_dump_enabled_;
+  bool core_dump_enabled_ = false;
   bool cpuset_threads_;
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
