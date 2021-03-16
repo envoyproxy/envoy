@@ -132,6 +132,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_google_benchmark()
+    _com_github_google_http_pattern_matcher()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_tcmalloc()
@@ -842,6 +843,14 @@ def _emscripten_toolchain():
         patch_cmds = [
             "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
         ],
+    )
+
+def _com_github_google_http_pattern_matcher():
+    external_http_archive("com_github_google_http_pattern_matcher")
+
+    native.bind(
+        name = "http_pattern_matcher_lib",
+        actual = "@com_github_google_http_pattern_matcher//:path_matcher_lib",
     )
 
 def _com_github_google_jwt_verify():

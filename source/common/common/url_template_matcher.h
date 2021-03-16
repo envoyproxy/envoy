@@ -2,7 +2,7 @@
 
 #include "envoy/common/matchers.h"
 
-#include "grpc_transcoding/path_matcher.h"
+#include "include/http_pattern_matcher/path_matcher.h"
 
 namespace Envoy {
 namespace Matchers {
@@ -14,7 +14,7 @@ public:
   bool match(const absl::string_view path) const override;
 
 private:
-  google::grpc::transcoding::PathMatcherPtr<const UrlTemplateMatcher*> path_matcher_;
+  google::http::pattern_matcher::PathMatcherPtr<const UrlTemplateMatcher*> path_matcher_;
 };
 
 using UrlTemplateMatcherConstPtr = std::unique_ptr<const UrlTemplateMatcher>;

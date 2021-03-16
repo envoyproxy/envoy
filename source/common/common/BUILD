@@ -250,7 +250,7 @@ envoy_cc_library(
     name = "url_template_matcher_lib",
     srcs = ["url_template_matcher.cc"],
     hdrs = ["url_template_matcher.h"],
-    external_deps = ["path_matcher"],
+    external_deps = ["http_pattern_matcher_lib"],
     deps = [
         ":empty_string",
         ":matchers_lib",
