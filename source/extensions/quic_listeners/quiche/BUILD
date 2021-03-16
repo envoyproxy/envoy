@@ -380,8 +380,8 @@ envoy_cc_extension(
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
     category = (
-        "envoy.transport_sockets.downstream",
-        "envoy.transport_sockets.upstream",
+        # Remove QUIC as an extension
+        "DELIBERATELY_OMITTED",
     ),
     # Needed to verify that a quic specific configuration is used for quic transport socket.
     extra_visibility = [
@@ -390,6 +390,7 @@ envoy_cc_extension(
     ],
     security_posture = "unknown",
     tags = ["nofips"],
+    undocumented = True,
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -406,11 +407,12 @@ envoy_cc_extension(
 envoy_cc_extension(
     name = "quic_factory_lib",
     category = (
-        "envoy.transport_sockets.downstream",
-        "envoy.transport_sockets.upstream",
+        # Remove QUIC as an extension
+        "DELIBERATELY_OMITTED",
     ),
     security_posture = "unknown",
     tags = ["nofips"],
+    undocumented = True,
     # QUICHE can't build against FIPS BoringSSL until the FIPS build
     # is on a new enough version to have QUIC support. Remove it from
     # the build until then. Re-enable as part of #7433.

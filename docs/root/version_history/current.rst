@@ -108,7 +108,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-
+* access log: added the new response flag `NC` for upstream cluster not found. The error flag is set when the http or tcp route is found for the request but the cluster is not available.
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
 * access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
@@ -147,6 +147,11 @@ New Features
   field as well as explicit configuration for the built-in :ref:`UuidRequestIdConfig <envoy_v3_api_msg_extensions.request_id.uuid.v3.UuidRequestIdConfig>`
   request ID implementation. See the trace context propagation :ref:`architecture overview
   <arch_overview_tracing_context_propagation>` for more information.
+* udp: added :ref:`max_downstream_rx_datagram_size <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.max_downstream_rx_datagram_size>`
+  listener configuration to allow configuration of downstream max UDP datagram size. Also added
+  :ref:`max_upstream_rx_datagram_size <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.max_upstream_rx_datagram_size>`
+  UDP proxy configuration to allow configuration of upstream max UDP datagram size. The defaults for
+  both remain 1500 bytes.
 
 Deprecated
 ----------

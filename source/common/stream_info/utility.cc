@@ -30,6 +30,7 @@ const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
 const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
 const std::string ResponseFlagUtils::DURATION_TIMEOUT = "DT";
 const std::string ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR = "UPE";
+const std::string ResponseFlagUtils::NO_CLUSTER_FOUND = "NC";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -139,6 +140,9 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     appendString(result, UPSTREAM_PROTOCOL_ERROR);
   }
 
+  if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
+    appendString(result, NO_CLUSTER_FOUND);
+  }
   return result.empty() ? NONE : result;
 }
 
@@ -171,6 +175,7 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
       {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
       {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
+      {ResponseFlagUtils::NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {
