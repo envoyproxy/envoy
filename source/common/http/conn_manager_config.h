@@ -467,7 +467,7 @@ public:
    */
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
-  virtual void normalizePath(Http::RequestHeaderMap&) const {}
+  virtual void normalizePath(Http::RequestHeaderMap&) const PURE;
 };
 } // namespace Http
 } // namespace Envoy

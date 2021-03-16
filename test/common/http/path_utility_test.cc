@@ -277,6 +277,10 @@ TEST_F(PathTransformerTest, RfcNormalize) {
   EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2e%2e/c").value()); // ends with slash
   EXPECT_EQ("/a/%2F%2f/c",
             path_transformer.transform("/a/%2F%2f/c").value()); // relative ends with slash
+
+  EXPECT_FALSE(path_transformer.transform("/xyz/.%00../abc").has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/%00.%00./abc").has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/AAAAA%%0000/abc").has_value());
 }
 
 TEST_F(PathTransformerTest, DuplicateTransformation) {

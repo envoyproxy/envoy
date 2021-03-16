@@ -30,8 +30,6 @@ public:
   static absl::string_view removeQueryAndFragment(const absl::string_view path);
 };
 
-using Transformation = std::function<absl::optional<std::string>(absl::string_view)>;
-
 class PathTransformer {
 public:
   PathTransformer(envoy::type::http::v3::PathTransformation operations);
@@ -43,6 +41,7 @@ public:
   static absl::optional<std::string> rfcNormalize(absl::string_view original_path);
 
 private:
+  using Transformation = std::function<absl::optional<std::string>(absl::string_view)>;
   std::list<Transformation> transformations_;
 };
 

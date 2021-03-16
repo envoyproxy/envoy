@@ -198,6 +198,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
+  void normalizePath(Http::RequestHeaderMap&) const override {}
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {

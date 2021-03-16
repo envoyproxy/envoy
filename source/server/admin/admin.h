@@ -194,6 +194,7 @@ public:
       return runCallback(path_and_query, response_headers, response, filter);
     };
   }
+  void normalizePath(Http::RequestHeaderMap&) const override {}
 
 private:
   /**
