@@ -484,7 +484,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "6d0e24fb1f435b984bd2c521ae92faa6451f6d7ee38292934d53cc3d5959314b",
         strip_prefix = "http_pattern_matcher-{version}",
         urls = ["https://github.com/google/http_pattern_matcher/archive/{version}.tar.gz"],
-        use_category = ["controlplane_core", "dataplane_core"],
+        use_category = ["controlplane", "dataplane_core"],
         release_date = "2021-03-15",
         cpe = "N/A",
     ),
