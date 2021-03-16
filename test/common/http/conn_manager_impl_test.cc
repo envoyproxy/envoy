@@ -721,7 +721,6 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
 TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverride) {
   setup(false, "");
-
   setupFilterChain(2, 0);
 
   // Cluster mocks: default and foo
@@ -740,48 +739,39 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
       .Times(1)
       .WillRepeatedly(Return(foo_cluster.get()));
 
-  // Route mock: default_route
+  // Route mock: default
   std::shared_ptr<Router::MockRoute> default_route =
       std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(default_route->route_entry_, clusterName())
-      .Times(1)
+      .Times(2) // Expected call twice: once from refreshCachedRoute, once from EXPECT_EQ macro
       .WillRepeatedly(ReturnRef(default_cluster_name));
 
   // RouteConstSharedPtr of DelegatingRoute for foo
-  // Initialization separate from declaration to be in scope for both filters
+  // Initialization separate from declaration to be in scope for both decoder_filters_
   std::shared_ptr<const ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
 
-  // TODO why does this get called more than once?
+  // Route config mock
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .WillOnce(Return(default_route));
 
   // Filter that performs setRoute (sets cached_route_ & cached_cluster_info_)
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        // clearRouteCache to clear cached_route_, ensuring refreshCachedRoute gets called and
-        // cached_route_ gets correctly initialized as default_route upon the first
-        // callbacks_->route() call
-        decoder_filters_[0]->callbacks_->clearRouteCache();
-
-        // Calls ConnectionManagerImpl::ActiveStream::route(nullptr),
-        // which calls refreshCachedRoute(cb), which (1) gets default_route from
-        // route_config_->route(_, _, _, _) mock and sets cached_route_ to default_route, and (2)
-        // calls getThreadLocalCluster mock to set cached_cluster_info_.
+        // Calls ConnectionManagerImpl::ActiveStream::route(cb), which calls
+        // refreshCachedRoute(cb), which (1) calls route_config_->route(_, _, _, _) mock to set
+        // default_route as cached_route_, and (2) calls getThreadLocalCluster mock to set
+        // cached_cluster_info_.
         EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-        // Since cached_route_ has a value set, route() will return cached_route_ (the
-        // default_route mock). default_route->routeEntry()->clusterName() is mocked to return
-        // default_cluster_name.
         EXPECT_EQ(default_cluster_name,
                   decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
         EXPECT_EQ(default_route->routeEntry(),
                   decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
         EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
+        // Instantiate a DelegatingRoute child class object and invoke setRoute from
+        // StreamFilterCallbacks to manually override the cached route for the current request.
         foo_route_override = std::make_shared<ExampleDerivedDelegatingRoute>(
             decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
-
-        // Invokes setRoute from StreamFilterCallbacks to manually set the cached route to a
-        // DelegatingRoute child class.
         decoder_filters_[0]->callbacks_->setRoute(foo_route_override);
 
         return FilterHeadersStatus::Continue;
@@ -791,8 +781,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
   // Router filter
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        // Since cached_route_ has a value set, route() will return cached_route_ with no other
-        // route calculations / method calls.
+        // Returns cached_route, does not invoke route(cb)
         EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->route());
         // Note: The route filter determines the finalized route's upstream cluster name via
         // routeEntry()->clusterName(), so that's the key piece to check.
