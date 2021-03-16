@@ -234,8 +234,8 @@ bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
   // cert.
   assert(san_names != nullptr);
 
-  // Only match against URIL SAN since SPIFFE specification does not restrict values in other SAN
-  // types. See the disscussion: https://github.com/envoyproxy/envoy/issues/15392
+  // Only match against URI SAN since SPIFFE specification does not restrict values in other SAN
+  // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = Utility::generalNameAsString(general_name);
     for (auto& config_san_matcher : subject_alt_name_matchers_) {

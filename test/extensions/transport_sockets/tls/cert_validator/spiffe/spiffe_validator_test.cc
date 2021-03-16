@@ -389,7 +389,7 @@ typed_config:
   }
 }
 
-// SPIFFE validator ignores any SANs other thatn URI.
+// SPIFFE validator ignores any SANs other than URI.
 TEST_F(TestSPIFFEValidator, TestMatchSubjectAltNameWithoutURISan) {
   envoy::type::matcher::v3::StringMatcher exact_matcher, prefix_matcher;
   exact_matcher.set_exact("spiffe://example.com/workload");
