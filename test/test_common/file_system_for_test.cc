@@ -25,7 +25,7 @@ void MemfileInstanceImpl::renameFile(const std::string& old_name, const std::str
     absl::MutexLock m(&lock_);
     // It's easy enough to change the key to the hash set, but most instances of
     // renameFile are to trigger file watches in core code, and those are not
-    // memfile-aware.
+    // mem-file-aware.
     RELEASE_ASSERT(!use_memfiles_,
                    "moving files not supported with memfile. Please call setUseMemfiles(false)");
   }
