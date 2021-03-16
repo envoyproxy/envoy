@@ -1109,11 +1109,11 @@ typed_config:
   EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
 }
 
-TEST_F(AccessLogImplTest, Stderr) {
+TEST_F(AccessLogImplTest, Stderror) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stderr.v3.StdErrorAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stderror.v3.StdErrorAccessLog
   )EOF";
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
