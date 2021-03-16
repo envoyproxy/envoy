@@ -467,6 +467,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   for (int32_t i = 0; i < filters.size(); i++) {
     processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_, dependency_manager);
   }
+  // TODO(auni53): Validate encode dependencies too.
   auto status = dependency_manager.validDecodeDependencies();
   if (!status.ok()) {
     throw EnvoyException(std::string(status.message()));

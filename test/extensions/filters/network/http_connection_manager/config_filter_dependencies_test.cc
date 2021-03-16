@@ -60,6 +60,11 @@ public:
   }
 };
 
+/**
+ * Testing scenario for testing filter dependencies.
+ * ChefFilter requires a "potato" dependency, which PantryFilter provides.
+ */
+
 // Test filter that requires a potato.
 class ChefFilterFactory : public PassThroughFilterFactory {
 public:
@@ -72,7 +77,7 @@ public:
   }
 };
 
-TEST_F(HttpConnectionManagerConfigTest, NoPantry) {
+TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   hcm_config.add_http_filters()->set_name("test.pantry");
   hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
@@ -85,7 +90,8 @@ TEST_F(HttpConnectionManagerConfigTest, NoPantry) {
       EnvoyException, "Didn't find a registered implementation for name: 'test.pantry'");
 }
 
-TEST_F(HttpConnectionManagerConfigTest, DependenciesSatisfied) {
+// ChefFilter requires a potato, and PantryFilter provides it.
+TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   hcm_config.add_http_filters()->set_name("test.pantry");
   hcm_config.add_http_filters()->set_name("test.chef");
@@ -101,7 +107,8 @@ TEST_F(HttpConnectionManagerConfigTest, DependenciesSatisfied) {
                               filter_config_provider_manager_);
 }
 
-TEST_F(HttpConnectionManagerConfigTest, UnneededProvidencyOk) {
+// PantryFilter provides a potato, which is not required by any other filter.
+TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   hcm_config.add_http_filters()->set_name("test.pantry");
   hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
@@ -114,7 +121,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnneededProvidencyOk) {
                               filter_config_provider_manager_);
 }
 
-TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyErrorMissingProvidency) {
+// ChefFilter requires a potato, but no filter provides it.
+TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   hcm_config.add_http_filters()->set_name("test.chef");
   hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
@@ -130,7 +138,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyErrorMissingProvidency) {
       EnvoyException, "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
-TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyErrorMisordered) {
+// ChefFilter requires a potato, but no preceding filter provides it.
+TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
   hcm_config.add_http_filters()->set_name("test.chef");
   hcm_config.add_http_filters()->set_name("test.pantry");
