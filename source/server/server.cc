@@ -273,10 +273,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
   } else if (*bootstrap_version == 3) {
     load_function(bootstrap, false);
   } else if (*bootstrap_version == 2) {
-    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
-    load_function(bootstrap_v2, false);
-    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
-    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
+    throw EnvoyException("v2 bootstrap is deprecated and no longer supported.");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }

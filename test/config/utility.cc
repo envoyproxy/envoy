@@ -221,7 +221,10 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      udp_listener_name: "quiche_quic_listener"
+      listener_config:
+        name: quic_listener_config
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
 )EOF",
                                                            Platform::null_device_path));
 }
@@ -748,7 +751,7 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
 }
 
 void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
+  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
