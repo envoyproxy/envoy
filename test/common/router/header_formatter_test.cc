@@ -27,14 +27,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-
 namespace Envoy {
 namespace Router {
 namespace {
+
+using ::testing::ElementsAre;
+using ::testing::NiceMock;
+using ::testing::Pair;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
 
 static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml,
                                                             bool avoid_boosting = true) {
@@ -1434,6 +1436,36 @@ response_headers_to_remove: ["x-foo-header"]
 
   resp_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
+}
+
+TEST(HeaderParserTest, GetHeaderTransforms) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "foo"
+    append: true
+  - header:
+      key: "x-bar-header"
+      value: "bar"
+    append: false
+response_headers_to_remove: ["x-baz-header"]
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
+  EXPECT_THAT(transforms.headers_to_append,
+              ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
+  EXPECT_THAT(transforms.headers_to_overwrite,
+              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
+  EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 
 } // namespace

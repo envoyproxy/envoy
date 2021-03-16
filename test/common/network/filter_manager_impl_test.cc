@@ -50,6 +50,7 @@ public:
   }
 
   NiceMock<MockFilterManagerConnection> connection_;
+  NiceMock<MockListenSocket> socket_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -73,13 +74,15 @@ TEST_F(NetworkFilterManagerTest, All) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
+  EXPECT_EQ(&read_filter->callbacks_->socket(), &socket_);
+  EXPECT_EQ(&write_filter->write_callbacks_->socket(), &socket_);
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_EQ(manager.initializeReadFilters(), true);
@@ -119,7 +122,7 @@ TEST_F(NetworkFilterManagerTest, ConnectionClosedBeforeRunningFilter) {
   MockReadFilter* read_filter(new MockReadFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
@@ -146,7 +149,7 @@ TEST_F(NetworkFilterManagerTest, FilterReturnStopAndNoCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -174,7 +177,7 @@ TEST_F(NetworkFilterManagerTest, ReadFilterCloseConnectionAndReturnContinue) {
   MockReadFilter* read_filter(new MockReadFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
@@ -206,7 +209,7 @@ TEST_F(NetworkFilterManagerTest, WriteFilterCloseConnectionAndReturnContinue) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -245,7 +248,7 @@ TEST_F(NetworkFilterManagerTest, ReadCloseConnectionReturnStopAndCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -279,7 +282,7 @@ TEST_F(NetworkFilterManagerTest, WriteCloseConnectionReturnStopAndCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -320,7 +323,7 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -363,7 +366,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   NiceMock<MockClientConnection> upstream_connection;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
 
   std::string rl_yaml = R"EOF(
 domain: foo
@@ -435,7 +438,7 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -467,7 +470,7 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});

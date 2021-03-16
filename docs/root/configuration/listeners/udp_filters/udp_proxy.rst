@@ -47,7 +47,8 @@ Example configuration
 ---------------------
 
 The following example configuration will cause Envoy to listen on UDP port 1234 and proxy to a UDP
-server listening on port 1235.
+server listening on port 1235, allowing 9000 byte packets in both directions (i.e., either jumbo
+frames or fragmented IP packets).
 
 .. literalinclude:: _include/udp-proxy.yaml
     :language: yaml

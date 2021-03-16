@@ -81,6 +81,15 @@ int reasonToReset(StreamResetReason reason) {
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
+ReceivedSettingsImpl::ReceivedSettingsImpl(const nghttp2_settings& settings) {
+  for (uint32_t i = 0; i < settings.niv; ++i) {
+    if (settings.iv[i].settings_id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = settings.iv[i].value;
+      break;
+    }
+  }
+}
+
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
   if (key != Headers::get().Cookie.get().c_str()) {
@@ -803,7 +812,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettingsForTest(frame->settings);
+    onSettings(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);
@@ -998,7 +1007,10 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
         // about). In other cases we treat invalid frames as a protocol error and just kill
         // the connection.
-        reason = StreamResetReason::LocalReset;
+
+        // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
+        // depending whether the connection is upstream or downstream.
+        reason = getMessagingErrorResetReason();
       } else {
         if (error_code == NGHTTP2_REFUSED_STREAM) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
@@ -1605,6 +1617,17 @@ ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
         is_outbound_flood_monitored_control_frame);
   }
   return ProtocolConstraints::ReleasorProc([]() {});
+}
+
+StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
+  StreamResetReason reason = StreamResetReason::LocalReset;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+    reason = StreamResetReason::ProtocolError;
+    connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  }
+
+  return reason;
 }
 
 ServerConnectionImpl::ServerConnectionImpl(

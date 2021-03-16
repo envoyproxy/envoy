@@ -247,6 +247,15 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   }
 }
 
+bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
+  bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
+  if (read_side_closed()) {
+    // Treat this as a remote reset, since the stream will be closed in both directions.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
+  }
+  return ret;
+}
+
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
