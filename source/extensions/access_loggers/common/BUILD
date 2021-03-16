@@ -41,7 +41,7 @@ envoy_cc_library(
         "//source/common/config:config_provider_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",
-        "//source/extensions/access_loggers/common:file_access_log_lib"
+        "//source/extensions/access_loggers/common:file_access_log_lib",
     ],
 )
 

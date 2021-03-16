@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#extension: envoy.access_loggers.stderror]
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v4alpha.AccessLog>`
-// that writes log entries directly to a standard error.
+// that writes log entries directly to the operating system's standard error.
 message StdErrorAccessLog {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.access_loggers.stderror.v3.StdErrorAccessLog";
