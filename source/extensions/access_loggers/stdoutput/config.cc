@@ -1,9 +1,9 @@
-#include "extensions/access_loggers/stdout/config.h"
+#include "extensions/access_loggers/stdoutput/config.h"
 
 #include <memory>
 
-#include "envoy/extensions/access_loggers/stdout/v3/stdout.pb.h"
-#include "envoy/extensions/access_loggers/stdout/v3/stdout.pb.validate.h"
+#include "envoy/extensions/access_loggers/stdoutput/v3/stdoutput.pb.h"
+#include "envoy/extensions/access_loggers/stdoutput/v3/stdoutput.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -23,26 +23,26 @@ namespace AccessLoggers {
 namespace File {
 
 AccessLog::InstanceSharedPtr
-StdoutAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                                AccessLog::FilterPtr&& filter,
-                                                Server::Configuration::FactoryContext& context) {
+StdoutputAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                                   AccessLog::FilterPtr&& filter,
+                                                   Server::Configuration::FactoryContext& context) {
   return AccessLoggers::createStreamAccessLogInstance<
-      envoy::extensions::access_loggers::stdout::v3::StdoutAccessLog,
+      envoy::extensions::access_loggers::stdoutput::v3::StdoutputAccessLog,
       Filesystem::DestinationType::Stdout>(config, std::move(filter), context);
 }
 
-ProtobufTypes::MessagePtr StdoutAccessLogFactory::createEmptyConfigProto() {
+ProtobufTypes::MessagePtr StdoutputAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{
-      new envoy::extensions::access_loggers::stdout::v3::StdoutAccessLog()};
+      new envoy::extensions::access_loggers::stdoutput::v3::StdoutputAccessLog()};
 }
 
-std::string StdoutAccessLogFactory::name() const { return AccessLogNames::get().Stdout; }
+std::string StdoutputAccessLogFactory::name() const { return AccessLogNames::get().Stdoutput; }
 
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(StdoutAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.stdout_access_log"};
+REGISTER_FACTORY(StdoutputAccessLogFactory,
+                 Server::Configuration::AccessLogInstanceFactory){"envoy.stdoutput_access_log"};
 
 } // namespace File
 } // namespace AccessLoggers

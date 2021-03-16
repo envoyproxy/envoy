@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.access_loggers.stdout.v4alpha;
+package envoy.extensions.access_loggers.stdoutput.v4alpha;
 
 import "envoy/config/core/v4alpha/substitution_format_string.proto";
 
@@ -10,19 +10,19 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stdout.v4alpha";
-option java_outer_classname = "StdoutProto";
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stdoutput.v4alpha";
+option java_outer_classname = "StdoutputProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Standard Output access log]
-// [#extension: envoy.access_loggers.stdout]
+// [#extension: envoy.access_loggers.stdoutput]
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v4alpha.AccessLog>`
 // that writes log entries directly to the operating system's standard output.
-message StdoutAccessLog {
+message StdoutputAccessLog {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.access_loggers.stdout.v3.StdoutAccessLog";
+      "envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog";
 
   oneof access_log_format {
     // Configuration to form access log data and format.

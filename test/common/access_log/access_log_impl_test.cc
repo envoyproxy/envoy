@@ -1093,7 +1093,7 @@ TEST_F(AccessLogImplTest, Stdout) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stdout.v3.StdoutAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
   )EOF";
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));

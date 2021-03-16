@@ -17,7 +17,7 @@ envoy_cc_test(
         "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/access_loggers/grpc:tcp_config",
         "//source/extensions/access_loggers/stderror:config",
-        "//source/extensions/access_loggers/stdout:config",
+        "//source/extensions/access_loggers/stdoutput:config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",

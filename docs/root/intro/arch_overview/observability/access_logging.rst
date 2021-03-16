@@ -54,8 +54,8 @@ Further reading
 * gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
   sink.
 
-Stdout
-******
+Stdoutput
+*********
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
   threads.

@@ -2,6 +2,10 @@
 
 #include "envoy/server/access_log_config.h"
 
+#include "common/formatter/substitution_formatter.h"
+
+#include "extensions/access_loggers/common/file_access_log_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -21,8 +25,8 @@ createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::Filter
     formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
   }
   Filesystem::FilePathAndType file_info{destination_type, ""};
-  return std::make_shared<File::FileAccessLog>(file_info, std::move(filter), std::move(formatter),
-                                               context.accessLogManager());
+  return std::make_shared<AccessLoggers::File::FileAccessLog>(
+      file_info, std::move(filter), std::move(formatter), context.accessLogManager());
 }
 
 } // namespace AccessLoggers

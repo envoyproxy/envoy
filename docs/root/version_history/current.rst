@@ -110,7 +110,7 @@ New Features
 ------------
 
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
-* access log: added support for cross platform writing to standard output and standard error :ref:` standard output <envoy_api_msg_config.accesslog.v3.StdoutAccessLog>`, :ref:` standard error <envoy_api_msg_config.accesslog.v3.StdErrorAccessLog>`.
+* access log: added support for cross platform writing to standard output and standard error :ref:` standard output <envoy_api_msg_config.accesslog.v3.StdoutputAccessLog>`, :ref:` standard error <envoy_api_msg_config.accesslog.v3.StdErrorAccessLog>`.
 * access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
 * access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
 * compression: add brotli :ref:`compressor <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`.

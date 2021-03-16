@@ -10,7 +10,7 @@ namespace File {
 /**
  * Config registration for the standard output access log. @see AccessLogInstanceFactory.
  */
-class StdoutAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class StdoutputAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,

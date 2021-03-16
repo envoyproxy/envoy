@@ -21,7 +21,7 @@ public:
   // Standard error access log
   const std::string Stderror = "envoy.access_loggers.stderror";
   // Standard output access log
-  const std::string Stdout = "envoy.access_loggers.stdout";
+  const std::string Stdoutput = "envoy.access_loggers.stdoutput";
   // TCP gRPC access log
   const std::string TcpGrpc = "envoy.access_loggers.tcp_grpc";
   // WASM access log
