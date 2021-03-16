@@ -20,6 +20,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/safe_memcpy.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -200,15 +201,16 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   auto buffer = std::unique_ptr<char[]>(new char[s]);
   char* b = buffer.get();
   uint32_t n = response.size();
-  memcpy(b, &n, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &n);
   b += sizeof(uint32_t);
   for (auto& e : response) {
     uint32_t ttl = e.ttl_.count();
-    memcpy(b, &ttl, sizeof(uint32_t));
+    safeMemcpyUnsafeDst(b, &ttl);
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
-    memcpy(b, e.address_->asStringView().data(), e.address_->asStringView().size());
+    memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
+           e.address_->asStringView().size());
     b += e.address_->asStringView().size();
     *b++ = 0;
   };
@@ -269,45 +271,46 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   auto buffer = std::unique_ptr<char[]>(new char[counter_block_size + gauge_block_size]);
   char* b = buffer.get();
 
-  memcpy(b, &counter_block_size, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &counter_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &counter_type, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &counter_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_counters, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &num_counters);
   b += sizeof(uint32_t);
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       n = counter.counter_.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t));
+      safeMemcpyUnsafeDst(b, &n);
       b += sizeof(uint32_t);
-      memcpy(b, counter.counter_.get().name().data(), counter.counter_.get().name().size());
+      memcpy(b, counter.counter_.get().name().data(), // NOLINT(safe-memcpy)
+             counter.counter_.get().name().size());
       b = align<uint64_t>(b + counter.counter_.get().name().size());
       v = counter.counter_.get().value();
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
       v = counter.delta_;
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
 
-  memcpy(b, &gauge_block_size, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &gauge_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &gauge_type, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &gauge_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_gauges, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &num_gauges);
   b += sizeof(uint32_t);
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       n = gauge.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t));
+      safeMemcpyUnsafeDst(b, &n);
       b += sizeof(uint32_t);
-      memcpy(b, gauge.get().name().data(), gauge.get().name().size());
+      memcpy(b, gauge.get().name().data(), gauge.get().name().size()); // NOLINT(safe-memcpy)
       b = align<uint64_t>(b + gauge.get().name().size());
       v = gauge.get().value();
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
