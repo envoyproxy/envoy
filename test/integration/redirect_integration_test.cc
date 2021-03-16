@@ -19,6 +19,8 @@ constexpr char kTestHeaderKey[] = "test-header";
 class RedirectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    setMaxRequestHeadersKb(60);
+    setMaxRequestHeadersCount(100);
     envoy::config::route::v3::RetryPolicy retry_policy;
 
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
@@ -61,9 +63,8 @@ protected:
     // connections because connection reuse may or may not be triggered.
     while (new_stream == nullptr) {
       FakeHttpConnectionPtr new_connection = nullptr;
-
       AssertionResult result = fake_upstreams_[0]->waitForHttpConnection(
-          *dispatcher_, new_connection, std::chrono::milliseconds(50), 60, 100);
+          *dispatcher_, new_connection, std::chrono::milliseconds(50));
       if (result) {
         ASSERT(new_connection);
         upstream_connections_.push_back(std::move(new_connection));

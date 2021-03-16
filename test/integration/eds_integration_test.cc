@@ -182,8 +182,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
 
   // We need to do a bunch of work to get a hold of second hc connection.
   FakeHttpConnectionPtr fake_upstream_connection;
-  auto result = fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection, TestUtility::DefaultTimeout, max_request_headers_kb_);
+  auto result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection);
   RELEASE_ASSERT(result, result.message());
 
   FakeStreamPtr upstream_request;

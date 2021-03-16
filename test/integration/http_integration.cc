@@ -383,8 +383,7 @@ absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
   while (!result) {
     upstream_index = upstream_index % upstream_indices.size();
     result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5),
-        max_request_headers_kb_, max_request_headers_count_);
+        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5));
     if (result) {
       return upstream_index;
     } else if (!bound.withinBound()) {
@@ -1053,7 +1052,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_headers_size); });
-  max_request_headers_kb_ = max_headers_size;
+  setMaxRequestHeadersKb(max_headers_size);
 
   Http::TestRequestHeaderMapImpl big_headers{{":method", "GET"},
                                              {":path", "/" + std::string(url_size * 1024, 'a')},
@@ -1097,8 +1096,8 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
-  max_request_headers_kb_ = max_size;
-  max_request_headers_count_ = max_count;
+  setMaxRequestHeadersKb(max_size);
+  setMaxRequestHeadersCount(max_count);
 
   Http::TestRequestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
@@ -1141,7 +1140,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
-  max_request_headers_kb_ = max_size;
+  setMaxRequestHeadersKb(max_size);
   Http::TestRequestTrailerMapImpl request_trailers{{"trailer", "trailer"}};
   request_trailers.addCopy("big", std::string(size * 1024, 'a'));
 
@@ -1178,15 +1177,15 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
 void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time) {
   // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
   // time-consuming asserts when using a large number of headers.
-  max_request_headers_kb_ = 96;
-  max_request_headers_count_ = 10005;
+  setMaxRequestHeadersKb(96);
+  setMaxRequestHeadersCount(10005);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
+        hcm.mutable_max_request_headers_kb()->set_value(upstreamConfig().max_request_headers_kb_);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
-            max_request_headers_count_);
+            upstreamConfig().max_request_headers_count_);
       });
 
   auto big_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(

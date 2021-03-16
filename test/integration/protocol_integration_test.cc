@@ -1311,7 +1311,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
-  max_request_headers_count_ = max_count;
+  setMaxRequestHeadersCount(max_count);
 
   initialize();
 
@@ -1544,7 +1544,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
             max_count);
       });
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-  max_request_headers_count_ = max_count;
+  setMaxRequestHeadersCount(max_count);
   Http::TestRequestTrailerMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
     request_trailers.addCopy("trailer", std::string(1, 'a'));
@@ -1588,16 +1588,16 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
 // time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   EXCLUDE_UPSTREAM_HTTP3;
-  max_request_headers_kb_ = 96;
-  max_request_headers_count_ = 20005;
+  setMaxRequestHeadersKb(96);
+  setMaxRequestHeadersCount(20005);
 
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
+        hcm.mutable_max_request_headers_kb()->set_value(upstreamConfig().max_request_headers_kb_);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
-            max_request_headers_count_);
+            upstreamConfig().max_request_headers_count_);
       });
 
   auto request_trailers = Http::RequestTrailerMapImpl::create();
@@ -1947,9 +1947,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
 
-  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
-                                                        TestUtility::DefaultTimeout,
-                                                        max_request_headers_kb_));
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
 
   EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
