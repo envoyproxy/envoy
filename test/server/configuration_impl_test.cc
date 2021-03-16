@@ -100,11 +100,8 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -137,11 +134,8 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -173,11 +167,8 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -207,11 +198,8 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -270,11 +258,8 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -325,11 +310,8 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -376,11 +358,8 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -439,11 +418,8 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -476,11 +452,8 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -519,11 +492,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -560,11 +530,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -600,11 +567,8 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -764,10 +728,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "path": "/dev/null"
           }
         }
       ],
@@ -810,6 +771,38 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
       socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
   ASSERT_NE(detail, absl::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
+}
+
+TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": { 
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
 
 TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
@@ -876,11 +869,8 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],
@@ -993,11 +983,8 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
         {
           "name": "envoy.access_loggers.file",
           "typed_config": { 
-            "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-            "type_url": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
-            "value": {
-              "path": "/dev/null"
-            }
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
           }
         }
       ],

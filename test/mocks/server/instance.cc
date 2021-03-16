@@ -78,6 +78,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(stats_config_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
