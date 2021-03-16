@@ -35,7 +35,7 @@ DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   case Command::Cmd::InitDb:
   case Command::Cmd::CreateDb:
   case Command::Cmd::DropDb: {
-    std::string db = "";
+    std::string db;
     BufferHelper::readStringBySize(buffer, len - 1, db);
     setDb(db);
     break;
@@ -43,13 +43,8 @@ DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
 
   case Command::Cmd::Query:
     is_query_ = true;
-    // query string starts after one byte for comm type
-    BufferHelper::readStringBySize(buffer, len - 1, data_);
-    setDb("");
-    break;
-
   default:
-    setDb("");
+    BufferHelper::readStringBySize(buffer, len - 1, data_);
     break;
   }
 
@@ -60,7 +55,17 @@ void Command::setData(const std::string& data) { data_.assign(data); }
 
 void Command::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, static_cast<int>(cmd_));
-  BufferHelper::addString(out, data_);
+  switch (cmd_) {
+  case Command::Cmd::InitDb:
+  case Command::Cmd::CreateDb:
+  case Command::Cmd::DropDb: {
+    BufferHelper::addString(out, db_);
+    break;
+  }
+  default:
+    BufferHelper::addString(out, data_);
+    break;
+  }
 }
 
 DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {

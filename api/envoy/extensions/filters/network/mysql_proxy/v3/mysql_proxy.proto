@@ -2,6 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.mysql_proxy.v3;
 
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -15,9 +21,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
 // [#extension: envoy.filters.network.mysql_proxy]
 
+// [#next-free-field: 7]
 message MySQLProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mysql_proxy.v1alpha1.MySQLProxy";
+
+  message Route {
+    // String database name that must exact match with client connection db name
+    string database = 1;
+
+    // Upstream cluster to forward the command to.
+    string cluster = 2;
+  }
+
+  message ConnectionPoolSettings {
+    // Max connections exists in the connection pool, default is 10. FIXME(qinggniq)
+    google.protobuf.UInt32Value max_connections = 1;
+
+    // Max spare connections in the connection pool, addition spare connection will be closed, default is 0.
+    google.protobuf.UInt32Value max_idle_connections = 2;
+
+    // Connections when envoy setup, default is 0.
+    google.protobuf.UInt32Value start_connections = 3;
+  }
 
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.
@@ -26,4 +52,18 @@ message MySQLProxy {
   // [#not-implemented-hide:] The optional path to use for writing MySQL access logs.
   // If the access log field is empty, access logs will not be written.
   string access_log = 2;
+
+  repeated Route routes = 3;
+
+  ConnectionPoolSettings setting = 4 [(validate.rules).message = {required: true}];
+
+  config.core.v3.DataSource downstream_auth_username = 5 [(udpa.annotations.sensitive) = true];
+
+  config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+}
+
+message MySQLProtocolOptions {
+  config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
+
+  config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }

@@ -24,6 +24,9 @@ public:
     NotHandled = 12,
     Error = 13,
   };
+  bool operator==(const MySQLSession& rhs) const {
+    return state_ == rhs.state_ && expected_seq_ == rhs.expected_seq_;
+  }
 
   void setState(MySQLSession::State state) { state_ = state; }
   MySQLSession::State getState() { return state_; }

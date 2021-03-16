@@ -1,14 +1,19 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mysql_proxy/conn_pool.h"
+#include "extensions/filters/network/mysql_proxy/mysql_client.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
@@ -17,6 +22,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "extensions/filters/network/mysql_proxy/route.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,15 +55,17 @@ struct MySQLProxyStats {
  */
 class MySQLFilterConfig {
 public:
-  MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope);
+  MySQLFilterConfig(Stats::Scope& scope,
+                    const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& config,
+                    Api::Api& api);
 
   const MySQLProxyStats& stats() { return stats_; }
 
-  Stats::Scope& scope_;
   MySQLProxyStats stats_;
+  std::string username_;
+  std::string password_;
 
-private:
-  MySQLProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  static MySQLProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return MySQLProxyStats{ALL_MYSQL_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 };
@@ -67,9 +75,15 @@ using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
 /**
  * Implementation of MySQL proxy filter.
  */
-class MySQLFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
+class MySQLFilter : public Network::ReadFilter,
+                    public DecoderCallbacks,
+                    public ClientCallBack,
+                    public ConnectionPool::ClientPoolCallBack,
+                    public Network::ConnectionCallbacks,
+                    public Logger::Loggable<Logger::Id::filter> {
 public:
-  MySQLFilter(MySQLFilterConfigSharedPtr config);
+  MySQLFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router,
+              ClientFactory& client_factory, DecoderFactory& decoder_factory);
   ~MySQLFilter() override = default;
 
   // Network::ReadFilter
@@ -77,8 +91,10 @@ public:
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // Network::WriteFilter
-  Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
   // MySQLProxy::DecoderCallback
   void onProtocolError() override;
@@ -91,17 +107,35 @@ public:
   void onCommand(Command& message) override;
   void onCommandResponse(CommandResponse&) override{};
 
+  // ConnectionPool::ClientPoolCallBack
+  void onClientReady(ConnectionPool::ClientDataPtr&&) override;
+  void onClientFailure(ConnectionPool::MySQLPoolFailureReason) override;
+
+  // ClientCallBack
+  void onResponse(MySQLCodec&, uint8_t seq) override;
+  void onFailure() override;
+
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   MySQLSession& getSession() { return decoder_->getSession(); }
+
+private:
+  void onFailure(const ClientLoginResponse& err, uint8_t seq);
+  void onAuthOk();
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   MySQLFilterConfigSharedPtr config_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
-  std::unique_ptr<Decoder> decoder_;
-  bool sniffing_{true};
+  DecoderPtr decoder_;
+  RouterSharedPtr router_;
+  ClientFactory& client_factory_;
+  DecoderFactory& decoder_factory_;
+  ConnectionPool::Cancellable* canceler_{nullptr};
+  ClientPtr client_;
+  std::vector<uint8_t> seed_;
+  bool authed_{false};
 };
 
 } // namespace MySQLProxy
