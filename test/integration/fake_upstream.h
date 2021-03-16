@@ -528,6 +528,10 @@ private:
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 struct FakeUpstreamConfig {
+  struct UdpConfig {
+    absl::optional<uint64_t> max_rx_datagram_size_;
+  };
+
   FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {
     http2_options_ = ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options_);
     // Legacy options which are always set.
@@ -538,7 +542,7 @@ struct FakeUpstreamConfig {
   Event::TestTimeSystem& time_system_;
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   bool enable_half_close_{};
-  bool udp_fake_upstream_{};
+  absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
 };
 
@@ -675,9 +679,9 @@ private:
     Network::SocketSharedPtr socket_;
   };
 
-  class FakeUpstreamUdpFilter : public Network::UdpListenerReadFilter {
+  class FakeUdpFilter : public Network::UdpListenerReadFilter {
   public:
-    FakeUpstreamUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
+    FakeUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
 
     // Network::UdpListenerReadFilter
@@ -690,20 +694,41 @@ private:
 
   class FakeListener : public Network::ListenerConfig {
   public:
+    struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
+      UdpListenerConfigImpl()
+          : writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
+            listener_worker_router_(1) {}
+
+      // Network::UdpListenerConfig
+      Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
+      Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+      Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
+        return listener_worker_router_;
+      }
+      const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+
+      envoy::config::listener::v3::UdpListenerConfig config_;
+      std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
+      std::unique_ptr<Network::UdpPacketWriterFactory> writer_factory_;
+      Network::UdpListenerWorkerRouterImpl listener_worker_router_;
+    };
+
     FakeListener(FakeUpstream& parent, bool is_quic = false)
-        : parent_(parent), name_("fake_upstream"),
-          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
-          udp_listener_worker_router_(1), init_manager_(nullptr) {
+        : parent_(parent), name_("fake_upstream"), init_manager_(nullptr) {
       if (is_quic) {
         envoy::config::listener::v3::QuicProtocolOptions config;
         auto& config_factory =
             Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
                 "quiche_quic_listener");
-        udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(config, 1);
+        udp_listener_config_.listener_factory_ =
+            config_factory.createActiveUdpListenerFactory(config, 1);
       } else {
-        udp_listener_factory_ = std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+        udp_listener_config_.listener_factory_ =
+            std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       }
     }
+
+    UdpListenerConfigImpl udp_listener_config_;
 
   private:
     // Network::ListenerConfig
@@ -720,15 +745,7 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      return udp_listener_factory_.get();
-    }
-    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-      return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
-    }
-    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-      return udp_listener_worker_router_;
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -748,9 +765,6 @@ private:
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
-    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
-    const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-    Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;

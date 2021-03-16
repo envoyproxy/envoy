@@ -30,7 +30,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
-#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -306,7 +305,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
-  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -364,7 +362,6 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
-  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -386,45 +383,47 @@ void ListenerImpl::buildAccessLog() {
 
 void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                                            uint32_t concurrency) {
-  if (socket_type == Network::Socket::Type::Datagram) {
-    if (!config_.reuse_port() && concurrency > 1) {
-      throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
-                           "socket option results in "
-                           "unstable packet proxying. Configure the reuse_port listener option or "
-                           "set concurrency = 1.");
-    }
-    auto udp_config = config_.udp_listener_config();
-    if (udp_config.udp_listener_name().empty()) {
-      udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
-    }
-    auto& config_factory =
-        Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(
-            udp_config.udp_listener_name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
-    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
-
-    udp_listener_worker_router_ =
-        std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
+  if (socket_type != Network::Socket::Type::Datagram) {
+    return;
   }
-}
-
-void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
-  if (socket_type == Network::Socket::Type::Datagram) {
-    auto udp_writer_config = config_.udp_writer_config();
-    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
-        udp_writer_config.typed_config().type_url().empty()) {
-      const std::string default_type_url =
-          "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
-      udp_writer_config.mutable_typed_config()->set_type_url(default_type_url);
-    }
-    auto& config_factory =
-        Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(
-            udp_writer_config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        udp_writer_config.typed_config(), validation_visitor_, config_factory);
-    udp_writer_factory_ = config_factory.createUdpPacketWriterFactory(*message);
+  if (!config_.reuse_port() && concurrency > 1) {
+    throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
+                         "socket option results in "
+                         "unstable packet proxying. Configure the reuse_port listener option or "
+                         "set concurrency = 1.");
   }
+  auto udp_config = config_.udp_listener_config();
+  if (udp_config.listener_config().typed_config().type_url().empty()) {
+    const std::string default_type_url =
+        "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
+    udp_config.mutable_listener_config()->mutable_typed_config()->set_type_url(default_type_url);
+  }
+
+  auto& listener_config_factory =
+      Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+          udp_config.listener_config());
+  ProtobufTypes::MessagePtr listener_typed_config = Config::Utility::translateAnyToFactoryConfig(
+      udp_config.listener_config().typed_config(), validation_visitor_, listener_config_factory);
+
+  udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
+  udp_listener_config_->listener_factory_ =
+      listener_config_factory.createActiveUdpListenerFactory(*listener_typed_config, concurrency);
+  udp_listener_config_->listener_worker_router_ =
+      std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
+
+  auto writer_config = udp_config.writer_config();
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+      writer_config.typed_config().type_url().empty()) {
+    const std::string default_type_url =
+        "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
+    writer_config.mutable_typed_config()->set_type_url(default_type_url);
+  }
+  auto& writer_config_factory =
+      Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(writer_config);
+  ProtobufTypes::MessagePtr writer_typed_config = Config::Utility::translateAnyToFactoryConfig(
+      writer_config.typed_config(), validation_visitor_, writer_config_factory);
+  udp_listener_config_->writer_factory_ =
+      writer_config_factory.createUdpPacketWriterFactory(*writer_typed_config);
 }
 
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
@@ -485,13 +484,13 @@ void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_ty
 void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
   if (config_.filter_chains().empty() && !config_.has_default_filter_chain() &&
       (socket_type == Network::Socket::Type::Stream ||
-       !udp_listener_factory_->isTransportConnectionless())) {
+       !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
-  } else if (udp_listener_factory_ != nullptr &&
-             !udp_listener_factory_->isTransportConnectionless()) {
+  } else if (udp_listener_config_ != nullptr &&
+             !udp_listener_config_->listener_factory_->isTransportConnectionless()) {
     // Early fail if any filter chain doesn't have transport socket configured.
     if (anyFilterChain(config_, [](const auto& filter_chain) {
           return !filter_chain.has_transport_socket();

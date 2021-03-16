@@ -73,8 +73,9 @@ public:
   }
 
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb)};
+                                            Network::UdpListenerCallbacks& cb,
+                                            const CreateUdpListenerParams& params) override {
+    return Network::UdpListenerPtr{createUdpListener_(socket, cb, params)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -137,7 +138,8 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                bool bind_to_port, uint32_t backlog_size));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
+              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+               const CreateUdpListenerParams& params));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
