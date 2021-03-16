@@ -36,6 +36,9 @@ public:
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
   uint64_t maxDatagramSize() const override;
+  void onDatagramsDropped(uint32_t) override {
+    // TODO(mattklein123): Emit a stat for this.
+  }
 
   // Register file event and apply socket options.
   void setUpConnectionSocket();

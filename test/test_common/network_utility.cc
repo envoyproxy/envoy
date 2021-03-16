@@ -210,6 +210,7 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
     data_.push_back(std::move(datagram));
   }
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
+  void onDatagramsDropped(uint32_t) override {}
 
   std::list<Network::UdpRecvData>& data_;
   const uint64_t max_rx_datagram_size_;

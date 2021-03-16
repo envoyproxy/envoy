@@ -133,6 +133,43 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   requestResponseWithListenerAddress(*listener_address);
 }
 
+// Verify downstream drops are handled correctly with stats.
+TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
+  setup(1);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Test::UdpSyncPeer client(version_);
+  const uint64_t large_datagram_size =
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+  client.write(std::string(large_datagram_size, 'a'), *listener_address);
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.0.0.0.0_0.udp.downstream_rx_datagram_dropped", 1);
+  } else {
+    test_server_->waitForCounterEq("listener.[__]_0.udp.downstream_rx_datagram_dropped", 1);
+  }
+}
+
+// Verify upstream drops are handled correctly with stats.
+TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
+  setup(1);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Test::UdpSyncPeer client(version_);
+
+  client.write("hello", *listener_address);
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("hello", request_datagram.buffer_->toString());
+
+  const uint64_t large_datagram_size =
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+  fake_upstreams_[0]->sendUdpDatagram(std::string(large_datagram_size, 'a'),
+                                      request_datagram.addresses_.peer_);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_dropped", 1);
+}
+
 // Test with large packet sizes.
 TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
   // The following tests large packets end to end. We use a size larger than

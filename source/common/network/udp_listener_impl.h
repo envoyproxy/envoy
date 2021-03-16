@@ -27,23 +27,24 @@ public:
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
 
-  // Network::Listener Interface
+  // Network::Listener
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat) override {}
 
-  // Network::UdpListener Interface
+  // Network::UdpListener
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
   Api::IoCallUint64Result send(const UdpSendData& data) override;
   Api::IoCallUint64Result flush() override;
   void activateRead() override;
 
+  // Network::UdpPacketProcessor
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
                      MonotonicTime receive_time) override;
-
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
+  void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
 
 protected:
   void handleWriteCallback();

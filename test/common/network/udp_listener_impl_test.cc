@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -147,6 +148,7 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
   client_.write(third, *send_to_addr_);
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
     validateRecvCallbackParams(
         data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u);
@@ -173,6 +175,7 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
   client_.write(third, *send_to_addr_);
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
     validateRecvCallbackParams(
         data, Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_MMSG_RECEIVE : 1u);
@@ -193,6 +196,7 @@ TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
   client_.write(second, *send_to_addr_);
 
   EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
   EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
     validateRecvCallbackParams(data, 1);
     EXPECT_EQ(data.buffer_->toString(), second);

@@ -54,9 +54,11 @@ filter_chains:
 reuse_port: true
 udp_listener_config:
   listener_config:
+    name: quic_listener
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
   writer_config:
+    name: gso_writer
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
   )EOF",
@@ -160,9 +162,11 @@ filter_chains:
 reuse_port: true
 udp_listener_config:
   listener_config:
+    name: quic_listener
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
   writer_config:
+    name: gso_writer
     typed_config:
       "@type": type.googleapis.com/envoy.config.listener.v3.UdpGsoBatchWriterOptions
   )EOF",
