@@ -986,12 +986,14 @@ filter:
       - RFCF
       - NFCF
       - DT
+      - UPE
+      - NC
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x800000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -1017,7 +1019,10 @@ typed_config:
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
       StreamInfo::ResponseFlag::NoFilterConfigFound,
-      StreamInfo::ResponseFlag::DurationTimeout};
+      StreamInfo::ResponseFlag::DurationTimeout,
+      StreamInfo::ResponseFlag::UpstreamProtocolError,
+      StreamInfo::ResponseFlag::NoClusterFound,
+  };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 

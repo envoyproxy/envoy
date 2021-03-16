@@ -524,7 +524,7 @@ response header/body with end-stream set are received. This is handled in
 It is possible for a request to terminate early. This may be due to (but not limited to):
 
 * Request timeout.
-* Upstream endpoint steam reset.
+* Upstream endpoint stream reset.
 * HTTP filter stream reset.
 * Circuit breaking.
 * Unavailability of upstream resources, e.g. missing a cluster for a route.

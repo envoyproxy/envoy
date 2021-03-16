@@ -10,6 +10,7 @@
 #include "common/network/socket_impl.h"
 #include "common/network/socket_interface.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/udp/udp_proxy/hash_policy_impl.h"
@@ -69,7 +70,9 @@ public:
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
-        stats_(generateStats(config.stat_prefix(), root_scope)) {
+        stats_(generateStats(config.stat_prefix(), root_scope)),
+        max_upstream_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+            config, max_upstream_rx_datagram_size, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE)) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(
           "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
@@ -87,6 +90,7 @@ public:
   const Udp::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
+  uint64_t maxUpstreamDatagramSize() const { return max_upstream_rx_datagram_size_; }
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
@@ -103,6 +107,7 @@ private:
   const bool use_original_src_ip_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
+  const uint64_t max_upstream_rx_datagram_size_;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -164,11 +169,8 @@ private:
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                        Network::Address::InstanceConstSharedPtr peer_address,
                        Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
-    uint64_t maxPacketSize() const override {
-      // TODO(mattklein123): Support configurable/jumbo frames when proxying to upstream.
-      // Eventually we will want to support some type of PROXY header when doing L4 QUIC
-      // forwarding.
-      return Network::MAX_UDP_PACKET_SIZE;
+    uint64_t maxDatagramSize() const override {
+      return cluster_.filter_.config_->maxUpstreamDatagramSize();
     }
 
     ClusterInfo& cluster_;

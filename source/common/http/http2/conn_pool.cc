@@ -68,14 +68,24 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
 }
 
 void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) {
-  if (reason == StreamResetReason::ConnectionTermination ||
-      reason == StreamResetReason::ConnectionFailure) {
+  switch (reason) {
+  case StreamResetReason::ConnectionTermination:
+  case StreamResetReason::ConnectionFailure:
     parent_.host()->cluster().stats().upstream_rq_pending_failure_eject_.inc();
     closed_with_active_rq_ = true;
-  } else if (reason == StreamResetReason::LocalReset) {
+    break;
+  case StreamResetReason::LocalReset:
+  case StreamResetReason::ProtocolError:
     parent_.host()->cluster().stats().upstream_rq_tx_reset_.inc();
-  } else if (reason == StreamResetReason::RemoteReset) {
+    break;
+  case StreamResetReason::RemoteReset:
     parent_.host()->cluster().stats().upstream_rq_rx_reset_.inc();
+    break;
+  case StreamResetReason::LocalRefusedStreamReset:
+  case StreamResetReason::RemoteRefusedStreamReset:
+  case StreamResetReason::Overflow:
+  case StreamResetReason::ConnectError:
+    break;
   }
 }
 
