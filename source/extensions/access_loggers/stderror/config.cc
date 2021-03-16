@@ -52,7 +52,7 @@ ProtobufTypes::MessagePtr StderrAccessLogFactory::createEmptyConfigProto() {
 std::string StderrAccessLogFactory::name() const { return AccessLogNames::get().Stderror; }
 
 /**
- * Static registration for the stderror access log. @see RegisterFactory.
+ * Static registration for the `stderror` access log. @see RegisterFactory.
  */
 REGISTER_FACTORY(StderrAccessLogFactory,
                  Server::Configuration::AccessLogInstanceFactory){"envoy.stderror_access_log"};
