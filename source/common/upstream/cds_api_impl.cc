@@ -104,7 +104,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
     }
   }
 
-  ENVOY_LOG(debug, "cds: added/updated {} cluster(s), {} skipped unmodified cluster(s)",
+  ENVOY_LOG(info, "cds: added/updated {} cluster(s), skipped {} unmodified cluster(s)",
             added_or_updated, skipped);
 
   if (any_applied) {
