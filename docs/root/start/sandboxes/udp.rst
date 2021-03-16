@@ -15,7 +15,7 @@ User Datagram Protocol (``UDP``)
 
 This sandbox provides a very simple example of Envoy proxying ``UDP``.
 
-It also demonstrates ``UDP`` traffic stats provided by Envoy.
+It also demonstrates ``UDP`` traffic stats provided by the Envoy admin endpoint.
 
 Step 1: Build the sandbox
 *************************
@@ -33,11 +33,13 @@ Start the Docker composition:
   $ docker-compose ps
 
       Name                 Command                   State      Ports
-  ----------------------------------------------------------------------------------------------
-  udp_service-udp_1   python -u /udplistener.py      Up      5005/tcp, 5005/udp
-  udp_testing_1       /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:10000->10000/udp
+  -----------------------------------------------------------------------------------------------------------------------
+  udp_service-udp_1   python -u /udplistener.py      Up     5005/tcp, 5005/udp
+  udp_testing_1       /docker-entrypoint.sh /usr ... Up     10000/tcp, 0.0.0.0:10000->10000/udp, 0.0.0.0:10001->10001/tcp
 
-Envoy should be proxying ``UDP`` on port ``10000`` to an upstream listener server.
+
+Envoy should proxy ``UDP`` on port ``10000`` to an upstream listener, and provide an admin
+interface on port ``10001``.
 
 Step 2: Send the ``UDP`` server some messages
 *********************************************
@@ -65,7 +67,7 @@ Checking the logs of the upstream server you should see the packets that you sen
 Step 4: View the Envoy admin ``UDP`` stats
 ******************************************
 
-You can view the `UDP``-related admin stats provided by the Envoy admin endpoint.
+You can view the ``UDP``-related admin stats provided by the Envoy admin endpoint.
 
 For example, to view the non-zero stats:
 
