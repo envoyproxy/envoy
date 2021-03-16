@@ -1,7 +1,9 @@
 #include "common/http/http2/codec_impl.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
@@ -11,8 +13,10 @@
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
@@ -76,6 +80,15 @@ int reasonToReset(StreamResetReason reason) {
 }
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+
+ReceivedSettingsImpl::ReceivedSettingsImpl(const nghttp2_settings& settings) {
+  for (uint32_t i = 0; i < settings.niv; ++i) {
+    if (settings.iv[i].settings_id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = settings.iv[i].value;
+      break;
+    }
+  }
+}
 
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
@@ -641,12 +654,18 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
+  ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
   // ConnectionImpl::dispatch returns early or throws an exception (consider removing if there is a
   // single return after exception removal (#10878)).
-  Cleanup cleanup([this]() { dispatching_ = false; });
+  Cleanup cleanup([this]() {
+    dispatching_ = false;
+    current_slice_ = nullptr;
+    current_stream_id_.reset();
+  });
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    current_slice_ = &slice;
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);
@@ -665,7 +684,9 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
       return codecProtocolError(nghttp2_strerror(rc));
     }
 
+    current_slice_ = nullptr;
     dispatching_ = false;
+    current_stream_id_.reset();
   }
 
   ENVOY_CONN_LOG(trace, "dispatched {} bytes", connection_, data.length());
@@ -673,6 +694,10 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
   // Decoding incoming frames can generate outbound frames so flush pending.
   return sendPendingFrames();
+}
+
+const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) const {
+  return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
@@ -728,6 +753,7 @@ Status ConnectionImpl::protocolErrorForTest() {
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
+  current_stream_id_ = hd->stream_id;
 
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
@@ -786,7 +812,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettingsForTest(frame->settings);
+    onSettings(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);
@@ -1000,6 +1026,7 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
     }
 
     stream->destroy();
+    current_stream_id_.reset();
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
@@ -1386,6 +1413,121 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
       options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 }
 
+void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Http2::ConnectionImpl " << this << DUMP_MEMBER(max_headers_kb_)
+     << DUMP_MEMBER(max_headers_count_) << DUMP_MEMBER(per_stream_buffer_limit_)
+     << DUMP_MEMBER(allow_metadata_) << DUMP_MEMBER(stream_error_on_invalid_http_messaging_)
+     << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_)
+     << DUMP_MEMBER(skip_encoding_empty_trailers_) << DUMP_MEMBER(dispatching_)
+     << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(pending_deferred_reset_) << '\n';
+
+  // Dump the protocol constraints
+  DUMP_DETAILS(&protocol_constraints_);
+
+  // Dump either a targeted stream or several of the active streams.
+  dumpStreams(os, indent_level);
+
+  // Dump the active slice
+  if (current_slice_ == nullptr) {
+    // No current slice, use macro for consistent formatting.
+    os << spaces << "current_slice_: null\n";
+  } else {
+    auto slice_view =
+        absl::string_view(static_cast<const char*>(current_slice_->mem_), current_slice_->len_);
+
+    os << spaces << "current slice length: " << slice_view.length() << " contents: \"";
+    StringUtil::escapeToOstream(os, slice_view);
+    os << "\"\n";
+  }
+}
+
+void ConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+
+  // Try to dump details for the current stream.
+  // If none, dump a subset of our active streams.
+  os << spaces << "Number of active streams: " << active_streams_.size()
+     << DUMP_OPTIONAL_MEMBER(current_stream_id_);
+
+  if (current_stream_id_.has_value()) {
+    os << " Dumping current stream:\n";
+    const ConnectionImpl::StreamImpl* stream = getStream(current_stream_id_.value());
+    DUMP_DETAILS(stream);
+  } else {
+    os << " Dumping " << std::min<size_t>(25, active_streams_.size()) << " Active Streams:\n";
+    size_t count = 0;
+    for (auto& stream : active_streams_) {
+      DUMP_DETAILS(stream);
+      if (++count >= 25) {
+        break;
+      }
+    }
+  }
+}
+
+void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const {
+  ConnectionImpl::dumpStreams(os, indent_level);
+
+  if (!current_stream_id_.has_value()) {
+    return;
+  }
+
+  // Try to dump the downstream request information, corresponding to the
+  // stream we were processing.
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "Dumping corresponding downstream request for upstream stream "
+     << current_stream_id_.value() << ":\n";
+
+  const ClientStreamImpl* client_stream =
+      static_cast<const ClientStreamImpl*>(getStream(current_stream_id_.value()));
+  if (client_stream) {
+    client_stream->response_decoder_.dumpState(os, indent_level + 1);
+  } else {
+    os << spaces
+       << " Failed to get the upstream stream with stream id: " << current_stream_id_.value()
+       << " Unable to dump downstream request.\n";
+  }
+}
+
+void ConnectionImpl::StreamImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
+     << DUMP_MEMBER(unconsumed_bytes_) << DUMP_MEMBER(read_disable_count_)
+     << DUMP_MEMBER(local_end_stream_sent_) << DUMP_MEMBER(remote_end_stream_)
+     << DUMP_MEMBER(data_deferred_) << DUMP_MEMBER(received_noninformational_headers_)
+     << DUMP_MEMBER(pending_receive_buffer_high_watermark_called_)
+     << DUMP_MEMBER(pending_send_buffer_high_watermark_called_)
+     << DUMP_MEMBER(reset_due_to_messaging_error_)
+     << DUMP_MEMBER_AS(cookies_, cookies_.getStringView());
+
+  DUMP_DETAILS(pending_trailers_to_encode_);
+}
+
+void ConnectionImpl::ClientStreamImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  StreamImpl::dumpState(os, indent_level);
+
+  // Dump header map
+  if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_));
+  }
+}
+
+void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  StreamImpl::dumpState(os, indent_level);
+
+  // Dump header map
+  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
     Random::RandomGenerator& random_generator,
@@ -1394,7 +1536,8 @@ ClientConnectionImpl::ClientConnectionImpl(
     Nghttp2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_response_headers_kb,
                      max_response_headers_count),
-      callbacks_(callbacks) {
+      callbacks_(callbacks), enable_upstream_http2_flood_checks_(Runtime::runtimeFeatureEnabled(
+                                 "envoy.reloadable_features.upstream_http2_flood_checks")) {
   ClientHttp2Options client_http2_options(http2_options);
   session_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
                                           client_http2_options.options());
@@ -1443,7 +1586,7 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
                                                 uint32_t padding_length) {
   Status result;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.upstream_http2_flood_checks")) {
+  if (enable_upstream_http2_flood_checks_) {
     ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
                    connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
                    static_cast<uint64_t>(hd->length), padding_length);
@@ -1466,7 +1609,7 @@ Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
 // TODO(yanavlasov): move to the base class once the runtime flag is removed.
 ProtocolConstraints::ReleasorProc
 ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.upstream_http2_flood_checks")) {
+  if (enable_upstream_http2_flood_checks_) {
     return protocol_constraints_.incrementOutboundFrameCount(
         is_outbound_flood_monitored_control_frame);
   }

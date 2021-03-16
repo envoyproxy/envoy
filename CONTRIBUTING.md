@@ -29,7 +29,7 @@ following guidelines for all code, APIs, and documentation:
 * The following words and phrases are not allowed:
   * *Whitelist*: use allowlist instead.
   * *Blacklist*: use denylist or blocklist instead.
-  * *Master*: use primary instead.
+  * *Master*: use primary or main instead.
   * *Slave*: use secondary or replica instead.
 * Documentation should be written in an inclusive style. The [Google developer
   documentation](https://developers.google.com/style/inclusive-documentation) contains an excellent
@@ -238,9 +238,9 @@ and false.
 
 # API changes
 
-If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/master/api),
+If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/main/api),
 please read the [API Review
-Checklist](https://github.com/envoyproxy/envoy/tree/master/api/review_checklist.md)
+Checklist](https://github.com/envoyproxy/envoy/tree/main/api/review_checklist.md)
 and make sure that your changes have addressed all of the considerations listed there.
 
 # Adding new extensions

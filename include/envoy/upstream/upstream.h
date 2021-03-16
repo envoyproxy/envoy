@@ -404,9 +404,10 @@ public:
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
    * Install a callback that will be invoked when a host set changes. Triggers when any change
@@ -414,9 +415,10 @@ public:
    * added/removed hosts will be passed to the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
    */
-  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
@@ -539,6 +541,7 @@ public:
   COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
   COUNTER(upstream_cx_http2_total)                                                                 \
+  COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
@@ -697,17 +700,17 @@ class ClusterInfo {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
-    static const uint64_t HTTP2 = 0x1;
+    static constexpr uint64_t HTTP2 = 0x1;
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
-    static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
+    static constexpr uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
-    static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    static constexpr uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
     // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
     // If ALPN is attempted but not supported by the upstream HTTP/1.1 is used.
-    static const uint64_t USE_ALPN = 0x8;
+    static constexpr uint64_t USE_ALPN = 0x8;
     // Whether the upstream supports HTTP3. This is used when creating connection pools.
-    static const uint64_t HTTP3 = 0x10;
+    static constexpr uint64_t HTTP3 = 0x10;
   };
 
   virtual ~ClusterInfo() = default;
@@ -858,6 +861,14 @@ public:
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return the observability name associated to the cluster. Used in stats, tracing, logging, and
+   * config dumps. The observability name is configured with :ref:`alt_stat_name
+   * <envoy_api_field_config.cluster.v3.Cluster.alt_stat_name>`. If unprovided, the default value is
+   * the cluster name.
+   */
+  virtual const std::string& observabilityName() const PURE;
 
   /**
    * @return ResourceManager& the resource manager to use by proxy agents for this cluster (at

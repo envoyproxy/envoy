@@ -13,6 +13,7 @@
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/assert.h"
@@ -560,14 +561,25 @@ public:
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 
   /**
-   * @param utils The requestID utils implementation this stream uses
+   * @param provider The requestID provider implementation this stream uses.
    */
-  virtual void setRequestIDExtension(Http::RequestIDExtensionSharedPtr utils) PURE;
+  virtual void
+  setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) PURE;
 
   /**
-   * @return A shared pointer to the request ID utils for this stream
+   * @return the request ID provider for this stream if available.
    */
-  virtual Http::RequestIDExtensionSharedPtr getRequestIDExtension() const PURE;
+  virtual const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const PURE;
+
+  /**
+   * Set the trace reason for the stream.
+   */
+  virtual void setTraceReason(Tracing::Reason reason) PURE;
+
+  /**
+   * @return the trace reason for the stream.
+   */
+  virtual Tracing::Reason traceReason() const PURE;
 
   /**
    * @return Connection ID of the downstream connection, or unset if not available.
@@ -578,6 +590,16 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param filter_chain_name Network filter chain name of the downstream connection.
+   */
+  virtual void setFilterChainName(absl::string_view filter_chain_name) PURE;
+
+  /**
+   * @return Network filter chain name of the downstream connection.
+   */
+  virtual const std::string& filterChainName() const PURE;
 };
 
 } // namespace StreamInfo

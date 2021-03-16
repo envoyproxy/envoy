@@ -33,6 +33,7 @@
 #include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -977,15 +978,8 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : ListenerFilterChainFactoryBuilder(listener.validation_visitor_, listener.parent_.factory_,
-                                        factory_context) {}
-
-ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
-    ProtobufMessage::ValidationVisitor& validator,
-    ListenerComponentFactory& listener_component_factory,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : validator_(validator), listener_component_factory_(listener_component_factory),
-      factory_context_(factory_context) {}
+    : listener_(listener), validator_(listener.validation_visitor_),
+      listener_component_factory_(listener.parent_.factory_), factory_context_(factory_context) {}
 
 Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
@@ -1014,6 +1008,16 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
+  // The only connection oriented UDP transport protocol right now is QUIC.
+  const bool is_quic = listener_.udpListenerFactory() != nullptr &&
+                       !listener_.udpListenerFactory()->isTransportConnectionless();
+  if (is_quic &&
+      dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
+    throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
+                                     "transport socket config specified for quic transport socket: "
+                                     "{}. \nUse QuicDownstreamTransport instead.",
+                                     transport_socket.DebugString()));
+  }
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
 
@@ -1026,7 +1030,8 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
                                                                  *filter_chain_factory_context),
       std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)));
+          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
+      filter_chain.name());
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;

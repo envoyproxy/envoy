@@ -319,7 +319,9 @@ The following command operators are supported:
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
 %UPSTREAM_CLUSTER%
-  Upstream cluster to which the upstream host belongs to.
+  Upstream cluster to which the upstream host belongs to. If runtime feature
+  `envoy.reloadable_features.use_observable_cluster_name` is enabled, then :ref:`alt_stat_name
+  <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
 
 %UPSTREAM_LOCAL_ADDRESS%
   Local address of the upstream connection. If the address is an IP address it includes both
@@ -611,3 +613,6 @@ The following command operators are supported:
 
 %LOCAL_REPLY_BODY%
   The body text for the requests rejected by the Envoy.
+
+%FILTER_CHAIN_NAME%
+  The network filter chain name of the downstream connection.

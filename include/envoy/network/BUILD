@@ -35,6 +35,7 @@ envoy_cc_library(
     name = "connection_handler_interface",
     hdrs = ["connection_handler.h"],
     deps = [
+        ":connection_balancer_interface",
         ":listen_socket_interface",
         ":listener_interface",
         "//include/envoy/ssl:context_interface",
@@ -79,6 +80,7 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/protobuf",
     ],

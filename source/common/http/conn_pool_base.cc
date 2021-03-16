@@ -31,8 +31,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http2);
       break;
     case Http::Protocol::Http3:
-      // TODO(snowp): Add once HTTP/3 upstream support is added.
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      // TODO(#14829) hard-code H3 ALPN, consider failing if other things are negotiated.
       break;
     }
   }

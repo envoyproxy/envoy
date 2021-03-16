@@ -68,14 +68,14 @@ static_resources:
           route_config:
             virtual_hosts:
             - name: default
-              domains: "*"
+              domains: ["*"]
               routes:
               - match: { prefix: "/" }
                 route:
                   cluster: service_foo
                   idle_timeout: 15s # must be disabled for long-lived and streaming requests
   clusters:
-    name: service_foo
+  - name: service_foo
     connect_timeout: 15s
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
     load_assignment:

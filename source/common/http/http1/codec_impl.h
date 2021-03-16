@@ -78,7 +78,7 @@ public:
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
-                         bool end_stream);
+                         bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;

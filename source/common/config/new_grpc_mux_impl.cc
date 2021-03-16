@@ -25,10 +25,23 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const LocalInfo::LocalInfo& local_info)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      local_info_(local_info), transport_api_version_(transport_api_version),
-      dispatcher_(dispatcher),
+      local_info_(local_info),
+      dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
+          [this](absl::string_view resource_type_url) {
+            onDynamicContextUpdate(resource_type_url);
+          })),
+      transport_api_version_(transport_api_version), dispatcher_(dispatcher),
       enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {}
+
+void NewGrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
+  auto sub = subscriptions_.find(resource_type_url);
+  if (sub == subscriptions_.end()) {
+    return;
+  }
+  sub->second->sub_state_.setMustSendDiscoveryRequest();
+  trySendDiscoveryRequests();
+}
 
 ScopedResume NewGrpcMuxImpl::pause(const std::string& type_url) {
   return pause(std::vector<std::string>{type_url});
@@ -50,7 +63,6 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
-
   TypeUrlMap& type_url_map = typeUrlMap();
   if (type_url_map.find(type_url) != type_url_map.end()) {
     return;
