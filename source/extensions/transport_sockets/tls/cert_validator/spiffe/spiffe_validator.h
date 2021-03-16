@@ -62,9 +62,12 @@ public:
     return trust_bundle_stores_;
   };
 
+  bool matchSubjectAltName(X509& leaf_cert);
+
 private:
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
   std::string ca_file_name_;
+  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers_{};
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
 
   SslStats& stats_;

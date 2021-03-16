@@ -4,6 +4,7 @@
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
 #include "common/common/macros.h"
+#include "common/common/matchers.h"
 
 #include "test/test_common/utility.h"
 
@@ -30,8 +31,11 @@ private:
 class TestCertificateValidationContextConfig
     : public Envoy::Ssl::CertificateValidationContextConfig {
 public:
-  TestCertificateValidationContextConfig(envoy::config::core::v3::TypedExtensionConfig config)
-      : api_(Api::createApiForTest()), custom_validator_config_(config){};
+  TestCertificateValidationContextConfig(
+      envoy::config::core::v3::TypedExtensionConfig config,
+      std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers = {})
+      : api_(Api::createApiForTest()), custom_validator_config_(config),
+        san_matchers_(san_matchers){};
   TestCertificateValidationContextConfig()
       : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt){};
 
@@ -48,7 +52,7 @@ public:
   }
   const std::vector<envoy::type::matcher::v3::StringMatcher>&
   subjectAltNameMatchers() const override {
-    CONSTRUCT_ON_FIRST_USE(std::vector<envoy::type::matcher::v3::StringMatcher>, {});
+    return san_matchers_;
   }
   const std::vector<std::string>& verifyCertificateHashList() const override {
     CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
@@ -75,6 +79,7 @@ public:
 private:
   Api::ApiPtr api_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
+  const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
 };
 
 } // namespace Tls
