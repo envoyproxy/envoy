@@ -51,7 +51,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
         0x05, '0', '.', '0', '.', '0', // Service version
         0x04, 't', 'e', 's', 't',      // method name
     }));
-    std::string exception_string = fmt::format("RpcInvocation size({}) large than body size({})",
+    std::string exception_string = fmt::format("RpcInvocation size({}) larger than body size({})",
                                                buffer.length(), buffer.length() - 1);
     std::shared_ptr<ContextImpl> context = std::make_shared<ContextImpl>();
     context->setBodySize(buffer.length() - 1);

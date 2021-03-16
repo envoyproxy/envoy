@@ -90,10 +90,6 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
   invo.setServiceVersion("fake_version");
   EXPECT_EQ("fake_version", invo.serviceVersion().value());
 
-  EXPECT_EQ(false, invo.serviceGroup().has_value());
-  invo.setServiceGroup("fake_group");
-  EXPECT_EQ("fake_group", invo.serviceGroup().value());
-
   bool set_parameters{false};
   bool set_attachment{false};
 
@@ -106,7 +102,7 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
     auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
 
     map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
-                                        std::make_unique<Hessian2::StringObject>("new_fake_group"));
+                                        std::make_unique<Hessian2::StringObject>("fake_group"));
 
     auto attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
 
@@ -125,6 +121,9 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
   EXPECT_EQ(true, set_attachment);
   EXPECT_EQ(true, invo.hasParameters());
   EXPECT_EQ(true, invo.hasAttachment());
+  EXPECT_EQ("fake_group", invo.serviceGroup().value());
+
+  invo.setServiceGroup("new_fake_group");
   EXPECT_EQ("new_fake_group", invo.serviceGroup().value());
 
   // If parameters and attachment have values, the callback function will not be executed.
