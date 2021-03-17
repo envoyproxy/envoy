@@ -8,7 +8,7 @@ specific place yourself.
 
 Static linking is already available (because of a `HeapProfilerDump()` call
 inside
-[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L32-L39)).
+[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/main/source/common/profiler/profiler.cc#L32-L39)).
 
 ### Compiling a statically-linked Envoy
 
@@ -61,7 +61,7 @@ is controlled by `ProfilerStart()`/`ProfilerStop()`, and the
 [Gperftools Heap Profiler](https://gperftools.github.io/gperftools/heapprofile.html)
 is controlled by `HeapProfilerStart()`, `HeapProfilerStop()` and `HeapProfilerDump()`.
 
-These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.h)).
+These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/main/source/common/profiler/profiler.h)).
 
 To enable profiling programmatically:
 

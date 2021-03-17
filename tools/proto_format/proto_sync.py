@@ -433,7 +433,7 @@ def Sync(api_root, mode, labels, shadow):
         if deleted_files:
           print('The following files will be deleted: %s' % sorted(deleted_files))
           print(
-              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/master/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
+              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
           )
           if input('Delete files? [yN] ').strip().lower() == 'y':
             subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
