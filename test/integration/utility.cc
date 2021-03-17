@@ -18,6 +18,7 @@
 #include "common/http/headers.h"
 #include "common/http/http3/quic_client_connection_factory.h"
 #include "common/http/http3/well_known_names.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -158,8 +159,16 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
             Http::QuicCodecNames::get().Quiche);
     persistent_info = connection_factory.createNetworkConnectionInfo(
         *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
-    connection = connection_factory.createQuicNetworkConnection(
-        *persistent_info, *dispatcher, addr, Network::Address::InstanceConstSharedPtr());
+
+    Network::Address::InstanceConstSharedPtr local_address;
+    if (addr->ip()->version() == Network::Address::IpVersion::v4) {
+      local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
+    } else {
+      // Docker only works with loopback v6 address.
+      local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
+    }
+    connection = connection_factory.createQuicNetworkConnection(*persistent_info, *dispatcher, addr,
+                                                                local_address);
     connection->addConnectionCallbacks(connection_callbacks);
   } else {
     connection =

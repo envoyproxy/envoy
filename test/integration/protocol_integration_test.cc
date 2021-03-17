@@ -1309,6 +1309,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   initialize();
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                  {":path", "/test/long/url"},
