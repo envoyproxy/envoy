@@ -519,8 +519,8 @@ timestamp()
 
   timestamp = handle:timestamp(format)
 
-High resolution timestamp function. *format* is an optional string parameter to indicate the format of the timestamp.
-*milliseconds_since_epoch* and *nanoseconds_since_epoch* are supported.
+High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
+*EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
 
 Header object API

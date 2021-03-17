@@ -174,7 +174,6 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
             lua_newtable(state);
             {
               LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
-              LUA_ENUM(state, NANOSECOND, Timestamp::Resolution::Nanosecond);
             }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
@@ -667,21 +666,14 @@ int StreamHandleWrapper::luaTimestamp(lua_State* state) {
 
   auto milliseconds_since_epoch =
       std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-  auto nanoseconds_since_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
 
   absl::uint128 resolution_as_int_from_state = 0;
   if (unit_parameter.empty()) {
     lua_pushnumber(state, milliseconds_since_epoch);
-  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state)) {
-    if (resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
-      lua_pushnumber(state, milliseconds_since_epoch);
-    } else if (resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Nanosecond)) {
-      lua_pushnumber(state, nanoseconds_since_epoch);
-    } else {
-      luaL_error(state, "timestamp format must be MILLISECOND or NANOSECOND.");
-    }
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) && resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
+    lua_pushnumber(state, milliseconds_since_epoch);
   } else {
-    luaL_error(state, "timestamp format must be MILLISECOND or NANOSECOND.");
+    luaL_error(state, "timestamp format must be MILLISECOND.");
   }
 
   return 1;
