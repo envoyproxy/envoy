@@ -9,7 +9,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 
-#include "extensions/filters/http/cache/inline_headers_handles.h"
+#include "extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"
