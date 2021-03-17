@@ -621,6 +621,8 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
 
   // Send a response which causes connection to close.
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+
   Buffer::OwnedImpl buffer(response);
   // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
   // shouldn't be called because the connection is closed.
@@ -644,6 +646,7 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
             return quic::QuicConsumedData{0, false};
           }));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
