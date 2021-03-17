@@ -9,7 +9,7 @@ repos:
     - id: check-executables-have-shebangs
     - id: check-merge-conflict
     - id: check-yaml
-      exclude: '.clang_format'
+      exclude: '.clang-format'
     - id: detect-private-key
     - id: mixed-line-ending
 - repo: https://github.com/codespell-project/codespell
