@@ -11,8 +11,8 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -64,8 +64,8 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
-  const absl::string_view cache_control = request_headers.getInlineValue(
-      CacheCustomHeaders::get().request_cache_control.handle());
+  const absl::string_view cache_control =
+      request_headers.getInlineValue(CacheCustomHeaders::get().request_cache_control.handle());
   const absl::string_view pragma =
       request_headers.getInlineValue(CacheCustomHeaders::get().pragma.handle());
 
@@ -83,8 +83,8 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
                                        SystemTime::duration response_age) const {
   // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
   // lookup.
-  const absl::string_view cache_control = response_headers.getInlineValue(
-      CacheCustomHeaders::get().response_cache_control.handle());
+  const absl::string_view cache_control =
+      response_headers.getInlineValue(CacheCustomHeaders::get().response_cache_control.handle());
   const ResponseCacheControl response_cache_control(cache_control);
 
   const bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
@@ -139,8 +139,7 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
   const Seconds age =
       CacheHeadersUtils::calculateAge(*response_headers, metadata.response_time_, timestamp_);
-  response_headers->setInline(CacheCustomHeaders::get().age.handle(),
-                              std::to_string(age.count()));
+  response_headers->setInline(CacheCustomHeaders::get().age.handle(), std::to_string(age.count()));
 
   result.cache_entry_status_ = requiresValidation(*response_headers, age)
                                    ? CacheEntryStatus::RequiresValidation

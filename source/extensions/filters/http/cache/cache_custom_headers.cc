@@ -18,9 +18,8 @@ CacheCustomHeaders::CacheCustomHeaders()
       if_unmodified_since(Http::CustomHeaders::get().IfUnmodifiedSince),
       if_range(Http::CustomHeaders::get().IfRange),
       response_cache_control(Http::CustomHeaders::get().CacheControl),
-      last_modified(Http::CustomHeaders::get().LastModified),
-      etag(Http::CustomHeaders::get().Etag), age(Http::CustomHeaders::get().Age),
-      expires(Http::CustomHeaders::get().Expires) {}
+      last_modified(Http::CustomHeaders::get().LastModified), etag(Http::CustomHeaders::get().Etag),
+      age(Http::CustomHeaders::get().Age), expires(Http::CustomHeaders::get().Expires) {}
 
 } // namespace Cache
 } // namespace HttpFilters

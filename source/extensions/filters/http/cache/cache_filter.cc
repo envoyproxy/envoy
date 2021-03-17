@@ -6,8 +6,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-#include "extensions/filters/http/cache/cacheability_utils.h"
 #include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "extensions/filters/http/cache/cacheability_utils.h"
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
@@ -431,8 +431,7 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
   if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers.setInline(CacheCustomHeaders::get().if_modified_since.handle(),
-                              last_modified);
+    request_headers.setInline(CacheCustomHeaders::get().if_modified_since.handle(), last_modified);
   } else {
     // Either Last-Modified is missing or invalid, fallback to Date.
     // A correct behaviour according to:
