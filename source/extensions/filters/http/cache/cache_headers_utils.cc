@@ -156,7 +156,7 @@ Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_
 
   long age_value;
   const absl::string_view age_header =
-      response_headers.getInlineValue(CacheCustomHeaders::get().age_handle.handle());
+      response_headers.getInlineValue(CacheCustomHeaders::get().age.handle());
   if (!absl::SimpleAtoi(age_header, &age_value)) {
     age_value = 0;
   }

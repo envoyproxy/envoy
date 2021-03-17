@@ -65,9 +65,9 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control = request_headers.getInlineValue(
-      CacheCustomHeaders::get().request_cache_control_handle.handle());
+      CacheCustomHeaders::get().request_cache_control.handle());
   const absl::string_view pragma =
-      request_headers.getInlineValue(CacheCustomHeaders::get().pragma_handle.handle());
+      request_headers.getInlineValue(CacheCustomHeaders::get().pragma.handle());
 
   if (!cache_control.empty()) {
     request_cache_control_ = RequestCacheControl(cache_control);
@@ -84,7 +84,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
   // lookup.
   const absl::string_view cache_control = response_headers.getInlineValue(
-      CacheCustomHeaders::get().response_cache_control_handle.handle());
+      CacheCustomHeaders::get().response_cache_control.handle());
   const ResponseCacheControl response_cache_control(cache_control);
 
   const bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
@@ -98,7 +98,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 
   // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this.
   ASSERT(response_cache_control.max_age_.has_value() ||
-             (response_headers.getInline(CacheCustomHeaders::get().expires_handle.handle()) &&
+             (response_headers.getInline(CacheCustomHeaders::get().expires.handle()) &&
               response_headers.Date()),
          "Cache entry does not have valid expiration data.");
 
@@ -107,7 +107,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
     freshness_lifetime = response_cache_control.max_age_.value();
   } else {
     const SystemTime expires_value = CacheHeadersUtils::httpTime(
-        response_headers.getInline(CacheCustomHeaders::get().expires_handle.handle()));
+        response_headers.getInline(CacheCustomHeaders::get().expires.handle()));
     const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
     freshness_lifetime = expires_value - date_value;
   }
@@ -139,7 +139,7 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
   const Seconds age =
       CacheHeadersUtils::calculateAge(*response_headers, metadata.response_time_, timestamp_);
-  response_headers->setInline(CacheCustomHeaders::get().age_handle.handle(),
+  response_headers->setInline(CacheCustomHeaders::get().age.handle(),
                               std::to_string(age.count()));
 
   result.cache_entry_status_ = requiresValidation(*response_headers, age)
