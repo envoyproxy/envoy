@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "UdpSocketConfigProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: UDP socket config]
+
+// Generic UDP socket configuration.
+message UdpSocketConfig {
+  // The maximum size of received UDP datagrams. Using a larger size will cause Envoy to allocate
+  // more memory per socket. Received datagrams above this size will be dropped. If not set
+  // defaults to 1500 bytes.
+  google.protobuf.UInt64Value max_rx_datagram_size = 1
+      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
+}

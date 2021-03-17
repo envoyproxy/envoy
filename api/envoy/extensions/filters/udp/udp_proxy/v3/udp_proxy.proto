@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
+import "envoy/config/core/v3/udp_socket_config.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -70,9 +72,6 @@ message UdpProxyConfig {
   // limited to 1.
   repeated HashPolicy hash_policies = 5 [(validate.rules).repeated = {max_items: 1}];
 
-  // The maximum size of received upstream UDP datagrams. Using a larger size will cause Envoy to allocate
-  // more memory per listener. Received datagrams above this size will be dropped. If not set
-  // defaults to 1500 bytes.
-  google.protobuf.UInt64Value max_upstream_rx_datagram_size = 6
-      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
+  // UDP socket configuration for upstream sockets.
+  config.core.v3.UdpSocketConfig upstream_socket_config = 6;
 }

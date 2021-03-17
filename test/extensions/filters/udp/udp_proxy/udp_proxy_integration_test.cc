@@ -44,7 +44,8 @@ public:
               bootstrap.mutable_static_resources()
                   ->mutable_listeners(0)
                   ->mutable_udp_listener_config()
-                  ->mutable_max_downstream_rx_datagram_size()
+                  ->mutable_downstream_socket_config()
+                  ->mutable_max_rx_datagram_size()
                   ->set_value(max_rx_datagram_size.value());
             });
       }
@@ -55,7 +56,8 @@ typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
   cluster: cluster_0
-  max_upstream_rx_datagram_size: {}
+  upstream_socket_config:
+    max_rx_datagram_size: {}
 )EOF",
                                                    max_rx_datagram_size.value()));
     } else {

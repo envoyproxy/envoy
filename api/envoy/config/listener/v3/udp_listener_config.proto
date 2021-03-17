@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/udp_socket_config.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -35,11 +36,8 @@ message UdpListenerConfig {
   // [#comment:TODO(#12829): Remove this as an extension point.]
   core.v3.TypedExtensionConfig listener_config = 4;
 
-  // The maximum size of received downstream UDP datagrams. Using a larger size will cause Envoy to allocate
-  // more memory per listener. Received datagrams above this size will be dropped. If not set
-  // defaults to 1500 bytes.
-  google.protobuf.UInt64Value max_downstream_rx_datagram_size = 5
-      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
+  // UDP socket configuration for the listener.
+  core.v3.UdpSocketConfig downstream_socket_config = 5;
 
   // If the protocol in the listener socket address in :ref:`protocol
   // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
