@@ -116,9 +116,9 @@ private:
     GrpcMuxImpl& parent_;
 
   private:
-    using GrpcMuxWatchImplList = std::list<GrpcMuxWatchImpl*>;
-    GrpcMuxWatchImplList& watches_;
-    GrpcMuxWatchImplList::iterator iter_;
+    using WatchList = std::list<GrpcMuxWatchImpl*>;
+    WatchList& watches_;
+    WatchList::iterator iter_;
   };
 
   // Per muxed API state.
