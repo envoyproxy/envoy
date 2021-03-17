@@ -24,6 +24,7 @@ message TcpProtocolOptions {
       "envoy.config.core.v3.TcpProtocolOptions";
 }
 
+// QUIC protocol options which apply to both downstream and upstream connections.
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.QuicProtocolOptions";
