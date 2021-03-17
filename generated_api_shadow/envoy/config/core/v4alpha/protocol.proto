@@ -24,7 +24,6 @@ message TcpProtocolOptions {
       "envoy.config.core.v3.TcpProtocolOptions";
 }
 
-// [#not-implemented-hide:]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.QuicProtocolOptions";

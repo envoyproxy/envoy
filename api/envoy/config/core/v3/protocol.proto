@@ -24,7 +24,6 @@ message TcpProtocolOptions {
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
-// [#not-implemented-hide:]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
