@@ -19,7 +19,10 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
-      quic_connection_(std::move(connection)), listener_config_(listener_config) {}
+      quic_connection_(std::move(connection)), listener_config_(listener_config) {
+  // HTTP/3 header limits should be configurable, but for now hard-code to Envoy defaults.
+  set_max_inbound_header_list_size(Http::DEFAULT_MAX_REQUEST_HEADERS_KB * 1000);
+}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());

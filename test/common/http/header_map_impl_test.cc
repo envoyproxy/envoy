@@ -395,28 +395,36 @@ TEST_P(HeaderMapImplTest, CustomRegisteredHeaders) {
   header_map->addCopy(Headers::get().name, #name);                                                 \
   EXPECT_EQ(header_map->name()->value().getStringView(), #name);                                   \
   header_map->remove##name();                                                                      \
-  EXPECT_EQ(nullptr, header_map->name());                                                          \
+  EXPECT_EQ(nullptr, header_map->name());
+
+#define TEST_INLINE_STRING_HEADER_FUNCS(name)                                                      \
+  TEST_INLINE_HEADER_FUNCS(name)                                                                   \
   header_map->set##name(#name);                                                                    \
   EXPECT_EQ(header_map->get(Headers::get().name)[0]->value().getStringView(), #name);
+
+#define TEST_INLINE_NUMERIC_HEADER_FUNCS(name)                                                     \
+  TEST_INLINE_HEADER_FUNCS(name)                                                                   \
+  header_map->set##name(1);                                                                        \
+  EXPECT_EQ(header_map->get(Headers::get().name)[0]->value().getStringView(), 1);
 
 // Make sure that the O(1) headers are wired up properly.
 TEST_P(HeaderMapImplTest, AllInlineHeaders) {
   {
     auto header_map = RequestHeaderMapImpl::create();
-    INLINE_REQ_HEADERS(TEST_INLINE_HEADER_FUNCS)
-    INLINE_REQ_RESP_HEADERS(TEST_INLINE_HEADER_FUNCS)
+    INLINE_REQ_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
+    INLINE_REQ_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
   }
   {
       // No request trailer O(1) headers.
   } {
     auto header_map = ResponseHeaderMapImpl::create();
-    INLINE_RESP_HEADERS(TEST_INLINE_HEADER_FUNCS)
-    INLINE_REQ_RESP_HEADERS(TEST_INLINE_HEADER_FUNCS)
-    INLINE_RESP_HEADERS_TRAILERS(TEST_INLINE_HEADER_FUNCS)
+    INLINE_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
+    INLINE_REQ_RESP_STRING_HEADERS(TEST_INLINE_STRING_HEADER_FUNCS)
+    INLINE_RESP_STRING_HEADERS_TRAILERS(TEST_INLINE_STRING_HEADER_FUNCS)
   }
   {
     auto header_map = ResponseTrailerMapImpl::create();
-    INLINE_RESP_HEADERS_TRAILERS(TEST_INLINE_HEADER_FUNCS)
+    INLINE_RESP_STRING_HEADERS_TRAILERS(TEST_INLINE_STRING_HEADER_FUNCS)
   }
 }
 
@@ -468,14 +476,6 @@ TEST_P(HeaderMapImplTest, InlineAppend) {
     EXPECT_EQ(headers.getViaValue(), "1.0 fred,1.1 nowhere.com");
     headers.setVia("2.0 override");
     EXPECT_EQ(headers.getViaValue(), "2.0 override");
-  }
-  {
-    // Set and then append. This mimics how GrpcTimeout is set.
-    TestRequestHeaderMapImpl headers;
-    headers.setGrpcTimeout(42);
-    EXPECT_EQ(headers.getGrpcTimeoutValue(), "42");
-    headers.appendGrpcTimeout("s", "");
-    EXPECT_EQ(headers.getGrpcTimeoutValue(), "42s");
   }
 }
 
@@ -739,6 +739,24 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
   ASSERT_EQ(set_cookie_value.size(), 2);
   ASSERT_EQ(set_cookie_value[0]->value().getStringView(), "foo");
   ASSERT_EQ(set_cookie_value[1]->value().getStringView(), "bar");
+}
+
+TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
+    return;
+  }
+  TestRequestHeaderMapImpl headers;
+  const std::string foo("foo=1");
+  const std::string bar("bar=2");
+  const LowerCaseString& cookie = Http::Headers::get().Cookie;
+  headers.addReference(cookie, foo);
+  headers.appendCopy(cookie, bar);
+  EXPECT_EQ(1UL, headers.size());
+
+  const auto cookie_value = headers.get(LowerCaseString("cookie"));
+  ASSERT_EQ(cookie_value.size(), 1);
+  ASSERT_EQ(cookie_value[0]->value().getStringView(), "foo=1; bar=2");
 }
 
 TEST_P(HeaderMapImplTest, DoubleInlineSet) {
@@ -1074,7 +1092,7 @@ TEST_P(HeaderMapImplTest, TestAppendHeader) {
     headers.setPath(empty);
     // Append with default delimiter.
     headers.appendPath(" ", ",");
-    headers.setPath(0);
+    headers.setPath("0");
     EXPECT_EQ("0", headers.getPathValue());
     EXPECT_EQ(1U, headers.Path()->value().size());
   }

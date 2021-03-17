@@ -81,6 +81,8 @@ function cp_binary_for_image_build() {
   COMPILE_TYPE="$2"
   mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
+  # Copy the su-exec utility binary into the image
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/build_"$1"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
   fi
@@ -132,6 +134,8 @@ function bazel_binary_build() {
     cp_debug_info_for_outside_access envoy
   fi
 
+  # Build su-exec utility
+  bazel build external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
 
 }
@@ -139,6 +143,29 @@ function bazel_binary_build() {
 function run_process_test_result() {
   echo "running flaky test reporting script"
   "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+}
+
+function run_ci_verify () {
+  echo "verify examples..."
+  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
+  _images=$(docker image list --format "{{.Repository}}")
+  while read -r line; do images+=("$line"); done \
+      <<< "$_images"
+  _tags=$(docker image list --format "{{.Tag}}")
+  while read -r line; do tags+=("$line"); done \
+      <<< "$_tags"
+  for i in "${!images[@]}"; do
+      if [[ "${images[i]}" =~ "envoy" ]]; then
+          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
+      fi
+  done
+  docker images
+  sudo apt-get update -y
+  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
+  export DOCKER_NO_PULL=1
+  umask 027
+  chmod -R o-rwx examples/
+  ci/verify_examples.sh "${@}" || exit
 }
 
 CI_TARGET=$1
@@ -306,6 +333,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # these tests under "-c opt" to save time in CI.
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
 
+  # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
+    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
+
   echo "Building binary with wasm=wavm..."
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
@@ -388,6 +418,8 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
+
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
@@ -419,38 +451,24 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Validate dependency relationships between core/extensions and external deps.
   ./tools/dependency/validate_test.py
   ./tools/dependency/validate.py
+
   # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
   # presubmits, but cve_scan only runs async.
-  python3.8 tools/dependency/cve_scan_test.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+
   # Validate repository metadata.
   ./ci/check_repository_locations.sh
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
-  python3.8 tools/dependency/cve_scan_test.py
-  python3.8 tools/dependency/cve_scan.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
-  done
-  docker images
-  sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
-  export DOCKER_NO_PULL=1
-  umask 027
-  chmod -R o-rwx examples/
-  ci/verify_examples.sh
+  run_ci_verify "*" wasm-cc
+  exit 0
+elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
+  run_ci_verify wasm-cc
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

@@ -801,10 +801,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
+TEST_F(HttpConnectionManagerImplTest, DateHeaderNotPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
@@ -815,63 +812,10 @@ TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateNotSet) {
   doRemoteClose();
 }
 
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateNotSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
+TEST_F(HttpConnectionManagerImplTest, DateHeaderPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
-  const auto* modified_headers = sendResponseHeaders(
-      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
-  ASSERT_TRUE(modified_headers);
-  EXPECT_TRUE(modified_headers->Date());
-  doRemoteClose();
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
-  const auto* modified_headers =
-      sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
-          {":status", "200"}, {"server", "foo"}, {"date", expected_date.c_str()}}});
-  ASSERT_TRUE(modified_headers);
-  ASSERT_TRUE(modified_headers->Date());
-  EXPECT_NE(expected_date, modified_headers->getDateValue());
-  doRemoteClose();
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateEnabledDateSet) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "true"}});
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
-  const auto* modified_headers =
-      sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{
-          {":status", "200"}, {"server", "foo"}, {"date", expected_date.c_str()}}});
-  ASSERT_TRUE(modified_headers);
-  ASSERT_TRUE(modified_headers->Date());
-  EXPECT_EQ(expected_date, modified_headers->getDateValue());
-  doRemoteClose();
-}
-
-TEST_F(HttpConnectionManagerImplTest, PreserveUpstreamDateDisabledDateFromCache) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_upstream_date", "false"}});
-  setup(false, "");
-  setUpEncoderAndDecoder(false, false);
-  sendRequestHeadersAndData();
-  encoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter);
   const std::string expected_date{"Tue, 15 Nov 1994 08:12:31 GMT"};
   const auto* modified_headers =
       sendResponseHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{

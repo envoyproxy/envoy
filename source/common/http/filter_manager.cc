@@ -15,7 +15,6 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
@@ -244,8 +243,7 @@ void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
 }
 
-void FilterMatchState::evaluateMatchTreeWithNewData(
-    std::function<void(HttpMatchingDataImpl&)> update_func) {
+void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
   if (match_tree_evaluated_ || !matching_data_) {
     return;
   }
@@ -491,10 +489,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->filter_match_state_) {
-      (*entry)->filter_match_state_->evaluateMatchTreeWithNewData(
-          [&](auto& matching_data) { matching_data.onRequestHeaders(headers); });
-    }
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onRequestHeaders(headers); });
 
     if ((*entry)->skipFilter()) {
       continue;
@@ -714,6 +710,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onRequestTrailers(trailers); });
+
     if ((*entry)->skipFilter()) {
       continue;
     }
@@ -812,10 +811,23 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
+void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+  state_.under_on_local_reply_ = true;
+  filter_manager_callbacks_.onLocalReply(data.code_);
+
+  for (auto entry : filters_) {
+    if (entry->onLocalReply(data) == LocalErrorStatus::ContinueAndResetStream) {
+      data.reset_imminent_ = true;
+    }
+  }
+  state_.under_on_local_reply_ = false;
+}
+
 void FilterManager::sendLocalReply(
     bool old_was_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   bool is_grpc_request = old_was_grpc_request;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unify_grpc_handling")) {
@@ -824,7 +836,14 @@ void FilterManager::sendLocalReply(
 
   stream_info_.setResponseCodeDetails(details);
 
-  filter_manager_callbacks_.onLocalReply(code);
+  StreamFilterBase::LocalReplyData data{code, details, false};
+  FilterManager::onLocalReply(data);
+  if (data.reset_imminent_) {
+    ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
+                     details);
+    filter_manager_callbacks_.resetStream();
+    return;
+  }
 
   if (!filter_manager_callbacks_.responseHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
@@ -1001,10 +1020,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
-    if ((*entry)->filter_match_state_) {
-      (*entry)->filter_match_state_->evaluateMatchTreeWithNewData(
-          [&headers](auto& matching_data) { matching_data.onResponseHeaders(headers); });
-    }
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&headers](auto& matching_data) { matching_data.onResponseHeaders(headers); });
+
     if ((*entry)->skipFilter()) {
       continue;
     }
@@ -1198,6 +1216,13 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
+    (*entry)->maybeEvaluateMatchTreeWithNewData(
+        [&](auto& matching_data) { matching_data.onResponseTrailers(trailers); });
+
+    if ((*entry)->skipFilter()) {
+      continue;
+    }
+
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
       return;

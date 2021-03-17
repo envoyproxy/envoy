@@ -20,7 +20,7 @@ interact_ws () {
     fi
     expect <<EOF
 set timeout 1
-spawn docker run --rm -ti --network=host solsson/websocat $insecure $protocol://localhost:$port
+spawn docker run --rm -ti --network=host solsson/websocat $insecure $protocol://127.0.0.1:$port
 set ret 1
 expect "\n"
 send "HELO\n"

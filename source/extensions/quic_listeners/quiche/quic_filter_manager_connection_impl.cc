@@ -11,7 +11,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnec
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection.connection_id().Hash()),
-      quic_connection_(&connection), filter_manager_(*this),
+      quic_connection_(&connection), filter_manager_(*this, *connection.connectionSocket()),
       stream_info_(dispatcher.timeSource(),
                    connection.connectionSocket()->addressProviderSharedPtr()),
       write_buffer_watermark_simulation_(

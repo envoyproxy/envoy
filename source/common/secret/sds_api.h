@@ -158,12 +158,13 @@ public:
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
     return resolved_tls_certificate_secrets_.get();
   }
-  Common::CallbackHandle* addValidationCallback(
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<void(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>)
       override {
     return nullptr;
   }
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<void()> callback) override {
     if (secret()) {
       callback();
     }
@@ -242,13 +243,14 @@ public:
   secret() const override {
     return resolved_certificate_validation_context_secrets_.get();
   }
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<void()> callback) override {
     if (secret()) {
       callback();
     }
     return update_callback_manager_.add(callback);
   }
-  Common::CallbackHandle* addValidationCallback(
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<
           void(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
           callback) override {
@@ -337,14 +339,15 @@ public:
     return tls_session_ticket_keys_.get();
   }
 
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<void()> callback) override {
     if (secret()) {
       callback();
     }
     return update_callback_manager_.add(callback);
   }
 
-  Common::CallbackHandle* addValidationCallback(
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<
           void(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
           callback) override {
@@ -405,10 +408,11 @@ public:
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
     return generic_secret_.get();
   }
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
   }
-  Common::CallbackHandle* addValidationCallback(
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
           callback) override {
     return validation_callback_manager_.add(callback);

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 #include "envoy/config/typed_config.h"

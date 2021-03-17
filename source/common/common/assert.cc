@@ -53,7 +53,7 @@ public:
   // The implementation may also be a inline static counter per-file and line. There is no benchmark
   // to show that the performance of this mutex is any worse than atomic counters. Acquiring and
   // releasing a mutex is cheaper than a cache miss, but the mutex here is contended for every
-  // ENVOY_BUG failure rather than per individual bug. Logging ENVOY_BUGs is not a performance
+  // ENVOY_BUG failure rather than per individual bug. Hitting ENVOY_BUGs is not a performance
   // critical path, and mutex contention would indicate that there is a serious failure.
   // Currently, this choice reduces code size and has the advantage that behavior is easier to
   // understand and debug, and test behavior is predictable.
@@ -72,6 +72,13 @@ public:
   static void invokeAction() {
     if (envoy_bug_failure_record_action_ != nullptr) {
       envoy_bug_failure_record_action_();
+    }
+  }
+
+  static void resetEnvoyBugCounters() {
+    {
+      absl::MutexLock lock(&mutex_);
+      counters_.clear();
     }
   }
 
@@ -110,6 +117,8 @@ void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly() {
 bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name) {
   return EnvoyBugRegistrationImpl::shouldLogAndInvoke(bug_name);
 }
+
+void resetEnvoyBugCountersForTest() { EnvoyBugRegistrationImpl::resetEnvoyBugCounters(); }
 
 } // namespace Assert
 } // namespace Envoy

@@ -139,6 +139,7 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroying listener manager");
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
+  dispatcher_->shutdown();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
@@ -272,10 +273,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
   } else if (*bootstrap_version == 3) {
     load_function(bootstrap, false);
   } else if (*bootstrap_version == 2) {
-    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
-    load_function(bootstrap_v2, false);
-    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
-    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
+    throw EnvoyException("v2 bootstrap is deprecated and no longer supported.");
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -432,7 +430,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_);
+      messageValidationContext().staticValidationVisitor(), *api_, options);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -541,7 +539,7 @@ void InstanceImpl::initialize(const Options& options,
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_);
+      access_log_manager_, *singleton_manager_, options_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -601,21 +599,33 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
+  // Initializing can throw exceptions, so catch these.
+  try {
+    clusterManager().initializeSecondaryClusters(bootstrap_);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
+    shutdown();
+  }
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        stats_store_,
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_, false)
-            ->create(),
-        Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
-        Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
-        access_log_manager_, *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_,
-        thread_local_, messageValidationContext().dynamicValidationVisitor(), *api_);
+    try {
+      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+          stats_store_,
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
+                                                         stats_store_, false)
+              ->create(),
+          Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
+          Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
+          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
+          *api_, options_);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+      shutdown();
+    }
   }
 
   // If there is no global limit to the number of active connections, warn on startup.

@@ -7,13 +7,19 @@
 
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/skywalking/skywalking_client_config.h"
 #include "extensions/tracers/skywalking/tracer.h"
+
+#include "cpp2sky/exception.h"
+#include "cpp2sky/segment_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+
+using cpp2sky::SegmentContextFactoryPtr;
+using cpp2sky::SegmentContextPtr;
+using cpp2sky::TracerConfig;
 
 class Driver : public Tracing::Driver, public Logger::Loggable<Logger::Id::tracing> {
 public:
@@ -25,19 +31,23 @@ public:
                              const Tracing::Decision decision) override;
 
 private:
-  struct TlsTracer : ThreadLocal::ThreadLocalObject {
-    TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}
+  void loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
+                  Server::Configuration::ServerFactoryContext& server_factory_context);
 
+  class TlsTracer : public ThreadLocal::ThreadLocalObject {
+  public:
+    TlsTracer(TracerPtr tracer);
+
+    Tracer& tracer();
+
+  private:
     TracerPtr tracer_;
   };
 
+  TracerConfig config_;
   SkyWalkingTracerStats tracing_stats_;
-
-  SkyWalkingClientConfigPtr client_config_;
-
-  // This random_generator_ will be used to create SkyWalking trace id and segment id.
-  Random::RandomGenerator& random_generator_;
   ThreadLocal::SlotPtr tls_slot_ptr_;
+  SegmentContextFactoryPtr segment_context_factory_;
 };
 
 using DriverPtr = std::unique_ptr<Driver>;

@@ -67,9 +67,8 @@ message Gzip {
   // zlib manual > deflateInit2.
   google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {lte: 15 gte: 9}];
 
-  // Set of configuration parameters common for all compression filters. If this field is set then
-  // the fields `content_length`, `content_type`, `disable_on_etag_header` and
-  // `remove_accept_encoding_header` are ignored.
+  // Set of configuration parameters common for all compression filters. You can define
+  // `content_length`, `content_type` and other parameters in this field.
   compressor.v3.Compressor compressor = 10;
 
   // Value for Zlib's next output buffer. If not set, defaults to 4096.

@@ -382,7 +382,7 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::config::route::v3::ScopedRouteConfiguration(iter->second->configProto()),
       std::make_shared<ConfigImpl>(
-          rds_subscription.routeConfigUpdate()->routeConfiguration(), factory_context_,
+          rds_subscription.routeConfigUpdate()->protobufConfiguration(), factory_context_,
           factory_context_.messageValidationContext().dynamicValidationVisitor(), false));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {

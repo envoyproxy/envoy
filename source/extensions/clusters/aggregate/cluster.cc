@@ -46,13 +46,14 @@ AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
 
 void AggregateClusterLoadBalancer::addMemberUpdateCallbackForCluster(
     Upstream::ThreadLocalCluster& thread_local_cluster) {
-  thread_local_cluster.prioritySet().addMemberUpdateCb(
-      [this, target_cluster_info = thread_local_cluster.info()](const Upstream::HostVector&,
-                                                                const Upstream::HostVector&) {
-        ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'",
-                  target_cluster_info->name(), parent_info_->name());
-        refresh();
-      });
+  member_update_cbs_[thread_local_cluster.info()->name()] =
+      thread_local_cluster.prioritySet().addMemberUpdateCb(
+          [this, target_cluster_info = thread_local_cluster.info()](const Upstream::HostVector&,
+                                                                    const Upstream::HostVector&) {
+            ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'",
+                      target_cluster_info->name(), parent_info_->name());
+            refresh();
+          });
 }
 
 PriorityContextPtr

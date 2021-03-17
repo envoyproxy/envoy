@@ -64,7 +64,7 @@ public:
       const spdy::SpdyStreamPrecedence& precedence,
       quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
 
-  using quic::QuicSession::stream_map;
+  using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:
   // quic::QuicServerSessionBase

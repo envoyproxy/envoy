@@ -104,7 +104,9 @@ value {
     shadow_proto = descriptor_pb2.EnumDescriptorProto()
     text_format.Merge(shadow_pb_text, shadow_proto)
     target_proto = descriptor_pb2.EnumDescriptorProto()
-    merge_active_shadow.MergeActiveShadowEnum(active_proto, shadow_proto, target_proto)
+    target_proto_dependencies = []
+    merge_active_shadow.MergeActiveShadowEnum(active_proto, shadow_proto, target_proto,
+                                              target_proto_dependencies)
     target_pb_text = """
 value {
   name: "foo"
@@ -256,8 +258,10 @@ oneof_decl {
     target_proto = descriptor_pb2.DescriptorProto()
     source_code_info = api_type_context.SourceCodeInfo('fake', active_source_code_info)
     fake_type_context = api_type_context.TypeContext(source_code_info, 'fake_package')
+    target_proto_dependencies = []
     merge_active_shadow.MergeActiveShadowMessage(fake_type_context.ExtendMessage(1, "foo", False),
-                                                 active_proto, shadow_proto, target_proto)
+                                                 active_proto, shadow_proto, target_proto,
+                                                 target_proto_dependencies)
     target_pb_text = """
 field {
   name: "oneof_1_0"
@@ -441,8 +445,17 @@ field {
   name: "baz"
 }
 field {
-  number: 2
+  number: 5
   name: "hidden_envoy_deprecated_wow"
+  options {
+    deprecated: true
+    [validate.rules] {
+      string {
+        max_bytes: 1024
+      }
+    }
+    [envoy.annotations.disallowed_by_default]: true
+  }
   oneof_index: 0
 }
 oneof_decl {
@@ -452,8 +465,9 @@ oneof_decl {
     shadow_proto = descriptor_pb2.DescriptorProto()
     text_format.Merge(shadow_pb_text, shadow_proto)
     target_proto = descriptor_pb2.DescriptorProto()
+    target_proto_dependencies = []
     merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
+                                                 target_proto, target_proto_dependencies)
     target_pb_text = """
 field {
   name: "foo"
@@ -466,7 +480,16 @@ field {
 }
 field {
   name: "hidden_envoy_deprecated_wow"
-  number: 2
+  number: 5
+  options {
+    deprecated: true
+    [validate.rules] {
+      string {
+        max_bytes: 1024
+      }
+    }
+    [envoy.annotations.disallowed_by_default]: true
+  }
   oneof_index: 2
 }
 field {
@@ -486,8 +509,13 @@ oneof_decl {
 oneof_decl {
   name: "some_oneof"
 }
+reserved_range {
+  start: 2
+  end: 3
+}
     """
     self.assertTextProtoEq(target_pb_text, str(target_proto))
+    self.assertEqual(target_proto_dependencies[0], 'envoy/annotations/deprecation.proto')
 
   def testMergeActiveShadowMessageNoShadowMessage(self):
     """MergeActiveShadowMessage doesn't require a shadow message for new nested active messages."""
@@ -495,8 +523,9 @@ oneof_decl {
     shadow_proto = descriptor_pb2.DescriptorProto()
     active_proto.nested_type.add().name = 'foo'
     target_proto = descriptor_pb2.DescriptorProto()
+    target_proto_dependencies = []
     merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
+                                                 target_proto, target_proto_dependencies)
     self.assertEqual(target_proto.nested_type[0].name, 'foo')
 
   def testMergeActiveShadowMessageNoShadowEnum(self):
@@ -505,8 +534,9 @@ oneof_decl {
     shadow_proto = descriptor_pb2.DescriptorProto()
     active_proto.enum_type.add().name = 'foo'
     target_proto = descriptor_pb2.DescriptorProto()
+    target_proto_dependencies = []
     merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
+                                                 target_proto, target_proto_dependencies)
     self.assertEqual(target_proto.enum_type[0].name, 'foo')
 
   def testMergeActiveShadowMessageMissing(self):
@@ -515,8 +545,9 @@ oneof_decl {
     shadow_proto = descriptor_pb2.DescriptorProto()
     shadow_proto.nested_type.add().name = 'foo'
     target_proto = descriptor_pb2.DescriptorProto()
+    target_proto_dependencies = []
     merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
+                                                 target_proto, target_proto_dependencies)
     self.assertEqual(target_proto.nested_type[0].name, 'foo')
 
   def testMergeActiveShadowFileMissing(self):

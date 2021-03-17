@@ -74,7 +74,7 @@ Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
   (*fields)["layers"] = ValueUtil::listValue(layer_names);
   (*fields)["entries"] = ValueUtil::structValue(layer_entries);
 
-  response.add(MessageUtil::getJsonStringFromMessage(runtime, true, true));
+  response.add(MessageUtil::getJsonStringFromMessageOrDie(runtime, true, true));
   return Http::Code::OK;
 }
 

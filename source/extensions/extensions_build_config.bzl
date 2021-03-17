@@ -23,6 +23,8 @@ EXTENSIONS = {
 
     "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
     "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+    "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
+    "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
 
     #
     # gRPC Credentials Plugins
@@ -41,6 +43,12 @@ EXTENSIONS = {
     #
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+
+    #
+    # Input Matchers
+    #
+
+    "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
 
     #
     # HTTP filters
@@ -110,7 +118,6 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
-    # WiP
     "envoy.filters.network.kafka_broker":               "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
     "envoy.filters.network.local_ratelimit":            "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
@@ -167,9 +174,14 @@ EXTENSIONS = {
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
-    # WiP
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
+
+    #
+    # Listener
+    #
+
+    "envoy.udp_listeners.quiche_quic_listener":         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
 
     #
     # Transport sockets
@@ -179,7 +191,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
 
     #
@@ -235,6 +247,18 @@ EXTENSIONS = {
     #
 
     "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
+
+    #
+    # IO socket
+    #
+
+    "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+
+    #
+    # TLS peer certification validators
+    #
+
+    "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

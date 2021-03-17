@@ -184,6 +184,7 @@ private:
     const std::string& name() const override { return EMPTY_STRING; }
     bool usesVhds() const override { return false; }
     bool mostSpecificHeaderMutationsWins() const override { return false; }
+    uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -228,10 +229,17 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
+    absl::optional<std::string>
+    currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+      return absl::optional<std::string>();
+    }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+      return {};
+    }
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
     const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
@@ -256,6 +264,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    bool usingNewTimeouts() const override { return false; }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
     absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
       return absl::nullopt;

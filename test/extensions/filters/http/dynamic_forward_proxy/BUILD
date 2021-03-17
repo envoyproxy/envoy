@@ -51,6 +51,9 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
+    # TODO(envoyproxy/windows-dev): Diagnose failure shown on clang-cl build, see:
+    #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
+    tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

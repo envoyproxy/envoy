@@ -16,6 +16,8 @@ from google.protobuf import json_format
 from bazel_tools.tools.python.runfiles import runfiles
 import yaml
 
+from jinja2 import Template
+
 # We have to do some evil things to sys.path due to the way that Python module
 # resolution works; we have both tools/ trees in bazel_tools and envoy. By
 # default, Bazel leaves us with a sys.path in which the @bazel_tools repository
@@ -53,13 +55,35 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
     os.environ['ENVOY_BLOB_SHA'])
 
 # Template for formating extension descriptions.
-EXTENSION_TEMPLATE = string.Template("""$anchor
-This extension may be referenced by the qualified name *$extension*
+EXTENSION_TEMPLATE = Template("""
+.. _extension_{{extension}}:
+
+This extension may be referenced by the qualified name *{{extension}}*
 
 .. note::
-  $status
+  {{status}}
 
-  $security_posture
+  {{security_posture}}
+
+.. tip::
+  This extension extends and can be used with the following extension {% if categories|length > 1 %}categories{% else %}category{% endif %}:
+
+{% for cat in categories %}
+  - :ref:`{{cat}} <extension_category_{{cat}}>`
+{% endfor %}
+
+""")
+
+# Template for formating an extension category.
+EXTENSION_CATEGORY_TEMPLATE = Template("""
+.. _extension_category_{{category}}:
+
+.. tip::
+  This extension category has the following known extensions:
+
+{% for ext in extensions %}
+  - :ref:`{{ext}} <extension_{{ext}}>`
+{% endfor %}
 
 """)
 
@@ -91,6 +115,14 @@ EXTENSION_STATUS_VALUES = {
     'wip':
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
+
+EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
+
+# create an index of extension categories from extension db
+EXTENSION_CATEGORIES = {}
+for _k, _v in EXTENSION_DB.items():
+  for _cat in _v['categories']:
+    EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
 
 
 class ProtodocError(Exception):
@@ -132,7 +164,12 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   if annotations.EXTENSION_ANNOTATION in comment.annotations:
     extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
-  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension
+  formatted_extension_category = ''
+  if annotations.EXTENSION_CATEGORY_ANNOTATION in comment.annotations:
+    for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
+      formatted_extension_category += FormatExtensionCategory(category)
+  comment = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
+  return comment + formatted_extension + formatted_extension_category
 
 
 def MapLines(f, s):
@@ -189,19 +226,37 @@ def FormatExtension(extension):
     RST formatted extension description.
   """
   try:
-    extension_metadata = json.loads(pathlib.Path(
-        os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
-    anchor = FormatAnchor('extension_' + extension)
+    extension_metadata = EXTENSION_DB[extension]
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
-    return EXTENSION_TEMPLATE.substitute(anchor=anchor,
-                                         extension=extension,
-                                         status=status,
-                                         security_posture=security_posture)
+    categories = extension_metadata["categories"]
   except KeyError as e:
     sys.stderr.write(
-        '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
+        f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
+    )
     exit(1)  # Raising the error buries the above message in tracebacks.
+
+  return EXTENSION_TEMPLATE.render(extension=extension,
+                                   status=status,
+                                   security_posture=security_posture,
+                                   categories=categories)
+
+
+def FormatExtensionCategory(extension_category):
+  """Format extension metadata as RST.
+
+  Args:
+    extension_category: the name of the extension_category, e.g. com.acme.
+
+  Returns:
+    RST formatted extension category description.
+  """
+  try:
+    extensions = EXTENSION_CATEGORIES[extension_category]
+  except KeyError as e:
+    raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
+  return EXTENSION_CATEGORY_TEMPLATE.render(category=extension_category,
+                                            extensions=sorted(extensions))
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):

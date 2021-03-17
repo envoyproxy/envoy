@@ -25,12 +25,13 @@ static_resources:
         port_value: 0
     filter_chains:
       - filters:
-          - name: postgres
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
-              stat_prefix: postgres_stats
-          - name: tcp
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-              stat_prefix: tcp_stats
-              cluster: cluster_0
+        - name: postgres
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
+            stat_prefix: postgres_stats
+            terminate_ssl: {}
+        - name: tcp
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+            stat_prefix: tcp_stats
+            cluster: cluster_0

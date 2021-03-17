@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 licenses(["notice"])  # Apache 2
 
@@ -10,6 +11,7 @@ exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
+    "repository_locations.bzl",
 ])
 
 genrule(
@@ -167,10 +169,34 @@ config_setting(
 )
 
 config_setting(
-    name = "gcc_build",
+    name = "gcc_build_gcc",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
     },
+)
+
+# This is needed due to a Bazel bug (https://github.com/bazelbuild/bazel/issues/12707)
+config_setting(
+    name = "gcc_build_compiler",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "compiler",
+    },
+)
+
+selects.config_setting_group(
+    name = "gcc_build_compiler_on_linux",
+    match_all = [
+        ":gcc_build_compiler",
+        ":linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "gcc_build",
+    match_any = [
+        ":gcc_build_gcc",
+        ":gcc_build_compiler_on_linux",
+    ],
 )
 
 config_setting(
@@ -300,6 +326,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_log_fast_debug_assert_in_release",
+    values = {"define": "log_fast_debug_assert_in_release=enabled"},
+)
+
+config_setting(
     name = "disable_known_issue_asserts",
     values = {"define": "disable_known_issue_asserts=true"},
 )
@@ -416,6 +447,11 @@ config_setting(
 )
 
 config_setting(
+    name = "darwin_arm64",
+    values = {"cpu": "darwin_arm64"},
+)
+
+config_setting(
     name = "ios_i386",
     values = {"cpu": "ios_i386"},
 )
@@ -465,7 +501,21 @@ config_setting(
 
 config_setting(
     name = "libfuzzer",
-    values = {"define": "FUZZING_ENGINE=libfuzzer"},
+    define_values = {"FUZZING_ENGINE": "libfuzzer"},
+)
+
+config_setting(
+    name = "oss_fuzz",
+    define_values = {"FUZZING_ENGINE": "oss-fuzz"},
+)
+
+alias(
+    name = "fuzzing_engine",
+    actual = select({
+        ":libfuzzer": "@rules_fuzzing//fuzzing/engines:libfuzzer",
+        ":oss_fuzz": "@rules_fuzzing_oss_fuzz//:oss_fuzz_engine",
+        "//conditions:default": "//test/fuzz:fuzz_runner_engine",
+    }),
 )
 
 alias(

@@ -68,7 +68,7 @@ protected:
             server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager()) {}
+            server_.accessLogManager(), server_.singletonManager(), server_.options()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -612,7 +612,7 @@ TEST(InitialImplTest, V2BootstrapRuntimeInjection) {
     admin_layer: {}
   - name: "enabled_deprecated_v2_api (auto-injected)"
     static_layer:
-      envoy.reloadable_features.enable_deprecated_v2_api: true
+      envoy.test_only.broken_in_production.enable_deprecated_v2_api: true
   )EOF";
   const auto expected_runtime =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);

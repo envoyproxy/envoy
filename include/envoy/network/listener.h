@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -23,9 +24,6 @@ namespace Network {
 
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
-
-using UdpListenerWorkerRouterOptRef =
-    absl::optional<std::reference_wrapper<UdpListenerWorkerRouter>>;
 
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
@@ -61,6 +59,36 @@ public:
 };
 
 using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
+
+/**
+ * Configuration for a UDP listener.
+ */
+class UdpListenerConfig {
+public:
+  virtual ~UdpListenerConfig() = default;
+
+  /**
+   * @return factory for creating a listener.
+   */
+  virtual ActiveUdpListenerFactory& listenerFactory() PURE;
+
+  /**
+   * @return factory for writing to a UDP socket.
+   */
+  virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
+
+  /**
+   * @return the UdpListenerWorkerRouter for this listener.
+   */
+  virtual UdpListenerWorkerRouter& listenerWorkerRouter() PURE;
+
+  /**
+   * @return the configuration for the listener.
+   */
+  virtual const envoy::config::listener::v3::UdpListenerConfig& config() PURE;
+};
+
+using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
 
 /**
  * A configuration for an individual listener.
@@ -136,22 +164,9 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return factory pointer if listening on UDP socket, otherwise return
-   * nullptr.
+   * @return the UDP configuration for the listener IFF it is a UDP listener.
    */
-  virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
-
-  /**
-   * @return factory if writing on UDP socket, otherwise return
-   * nullopt.
-   */
-  virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
-
-  /**
-   * @return the ``UdpListenerWorkerRouter`` for this listener. This will
-   * be non-empty iff this is a UDP listener.
-   */
-  virtual UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() PURE;
+  virtual UdpListenerConfigOptRef udpListenerConfig() PURE;
 
   /**
    * @return traffic direction of the listener.

@@ -493,24 +493,21 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   {
-    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(forced_header, Http::TraceStatus::Forced);
+    stream_info_.setTraceReason(Tracing::Reason::ServiceForced);
     EXPECT_CALL(*file_, write(_));
-    log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
+    stream_info_.setTraceReason(Tracing::Reason::NotTraceable);
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
-    stream_info_.getRequestIDExtension()->setTraceStatus(sampled_header,
-                                                         Http::TraceStatus::Sampled);
+    stream_info_.setTraceReason(Tracing::Reason::Sampling);
     EXPECT_CALL(*file_, write(_)).Times(0);
-    log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
 }
 
@@ -989,12 +986,14 @@ filter:
       - RFCF
       - NFCF
       - DT
+      - UPE
+      - NC
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x400000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x800000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -1020,7 +1019,10 @@ typed_config:
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
       StreamInfo::ResponseFlag::ResponseFromCacheFilter,
       StreamInfo::ResponseFlag::NoFilterConfigFound,
-      StreamInfo::ResponseFlag::DurationTimeout};
+      StreamInfo::ResponseFlag::DurationTimeout,
+      StreamInfo::ResponseFlag::UpstreamProtocolError,
+      StreamInfo::ResponseFlag::NoClusterFound,
+  };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
@@ -1052,7 +1054,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\" \"NC\"]]): "
+      "name: "
       "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
@@ -1081,8 +1084,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\"]]): name: "
-      "\"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\" \"DT\" \"UPE\" \"NC\"]]): "
+      "name: \"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog] {\n    path: "

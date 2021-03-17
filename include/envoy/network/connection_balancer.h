@@ -32,6 +32,9 @@ public:
    * transfer during the balancing process.
    */
   virtual void post(Network::ConnectionSocketPtr&& socket) PURE;
+
+  virtual void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
+                              bool hand_off_restored_destination_connections, bool rebalanced) PURE;
 };
 
 /**
@@ -66,6 +69,8 @@ public:
 };
 
 using ConnectionBalancerSharedPtr = std::shared_ptr<ConnectionBalancer>;
+using BalancedConnectionHandlerOptRef =
+    absl::optional<std::reference_wrapper<BalancedConnectionHandler>>;
 
 } // namespace Network
 } // namespace Envoy

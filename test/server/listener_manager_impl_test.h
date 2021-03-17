@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -269,14 +271,6 @@ protected:
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
-  }
-
-  ABSL_MUST_USE_RESULT
-  auto disableInplaceUpdateForThisTest() {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
-    return scoped_runtime;
   }
 
   ABSL_MUST_USE_RESULT

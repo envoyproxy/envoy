@@ -11,15 +11,14 @@ import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
+import "envoy/type/http/v3/path_transformation.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -35,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 43]
+// [#next-free-field: 44]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -240,6 +239,38 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
+  // [#not-implemented-hide] Transformations that apply to path headers. Transformations are applied
+  // before any processing of requests by HTTP filters, routing, and matching. Only the normalized
+  // path will be visible internally if a transformation is enabled. Any path rewrites that the
+  // router performs (e.g. :ref:`regex_rewrite
+  // <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>` or :ref:`prefix_rewrite
+  // <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply to the *:path* header
+  // destined for the upstream.
+  //
+  // Note: access logging and tracing will show the original *:path* header.
+  message PathNormalizationOptions {
+    // [#not-implemented-hide] Normalization applies internally before any processing of requests by
+    // HTTP filters, routing, and matching *and* will affect the forwarded *:path* header. Defaults
+    // to :ref:`NormalizePathRFC3986
+    // <envoy_api_msg_type.http.v3.PathTransformation.Operation.NormalizePathRFC3986>`. When not
+    // specified, this value may be overridden by the runtime variable
+    // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+    // Envoy will respond with 400 to paths that are malformed (e.g. for paths that fail RFC 3986
+    // normalization due to disallowed characters.)
+    type.http.v3.PathTransformation forwarding_transformation = 1;
+
+    // [#not-implemented-hide] Normalization only applies internally before any processing of
+    // requests by HTTP filters, routing, and matching. These will be applied after full
+    // transformation is applied. The *:path* header before this transformation will be restored in
+    // the router filter and sent upstream unless it was mutated by a filter. Defaults to no
+    // transformations.
+    // Multiple actions can be applied in the same Transformation, forming a sequential
+    // pipeline. The transformations will be performed in the order that they appear. Envoy will
+    // respond with 400 to paths that are malformed (e.g. for paths that fail RFC 3986
+    // normalization due to disallowed characters.)
+    type.http.v3.PathTransformation http_filter_transformation = 2;
+  }
+
   reserved 27, 11;
 
   reserved "idle_timeout";
@@ -270,6 +301,7 @@ message HttpConnectionManager {
   // A list of individual HTTP filters that make up the filter chain for
   // requests made to the connection manager. :ref:`Order matters <arch_overview_http_filters_ordering>`
   // as the filters are processed sequentially as request events happen.
+  // [#extension-category: envoy.filters.http]
   repeated HttpFilter http_filters = 5;
 
   // Whether the connection manager manipulates the :ref:`config_http_conn_man_headers_user-agent`
@@ -529,15 +561,21 @@ message HttpConnectionManager {
   bool merge_slashes = 33;
 
   // The configuration of the request ID extension. This includes operations such as
-  // generation, validation, and associated tracing operations.
+  // generation, validation, and associated tracing operations. If empty, the
+  // :ref:`UuidRequestIdConfig <envoy_v3_api_msg_extensions.request_id.uuid.v3.UuidRequestIdConfig>`
+  // default extension is used with default parameters. See the documentation for that extension
+  // for details on what it does. Customizing the configuration for the default extension can be
+  // achieved by configuring it explicitly here. For example, to disable trace reason packing,
+  // the following configuration can be used:
   //
-  // If not set, Envoy uses the default UUID-based behavior:
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.network.http_connection_manager.v3.RequestIDExtension
   //
-  // 1. Request ID is propagated using *x-request-id* header.
+  //   typed_config:
+  //     "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
+  //     pack_trace_reason: false
   //
-  // 2. Request ID is a universally unique identifier (UUID).
-  //
-  // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
+  // [#extension-category: envoy.request_id]
   RequestIDExtension request_id_extension = 36;
 
   // The configuration to customize local reply returned by Envoy. It can customize status code,
@@ -583,6 +621,16 @@ message HttpConnectionManager {
   // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
+
+  // [#not-implemented-hide:] Path normalization configuration. This includes
+  // configurations for transformations (e.g. RFC 3986 normalization or merge
+  // adjacent slashes) and the policy to apply them. The policy determines
+  // whether transformations affect the forwarded *:path* header. RFC 3986 path
+  // normalization is enabled by default and the default policy is that the
+  // normalized header will be forwarded. See :ref:`PathNormalizationOptions
+  // <envoy_api_msg_extensions.filters.network.http_connection_manager.v3.PathNormalizationOptions>`
+  // for details.
+  PathNormalizationOptions path_normalization_options = 43;
 }
 
 // The configuration to customize local reply returned by Envoy.
@@ -818,7 +866,7 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
@@ -842,6 +890,12 @@ message HttpFilter {
     // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
     config.core.v3.ExtensionConfigSource config_discovery = 5;
   }
+
+  // If true, clients that do not support this filter may ignore the
+  // filter but otherwise accept the config.
+  // Otherwise, clients that do not support this filter must reject the config.
+  // [#not-implemented-hide:]
+  bool is_optional = 6;
 }
 
 message RequestIDExtension {

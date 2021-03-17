@@ -26,6 +26,17 @@ envoy_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "assert2_test",
+    srcs = ["assert2_test.cc"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -266,6 +277,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "shared_token_bucket_impl_test",
+    srcs = ["shared_token_bucket_impl_test.cc"],
+    deps = [
+        "//source/common/common:shared_token_bucket_impl_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
@@ -346,6 +367,12 @@ envoy_cc_test(
     deps = [
         "//source/common/version:version_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "api_version_test",
+    srcs = ["api_version_test.cc"],
+    deps = ["//source/common/version:api_version_lib"],
 )
 
 envoy_cc_test(

@@ -13,6 +13,10 @@ namespace Stats {
 namespace Fuzz {
 
 void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
+  if (data.empty()) {
+    // Return early for empty strings.
+    return;
+  }
   StatNameDynamicPool dynamic_pool(symbol_table);
   StatNamePool symbolic_pool(symbol_table);
   StatNameVec stat_names;

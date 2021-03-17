@@ -115,7 +115,9 @@ public:
   }
 
   // Http::ConnectionManagerConfig
-  Http::RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
+  const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
+    return request_id_extension_;
+  }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -344,14 +346,8 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    Network::UdpListenerConfigOptRef udpListenerConfig() override {
+      return Network::UdpListenerConfigOptRef();
     }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -395,6 +391,8 @@ private:
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
       return empty_network_filter_factory_;
     }
+
+    absl::string_view name() const override { return "admin"; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;

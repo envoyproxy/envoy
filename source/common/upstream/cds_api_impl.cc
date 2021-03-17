@@ -46,9 +46,11 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& [cluster_name, _] : all_existing_clusters.active_clusters_) {
+    UNREFERENCED_PARAMETER(_);
     *to_remove_repeated.Add() = cluster_name;
   }
   for (const auto& [cluster_name, _] : all_existing_clusters.warming_clusters_) {
+    UNREFERENCED_PARAMETER(_);
     // Do not add the cluster twice when the cluster is both active and warming.
     if (all_existing_clusters.active_clusters_.count(cluster_name) == 0) {
       *to_remove_repeated.Add() = cluster_name;
@@ -73,6 +75,8 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   std::vector<std::string> exception_msgs;
   absl::flat_hash_set<std::string> cluster_names(added_resources.size());
   bool any_applied = false;
+  uint32_t added_or_updated = 0;
+  uint32_t skipped = 0;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;
     try {
@@ -83,9 +87,11 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
       }
       if (cm_.addOrUpdateCluster(cluster, resource.get().version())) {
         any_applied = true;
-        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
+        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+        ++added_or_updated;
       } else {
         ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
+        ++skipped;
       }
     } catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
@@ -94,9 +100,12 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
-      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
+      ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
     }
   }
+
+  ENVOY_LOG(info, "cds: added/updated {} cluster(s), skipped {} unmodified cluster(s)",
+            added_or_updated, skipped);
 
   if (any_applied) {
     system_version_info_ = system_version_info;

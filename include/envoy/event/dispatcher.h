@@ -8,6 +8,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"
@@ -226,14 +227,21 @@ public:
                                               Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                               uint32_t backlog_size) PURE;
 
+  struct CreateUdpListenerParams {
+    // The maximum size datagram to receive.
+    uint64_t max_rx_datagram_size_;
+  };
+
   /**
    * Creates a logical udp listener on a specific port.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the udp listener callbacks to invoke for listener events.
+   * @param params supplies the listener creation params.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                                    Network::UdpListenerCallbacks& cb) PURE;
+                                                    Network::UdpListenerCallbacks& cb,
+                                                    const CreateUdpListenerParams& params) PURE;
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */
@@ -259,6 +267,12 @@ public:
    * of the dispatcher event loop which may be on a different thread than the caller.
    */
   virtual void post(PostCb callback) PURE;
+
+  /**
+   * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on
+   * the dispatcher's thread before dispatcher destroy. This is safe cross thread.
+   */
+  virtual void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) PURE;
 
   /**
    * Runs the event loop. This will not return until exit() is called either from within a callback
@@ -287,6 +301,11 @@ public:
    * Updates approximate monotonic time to current value.
    */
   virtual void updateApproximateMonotonicTime() PURE;
+
+  /**
+   * Shutdown the dispatcher by clear dispatcher thread deletable.
+   */
+  virtual void shutdown() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

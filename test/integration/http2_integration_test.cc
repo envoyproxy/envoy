@@ -913,6 +913,40 @@ TEST_P(Http2IntegrationTest, TrailersGiantBody) {
   testTrailers(1024 * 1024, 1024 * 1024, false, false);
 }
 
+// Ensure if new timeouts are set, legacy timeouts do not apply.
+TEST_P(Http2IntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMixedLegacy)) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        route->mutable_route()->mutable_max_grpc_timeout()->set_nanos(1000 * 1000);
+        route->mutable_route()
+            ->mutable_max_stream_duration()
+            ->mutable_grpc_timeout_header_max()
+            ->set_seconds(60 * 60);
+      });
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  autonomous_upstream_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"te", "trailers"},
+                                     {"grpc-timeout", "2S"}, // 2 Second
+                                     {"content-type", "application/grpc"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
+}
+
 TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1601,6 +1635,30 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+static std::string on_local_reply_filter = R"EOF(
+name: on-local-reply-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
+)EOF";
+
+TEST_P(Http2IntegrationTest, OnLocalReply) {
+  config_helper_.addFilter(on_local_reply_filter);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+  }
+  {
+    default_request_headers_.addCopy("reset", "yes");
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForReset();
+    ASSERT_FALSE(response->complete());
+  }
 }
 
 } // namespace Envoy
