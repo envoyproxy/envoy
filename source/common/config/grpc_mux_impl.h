@@ -87,17 +87,18 @@ private:
           parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
       std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       watches_.emplace(watches_.begin(), this);
+      it_ = watches_.begin();
     }
 
     ~GrpcMuxWatchImpl() override {
-      watches_.remove(this);
+      watches_.erase(it_);
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
       }
     }
 
     void update(const absl::flat_hash_set<std::string>& resources) override {
-      watches_.remove(this);
+      watches_.erase(it_);
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
       }
@@ -105,6 +106,7 @@ private:
       std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       // move this watch to the beginning of the list
       watches_.emplace(watches_.begin(), this);
+      it_ = watches_.begin();
       parent_.queueDiscoveryRequest(type_url_);
     }
 
@@ -117,6 +119,7 @@ private:
 
   private:
     std::list<GrpcMuxWatchImpl*>& watches_;
+    std::list<GrpcMuxWatchImpl*>::iterator it_;
   };
 
   // Per muxed API state.
