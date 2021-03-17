@@ -39,7 +39,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
           // the stream to buffer all the data.
           // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
-          GetReceivedFlowControlWindow(client_session, id), *filterManagerConnection(),
+          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
