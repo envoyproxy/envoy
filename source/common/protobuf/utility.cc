@@ -615,7 +615,8 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     throw EnvoyException(json_or_error.status().ToString());
   }
   YAML::Node node;
-  TRY_NEEDS_AUDIT { node = YAML::Load(json_or_error.value()); }
+  TRY_ASSERT_MAIN_THREAD { node = YAML::Load(json_or_error.value()); }
+  END_TRY
   catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
   }
@@ -889,7 +890,8 @@ void MessageUtil::redact(Protobuf::Message& message) {
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
-  TRY_NEEDS_AUDIT { return parseYamlNode(YAML::Load(yaml)); }
+  TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
+  END_TRY
   catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
   }

@@ -626,18 +626,16 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   xff_string = StringUtil::ltrim(xff_string);
   xff_string = StringUtil::rtrim(xff_string);
 
-  TRY_NEEDS_AUDIT {
-    // This technically requires a copy because inet_pton takes a null terminated string. In
-    // practice, we are working with a view at the end of the owning string, and could pass the
-    // raw pointer.
-    // TODO(mattklein123) PERF: Avoid the copy here.
-    return {
-        Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
-        last_comma == std::string::npos && num_to_skip == 0};
+  // This technically requires a copy because inet_pton takes a null terminated string. In
+  // practice, we are working with a view at the end of the owning string, and could pass the
+  // raw pointer.
+  // TODO(mattklein123) PERF: Avoid the copy here.
+  Network::Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddressNoThrow(
+      std::string(xff_string.data(), xff_string.size()));
+  if (address != nullptr) {
+    return {address, last_comma == std::string::npos && num_to_skip == 0};
   }
-  catch (const EnvoyException&) {
-    return {nullptr, false};
-  }
+  return {nullptr, false};
 }
 
 bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {

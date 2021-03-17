@@ -178,30 +178,10 @@ struct MainThread {
   void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
   void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
   static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
-  static void initMainThread() {
-    if (!initialized()) {
-      MainThreadSingleton::initialize(new MainThread());
-    }
-    MainThreadSingleton::get().registerMainThread();
-  }
-  static void initTestThread() {
-    if (!initialized()) {
-      MainThreadSingleton::initialize(new MainThread());
-    }
-    MainThreadSingleton::get().registerTestThread();
-  }
-  static void clear() {
-    delete MainThreadSingleton::getExisting();
-    MainThreadSingleton::clear();
-  }
-  static bool isMainThread() {
-    // If threading is off, only main thread is running.
-    if (MainThreadSingleton::getExisting() == nullptr) {
-      return true;
-    }
-    // When threading is on, compare thread id with main thread id.
-    return MainThreadSingleton::get().inMainThread() || MainThreadSingleton::get().inTestThread();
-  }
+  static void initMainThread();
+  static void initTestThread();
+  static void clear();
+  static bool isMainThread();
 
 private:
   std::thread::id main_thread_id_;
