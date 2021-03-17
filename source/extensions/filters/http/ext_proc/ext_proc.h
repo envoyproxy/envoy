@@ -152,6 +152,10 @@ private:
   // failed.
   bool processing_complete_ = false;
 
+  // Set to true when an "immediate response" has been delivered. This helps us
+  // know what response to return from certain failures.
+  bool sent_immediate_response_ = false;
+
   // The headers that we'll be expected to modify. They are set when
   // received and reset to nullptr when they are no longer valid.
   Http::RequestHeaderMap* request_headers_ = nullptr;
