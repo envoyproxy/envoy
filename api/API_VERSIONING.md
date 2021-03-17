@@ -1,6 +1,6 @@
 # API versioning guidelines
 
-The Envoy project (and in the future [UDPA](https://github.com/cncf/udpa)) takes API stability and
+The Envoy project and [xDS working group](https://github.com/cncf/xds) take API stability and
 versioning seriously. Providing stable APIs is a necessary step in ensuring API adoption and success
 of the ecosystem. Below we articulate the API versioning guidelines that aim to deliver this
 stability.
