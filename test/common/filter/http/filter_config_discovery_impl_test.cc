@@ -263,6 +263,7 @@ resources:
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 
   provider_->setDefaultConfiguration(factory);
+  provider_->applyDefaultConfiguration();
   EXPECT_NE(absl::nullopt, provider_->config());
 
   do_xds_response(false);

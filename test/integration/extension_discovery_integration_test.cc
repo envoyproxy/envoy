@@ -346,9 +346,9 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
 
-  // Allow the TTL to expire.
   {
-    // Wait until the TTL removes the resource.
+    // Wait until the the TTL for the resource expires, which will trigger a config load to remove
+    // the resource.
     test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
                                    2);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
@@ -360,7 +360,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   {
     // Reinstate the previous configuration.
     sendXdsResponse("foo", "1", denyPrivateConfig(), true);
-    // Wait until the TTL removes the resource.
+    // Wait until the new configuration has been applied.
     test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
                                    3);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
@@ -394,9 +394,9 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
-  // Allow the TTL to expire.
   {
-    // Wait until the TTL removes the resource.
+    // Wait until the the TTL for the resource expires, which will trigger a config load to remove
+    // the resource.
     test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
                                    2);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
