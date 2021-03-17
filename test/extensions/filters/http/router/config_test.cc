@@ -58,17 +58,10 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(router_config, "stats.", context),
       ProtoValidationException,
-      "Proto constraint validation failed (RouterValidationError.StrictCheckHeaders[i]: "
-      "[\"value must be in list \" ["
-      "\"x-envoy-upstream-rq-timeout-ms\" "
-      "\"x-envoy-upstream-rq-per-try-timeout-ms\" "
-      "\"x-envoy-max-retries\" "
-      "\"x-envoy-retry-grpc-on\" "
-      "\"x-envoy-retry-on\""
-      "]]): strict_check_headers: \"unsupportedHeader\"\n");
+      "Proto constraint validation failed \\(RouterValidationError.StrictCheckHeaders");
 }
 
 TEST(RouterFilterConfigTest, RouterV2Filter) {

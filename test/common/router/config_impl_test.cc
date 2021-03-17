@@ -5530,7 +5530,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "RouteValidationError.Match: \\[\"value is required\"\\]");
+      "RouteValidationError.Match");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, DEPRECATED_FEATURE_TEST(BadRouteEntryConfigPrefixAndRegex)) {
