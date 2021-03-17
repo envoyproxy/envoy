@@ -46,13 +46,6 @@ gRPC
 
 * Envoy can send access log messages to a gRPC access logging service.
 
-Further reading
----------------
-
-* Access log :ref:`configuration <config_access_log>`.
-* File :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`.
-* gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
-  sink.
 
 Stdoutput
 *********
@@ -71,4 +64,14 @@ Stderror
   threads.
 * Customizable access log formats using predefined fields as well as arbitrary HTTP request and
   response headers.
-* Writes to the standard output of the process. It works in all platforms.
+* Writes to the standard error of the process. It works in all platforms.
+
+Further reading
+---------------
+
+* Access log :ref:`configuration <config_access_log>`.
+* File :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`.
+* gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
+  sink.
+* Stdoutput :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stdoutput.v3.StdoutputAccessLog>`
+* Stderror :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stderror.v3.StderrorAccessLog>`
