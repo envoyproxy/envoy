@@ -11,15 +11,15 @@ from udpa.annotations import migrate_pb2
 
 
 def decode(path):
-  with open(path, 'rb') as f:
-    file_set = descriptor_pb2.FileDescriptorSet()
-    file_set.ParseFromString(f.read())
-    return str(file_set)
+    with open(path, 'rb') as f:
+        file_set = descriptor_pb2.FileDescriptorSet()
+        file_set.ParseFromString(f.read())
+        return str(file_set)
 
 
 if __name__ == '__main__':
-  output_path = sys.argv[1]
-  input_paths = sys.argv[2:]
-  pb_text = '\n'.join(decode(path) for path in input_paths)
-  with open(output_path, 'w') as f:
-    f.write(pb_text)
+    output_path = sys.argv[1]
+    input_paths = sys.argv[2:]
+    pb_text = '\n'.join(decode(path) for path in input_paths)
+    with open(output_path, 'w') as f:
+        f.write(pb_text)

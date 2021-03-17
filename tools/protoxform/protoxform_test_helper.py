@@ -12,7 +12,7 @@ import tempfile
 
 
 def path_and_filename(label):
-  """Retrieve actual path and filename from bazel label
+    """Retrieve actual path and filename from bazel label
 
   Args:
     label: bazel label to specify target proto.
@@ -20,19 +20,19 @@ def path_and_filename(label):
   Returns:
     actual path and filename
   """
-  if label.startswith('/'):
-    label = label.replace('//', '/', 1)
-  elif label.startswith('@'):
-    label = re.sub(r'@.*/', '/', label)
-  else:
-    return label
-  label = label.replace(":", "/")
-  splitted_label = label.split('/')
-  return ['/'.join(splitted_label[:len(splitted_label) - 1]), splitted_label[-1]]
+    if label.startswith('/'):
+        label = label.replace('//', '/', 1)
+    elif label.startswith('@'):
+        label = re.sub(r'@.*/', '/', label)
+    else:
+        return label
+    label = label.replace(":", "/")
+    splitted_label = label.split('/')
+    return ['/'.join(splitted_label[:len(splitted_label) - 1]), splitted_label[-1]]
 
 
 def golden_proto_file(path, filename, version):
-  """Retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
+    """Retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
 
   Args:
     path: target proto path
@@ -42,27 +42,27 @@ def golden_proto_file(path, filename, version):
   Returns:
     actual golden proto absolute path
   """
-  base = "./"
-  base += path + "/" + filename + "." + version + ".gold"
-  return os.path.abspath(base)
+    base = "./"
+    base += path + "/" + filename + "." + version + ".gold"
+    return os.path.abspath(base)
 
 
 def proto_print(src, dst):
-  """Pretty-print FileDescriptorProto to a destination file.
+    """Pretty-print FileDescriptorProto to a destination file.
 
   Args:
     src: source path for FileDescriptorProto.
     dst: destination path for formatted proto.
   """
-  print('proto_print %s -> %s' % (src, dst))
-  subprocess.check_call([
-      'bazel-bin/tools/protoxform/protoprint', src, dst,
-      './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
-  ])
+    print('proto_print %s -> %s' % (src, dst))
+    subprocess.check_call([
+        'bazel-bin/tools/protoxform/protoprint', src, dst,
+        './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
+    ])
 
 
 def result_proto_file(cmd, path, tmp, filename, version):
-  """Retrieve result proto file path. In general, those are placed in bazel artifacts.
+    """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
   Args:
     cmd: fix or freeze?
@@ -74,17 +74,17 @@ def result_proto_file(cmd, path, tmp, filename, version):
   Returns:
     actual result proto absolute path
   """
-  base = "./bazel-bin"
-  base += os.path.join(path, "%s_protos" % cmd)
-  base += os.path.join(base, path)
-  base += "/{0}.{1}.proto".format(filename, version)
-  dst = os.path.join(tmp, filename)
-  proto_print(os.path.abspath(base), dst)
-  return dst
+    base = "./bazel-bin"
+    base += os.path.join(path, "%s_protos" % cmd)
+    base += os.path.join(base, path)
+    base += "/{0}.{1}.proto".format(filename, version)
+    dst = os.path.join(tmp, filename)
+    proto_print(os.path.abspath(base), dst)
+    return dst
 
 
 def diff(result_file, golden_file):
-  """Execute diff command with unified form
+    """Execute diff command with unified form
 
   Args:
     result_file: result proto file
@@ -93,15 +93,15 @@ def diff(result_file, golden_file):
   Returns:
     output and status code
   """
-  command = 'diff -u '
-  command += result_file + ' '
-  command += golden_file
-  status, stdout, stderr = run_command(command)
-  return [status, stdout, stderr]
+    command = 'diff -u '
+    command += result_file + ' '
+    command += golden_file
+    status, stdout, stderr = run_command(command)
+    return [status, stdout, stderr]
 
 
 def run(cmd, path, filename, version):
-  """Run main execution for protoxform test
+    """Run main execution for protoxform test
 
   Args:
     cmd: fix or freeze?
@@ -112,34 +112,34 @@ def run(cmd, path, filename, version):
   Returns:
     result message extracted from diff command
   """
-  message = ""
-  with tempfile.TemporaryDirectory() as tmp:
-    golden_path = golden_proto_file(path, filename, version)
-    test_path = result_proto_file(cmd, path, tmp, filename, version)
-    if os.stat(golden_path).st_size == 0 and not os.path.exists(test_path):
-      return message
+    message = ""
+    with tempfile.TemporaryDirectory() as tmp:
+        golden_path = golden_proto_file(path, filename, version)
+        test_path = result_proto_file(cmd, path, tmp, filename, version)
+        if os.stat(golden_path).st_size == 0 and not os.path.exists(test_path):
+            return message
 
-    status, stdout, stderr = diff(golden_path, test_path)
+        status, stdout, stderr = diff(golden_path, test_path)
 
-    if status != 0:
-      message = '\n'.join([str(line) for line in stdout + stderr])
+        if status != 0:
+            message = '\n'.join([str(line) for line in stdout + stderr])
 
-    return message
+        return message
 
 
 if __name__ == "__main__":
-  messages = ""
-  logging.basicConfig(format='%(message)s')
-  cmd = sys.argv[1]
-  for target in sys.argv[2:]:
-    path, filename = path_and_filename(target)
-    messages += run(cmd, path, filename, 'active_or_frozen')
-    messages += run(cmd, path, filename, 'next_major_version_candidate')
-    messages += run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
+    messages = ""
+    logging.basicConfig(format='%(message)s')
+    cmd = sys.argv[1]
+    for target in sys.argv[2:]:
+        path, filename = path_and_filename(target)
+        messages += run(cmd, path, filename, 'active_or_frozen')
+        messages += run(cmd, path, filename, 'next_major_version_candidate')
+        messages += run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
 
-  if len(messages) == 0:
-    logging.warning("PASS")
-    sys.exit(0)
-  else:
-    logging.error("FAILED:\n{}".format(messages))
-    sys.exit(1)
+    if len(messages) == 0:
+        logging.warning("PASS")
+        sys.exit(0)
+    else:
+        logging.error("FAILED:\n{}".format(messages))
+        sys.exit(1)
