@@ -3,7 +3,6 @@
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
