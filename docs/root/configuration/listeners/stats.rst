@@ -20,7 +20,7 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
-   global_cx_overflow, Counter, Total connections rejected due to enforecement of the global connection limit
+   global_cx_overflow, Counter, Total connections rejected due to enforcement of the global connection limit
    no_filter_chain_match, Counter, Total connections that didn't match any filter chain
 
 .. _config_listener_stats_tls:
@@ -31,6 +31,20 @@ TLS statistics
 The following TLS statistics are rooted at *listener.<address>.ssl.*:
 
 .. include:: ../../_include/ssl_stats.rst
+
+.. _config_listener_stats_udp:
+
+UDP statistics
+--------------
+
+The following UDP statistics are available for UDP listeners and are rooted at
+*listener.<address>.udp.*:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   downstream_rx_datagram_dropped, Counter, Number of datagrams dropped due to kernel overflow or truncation
 
 .. _config_listener_stats_per_handler:
 
@@ -52,7 +66,7 @@ on either accepted or active connections.
    downstream_cx_total, Counter, Total connections on this handler.
    downstream_cx_active, Gauge, Total active connections on this handler.
 
-.. _config_listener_manager_stats:
+   .. _config_listener_manager_stats:
 
 Listener manager
 ----------------

@@ -138,5 +138,6 @@ envoy_cc_library(
     hdrs = ["request_id_extension.h"],
     deps = [
         ":header_map_interface",
+        "//include/envoy/tracing:trace_reason_interface",
     ],
 )

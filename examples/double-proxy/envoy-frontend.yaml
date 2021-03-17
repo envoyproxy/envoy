@@ -20,7 +20,7 @@ static_resources:
   clusters:
   - name: postgres_cluster
     connect_timeout: 1s
-    type: strict_dns
+    type: STRICT_DNS
     load_assignment:
       cluster_name: postgres_cluster
       endpoints:
@@ -36,7 +36,7 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           tls_certificates:
-            certificate_chain:
+          - certificate_chain:
               filename: certs/clientcert.pem
             private_key:
               filename: certs/clientkey.pem

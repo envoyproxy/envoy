@@ -182,6 +182,9 @@ AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseco
   }
 
   if (wait_timer_triggered && !disconnected_) {
+    if (time_to_wait == TestUtility::DefaultTimeout) {
+      ADD_FAILURE() << "Please don't waitForDisconnect with a 5s timeout if failure is expected\n";
+    }
     return AssertionFailure() << "Timed out waiting for disconnect";
   }
   EXPECT_TRUE(disconnected_);
@@ -380,8 +383,7 @@ absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
   while (!result) {
     upstream_index = upstream_index % upstream_indices.size();
     result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5),
-        max_request_headers_kb_, max_request_headers_count_);
+        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5));
     if (result) {
       return upstream_index;
     } else if (!bound.withinBound()) {
@@ -450,6 +452,34 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   auto response =
       sendRequestAndWaitForResponse(request_headers, request_size, response_headers, response_size);
   checkSimpleRequestSuccess(request_size, response_size, response.get());
+}
+
+void HttpIntegrationTest::testRouterUpstreamProtocolError(const std::string& expected_code,
+                                                          const std::string& expected_flag) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
+  auto response = std::move(encoder_decoder.second);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
+  // be fixed.
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
+  ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(expected_code, response->headers().getStatusValue());
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr(expected_code));
+  EXPECT_THAT(log, HasSubstr(expected_flag));
 }
 
 IntegrationStreamDecoderPtr
@@ -1022,7 +1052,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_headers_size); });
-  max_request_headers_kb_ = max_headers_size;
+  setMaxRequestHeadersKb(max_headers_size);
 
   Http::TestRequestHeaderMapImpl big_headers{{":method", "GET"},
                                              {":path", "/" + std::string(url_size * 1024, 'a')},
@@ -1066,8 +1096,8 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
-  max_request_headers_kb_ = max_size;
-  max_request_headers_count_ = max_count;
+  setMaxRequestHeadersKb(max_size);
+  setMaxRequestHeadersCount(max_count);
 
   Http::TestRequestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
@@ -1110,7 +1140,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
-  max_request_headers_kb_ = max_size;
+  setMaxRequestHeadersKb(max_size);
   Http::TestRequestTrailerMapImpl request_trailers{{"trailer", "trailer"}};
   request_trailers.addCopy("big", std::string(size * 1024, 'a'));
 
@@ -1147,15 +1177,15 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
 void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time) {
   // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
   // time-consuming asserts when using a large number of headers.
-  max_request_headers_kb_ = 96;
-  max_request_headers_count_ = 10005;
+  setMaxRequestHeadersKb(96);
+  setMaxRequestHeadersCount(10005);
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
+        hcm.mutable_max_request_headers_kb()->set_value(upstreamConfig().max_request_headers_kb_);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
-            max_request_headers_count_);
+            upstreamConfig().max_request_headers_count_);
       });
 
   auto big_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(

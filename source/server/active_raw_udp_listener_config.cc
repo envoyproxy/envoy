@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 
+#include "server/active_udp_listener.h"
 #include "server/connection_handler_impl.h"
-#include "server/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -16,7 +16,7 @@ ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
 
 Network::ConnectionHandler::ActiveUdpListenerPtr
 ActiveRawUdpListenerFactory::createActiveUdpListener(uint32_t worker_index,
-                                                     Network::ConnectionHandler& parent,
+                                                     Network::UdpConnectionHandler& parent,
                                                      Event::Dispatcher& dispatcher,
                                                      Network::ListenerConfig& config) {
   return std::make_unique<ActiveRawUdpListener>(worker_index, concurrency_, parent, dispatcher,
@@ -33,9 +33,7 @@ ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
   return std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
 }
 
-std::string ActiveRawUdpListenerConfigFactory::name() const {
-  return UdpListenerNames::get().RawUdp;
-}
+std::string ActiveRawUdpListenerConfigFactory::name() const { return "default_udp_listener"; }
 
 REGISTER_FACTORY(ActiveRawUdpListenerConfigFactory, Server::ActiveUdpListenerConfigFactory);
 

@@ -51,13 +51,21 @@ public:
                              Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
 
   /**
-   * The expected max size of the packet to be read. If it's smaller than
-   * actually packets received, the payload will be truncated.
+   * Called whenever datagrams are dropped due to overflow or truncation.
+   * @param dropped supplies the number of dropped datagrams.
    */
-  virtual uint64_t maxPacketSize() const PURE;
+  virtual void onDatagramsDropped(uint32_t dropped) PURE;
+
+  /**
+   * The expected max size of the datagram to be read. If it's smaller than
+   * the size of datagrams received, they will be dropped.
+   */
+  virtual uint64_t maxDatagramSize() const PURE;
 };
 
-static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
+static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
+static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
 
 /**
  * Common network utility routines.
@@ -131,10 +139,22 @@ public:
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
-   * @return pointer to the Instance, or nullptr if unable to parse the address.
+   * @return pointer to the Instance.
+   * @throw EnvoyException in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr
   parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+
+  /**
+   * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
+   * not include a port number. Throws EnvoyException if unable to parse the address.
+   * @param ip_address string to be parsed as an internet address.
+   * @param port optional port to include in Instance created from ip_address, 0 by default.
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @return pointer to the Instance, or nullptr if unable to parse the address.
+   */
+  static Address::InstanceConstSharedPtr
+  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws

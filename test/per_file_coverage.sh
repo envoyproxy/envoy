@@ -43,7 +43,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/common/redis:96.3"
 "source/extensions/filters/network/dubbo_proxy:96.1"
 "source/extensions/filters/network/dubbo_proxy/router:95.1"
-"source/extensions/filters/network/mongo_proxy:94.1"
+"source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/sni_cluster:90.3"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:90.9"
 "source/extensions/health_checkers:95.9"
@@ -65,7 +65,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wavm:0.0" # Noe enabled in coverage build
 "source/extensions/watchdog:85.7" # Death tests within extensions
 "source/extensions/watchdog/profile_action:85.7"
-"source/server:94.5" # flaky: be careful adjusting
+"source/server:94.4" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:95.1"
 "source/server/config_validation:75.6"
 )

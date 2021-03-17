@@ -153,7 +153,7 @@ http_logs:
       scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 133
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -177,7 +177,7 @@ http_logs:
       scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 133
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -226,7 +226,7 @@ http_logs:
       scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 133
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:

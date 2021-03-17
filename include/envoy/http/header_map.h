@@ -50,7 +50,19 @@ public:
   LowerCaseString(LowerCaseString&& rhs) noexcept : string_(std::move(rhs.string_)) {
     ASSERT(valid());
   }
+  LowerCaseString& operator=(LowerCaseString&& rhs) noexcept {
+    string_ = std::move(rhs.string_);
+    ASSERT(valid());
+    return *this;
+  }
+
   LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
+  LowerCaseString& operator=(const LowerCaseString& rhs) {
+    string_ = std::move(rhs.string_);
+    ASSERT(valid());
+    return *this;
+  }
+
   explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
@@ -60,6 +72,10 @@ public:
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
   bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
+
+  friend std::ostream& operator<<(std::ostream& os, const LowerCaseString& lower_case_string) {
+    return os << lower_case_string.string_;
+  }
 
 private:
   void lower() {
@@ -648,6 +664,15 @@ public:
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 
 /**
+ * Wraps a set of header modifications.
+ */
+struct HeaderTransforms {
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_append;
+  std::vector<std::pair<Http::LowerCaseString, std::string>> headers_to_overwrite;
+  std::vector<Http::LowerCaseString> headers_to_remove;
+};
+
+/**
  * Registry for custom headers. Headers can be registered multiple times in independent
  * compilation units and will still point to the same slot. Headers are registered independently
  * for each concrete header map type and do not overlap. Handles are strongly typed and do not
@@ -793,6 +818,7 @@ class RequestTrailerMap
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
 using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
+using RequestTrailerMapOptConstRef = OptRef<const RequestTrailerMap>;
 
 // Base class for both response headers and trailers.
 class ResponseHeaderOrTrailerMap {

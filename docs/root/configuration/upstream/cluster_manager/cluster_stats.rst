@@ -84,7 +84,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
   upstream_flow_control_drained_total, Counter, Total number of times the upstream connection drained and resumed reads from downstream
   upstream_internal_redirect_failed_total, Counter, Total number of times failed internal redirects resulted in redirects being passed downstream.
-  upstream_internal_redirect_succeed_total, Counter, Total number of times internal redirects resulted in a second upstream request.
+  upstream_internal_redirect_succeeded_total, Counter, Total number of times internal redirects resulted in a second upstream request.
   membership_change, Counter, Total cluster membership changes
   membership_healthy, Gauge, Current cluster healthy total (inclusive of both health checking and outlier detection)
   membership_degraded, Gauge, Current cluster :ref:`degraded <arch_overview_load_balancing_degraded>` total
@@ -165,15 +165,15 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
-  cx_pool_open, Gauge, Whether the connection pool circuit breaker is closed (0) or open (1)
-  rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
-  rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
-  rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)
-  remaining_cx, Gauge, Number of remaining connections until the circuit breaker opens
-  remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker opens
-  remaining_rq, Gauge, Number of remaining requests until the circuit breaker opens
-  remaining_retries, Gauge, Number of remaining retries until the circuit breaker opens
+  cx_open, Gauge, Whether the connection circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  cx_pool_open, Gauge, Whether the connection pool circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  rq_pending_open, Gauge, Whether the pending requests circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  rq_open, Gauge, Whether the requests circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  rq_retry_open, Gauge, Whether the retry circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  remaining_cx, Gauge, Number of remaining connections until the circuit breaker reaches its concurrency limit
+  remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker reaches its concurrency limit
+  remaining_rq, Gauge, Number of remaining requests until the circuit breaker reaches its concurrency limit
+  remaining_retries, Gauge, Number of remaining retries until the circuit breaker reaches its concurrency limit
 
 .. _config_cluster_manager_cluster_stats_timeout_budgets:
 

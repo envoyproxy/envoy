@@ -2,38 +2,53 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/core/v3/extension.proto";
+
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "UdpListenerConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: UDP Listener Config]
+// [#protodoc-title: UDP listener config]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// [#next-free-field: 7]
 message UdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.UdpListenerConfig";
 
-  reserved 2;
+  reserved 1, 2, 3;
 
   reserved "config";
 
-  // Used to look up UDP listener factory, matches "raw_udp_listener" or
-  // "quic_listener" to create a specific udp listener.
-  // If not specified, treat as "raw_udp_listener".
-  string udp_listener_name = 1;
+  // Used to create a specific UDP listener factory. If not specified the default UDP listener is
+  // used.
+  // [#comment:#extension-category: envoy.udp_listeners]
+  // [#not-implemented-hide:]
+  // [#comment:TODO(#12829): Remove this as an extension point.]
+  core.v3.TypedExtensionConfig listener_config = 4;
 
-  // Used to create a specific listener factory. To some factory, e.g.
-  // "raw_udp_listener", config is not needed.
-  // [#extension-category: envoy.filters.udp_listener]
-  oneof config_type {
-    google.protobuf.Any typed_config = 3;
-  }
+  // The maximum size of received downstream UDP datagrams. Using a larger size will cause Envoy to allocate
+  // more memory per listener. Received datagrams above this size will be dropped. If not set
+  // defaults to 1500 bytes.
+  google.protobuf.UInt64Value max_downstream_rx_datagram_size = 5
+      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
+
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the
+  // actual UDP writer to create. If not specified the default UDP writer is used.
+  // [#comment:#extension-category: envoy.udp_packet_writers]
+  // [#not-implemented-hide:]
+  // [#comment:TODO(#12829): Remove this as an extension point.]
+  core.v3.TypedExtensionConfig writer_config = 6;
 }
 
 message ActiveRawUdpListenerConfig {
