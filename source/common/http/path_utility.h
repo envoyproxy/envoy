@@ -32,8 +32,10 @@ public:
 
 class PathTransformer {
 public:
-  PathTransformer(envoy::type::http::v3::PathTransformation operations);
+  PathTransformer(envoy::type::http::v3::PathTransformation const& path_transformation);
 
+  // Take a string_view as argument and return an optional string.
+  // The optional will be null if the transformation fail.
   absl::optional<std::string> transform(const absl::string_view original_path) const;
 
   static absl::optional<std::string> mergeSlashes(absl::string_view original_path);
@@ -42,6 +44,8 @@ public:
 
 private:
   using Transformation = std::function<absl::optional<std::string>(absl::string_view)>;
+  // A sequence of transformations specified by path_transformation.operations()
+  // Transformations will be applied to a path string in order in transform().
   std::list<Transformation> transformations_;
 };
 

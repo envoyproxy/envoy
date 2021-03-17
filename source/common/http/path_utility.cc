@@ -99,7 +99,8 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
   return normalized_path;
 }
 
-PathTransformer::PathTransformer(envoy::type::http::v3::PathTransformation path_transformation) {
+PathTransformer::PathTransformer(
+    envoy::type::http::v3::PathTransformation const& path_transformation) {
   const auto& operations = path_transformation.operations();
   std::vector<uint64_t> operation_hashes;
   for (auto const& operation : operations) {
