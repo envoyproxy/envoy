@@ -1,4 +1,5 @@
 #include "mock.h"
+
 #include "extensions/filters/network/mysql_proxy/route.h"
 
 using testing::_;

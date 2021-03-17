@@ -5,13 +5,13 @@
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 
-#include "envoy/tcp/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/message_helper.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"

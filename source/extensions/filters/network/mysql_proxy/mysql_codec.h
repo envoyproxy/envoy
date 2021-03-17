@@ -1,10 +1,11 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include <bits/stdint-uintn.h>
 
 namespace Envoy {
 namespace Extensions {

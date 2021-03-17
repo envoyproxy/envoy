@@ -24,7 +24,7 @@ class ClientTest : public testing::Test, public DecoderFactory {
 public:
   DecoderPtr create(DecoderCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    return DecoderPtr(decoder_, D());
+    return DecoderPtr(decoder_);
   }
   void setup() {
     EXPECT_CALL(*decoder_, getSession()).Times(2).WillRepeatedly(ReturnRef(decoder_->session_));

@@ -129,17 +129,6 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "mock_test",
-    srcs = [
-        "mock_test.cc",
-    ],
-    extension_name = "envoy.filters.network.mysql_proxy",
-    deps = [
-        "//test/test_common:printers_lib",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "filter_tests",
     srcs = [
         "filter_test.cc",
@@ -169,37 +158,37 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
-    name = "mysql_filter_tests",
-    srcs = [
-        "mysql_filter_test.cc",
-    ],
-    extension_name = "envoy.filters.network.mysql_proxy",
-    deps = [
-        ":mysql_test_utils_lib",
-        "//source/extensions/filters/network/mysql_proxy:config",
-        "//test/mocks/network:network_mocks",
-    ],
-)
+# envoy_extension_cc_test(
+#     name = "mysql_filter_tests",
+#     srcs = [
+#         "mysql_filter_test.cc",
+#     ],
+#     extension_name = "envoy.filters.network.mysql_proxy",
+#     deps = [
+#         ":mysql_test_utils_lib",
+#         "//source/extensions/filters/network/mysql_proxy:config",
+#         "//test/mocks/network:network_mocks",
+#     ],
+# )
 
-envoy_extension_cc_test(
-    name = "mysql_integration_test",
-    srcs = [
-        "mysql_integration_test.cc",
-    ],
-    data = [
-        "mysql_test_config.yaml",
-    ],
-    extension_name = "envoy.filters.network.mysql_proxy",
-    deps = [
-        ":mysql_test_utils_lib",
-        "//source/common/tcp_proxy",
-        "//source/extensions/filters/network/mysql_proxy:codec_lib",
-        "//source/extensions/filters/network/mysql_proxy:config",
-        "//source/extensions/filters/network/tcp_proxy:config",
-        "//test/integration:integration_lib",
-    ],
-)
+# envoy_extension_cc_test(
+#     name = "mysql_integration_test",
+#     srcs = [
+#         "mysql_integration_test.cc",
+#     ],
+#     data = [
+#         "mysql_test_config.yaml",
+#     ],
+#     extension_name = "envoy.filters.network.mysql_proxy",
+#     deps = [
+#         ":mysql_test_utils_lib",
+#         "//source/common/tcp_proxy",
+#         "//source/extensions/filters/network/mysql_proxy:codec_lib",
+#         "//source/extensions/filters/network/mysql_proxy:config",
+#         "//source/extensions/filters/network/tcp_proxy:config",
+#         "//test/integration:integration_lib",
+#     ],
+# )
 
 envoy_extension_cc_test(
     name = "integration_test",

@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
@@ -17,11 +19,10 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "mock.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <memory>
+#include "mock.h"
 #include "mysql_test_utils.h"
 
 namespace Envoy {

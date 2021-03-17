@@ -462,7 +462,7 @@ TEST_F(MySQLCLoginRespTest, MySQLLoginAuthMoreIncompletePluginData) {
   AuthMoreMessage mysql_login_auth_more_decode{};
   mysql_login_auth_more_decode.decode(buffer, CHALLENGE_SEQ_NUM, incomplete_len);
   EXPECT_EQ(mysql_login_auth_more_decode.getRespCode(), mysql_login_auth_more_encode.getRespCode());
-  EXPECT_EQ(mysql_login_auth_more_decode.getAuthMoreData(), "");
+  EXPECT_EQ(mysql_login_auth_more_decode.getAuthMoreData().size(), 0);
 }
 
 } // namespace MySQLProxy
