@@ -22,6 +22,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -575,10 +576,10 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time,
+                                                MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (handle.supportsUdpGro()) {
+  if (use_gro && handle.supportsUdpGro()) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -693,12 +694,13 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, uint32_t& packets_dropped) {
+                                               TimeSource& time_source, bool use_gro,
+                                               uint32_t& packets_dropped) {
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -723,6 +725,12 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
     }
   } while (true);
 }
+
+ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
+    const envoy::config::core::v3::UdpSocketConfig& config, bool use_gro_default)
+    : max_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_rx_datagram_size,
+                                                            DEFAULT_UDP_MAX_DATAGRAM_SIZE)),
+      use_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_gro, use_gro_default)) {}
 
 } // namespace Network
 } // namespace Envoy

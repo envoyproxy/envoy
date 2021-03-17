@@ -115,10 +115,12 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the connection, in such case ignore read
   // event processing.
+  // TODO(mattklein123): Right now QUIC client is hard coded to use GRO because it is probably the
+  // right default for QUIC. Determine whether this should be configurable or not.
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connectionSocket()->ioHandle(), *connectionSocket()->addressProvider().localAddress(),
-        *this, dispatcher_.timeSource(), packets_dropped_);
+        *this, dispatcher_.timeSource(), true, packets_dropped_);
     // TODO(danzh): Handle no error when we limit the number of packets read.
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
