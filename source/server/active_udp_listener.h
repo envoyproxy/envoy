@@ -15,6 +15,15 @@
 namespace Envoy {
 namespace Server {
 
+#define ALL_UDP_LISTENER_STATS(COUNTER) COUNTER(downstream_rx_datagram_dropped)
+
+/**
+ * Wrapper struct for UDP listener stats. @see stats_macros.h
+ */
+struct UdpListenerStats {
+  ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
                               public Network::ConnectionHandler::ActiveUdpListener {
 public:
@@ -27,6 +36,9 @@ public:
   void onData(Network::UdpRecvData&& data) final;
   uint32_t workerIndex() const final { return worker_index_; }
   void post(Network::UdpRecvData&& data) final;
+  void onDatagramsDropped(uint32_t dropped) final {
+    udp_stats_.downstream_rx_datagram_dropped_.add(dropped);
+  }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
@@ -45,6 +57,7 @@ protected:
   Network::UdpConnectionHandler& parent_;
   Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
+  UdpListenerStats udp_stats_;
 };
 
 /**
