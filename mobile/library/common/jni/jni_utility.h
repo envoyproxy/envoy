@@ -22,6 +22,16 @@ int unbox_integer(JNIEnv* env, jobject boxedInteger);
 
 envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data);
 
+/**
+ * Utility function that copies envoy_data to jbyteArray.
+ *
+ * @param env, the JNI env pointer.
+ * @param envoy_data, the source to copy from.
+ *
+ * @return jbyteArray, copied data. It is up to the function caller to clean up memory.
+ */
+jbyteArray native_data_to_array(JNIEnv* env, envoy_data data);
+
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data);
 
 envoy_data* buffer_to_native_data_ptr(JNIEnv* env, jobject j_data);

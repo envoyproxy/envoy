@@ -145,34 +145,20 @@ static void pass_headers(const char* method, envoy_headers headers, jobject j_co
   jboolean start_headers = JNI_TRUE;
 
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
-    // Note this is just an initial implementation, and we will pass a more optimized structure in
+    // Note: this is just an initial implementation, and we will pass a more optimized structure in
     // the future.
-
-    // Note the JNI function NewStringUTF would appear to be an appealing option here, except it
+    // Note: the JNI function NewStringUTF would appear to be an appealing option here, except it
     // requires a null-terminated *modified* UTF-8 string.
 
     // Create platform byte array for header key
-    jbyteArray key = env->NewByteArray(headers.entries[i].key.length);
-    // TODO: check if copied via isCopy.
-    // TODO: check for NULL.
-    // https://github.com/lyft/envoy-mobile/issues/758
-    void* critical_key = env->GetPrimitiveArrayCritical(key, nullptr);
-    memcpy(critical_key, headers.entries[i].key.bytes, headers.entries[i].key.length);
-    // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-    // to the JVM and free the c array, where applicable.
-    env->ReleasePrimitiveArrayCritical(key, critical_key, 0);
-
+    jbyteArray j_key = native_data_to_array(env, headers.entries[i].key);
     // Create platform byte array for header value
-    jbyteArray value = env->NewByteArray(headers.entries[i].value.length);
-    // TODO: check for NULL.
-    void* critical_value = env->GetPrimitiveArrayCritical(value, nullptr);
-    memcpy(critical_value, headers.entries[i].value.bytes, headers.entries[i].value.length);
-    env->ReleasePrimitiveArrayCritical(value, critical_value, 0);
+    jbyteArray j_value = native_data_to_array(env, headers.entries[i].value);
 
     // Pass this header pair to the platform
-    env->CallVoidMethod(j_context, jmid_passHeader, key, value, start_headers);
-    env->DeleteLocalRef(key);
-    env->DeleteLocalRef(value);
+    env->CallVoidMethod(j_context, jmid_passHeader, j_key, j_value, start_headers);
+    env->DeleteLocalRef(j_key);
+    env->DeleteLocalRef(j_value);
 
     // We don't release local refs currently because we've pushed a large enough frame, but we could
     // consider this and/or periodically popping the frame.
@@ -260,15 +246,7 @@ static void* jvm_on_data(const char* method, envoy_data data, bool end_stream, v
   jmethodID jmid_onData =
       env->GetMethodID(jcls_JvmCallbackContext, method, "([BZ)Ljava/lang/Object;");
 
-  jbyteArray j_data = env->NewByteArray(data.length);
-  // TODO: check if copied via isCopy.
-  // TODO: check for NULL.
-  // https://github.com/lyft/envoy-mobile/issues/758
-  void* critical_data = env->GetPrimitiveArrayCritical(j_data, nullptr);
-  memcpy(critical_data, data.bytes, data.length);
-  // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-  // to the JVM and free the c array, where applicable.
-  env->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
+  jbyteArray j_data = native_data_to_array(env, data);
   jobject result =
       env->CallObjectMethod(j_context, jmid_onData, j_data, end_stream ? JNI_TRUE : JNI_FALSE);
 
@@ -496,15 +474,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   }
   jbyteArray j_in_data = NULL;
   if (data) {
-    j_in_data = env->NewByteArray(data->length);
-    // TODO: check if copied via isCopy.
-    // TODO: check for NULL.
-    // https://github.com/lyft/envoy-mobile/issues/758
-    void* critical_data = env->GetPrimitiveArrayCritical(j_in_data, nullptr);
-    memcpy(critical_data, data->bytes, data->length);
-    // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-    // to the JVM and free the c array, where applicable.
-    env->ReleasePrimitiveArrayCritical(j_in_data, critical_data, 0);
+    j_in_data = native_data_to_array(env, *data);
   }
   jlong trailers_length = -1;
   if (trailers) {
@@ -572,15 +542,7 @@ static void* call_jvm_on_error(envoy_error error, void* context) {
   jmethodID jmid_onError =
       env->GetMethodID(jcls_JvmObserverContext, "onError", "(I[BI)Ljava/lang/Object;");
 
-  jbyteArray j_error_message = env->NewByteArray(error.message.length);
-  // TODO: check if copied via isCopy.
-  // TODO: check for NULL.
-  // https://github.com/lyft/envoy-mobile/issues/758
-  void* critical_error_message = env->GetPrimitiveArrayCritical(j_error_message, nullptr);
-  memcpy(critical_error_message, error.message.bytes, error.message.length);
-  // Here '0' (for which there is no named constant) indicates we want to commit the changes back
-  // to the JVM and free the c array, where applicable.
-  env->ReleasePrimitiveArrayCritical(j_error_message, critical_error_message, 0);
+  jbyteArray j_error_message = native_data_to_array(env, error.message);
 
   jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
                                          error.attempt_count);
