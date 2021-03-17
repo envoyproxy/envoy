@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/common/thread.h"
 #include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
@@ -230,10 +231,11 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
   // and the applied config eventually converges once ECDS update arrives.
   bool last_config_valid = false;
   if (subscription->lastConfig().has_value()) {
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       provider->validateTypeUrl(subscription->lastTypeUrl());
       last_config_valid = true;
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY catch (const EnvoyException& e) {
       ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
                 filter_config_name, e.what());
       subscription->incrementConflictCounter();
