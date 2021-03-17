@@ -47,12 +47,12 @@ class DeprecateVersionError(Exception):
   pass
 
 
-def GetConfirmation():
+def get_confirmation():
   """Obtain stdin confirmation to create issues in GH."""
   return input('Creates issues? [yN] ').strip().lower() in ('y', 'yes')
 
 
-def CreateIssues(access_token, runtime_and_pr):
+def create_issues(access_token, runtime_and_pr):
   """Create issues in GitHub for code to clean up old runtime guarded features.
 
   Args:
@@ -114,7 +114,7 @@ def CreateIssues(access_token, runtime_and_pr):
     print('No features to deprecate in this release')
     return
 
-  if GetConfirmation():
+  if get_confirmation():
     print('Creating issues...')
     for title, body, login in issues:
       try:
@@ -131,7 +131,7 @@ def CreateIssues(access_token, runtime_and_pr):
           raise
 
 
-def GetRuntimeAndPr():
+def get_runtime_and_pr():
   """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
   """
   repo = Repo(os.getcwd())
@@ -177,7 +177,7 @@ def GetRuntimeAndPr():
 
 
 if __name__ == '__main__':
-  runtime_and_pr = GetRuntimeAndPr()
+  runtime_and_pr = get_runtime_and_pr()
 
   if not runtime_and_pr:
     print('No code is deprecated.')
@@ -188,4 +188,4 @@ if __name__ == '__main__':
     print('Missing GITHUB_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
     sys.exit(1)
 
-  CreateIssues(access_token, runtime_and_pr)
+  create_issues(access_token, runtime_and_pr)

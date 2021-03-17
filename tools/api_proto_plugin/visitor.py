@@ -4,7 +4,7 @@
 class Visitor(object):
   """Abstract visitor interface for api_proto_plugin implementation."""
 
-  def VisitService(self, service_proto, type_context):
+  def visit_service(self, service_proto, type_context):
     """Visit a service definition.
 
     Args:
@@ -16,7 +16,7 @@ class Visitor(object):
     """
     pass
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     """Visit an enum definition.
 
     Args:
@@ -28,7 +28,7 @@ class Visitor(object):
     """
     pass
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     """Visit a message definition.
 
     Args:
@@ -42,7 +42,7 @@ class Visitor(object):
     """
     pass
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     """Visit a proto file definition.
 
     Args:

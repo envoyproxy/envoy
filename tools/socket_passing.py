@@ -24,7 +24,7 @@ ADMIN_FILE_TIMEOUT_SECS = 20
 
 # Because the hot restart files are yaml but yaml support is not included in
 # python by default, we parse this fairly manually.
-def GenerateNewConfig(original_yaml, admin_address, updated_json):
+def generate_new_config(original_yaml, admin_address, updated_json):
   # Get original listener addresses
   with open(original_yaml, 'r') as original_file:
     sys.stdout.write('Admin address is ' + admin_address + '\n')
@@ -112,7 +112,7 @@ if __name__ == '__main__':
   with open(admin_address_path, 'r') as admin_address_file:
     admin_address = admin_address_file.read()
 
-  success = GenerateNewConfig(args.original_json, admin_address, args.updated_json)
+  success = generate_new_config(args.original_json, admin_address, args.updated_json)
 
   if not success:
     sys.exit(1)

@@ -12,10 +12,9 @@ static_resources:
           codec_type: AUTO
           stat_prefix: ingress_http
           access_log:
-            - name: envoy.access_loggers.file
+            - name: envoy.access_loggers.stdoutput
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-                path: /dev/stdout
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
           route_config:
             name: local_route
             virtual_hosts:
