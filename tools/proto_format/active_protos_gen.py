@@ -34,19 +34,19 @@ $frozen_pkgs    ],
 
 
 # Key sort function to achieve consistent results with buildifier.
-def BuildOrderKey(key):
+def build_order_key(key):
   return key.replace(':', '!')
 
 
-def DepsFormat(pkgs):
+def deps_format(pkgs):
   if not pkgs:
     return ''
   return '\n'.join(
-      '        "//%s:pkg",' % p.replace('.', '/') for p in sorted(pkgs, key=BuildOrderKey)) + '\n'
+      '        "//%s:pkg",' % p.replace('.', '/') for p in sorted(pkgs, key=build_order_key)) + '\n'
 
 
 # Find packages with a given package version status in a given API tree root.
-def FindPkgs(package_version_status, api_root):
+def find_pkgs(package_version_status, api_root):
   try:
     active_files = subprocess.check_output(
         ['grep', '-l', '-r',
@@ -60,8 +60,8 @@ def FindPkgs(package_version_status, api_root):
 
 if __name__ == '__main__':
   api_root = sys.argv[1]
-  active_pkgs = FindPkgs('ACTIVE', api_root)
-  frozen_pkgs = FindPkgs('FROZEN', api_root)
+  active_pkgs = find_pkgs('ACTIVE', api_root)
+  frozen_pkgs = find_pkgs('FROZEN', api_root)
   sys.stdout.write(
-      BUILD_FILE_TEMPLATE.substitute(active_pkgs=DepsFormat(active_pkgs),
-                                     frozen_pkgs=DepsFormat(frozen_pkgs)))
+      BUILD_FILE_TEMPLATE.substitute(active_pkgs=deps_format(active_pkgs),
+                                     frozen_pkgs=deps_format(frozen_pkgs)))

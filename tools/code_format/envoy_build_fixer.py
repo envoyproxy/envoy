@@ -17,10 +17,10 @@ import pathlib
 import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = paths.getBuildozer()
+BUILDOZER_PATH = paths.get_buildozer()
 
 # Where does Buildifier live?
-BUILDIFIER_PATH = paths.getBuildifier()
+BUILDIFIER_PATH = paths.get_buildifier()
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
@@ -49,7 +49,7 @@ class EnvoyBuildFixerError(Exception):
 
 
 # Run Buildozer commands on a string representing a BUILD file.
-def RunBuildozer(cmds, contents):
+def run_buildozer(cmds, contents):
   with tempfile.NamedTemporaryFile(mode='w') as cmd_file:
     # We send the BUILD contents to buildozer on stdin and receive the
     # transformed BUILD on stdout. The commands are provided in a file.
@@ -71,7 +71,7 @@ def RunBuildozer(cmds, contents):
 
 
 # Add an Apache 2 license and envoy_package() import and rule as needed.
-def FixPackageAndLicense(path, contents):
+def fix_package_and_license(path, contents):
   regex_to_use = PACKAGE_LOAD_BLOCK_REGEX
   package_string = 'envoy_package'
 
@@ -83,7 +83,7 @@ def FixPackageAndLicense(path, contents):
   # the prefix to be overridden if envoy is included in a larger workspace.
   if re.search(ENVOY_RULE_REGEX, contents):
     new_load = 'new_load {}//bazel:envoy_build_system.bzl %s' % package_string
-    contents = RunBuildozer([
+    contents = run_buildozer([
         (new_load.format(os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),
     ], contents)
     # Envoy package is inserted after the load block containing the
@@ -103,7 +103,7 @@ def FixPackageAndLicense(path, contents):
 
 
 # Run Buildifier commands on a string with lint mode.
-def BuildifierLint(contents):
+def buildifier_lint(contents):
   r = subprocess.run([BUILDIFIER_PATH, '-lint=fix', '-mode=fix', '-type=build'],
                      input=contents.encode(),
                      stdout=subprocess.PIPE,
@@ -114,7 +114,7 @@ def BuildifierLint(contents):
 
 
 # Find all the API headers in a C++ source file.
-def FindApiHeaders(source_path):
+def find_api_headers(source_path):
   api_hdrs = set([])
   contents = pathlib.Path(source_path).read_text(encoding='utf8')
   for line in contents.split('\n'):
@@ -132,9 +132,9 @@ def FindApiHeaders(source_path):
 # if we made use of Clang libtooling semantic analysis. However, this requires a
 # compilation database and full build of Envoy, envoy_build_fixer.py is run
 # under check_format, which should be fast for developers.
-def FixApiDeps(path, contents):
+def fix_api_deps(path, contents):
   source_dirname = os.path.dirname(path)
-  buildozer_out = RunBuildozer([
+  buildozer_out = run_buildozer([
       ('print kind name srcs hdrs deps', '*'),
   ], contents).strip()
   deps_mutation_cmds = []
@@ -162,7 +162,7 @@ def FixApiDeps(path, contents):
     for p in source_paths:
       # We're not smart enough to infer on generated files.
       if os.path.exists(p):
-        api_hdrs = api_hdrs.union(FindApiHeaders(p))
+        api_hdrs = api_hdrs.union(find_api_headers(p))
     actual_api_deps = set(['@envoy_api//%s:pkg_cc_proto' % h for h in api_hdrs])
     existing_api_deps = set([])
     if deps != 'missing':
@@ -176,16 +176,16 @@ def FixApiDeps(path, contents):
     deps_to_add = actual_api_deps.difference(existing_api_deps)
     if deps_to_add:
       deps_mutation_cmds.append(('add deps %s' % ' '.join(deps_to_add), name))
-  return RunBuildozer(deps_mutation_cmds, contents)
+  return run_buildozer(deps_mutation_cmds, contents)
 
 
-def FixBuild(path):
+def fix_build(path):
   with open(path, 'r') as f:
     contents = f.read()
   xforms = [
-      functools.partial(FixPackageAndLicense, path),
-      functools.partial(FixApiDeps, path),
-      BuildifierLint,
+      functools.partial(fix_package_and_license, path),
+      functools.partial(fix_api_deps, path),
+      buildifier_lint,
   ]
   for xform in xforms:
     contents = xform(contents)
@@ -194,10 +194,10 @@ def FixBuild(path):
 
 if __name__ == '__main__':
   if len(sys.argv) == 2:
-    sys.stdout.write(FixBuild(sys.argv[1]))
+    sys.stdout.write(fix_build(sys.argv[1]))
     sys.exit(0)
   elif len(sys.argv) == 3:
-    reorderd_source = FixBuild(sys.argv[1])
+    reorderd_source = fix_build(sys.argv[1])
     with open(sys.argv[2], 'w') as f:
       f.write(reorderd_source)
     sys.exit(0)

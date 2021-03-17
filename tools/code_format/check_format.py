@@ -452,7 +452,7 @@ class FormatChecker:
   def allowlistedForBuildUrls(self, file_path):
     return file_path in BUILD_URLS_ALLOWLIST
 
-  # TODO(chaoqin-li1123): Exclude some important extensions from the allow list.
+  # TODO(chaoqin-li1123): Exclude some important extensions from allowlist.
   def allowlistedForRawTry(self, file_path):
     return file_path in RAW_TRY_ALLOWLIST or file_path.startswith("./source/extensions")
 

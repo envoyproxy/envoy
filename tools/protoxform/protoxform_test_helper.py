@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from run_command import runCommand
+from run_command import run_command
 
 import logging
 import os
@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 
-def PathAndFilename(label):
+def path_and_filename(label):
   """Retrieve actual path and filename from bazel label
 
   Args:
@@ -31,7 +31,7 @@ def PathAndFilename(label):
   return ['/'.join(splitted_label[:len(splitted_label) - 1]), splitted_label[-1]]
 
 
-def GoldenProtoFile(path, filename, version):
+def golden_proto_file(path, filename, version):
   """Retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
 
   Args:
@@ -47,21 +47,21 @@ def GoldenProtoFile(path, filename, version):
   return os.path.abspath(base)
 
 
-def ProtoPrint(src, dst):
+def proto_print(src, dst):
   """Pretty-print FileDescriptorProto to a destination file.
 
   Args:
     src: source path for FileDescriptorProto.
     dst: destination path for formatted proto.
   """
-  print('ProtoPrint %s -> %s' % (src, dst))
+  print('proto_print %s -> %s' % (src, dst))
   subprocess.check_call([
       'bazel-bin/tools/protoxform/protoprint', src, dst,
       './bazel-bin/tools/protoxform/protoprint.runfiles/envoy/tools/type_whisperer/api_type_db.pb_text'
   ])
 
 
-def ResultProtoFile(cmd, path, tmp, filename, version):
+def result_proto_file(cmd, path, tmp, filename, version):
   """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
   Args:
@@ -79,11 +79,11 @@ def ResultProtoFile(cmd, path, tmp, filename, version):
   base += os.path.join(base, path)
   base += "/{0}.{1}.proto".format(filename, version)
   dst = os.path.join(tmp, filename)
-  ProtoPrint(os.path.abspath(base), dst)
+  proto_print(os.path.abspath(base), dst)
   return dst
 
 
-def Diff(result_file, golden_file):
+def diff(result_file, golden_file):
   """Execute diff command with unified form
 
   Args:
@@ -96,11 +96,11 @@ def Diff(result_file, golden_file):
   command = 'diff -u '
   command += result_file + ' '
   command += golden_file
-  status, stdout, stderr = runCommand(command)
+  status, stdout, stderr = run_command(command)
   return [status, stdout, stderr]
 
 
-def Run(cmd, path, filename, version):
+def run(cmd, path, filename, version):
   """Run main execution for protoxform test
 
   Args:
@@ -114,12 +114,12 @@ def Run(cmd, path, filename, version):
   """
   message = ""
   with tempfile.TemporaryDirectory() as tmp:
-    golden_path = GoldenProtoFile(path, filename, version)
-    test_path = ResultProtoFile(cmd, path, tmp, filename, version)
+    golden_path = golden_proto_file(path, filename, version)
+    test_path = result_proto_file(cmd, path, tmp, filename, version)
     if os.stat(golden_path).st_size == 0 and not os.path.exists(test_path):
       return message
 
-    status, stdout, stderr = Diff(golden_path, test_path)
+    status, stdout, stderr = diff(golden_path, test_path)
 
     if status != 0:
       message = '\n'.join([str(line) for line in stdout + stderr])
@@ -132,10 +132,10 @@ if __name__ == "__main__":
   logging.basicConfig(format='%(message)s')
   cmd = sys.argv[1]
   for target in sys.argv[2:]:
-    path, filename = PathAndFilename(target)
-    messages += Run(cmd, path, filename, 'active_or_frozen')
-    messages += Run(cmd, path, filename, 'next_major_version_candidate')
-    messages += Run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
+    path, filename = path_and_filename(target)
+    messages += run(cmd, path, filename, 'active_or_frozen')
+    messages += run(cmd, path, filename, 'next_major_version_candidate')
+    messages += run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
 
   if len(messages) == 0:
     logging.warning("PASS")

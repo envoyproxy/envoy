@@ -53,7 +53,7 @@ class AnnotationError(Exception):
   """Base error class for the annotations module."""
 
 
-def ExtractAnnotations(s, inherited_annotations=None):
+def extract_annotations(s, inherited_annotations=None):
   """Extract annotations map from a given comment string.
 
   Args:
@@ -77,7 +77,7 @@ def ExtractAnnotations(s, inherited_annotations=None):
   return annotations
 
 
-def XformAnnotation(s, annotation_xforms):
+def xform_annotation(s, annotation_xforms):
   """Return transformed string with annotation transformers.
 
   The annotation will be replaced with the new value returned by the transformer.
@@ -115,5 +115,5 @@ def XformAnnotation(s, annotation_xforms):
   return xformed
 
 
-def WithoutAnnotations(s):
+def without_annotations(s):
   return re.sub(ANNOTATION_REGEX, '', s)

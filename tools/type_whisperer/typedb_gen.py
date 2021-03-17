@@ -43,7 +43,7 @@ PKG_FORCE_UPGRADE = [
 ]
 
 
-def UpgradedPackage(type_desc):
+def upgraded_package(type_desc):
   """Determine upgrade package for a type."""
   if type_desc.next_version_package:
     return type_desc.next_version_package
@@ -55,28 +55,28 @@ def UpgradedPackage(type_desc):
   raise ValueError('{} is not upgradable'.format(type_desc.qualified_package))
 
 
-def UpgradedType(type_name, type_desc):
+def upgraded_type(type_name, type_desc):
   """Determine upgraded type name."""
-  upgraded_package = UpgradedPackage(type_desc)
-  return type_name.replace(type_desc.qualified_package, upgraded_package)
+  _upgraded_package = upgraded_package(type_desc)
+  return type_name.replace(type_desc.qualified_package, _upgraded_package)
 
 
-def UpgradedPath(proto_path, upgraded_package):
+def upgraded_path(proto_path, upgraded_package):
   """Determine upgraded API .proto path."""
   return '/'.join([upgraded_package.replace('.', '/'), proto_path.split('/')[-1]])
 
 
-def UpgradedTypeWithDescription(type_name, type_desc):
+def upgraded_type_with_description(type_name, type_desc):
   upgrade_type_desc = TypeDescription()
-  upgrade_type_desc.qualified_package = UpgradedPackage(type_desc)
-  upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path,
-                                              upgrade_type_desc.qualified_package)
+  upgrade_type_desc.qualified_package = upgraded_package(type_desc)
+  upgrade_type_desc.proto_path = upgraded_path(type_desc.proto_path,
+                                               upgrade_type_desc.qualified_package)
   upgrade_type_desc.deprecated_type = type_desc.deprecated_type
   upgrade_type_desc.map_entry = type_desc.map_entry
-  return (UpgradedType(type_name, type_desc), upgrade_type_desc)
+  return (upgraded_type(type_name, type_desc), upgrade_type_desc)
 
 
-def LoadTypes(path):
+def load_types(path):
   """Load a tools.type_whisperer.Types proto from the filesystem.
 
   Args:
@@ -91,7 +91,7 @@ def LoadTypes(path):
   return types
 
 
-def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
+def next_version_upgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
   """Does a given type require upgrade between major version?
 
   Performs depth-first search through type dependency graph for any upgraded
@@ -116,7 +116,7 @@ def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=N
   if type_name in visited:
     return False
   visited = visited.union(set([type_name]))
-  # If we have seen this type in a previous NextVersionUpgrade(), use that
+  # If we have seen this type in a previous next_version_upgrade(), use that
   # result.
   if type_name in next_version_upgrade_memo:
     return next_version_upgrade_memo[type_name]
@@ -126,7 +126,7 @@ def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=N
     return True
   # Recurse and memoize.
   should_upgrade = type_desc.next_version_upgrade or any(
-      NextVersionUpgrade(d, type_map, next_version_upgrade_memo, visited)
+      next_version_upgrade(d, type_map, next_version_upgrade_memo, visited)
       for d in type_desc.type_dependencies)
   next_version_upgrade_memo[type_name] = should_upgrade
   return should_upgrade
@@ -138,7 +138,7 @@ if __name__ == '__main__':
 
   # Load type descriptors for each type whisper
   type_desc_paths = sys.argv[2:]
-  type_whispers = map(LoadTypes, type_desc_paths)
+  type_whispers = map(load_types, type_desc_paths)
 
   # Aggregate type descriptors to a single type map.
   type_map = dict(sum([list(t.types.items()) for t in type_whispers], []))
@@ -149,7 +149,7 @@ if __name__ == '__main__':
   next_versions_pkgs = set([
       type_desc.qualified_package
       for type_name, type_desc in type_map.items()
-      if NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo)
+      if next_version_upgrade(type_name, type_map, next_version_upgrade_memo)
   ]).union(set(['envoy.config.retry.previous_priorities', 'envoy.config.cluster.redis']))
 
   # Generate type map entries for upgraded types. We run this twice to allow
@@ -157,7 +157,7 @@ if __name__ == '__main__':
   # propagate to v4alpha (for shadowing purposes).
   for _ in range(2):
     type_map.update([
-        UpgradedTypeWithDescription(type_name, type_desc)
+        upgraded_type_with_description(type_name, type_desc)
         for type_name, type_desc in type_map.items()
         if type_desc.qualified_package in next_versions_pkgs and
         (type_desc.active or type_desc.deprecated_type or type_desc.map_entry)
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     type_desc.qualified_package = type_map[t].qualified_package
     type_desc.proto_path = type_map[t].proto_path
     if type_desc.qualified_package in next_versions_pkgs:
-      type_desc.next_version_type_name = UpgradedType(t, type_map[t])
+      type_desc.next_version_type_name = upgraded_type(t, type_map[t])
       assert (type_desc.next_version_type_name != t)
       next_proto_info[type_map[t].proto_path] = (
           type_map[type_desc.next_version_type_name].proto_path,
