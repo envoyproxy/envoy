@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
@@ -9,12 +11,10 @@ namespace MySQLProxy {
 
 void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len) {
   ENVOY_LOG(trace, "mysql_proxy: parsing message, seq {}, len {}", seq, len);
-
   // Run the MySQL state machine
   switch (session_.getState()) {
-
-  // Expect Server Challenge packet
   case MySQLSession::State::Init: {
+    // Expect Server Challenge packet
     ServerGreeting greeting;
     greeting.decode(message, seq, len);
     callbacks_.onServerGreeting(greeting);
@@ -22,9 +22,8 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     session_.setState(MySQLSession::State::ChallengeReq);
     break;
   }
-
-  // Process Client Handshake Response
   case MySQLSession::State::ChallengeReq: {
+    // Process Client Handshake Response
     ClientLogin client_login{};
     client_login.decode(message, seq, len);
     callbacks_.onClientLogin(client_login);
@@ -38,29 +37,48 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     }
     break;
   }
-
   case MySQLSession::State::SslPt:
+    // just consume
+    message.drain(len);
     break;
-
   case MySQLSession::State::ChallengeResp41:
   case MySQLSession::State::ChallengeResp320: {
-    ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, seq, len);
-    callbacks_.onClientLoginResponse(client_login_resp);
-
-    if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
-      session_.setState(MySQLSession::State::Req);
+    uint8_t resp_code;
+    if (BufferHelper::peekUint8(message, resp_code) != DecodeStatus::Success) {
+      session_.setState(MySQLSession::State::NotHandled);
+      break;
+    }
+    std::unique_ptr<ClientLoginResponse> msg;
+    MySQLSession::State state = MySQLSession::State::NotHandled;
+    switch (resp_code) {
+    case MYSQL_RESP_OK: {
+      msg = std::make_unique<OkMessage>();
+      state = MySQLSession::State::Req;
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-      session_.setState(MySQLSession::State::AuthSwitchResp);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-      // client/server should close the connection:
-      // https://dev.mysql.com/doc/internals/en/connection-phase.html
-      session_.setState(MySQLSession::State::Error);
-    } else {
-      session_.setState(MySQLSession::State::NotHandled);
+      break;
     }
+    case MYSQL_RESP_AUTH_SWITCH: {
+      msg = std::make_unique<AuthSwitchMessage>();
+      state = MySQLSession::State::AuthSwitchResp;
+      break;
+    }
+    case MYSQL_RESP_ERR: {
+      msg = std::make_unique<ErrMessage>();
+      state = MySQLSession::State::Error;
+      break;
+    }
+    case MYSQL_RESP_MORE: {
+      msg = std::make_unique<AuthMoreMessage>();
+      break;
+    }
+    default:
+      session_.setState(state);
+      return;
+    }
+    msg->decode(message, seq, len);
+    session_.setState(state);
+    callbacks_.onClientLoginResponse(*msg);
     break;
   }
 
@@ -68,27 +86,47 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.decode(message, seq, len);
     callbacks_.onClientSwitchResponse(client_switch_resp);
-
     session_.setState(MySQLSession::State::AuthSwitchMore);
     break;
   }
 
   case MySQLSession::State::AuthSwitchMore: {
-    ClientLoginResponse client_login_resp{};
-    client_login_resp.decode(message, seq, len);
-    callbacks_.onMoreClientLoginResponse(client_login_resp);
-
-    if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
-      session_.setState(MySQLSession::State::Req);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_MORE) {
-      session_.setState(MySQLSession::State::AuthSwitchResp);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-      // stop parsing auth req/response, attempt to resync in command state
-      session_.setState(MySQLSession::State::Resync);
-      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-    } else {
+    uint8_t resp_code;
+    if (BufferHelper::peekUint8(message, resp_code) != DecodeStatus::Success) {
       session_.setState(MySQLSession::State::NotHandled);
+      break;
     }
+    std::unique_ptr<ClientLoginResponse> msg;
+    MySQLSession::State state = MySQLSession::State::NotHandled;
+    switch (resp_code) {
+    case MYSQL_RESP_OK: {
+      msg = std::make_unique<OkMessage>();
+      state = MySQLSession::State::Req;
+      break;
+    }
+    case MYSQL_RESP_MORE: {
+      msg = std::make_unique<AuthMoreMessage>();
+      state = MySQLSession::State::AuthSwitchResp;
+      break;
+    }
+    case MYSQL_RESP_ERR: {
+      msg = std::make_unique<ErrMessage>();
+      // stop parsing auth req/response, attempt to resync in command state
+      state = MySQLSession::State::Resync;
+      session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
+      break;
+    }
+    case MYSQL_RESP_AUTH_SWITCH: {
+      msg = std::make_unique<AuthSwitchMessage>();
+      break;
+    }
+    default:
+      session_.setState(state);
+      return;
+    }
+    msg->decode(message, seq, len);
+    session_.setState(state);
+    callbacks_.onMoreClientLoginResponse(*msg);
     break;
   }
 
@@ -132,10 +170,15 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
   ENVOY_LOG(trace, "mysql_proxy: decoding {} bytes", data.length());
-
   uint32_t len = 0;
   uint8_t seq = 0;
-  if (BufferHelper::peekHdr(data, len, seq) != MYSQL_SUCCESS) {
+
+  // ignore ssl message
+  if (session_.getState() == MySQLSession::State::SslPt) {
+    data.drain(data.length());
+    return true;
+  }
+  if (BufferHelper::peekHdr(data, len, seq) != DecodeStatus::Success) {
     throw EnvoyException("error parsing mysql packet header");
   }
 
