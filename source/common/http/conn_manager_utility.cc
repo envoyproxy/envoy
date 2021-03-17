@@ -440,6 +440,9 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
   }
   bool is_valid_path = true;
   config.normalizePath(request_headers);
+  if (!config.shouldNormalizePath() && !config.shouldMergeSlashes()) {
+    return true;
+  }
   if (config.shouldNormalizePath()) {
     is_valid_path = PathUtil::canonicalPath(request_headers);
   }

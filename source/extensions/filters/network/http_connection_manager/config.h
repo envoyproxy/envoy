@@ -181,12 +181,15 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
   void normalizePath(Http::RequestHeaderMap& request_headers) const override {
+    if (forwarding_path_transformer_ == nullptr) {
+      return;
+    }
     const auto original_path = request_headers.getPathValue();
     absl::optional<std::string> forwarding_path =
-        forwarding_path_transformer_.transform(original_path);
+        forwarding_path_transformer_->transform(original_path);
     absl::optional<std::string> filter_path;
     if (forwarding_path.has_value()) {
-      filter_path = filter_path_transformer_.transform(forwarding_path.value());
+      filter_path = filter_path_transformer_->transform(forwarding_path.value());
     }
     if (forwarding_path.has_value()) {
       request_headers.setForwaringPath(forwarding_path.value());
@@ -267,8 +270,8 @@ private:
   const bool proxy_100_continue_;
   const bool stream_error_on_invalid_http_messaging_;
   std::chrono::milliseconds delayed_close_timeout_;
-  const bool normalize_path_;
-  const bool merge_slashes_;
+  bool normalize_path_;
+  bool merge_slashes_;
   Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
@@ -280,8 +283,8 @@ private:
   static const uint64_t RequestTimeoutMs = 0;
   // request header timeout is disabled by default
   static const uint64_t RequestHeaderTimeoutMs = 0;
-  Http::PathTransformer forwarding_path_transformer_;
-  Http::PathTransformer filter_path_transformer_;
+  std::unique_ptr<Http::PathTransformer> forwarding_path_transformer_;
+  std::unique_ptr<Http::PathTransformer> filter_path_transformer_;
 };
 
 /**

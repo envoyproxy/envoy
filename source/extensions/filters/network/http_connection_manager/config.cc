@@ -27,6 +27,7 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
+#include "common/http/path_utility.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
@@ -253,9 +254,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
-      forwarding_path_transformer_(config.path_normalization_options().forwarding_transformation()),
-      filter_path_transformer_(config.path_normalization_options().http_filter_transformation()) {
+      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -266,6 +265,17 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
+  }
+
+  // If the path normalization options has been set.
+  if (config.has_path_normalization_options()) {
+    ASSERT(false);
+    normalize_path_ = false;
+    merge_slashes_ = false;
+    forwarding_path_transformer_ = std::make_unique<Http::PathTransformer>(
+        config.path_normalization_options().forwarding_transformation());
+    filter_path_transformer_ = std::make_unique<Http::PathTransformer>(
+        config.path_normalization_options().http_filter_transformation());
   }
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
