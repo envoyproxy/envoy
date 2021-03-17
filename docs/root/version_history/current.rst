@@ -149,9 +149,9 @@ New Features
   <arch_overview_tracing_context_propagation>` for more information.
 * udp: added :ref:`downstream <config_listener_stats_udp>` and
   :ref:`upstream <config_udp_listener_filters_udp_proxy_stats>` statistics for dropped datagrams.
-* udp: added :ref:`max_downstream_rx_datagram_size <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.max_downstream_rx_datagram_size>`
+* udp: added :ref:`downstream_socket_config <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.downstream_socket_config>`
   listener configuration to allow configuration of downstream max UDP datagram size. Also added
-  :ref:`max_upstream_rx_datagram_size <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.max_upstream_rx_datagram_size>`
+  :ref:`upstream_socket_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_socket_config>`
   UDP proxy configuration to allow configuration of upstream max UDP datagram size. The defaults for
   both remain 1500 bytes.
 
