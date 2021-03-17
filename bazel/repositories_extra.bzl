@@ -13,8 +13,8 @@ def _python_deps():
 
         # project_name = "PyYAML",
         # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.3.1",
-        # release_date = "2020-03-18"
+        # version = "5.4.1",
+        # release_date = "2021-01-20"
         # use_category = ["devtools"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
@@ -73,8 +73,8 @@ def _python_deps():
 
         # project_name = "PyYAML",
         # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.3.1",
-        # release_date = "2020-03-18"
+        # version = "5.4.1",
+        # release_date = "2021-01-20"
         # use_category = ["docs"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )

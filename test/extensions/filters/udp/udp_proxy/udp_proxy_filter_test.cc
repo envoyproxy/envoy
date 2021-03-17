@@ -721,8 +721,7 @@ hash_policies:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
-                          "caused by HashPolicyValidationError\\.SourceIp: \\[\"value must equal "
-                          "\" %!q\\(bool=true\\)\\]");
+                          "caused by HashPolicyValidationError\\.SourceIp");
 }
 
 // Make sure hash policy is null if it is not mentioned.

@@ -72,8 +72,9 @@ public:
   }
 
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return impl_.createUdpListener(std::move(socket), cb);
+                                            Network::UdpListenerCallbacks& cb,
+                                            const CreateUdpListenerParams& params) override {
+    return impl_.createUdpListener(std::move(socket), cb, params);
   }
 
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }

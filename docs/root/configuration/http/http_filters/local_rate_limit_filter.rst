@@ -12,7 +12,7 @@ The HTTP local rate limit filter applies a :ref:`token bucket
 limit when the request's route or virtual host has a per filter
 :ref:`local rate limit configuration <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`.
 
-If the local rate limit token bucket is checked, and there are no token availables, a 429 response is returned
+If the local rate limit token bucket is checked, and there are no tokens available, a 429 response is returned
 (the response is configurable). The local rate limit filter also sets the
 :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header. Additional response
 headers may be configured.

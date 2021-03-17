@@ -569,6 +569,7 @@ private:
   void sendKeepalive();
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
+  virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 
   // Tracks the current slice we're processing in the dispatch loop.
   const Buffer::RawSlice* current_slice_ = nullptr;
@@ -613,6 +614,7 @@ private:
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
 
   void dumpStreams(std::ostream& os, int indent_level) const override;
+  StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
   // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
   bool enable_upstream_http2_flood_checks_;
@@ -640,6 +642,9 @@ private:
   trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+  StreamResetReason getMessagingErrorResetReason() const override {
+    return StreamResetReason::LocalReset;
+  }
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

@@ -107,6 +107,10 @@ STD_REGEX_ALLOWLIST = (
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 
+# Files that should not raise an error for using memcpy
+MEMCPY_WHITELIST = ("./source/common/common/mem_block_builder.h",
+                    "./source/common/common/safe_memcpy.h")
+
 # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
@@ -425,6 +429,9 @@ class FormatChecker:
 
   def allowlistedForGrpcInit(self, file_path):
     return file_path in GRPC_INIT_ALLOWLIST
+
+  def whitelistedForMemcpy(self, file_path):
+    return file_path in MEMCPY_WHITELIST
 
   def allowlistedForUnpackTo(self, file_path):
     return file_path.startswith("./test") or file_path in [
@@ -826,6 +833,14 @@ class FormatChecker:
         if comment == -1 or comment > grpc_init_or_shutdown:
           reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                       "Grpc::GoogleGrpcContext. See #8282")
+
+    if not self.whitelistedForMemcpy(file_path) and \
+       not ("test/" in file_path) and \
+       ("memcpy(" in line) and \
+       not ("NOLINT(safe-memcpy)" in line):
+      reportError(
+          "Don't call memcpy() directly; use safeMemcpy, safeMemcpyUnsafeSrc, safeMemcpyUnsafeDst or MemBlockBuilder instead."
+      )
 
     if self.denylistedForExceptions(file_path):
       # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".

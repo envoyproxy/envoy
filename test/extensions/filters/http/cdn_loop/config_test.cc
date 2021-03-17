@@ -65,6 +65,17 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
                              EnvoyException, HasSubstr("is not a valid CDN identifier"));
 }
 
+TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
+  config.set_cdn_id("cdn,cdn");
+  CdnLoopFilterFactory factory;
+
+  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
+}
+
 } // namespace CdnLoop
 } // namespace HttpFilters
 } // namespace Extensions
