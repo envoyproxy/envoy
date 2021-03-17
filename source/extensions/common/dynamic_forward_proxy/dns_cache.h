@@ -162,6 +162,7 @@ public:
   struct LoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandlePtr handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,

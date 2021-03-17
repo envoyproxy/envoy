@@ -56,29 +56,31 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
 
-  auto [cache_hit, is_overflow] = [&]() {
+  auto [is_overflow, host_info] = [&]() {
     absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
     auto tls_host = primary_hosts_.find(host);
-    bool cache_hit =
-        tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete();
-    bool is_overflow = primary_hosts_.size() >= max_hosts_;
-    return std::make_tuple(cache_hit, is_overflow);
+    return std::make_tuple(
+        primary_hosts_.size() >= max_hosts_,
+        (tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete())
+            ? absl::optional<DnsHostInfoSharedPtr>(tls_host->second->host_info_)
+            : absl::nullopt);
   }();
 
-  if (cache_hit) {
+  if (host_info) {
     ENVOY_LOG(debug, "cache hit for host '{}'", host);
-    return {LoadDnsCacheEntryStatus::InCache, nullptr};
+    return {LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
   } else if (is_overflow) {
     ENVOY_LOG(debug, "DNS cache overflow for host '{}'", host);
     stats_.host_overflow_.inc();
-    return {LoadDnsCacheEntryStatus::Overflow, nullptr};
+    return {LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt};
   } else {
     ENVOY_LOG(debug, "cache miss for host '{}', posting to main thread", host);
     main_thread_dispatcher_.post(
         [this, host = std::string(host), default_port]() { startCacheLoad(host, default_port); });
     return {LoadDnsCacheEntryStatus::Loading,
             std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                          callbacks)};
+                                                          callbacks),
+            absl::nullopt};
   }
 }
 

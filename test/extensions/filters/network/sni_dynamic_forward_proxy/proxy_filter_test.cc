@@ -78,7 +78,8 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
-      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -95,7 +96,8 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
-      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr}));
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -108,7 +110,8 @@ TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
-      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr}));
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
