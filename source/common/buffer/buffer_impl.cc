@@ -47,6 +47,48 @@ void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   slices_.emplace_back(fragment);
 }
 
+std::pair<bool, size_t> findDequeIndex(size_t i, RawSlice& slice, SliceDeque& slices) {
+  size_t empty_slices = 0;
+  size_t deque_index = 0;
+
+  // This is the same logic used by getRawSlices require any changes upstream applied here too
+  for (const auto& deque_slice : slices) {
+    if (deque_slice.dataSize() == 0) {
+      ++empty_slices;
+      continue;
+    }
+    if (deque_index == i && deque_slice.data() == slice.mem_ &&
+        deque_slice.dataSize() == slice.len_) {
+      return {true, deque_index + empty_slices};
+    }
+    ++deque_index;
+  }
+
+  return {false, deque_index + empty_slices};
+}
+
+bool OwnedImpl::insertBufferFragmentAfter(size_t i, RawSlice& slice, BufferFragment& fragment) {
+  auto deque_index = findDequeIndex(i, slice, slices_);
+  if (!deque_index.first) {
+    return false;
+  }
+
+  length_ += fragment.size();
+  slices_.emplace_insert(deque_index.second + 1, Slice{fragment});
+  return true;
+}
+
+bool OwnedImpl::insertBufferFragmentBefore(size_t i, RawSlice& slice, BufferFragment& fragment) {
+  auto deque_index = findDequeIndex(i, slice, slices_);
+  if (!deque_index.first) {
+    return false;
+  }
+
+  length_ += fragment.size();
+  slices_.emplace_insert(deque_index.second, Slice{fragment});
+  return true;
+}
+
 void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
@@ -131,6 +173,24 @@ void OwnedImpl::drainImpl(uint64_t size) {
   // sentinels for flushed data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
     slices_.pop_front();
+  }
+}
+
+void OwnedImpl::drainAtEnd(uint64_t size) {
+  while (size != 0) {
+    if (slices_.empty()) {
+      break;
+    }
+    uint64_t slice_size = slices_.back().dataSize();
+    if (slice_size <= size) {
+      slices_.pop_back();
+      length_ -= slice_size;
+      size -= slice_size;
+    } else {
+      slices_.back().drainAtEnd(size);
+      length_ -= size;
+      size = 0;
+    }
   }
 }
 

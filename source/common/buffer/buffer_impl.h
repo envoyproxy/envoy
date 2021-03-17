@@ -155,6 +155,15 @@ public:
   }
 
   /**
+   * Remove the last `size` bytes of usable content. Runs in O(1) time.
+   * @param size number of bytes to remove. If greater than data_size(), the result is undefined.
+   */
+  void drainAtEnd(uint64_t size) {
+    ASSERT(size <= dataSize());
+    reservable_ -= size;
+  }
+
+  /**
    * @return the number of bytes available to be reserve()d.
    * @note Read-only implementations of Slice should return zero from this method.
    */
@@ -435,6 +444,59 @@ public:
     return *this;
   }
 
+  void emplace_insert(size_t i, Slice&& slice) { // NOLINT(readability-identifier-naming)
+    // If insert location is smaller than start emplace_front
+    if (i == 0) {
+      emplace_front(std::move(slice));
+      return;
+    }
+
+    // If insert location is greater than last emplace_back
+    if (i >= size_) {
+      emplace_back(std::move(slice));
+      return;
+    }
+
+    // If we have enough room already
+    // Move element in last index to last index + 1
+    if (size_ < capacity_) {
+      size_t dst = internalIndex(size_); // last index + 1
+      size_t src = dst - 1;              // last index
+      size_t num_moves = dst - internalIndex(i);
+      for (size_t j = 0; j < num_moves; j++) {
+        ring_[dst--] = std::move(ring_[src--]);
+      }
+      // insert slice
+      ring_[dst] = std::move(slice);
+      ++size_;
+      return;
+    }
+
+    const size_t new_capacity = capacity_ * 2;
+    auto new_ring = std::make_unique<Slice[]>(new_capacity);
+    // move slices left of i
+    size_t src = start_;
+    size_t dst = 0;
+    for (size_t j = 0; j < i; j++) {
+      new_ring[dst++] = std::move(ring_[src++]);
+      if (src == capacity_) {
+        src = 0;
+      }
+    }
+    // insert slice at i
+    new_ring[dst++] = std::move(slice);
+    // move slices right of i
+    size_t num_moves = size_ - i;
+    for (size_t j = 0; j < num_moves; j++) {
+      new_ring[dst++] = std::move(ring_[src++]);
+    }
+
+    external_ring_.swap(new_ring);
+    ring_ = external_ring_.get();
+    start_ = 0;
+    capacity_ = new_capacity;
+  }
+
   void emplace_back(Slice&& slice) { // NOLINT(readability-identifier-naming)
     growRing();
     size_t index = internalIndex(size_);
@@ -638,12 +700,15 @@ public:
   void addDrainTracker(std::function<void()> drain_tracker) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
+  bool insertBufferFragmentAfter(size_t i, RawSlice& slice, BufferFragment& fragment) override;
+  bool insertBufferFragmentBefore(size_t i, RawSlice& slice, BufferFragment& fragment) override;
   void add(absl::string_view data) override;
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
+  void drainAtEnd(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
   RawSlice frontSlice() const override;
   SliceDataPtr extractMutableFrontSlice() override;

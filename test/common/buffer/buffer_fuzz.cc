@@ -85,6 +85,29 @@ public:
     fragment.done();
   }
 
+  bool insertBufferFragmentAfter(size_t i, Buffer::RawSlice& slice,
+                                 Buffer::BufferFragment& fragment) override {
+    // There is always only one slice in this StringBuffer
+    if (i != size_ || slice.mem_ != start()) {
+      return false;
+    }
+
+    addBufferFragment(fragment);
+    return true;
+  }
+
+  bool insertBufferFragmentBefore(size_t i, Buffer::RawSlice& slice,
+                                  Buffer::BufferFragment& fragment) override {
+    // There is always only one slice in this StringBuffer
+    if (i != size_ || slice.mem_ != start()) {
+      return false;
+    }
+
+    prepend(absl::string_view{static_cast<const char*>(fragment.data()), fragment.size()});
+    fragment.done();
+    return true;
+  }
+
   void add(absl::string_view data) override { add(data.data(), data.size()); }
 
   void add(const Buffer::Instance& data) override {
@@ -112,6 +135,11 @@ public:
   void drain(uint64_t size) override {
     FUZZ_ASSERT(size <= size_);
     start_ += size;
+    size_ -= size;
+  }
+
+  void drainAtEnd(uint64_t size) override {
+    FUZZ_ASSERT(size <= size_);
     size_ -= size;
   }
 

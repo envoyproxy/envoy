@@ -394,6 +394,150 @@ TEST(SliceDequeTest, CreateDelete) {
   EXPECT_TRUE(slice3_deleted);
 }
 
+TEST(SliceDequeTest, EmplaceInsert) {
+  bool slice1_deleted = false;
+  bool slice2_deleted = false;
+  bool slice3_deleted = false;
+  bool slice4_deleted = false;
+  bool slice5_deleted = false;
+  bool slice6_deleted = false;
+
+  {
+    // Create an empty deque.
+    SliceDeque slices;
+    EXPECT_TRUE(slices.empty());
+    EXPECT_EQ(0, slices.size());
+
+    // EmplaceInsert in empty deque see it is functions as emplace_first.
+    const std::string slice1 = "slice1";
+    slices.emplace_insert(
+        0, *OwnedBufferFragmentImpl::create(slice1, [&slice1_deleted](
+                                                        const OwnedBufferFragmentImpl* fragment) {
+              slice1_deleted = true;
+              delete fragment;
+            }).release());
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(1, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice1));
+
+    // Emplace Insert at index 0 see it is functions as emplace_first.
+    const std::string slice2 = "slice2";
+    slices.emplace_insert(
+        0, *OwnedBufferFragmentImpl::create(slice2, [&slice2_deleted](
+                                                        const OwnedBufferFragmentImpl* fragment) {
+              slice2_deleted = true;
+              delete fragment;
+            }).release());
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(2, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice2));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice1));
+
+    // Emplace Insert one past last index  see it is functions as emplace_last.
+    const std::string slice3 = "slice3";
+    slices.emplace_insert(
+        2, *OwnedBufferFragmentImpl::create(slice3, [&slice3_deleted](
+                                                        const OwnedBufferFragmentImpl* fragment) {
+              slice3_deleted = true;
+              delete fragment;
+            }).release());
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(3, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_FALSE(slice3_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice2));
+    EXPECT_TRUE(sliceMatches(slices[1], slice1));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice3));
+
+    // Emplace Insert past last index  see it is functions as emplace_last.
+    const std::string slice4 = "slice4";
+    slices.emplace_insert(
+        20, *OwnedBufferFragmentImpl::create(slice4, [&slice4_deleted](
+                                                         const OwnedBufferFragmentImpl* fragment) {
+               slice4_deleted = true;
+               delete fragment;
+             }).release());
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(4, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_FALSE(slice3_deleted);
+    EXPECT_FALSE(slice4_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice2));
+    EXPECT_TRUE(sliceMatches(slices[1], slice1));
+    EXPECT_TRUE(sliceMatches(slices[2], slice3));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice4));
+
+    // Emplace Insert at index 3
+    const std::string slice5 = "slice5";
+    slices.emplace_insert(
+        3, *OwnedBufferFragmentImpl::create(slice5, [&slice5_deleted](
+                                                        const OwnedBufferFragmentImpl* fragment) {
+              slice5_deleted = true;
+              delete fragment;
+            }).release());
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(5, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_FALSE(slice3_deleted);
+    EXPECT_FALSE(slice4_deleted);
+    EXPECT_FALSE(slice5_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice2));
+    EXPECT_TRUE(sliceMatches(slices[1], slice1));
+    EXPECT_TRUE(sliceMatches(slices[2], slice3));
+    EXPECT_TRUE(sliceMatches(slices[3], slice5));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice4));
+
+    // Emplace Insert at index 2
+    const std::string slice6 = "slice6";
+    slices.emplace_insert(
+        2, *OwnedBufferFragmentImpl::create(slice6, [&slice6_deleted](
+                                                        const OwnedBufferFragmentImpl* fragment) {
+              slice6_deleted = true;
+              delete fragment;
+            }).release());
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(6, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_FALSE(slice2_deleted);
+    EXPECT_FALSE(slice3_deleted);
+    EXPECT_FALSE(slice4_deleted);
+    EXPECT_FALSE(slice5_deleted);
+    EXPECT_FALSE(slice6_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice2));
+    EXPECT_TRUE(sliceMatches(slices[1], slice1));
+    EXPECT_TRUE(sliceMatches(slices[2], slice6));
+    EXPECT_TRUE(sliceMatches(slices[3], slice3));
+    EXPECT_TRUE(sliceMatches(slices[4], slice5));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice4));
+
+    // Remove the first view from the deque, and verify that its slice is deleted.
+    slices.pop_front();
+    EXPECT_FALSE(slices.empty());
+    ASSERT_EQ(5, slices.size());
+    EXPECT_FALSE(slice1_deleted);
+    EXPECT_TRUE(slice2_deleted);
+    EXPECT_FALSE(slice3_deleted);
+    EXPECT_FALSE(slice4_deleted);
+    EXPECT_FALSE(slice5_deleted);
+    EXPECT_FALSE(slice6_deleted);
+    EXPECT_TRUE(sliceMatches(slices.front(), slice1));
+    EXPECT_TRUE(sliceMatches(slices[1], slice6));
+    EXPECT_TRUE(sliceMatches(slices[2], slice3));
+    EXPECT_TRUE(sliceMatches(slices[3], slice5));
+    EXPECT_TRUE(sliceMatches(slices.back(), slice4));
+  }
+
+  EXPECT_TRUE(slice1_deleted);
+  EXPECT_TRUE(slice2_deleted);
+  EXPECT_TRUE(slice3_deleted);
+}
+
 TEST(BufferHelperTest, PeekI8) {
   {
     Buffer::OwnedImpl buffer;

@@ -118,6 +118,31 @@ public:
   virtual void addBufferFragment(BufferFragment& fragment) PURE;
 
   /**
+   * Insert externally owned data into the buffer after given RawSlice and its index. No copying is
+   * done. fragment is not owned. When the fragment->data() is no longer needed, fragment->done() is
+   * called. If RawSlice.mem_ and RawSlice.len_ not same in the Instance, BufferFragment insertion
+   * is not performed and false is returned.
+   *
+   * @param i index of RawSlice in RawSlice array obtained from getRawSlices method.
+   * @param slice slice from RawSlice array obtained from getRawSlices method.
+   * @param fragment the externally owned data to insert in to the buffer.
+   * @return true if insertion was successful or false and no change is made to the buffer
+   */
+  virtual bool insertBufferFragmentAfter(size_t i, RawSlice& slice, BufferFragment& fragment) PURE;
+
+  /**
+   * Insert externally owned data into the buffer after given RawSlice and its index. No copying is
+   * done. fragment is not owned. When the fragment->data() is no longer needed, fragment->done() is
+   * called. If RawSlice.mem_ and RawSlice.len_ not same in the Instance, BufferFragment insertion
+   * is not performed and false is returned.
+   *
+   * @param i index of RawSlice in RawSlice array obtained from getRawSlices method.
+   * @param slice slice from RawSlice array obtained from getRawSlices method.
+   * @param fragment the externally owned data to insert in to the buffer.
+   * @return true if insertion was successful or false and no change is made to the buffer.
+   */
+  virtual bool insertBufferFragmentBefore(size_t i, RawSlice& slice, BufferFragment& fragment) PURE;
+  /**
    * Copy a string into the buffer.
    * @param data supplies the string to copy.
    */
@@ -155,6 +180,12 @@ public:
    * @param size supplies the length of data to drain.
    */
   virtual void drain(uint64_t size) PURE;
+
+  /**
+   * Drain data from end of the buffer.
+   * @param size supplies the length of data to drain.
+   */
+  virtual void drainAtEnd(uint64_t size) PURE;
 
   /**
    * Fetch the raw buffer slices.
