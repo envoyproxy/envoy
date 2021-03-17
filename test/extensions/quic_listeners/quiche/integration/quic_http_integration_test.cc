@@ -26,6 +26,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "extensions/quic_listeners/quiche/client_connection_factory_impl.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
@@ -98,12 +99,11 @@ public:
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
-    ASSERT(quic_transport_socket_factory_ != nullptr);
+    ASSERT(quic_connection_persistent_info_ != nullptr);
+    auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        quic_config_, supported_versions_, std::move(connection),
-        quic::QuicServerId{transport_socket_factory_->clientContextConfig().serverNameIndication(),
-                           static_cast<uint16_t>(server_addr_->ip()->port()), false},
-        crypto_config_.get(), &push_promise_index_, *dispatcher_, 0);
+        quic_config_, supported_versions_, std::move(connection), persistent_info.server_id_,
+        persistent_info.crypto_config_.get(), &push_promise_index_, *dispatcher_, 0);
     session->Initialize();
     return session;
   }
@@ -202,10 +202,6 @@ public:
     registerTestServerPorts({"http"});
 
     ASSERT(&transport_socket_factory_->clientContextConfig());
-
-    crypto_config_ =
-        std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
-            stats_store_, transport_socket_factory_->clientContextConfig(), timeSystem()));
   }
 
   void testMultipleQuicConnections() {
@@ -256,7 +252,6 @@ protected:
   quic::QuicConfig quic_config_;
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
-  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;

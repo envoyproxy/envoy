@@ -249,6 +249,10 @@ protected:
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 
+  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
+  // Must outlive |codec_client_| because it may not close connection till the end of its life
+  // scope.
+  std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
   // A placeholder for the first upstream connection.
@@ -268,8 +272,6 @@ protected:
 
   bool set_reuse_port_{false};
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
-  std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
-  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
 };
 
 // Helper class for integration tests using raw HTTP/2 frames
