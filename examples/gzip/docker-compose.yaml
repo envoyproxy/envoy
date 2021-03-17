@@ -7,9 +7,9 @@ services:
     networks:
       - envoymesh
     ports:
+      - "9901:9901"
+      - "9902:9902"
       - "10000:10000"
-      - "10001:10001"
-      - "8089:8089"
 
   service:
     build:
