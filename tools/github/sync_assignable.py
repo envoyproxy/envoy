@@ -17,12 +17,12 @@ import sys
 import github
 
 
-def GetConfirmation():
+def get_confirmation():
   """Obtain stdin confirmation to add users in GH."""
   return input('Add users to envoyproxy/assignable ? [yN] ').strip().lower() in ('y', 'yes')
 
 
-def SyncAssignable(access_token):
+def sync_assignable(access_token):
   organization = github.Github(access_token).get_organization('envoyproxy')
   team = organization.get_team_by_slug('assignable')
   organization_members = set(organization.get_members())
@@ -37,7 +37,7 @@ def SyncAssignable(access_token):
   for m in missing:
     print(m.login)
 
-  if not GetConfirmation():
+  if not get_confirmation():
     return 1
 
   for m in missing:
@@ -50,4 +50,4 @@ if __name__ == '__main__':
     print('Missing GITHUB_TOKEN')
     sys.exit(1)
 
-  sys.exit(SyncAssignable(access_token))
+  sys.exit(sync_assignable(access_token))

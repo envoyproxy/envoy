@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 
-def FormatItem(extension, metadata):
+def format_item(extension, metadata):
   if metadata['undocumented']:
     item = '* %s' % extension
   else:
@@ -44,7 +44,7 @@ if __name__ == '__main__':
   for sp, extensions in security_postures.items():
     output_path = pathlib.Path(security_rst_root, 'secpos_%s.rst' % sp)
     content = '\n'.join(
-        FormatItem(extension, extension_db[extension])
+        format_item(extension, extension_db[extension])
         for extension in sorted(extensions)
         if extension_db[extension]['status'] != 'wip')
     output_path.write_text(content)

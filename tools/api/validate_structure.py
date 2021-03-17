@@ -39,7 +39,7 @@ class ValidationError(Exception):
 
 
 # Extract major version and full API version string from a proto path.
-def ProtoApiVersion(proto_path):
+def proto_api_version(proto_path):
   match = re.match('v(\d+).*', proto_path.parent.name)
   if match:
     return str(proto_path.parent.name)[1:], int(match.group(1))
@@ -47,8 +47,8 @@ def ProtoApiVersion(proto_path):
 
 
 # Validate a single proto path.
-def ValidateProtoPath(proto_path):
-  version_str, major_version = ProtoApiVersion(proto_path)
+def validate_proto_path(proto_path):
+  version_str, major_version = proto_api_version(proto_path)
 
   # Validate version-less paths.
   if major_version == 0:
@@ -67,11 +67,11 @@ def ValidateProtoPath(proto_path):
 
 
 # Validate a list of proto paths.
-def ValidateProtoPaths(proto_paths):
+def validate_proto_paths(proto_paths):
   error_msgs = []
   for proto_path in proto_paths:
     try:
-      ValidateProtoPath(proto_path)
+      validate_proto_path(proto_path)
     except ValidationError as e:
       error_msgs.append('Invalid .proto location [%s]: %s' % (proto_path, e))
   return error_msgs
@@ -80,7 +80,7 @@ def ValidateProtoPaths(proto_paths):
 if __name__ == '__main__':
   api_root = 'api/envoy'
   api_protos = pathlib.Path(api_root).rglob('*.proto')
-  error_msgs = ValidateProtoPaths(p.relative_to(api_root) for p in api_protos)
+  error_msgs = validate_proto_paths(p.relative_to(api_root) for p in api_protos)
   if error_msgs:
     for m in error_msgs:
       print(m)

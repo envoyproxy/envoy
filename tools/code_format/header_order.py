@@ -19,7 +19,7 @@ import re
 import sys
 
 
-def ReorderHeaders(path):
+def reorder_headers(path):
   source = pathlib.Path(path).read_text(encoding='utf-8')
 
   all_lines = iter(source.split('\n'))
@@ -108,12 +108,12 @@ if __name__ == '__main__':
   parser.add_argument('--rewrite', action='store_true', help='rewrite header file in-place')
   parser.add_argument('--include_dir_order',
                       type=str,
-                      default=','.join(common.includeDirOrder()),
+                      default=','.join(common.include_dir_order()),
                       help='specify the header block include directory order')
   args = parser.parse_args()
   target_path = args.path
   include_dir_order = args.include_dir_order.split(',')
-  reorderd_source = ReorderHeaders(target_path)
+  reorderd_source = reorder_headers(target_path)
   if args.rewrite:
     pathlib.Path(target_path).write_text(reorderd_source, encoding='utf-8')
   else:
