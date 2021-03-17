@@ -1028,7 +1028,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBodyExceedsBuff
   EXPECT_EQ(buffer.length(), 0);
 
   EXPECT_EQ(decoder_callbacks_.details(),
-            "grpc_json_transcode_failure_request_buffer_size_limit_reached");
+            "grpc_json_transcode_failure{request_buffer_size_limit_reached}");
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithNestedHttpBody) {

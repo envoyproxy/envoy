@@ -916,7 +916,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
         "Request rejected because the transcoder's internal buffer size exceeds the configured "
         "limit.",
         nullptr, absl::nullopt,
-        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "_request_buffer_size_limit_reached"));
+        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{request_buffer_size_limit_reached}"));
     return true;
   }
   return false;
@@ -938,7 +938,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
         "Response not transcoded because the transcoder's internal buffer size exceeds the "
         "configured limit.",
         nullptr, absl::nullopt,
-        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "_response_buffer_size_limit_reached"));
+        absl::StrCat(RcDetails::get().GrpcTranscodeFailed, "{response_buffer_size_limit_reached}"));
     return true;
   }
   return false;
