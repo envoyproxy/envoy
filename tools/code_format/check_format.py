@@ -91,6 +91,8 @@ HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = ("downstream_cx_length_ms", "downstream_cx_
                                       "request_time_ms", "upstream_cx_connect_ms",
                                       "upstream_cx_length_ms")
 
+RAW_TRY_ALLOWLIST = ("./source/common/common/regex.cc", "./source/common/common/thread.h")
+
 # Files in these paths can use std::regex
 STD_REGEX_ALLOWLIST = (
     "./source/common/common/utility.cc", "./source/common/common/regex.h",
@@ -106,6 +108,10 @@ STD_REGEX_ALLOWLIST = (
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
+
+# Files that should not raise an error for using memcpy
+MEMCPY_WHITELIST = ("./source/common/common/mem_block_builder.h",
+                    "./source/common/common/safe_memcpy.h")
 
 # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
@@ -426,6 +432,9 @@ class FormatChecker:
   def allowlistedForGrpcInit(self, file_path):
     return file_path in GRPC_INIT_ALLOWLIST
 
+  def whitelistedForMemcpy(self, file_path):
+    return file_path in MEMCPY_WHITELIST
+
   def allowlistedForUnpackTo(self, file_path):
     return file_path.startswith("./test") or file_path in [
         "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
@@ -442,6 +451,9 @@ class FormatChecker:
 
   def allowlistedForBuildUrls(self, file_path):
     return file_path in BUILD_URLS_ALLOWLIST
+
+  def allowlistedForRawTry(self, file_path):
+    return file_path in RAW_TRY_ALLOWLIST or file_path.startswith("./source/extensions")
 
   def isApiFile(self, file_path):
     return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
@@ -758,8 +770,7 @@ class FormatChecker:
       reportError("Don't use std::variant; use absl::variant instead")
     if self.tokenInLine("std::visit", line):
       reportError("Don't use std::visit; use absl::visit instead")
-    if " try {" in line and file_path.startswith("./source") and not file_path.startswith(
-        "./source/extensions") and not file_path == "./source/common/common/thread.h":
+    if " try {" in line and file_path.startswith("./source") and not self.allowlistedForRawTry(file_path):
       reportError(
           "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
       )
@@ -831,6 +842,14 @@ class FormatChecker:
         if comment == -1 or comment > grpc_init_or_shutdown:
           reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                       "Grpc::GoogleGrpcContext. See #8282")
+
+    if not self.whitelistedForMemcpy(file_path) and \
+       not ("test/" in file_path) and \
+       ("memcpy(" in line) and \
+       not ("NOLINT(safe-memcpy)" in line):
+      reportError(
+          "Don't call memcpy() directly; use safeMemcpy, safeMemcpyUnsafeSrc, safeMemcpyUnsafeDst or MemBlockBuilder instead."
+      )
 
     if self.denylistedForExceptions(file_path):
       # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".
