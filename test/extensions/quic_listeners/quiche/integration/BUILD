@@ -10,12 +10,12 @@ envoy_package()
 
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "medium",
+    size = "large",
     srcs = [
         "quic_protocol_integration_test.cc",
     ],
     data = ["//test/config/integration/certs"],
-    shard_count = 6,
+    shard_count = 8,
     tags = [
         "fails_on_clang_cl",
         "fails_on_windows",
