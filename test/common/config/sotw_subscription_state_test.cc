@@ -29,9 +29,9 @@ protected:
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
   }
 
-  std::unique_ptr<envoy::api::v2::DiscoveryRequest> getNextDiscoveryRequestAckless() {
-    auto* ptr = static_cast<envoy::api::v2::DiscoveryRequest*>(state_.getNextRequestAckless());
-    return std::unique_ptr<envoy::api::v2::DiscoveryRequest>(ptr);
+  std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest> getNextDiscoveryRequestAckless() {
+    auto* ptr = static_cast<envoy::service::discovery::v3::DiscoveryRequest*>(state_.getNextRequestAckless());
+    return std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>(ptr);
   }
 
   UpdateAck deliverDiscoveryResponse(const std::vector<std::string>& resource_names,
