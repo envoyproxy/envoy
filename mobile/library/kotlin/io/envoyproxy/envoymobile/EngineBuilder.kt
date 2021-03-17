@@ -162,8 +162,8 @@ open class EngineBuilder(
    *
    * @return this builder.
    */
-  fun addStringAccessor(name: String, accessor: EnvoyStringAccessor): EngineBuilder {
-    this.stringAccessors.put(name, accessor)
+  fun addStringAccessor(name: String, accessor: () -> String): EngineBuilder {
+    this.stringAccessors.put(name, EnvoyStringAccessorAdapter(StringAccessor(accessor)))
     return this
   }
 
