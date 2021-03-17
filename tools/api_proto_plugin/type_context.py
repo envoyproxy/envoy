@@ -11,9 +11,9 @@ class Comment(object):
   def __init__(self, comment, file_level_annotations=None):
     self.raw = comment
     self.file_level_annotations = file_level_annotations
-    self.annotations = annotations.ExtractAnnotations(self.raw, file_level_annotations)
+    self.annotations = annotations.extract_annotations(self.raw, file_level_annotations)
 
-  def getCommentWithTransforms(self, annotation_xforms):
+  def get_comment_with_transforms(self, annotation_xforms):
     """Return transformed comment with annotation transformers.
 
     Args:
@@ -22,7 +22,7 @@ class Comment(object):
     Returns:
       transformed Comment object.
     """
-    return Comment(annotations.XformAnnotation(self.raw, annotation_xforms),
+    return Comment(annotations.xform_annotation(self.raw, annotation_xforms),
                    self.file_level_annotations)
 
 
@@ -60,11 +60,11 @@ class SourceCodeInfo(object):
     if self._file_level_annotations:
       return self._file_level_annotations
     self._file_level_annotations = dict(
-        sum([list(annotations.ExtractAnnotations(c).items()) for c in self.file_level_comments],
+        sum([list(annotations.extract_annotations(c).items()) for c in self.file_level_comments],
             []))
     return self._file_level_annotations
 
-  def LocationPathLookup(self, path):
+  def location_path_lookup(self, path):
     """Lookup SourceCodeInfo.Location by path in SourceCodeInfo.
 
     Args:
@@ -78,7 +78,7 @@ class SourceCodeInfo(object):
 
   # TODO(htuch): consider integrating comment lookup with overall
   # FileDescriptorProto, perhaps via two passes.
-  def LeadingCommentPathLookup(self, path):
+  def leading_comment_path_lookup(self, path):
     """Lookup leading comment by path in SourceCodeInfo.
 
     Args:
@@ -88,12 +88,12 @@ class SourceCodeInfo(object):
     Returns:
       Comment object.
     """
-    location = self.LocationPathLookup(path)
+    location = self.location_path_lookup(path)
     if location is not None:
       return Comment(location.leading_comments, self.file_level_annotations)
     return Comment('')
 
-  def LeadingDetachedCommentsPathLookup(self, path):
+  def leading_detached_comments_path_lookup(self, path):
     """Lookup leading detached comments by path in SourceCodeInfo.
 
     Args:
@@ -103,12 +103,12 @@ class SourceCodeInfo(object):
     Returns:
       List of detached comment strings.
     """
-    location = self.LocationPathLookup(path)
+    location = self.location_path_lookup(path)
     if location is not None and location.leading_detached_comments != self.file_level_comments:
       return location.leading_detached_comments
     return []
 
-  def TrailingCommentPathLookup(self, path):
+  def trailing_comment_path_lookup(self, path):
     """Lookup trailing comment by path in SourceCodeInfo.
 
     Args:
@@ -118,7 +118,7 @@ class SourceCodeInfo(object):
     Returns:
       Raw detached comment string
     """
-    location = self.LocationPathLookup(path)
+    location = self.location_path_lookup(path)
     if location is not None:
       return location.trailing_comments
     return ''
@@ -143,7 +143,7 @@ class TypeContext(object):
     self.name = name
     # Map from type name to the correct type annotation string, e.g. from
     # ".envoy.api.v2.Foo.Bar" to "map<string, string>". This is lost during
-    # proto synthesis and is dynamically recovered in TraverseMessage.
+    # proto synthesis and is dynamically recovered in traverse_message.
     self.map_typenames = {}
     # Map from a message's oneof index to the fields sharing a oneof.
     self.oneof_fields = {}
@@ -154,7 +154,7 @@ class TypeContext(object):
     self.type_name = 'file'
     self.deprecated = False
 
-  def _Extend(self, path, type_name, name, deprecated=False):
+  def _extend(self, path, type_name, name, deprecated=False):
     if not self.name:
       extended_name = name
     else:
@@ -169,7 +169,7 @@ class TypeContext(object):
     extended.deprecated = self.deprecated or deprecated
     return extended
 
-  def ExtendMessage(self, index, name, deprecated):
+  def extend_message(self, index, name, deprecated):
     """Extend type context with a message.
 
     Args:
@@ -177,9 +177,9 @@ class TypeContext(object):
       name: message name.
       deprecated: is the message depreacted?
     """
-    return self._Extend([4, index], 'message', name, deprecated)
+    return self._extend([4, index], 'message', name, deprecated)
 
-  def ExtendNestedMessage(self, index, name, deprecated):
+  def extend_nested_message(self, index, name, deprecated):
     """Extend type context with a nested message.
 
     Args:
@@ -187,18 +187,18 @@ class TypeContext(object):
       name: message name.
       deprecated: is the message depreacted?
     """
-    return self._Extend([3, index], 'message', name, deprecated)
+    return self._extend([3, index], 'message', name, deprecated)
 
-  def ExtendField(self, index, name):
+  def extend_field(self, index, name):
     """Extend type context with a field.
 
     Args:
       index: field index in message.
       name: field name.
     """
-    return self._Extend([2, index], 'field', name)
+    return self._extend([2, index], 'field', name)
 
-  def ExtendEnum(self, index, name, deprecated):
+  def extend_enum(self, index, name, deprecated):
     """Extend type context with an enum.
 
     Args:
@@ -206,18 +206,18 @@ class TypeContext(object):
       name: enum name.
       deprecated: is the message depreacted?
     """
-    return self._Extend([5, index], 'enum', name, deprecated)
+    return self._extend([5, index], 'enum', name, deprecated)
 
-  def ExtendService(self, index, name):
+  def extend_service(self, index, name):
     """Extend type context with a service.
 
     Args:
       index: service index in file.
       name: service name.
     """
-    return self._Extend([6, index], 'service', name)
+    return self._extend([6, index], 'service', name)
 
-  def ExtendNestedEnum(self, index, name, deprecated):
+  def extend_nested_enum(self, index, name, deprecated):
     """Extend type context with a nested enum.
 
     Args:
@@ -225,51 +225,51 @@ class TypeContext(object):
       name: enum name.
       deprecated: is the message depreacted?
     """
-    return self._Extend([4, index], 'enum', name, deprecated)
+    return self._extend([4, index], 'enum', name, deprecated)
 
-  def ExtendEnumValue(self, index, name):
+  def extend_enum_value(self, index, name):
     """Extend type context with an enum enum.
 
     Args:
       index: enum value index in enum.
       name: value name.
     """
-    return self._Extend([2, index], 'enum_value', name)
+    return self._extend([2, index], 'enum_value', name)
 
-  def ExtendOneof(self, index, name):
+  def extend_oneof(self, index, name):
     """Extend type context with an oneof declaration.
 
     Args:
       index: oneof index in oneof_decl.
       name: oneof name.
     """
-    return self._Extend([8, index], 'oneof', name)
+    return self._extend([8, index], 'oneof', name)
 
-  def ExtendMethod(self, index, name):
+  def extend_method(self, index, name):
     """Extend type context with a service method declaration.
 
     Args:
       index: method index in service.
       name: method name.
     """
-    return self._Extend([2, index], 'method', name)
+    return self._extend([2, index], 'method', name)
 
   @property
   def location(self):
     """SourceCodeInfo.Location for type context."""
-    return self.source_code_info.LocationPathLookup(self.path)
+    return self.source_code_info.location_path_lookup(self.path)
 
   @property
   def leading_comment(self):
     """Leading comment for type context."""
-    return self.source_code_info.LeadingCommentPathLookup(self.path)
+    return self.source_code_info.leading_comment_path_lookup(self.path)
 
   @property
   def leading_detached_comments(self):
     """Leading detached comments for type context."""
-    return self.source_code_info.LeadingDetachedCommentsPathLookup(self.path)
+    return self.source_code_info.leading_detached_comments_path_lookup(self.path)
 
   @property
   def trailing_comment(self):
     """Trailing comment for type context."""
-    return self.source_code_info.TrailingCommentPathLookup(self.path)
+    return self.source_code_info.trailing_comment_path_lookup(self.path)

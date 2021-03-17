@@ -3,7 +3,7 @@
 from tools.api_proto_plugin import type_context
 
 
-def TraverseService(type_context, service_proto, visitor):
+def traverse_service(type_context, service_proto, visitor):
   """Traverse a service definition.
 
   Args:
@@ -14,10 +14,10 @@ def TraverseService(type_context, service_proto, visitor):
   Returns:
     Plugin specific output.
   """
-  return visitor.VisitService(service_proto, type_context)
+  return visitor.visit_service(service_proto, type_context)
 
 
-def TraverseEnum(type_context, enum_proto, visitor):
+def traverse_enum(type_context, enum_proto, visitor):
   """Traverse an enum definition.
 
   Args:
@@ -28,10 +28,10 @@ def TraverseEnum(type_context, enum_proto, visitor):
   Returns:
     Plugin specific output.
   """
-  return visitor.VisitEnum(enum_proto, type_context)
+  return visitor.visit_enum(enum_proto, type_context)
 
 
-def TraverseMessage(type_context, msg_proto, visitor):
+def traverse_message(type_context, msg_proto, visitor):
   """Traverse a message definition.
 
   Args:
@@ -50,19 +50,19 @@ def TraverseMessage(type_context, msg_proto, visitor):
       if nested_msg.options.map_entry
   }
   nested_msgs = [
-      TraverseMessage(
-          type_context.ExtendNestedMessage(index, nested_msg.name, nested_msg.options.deprecated),
+      traverse_message(
+          type_context.extend_nested_message(index, nested_msg.name, nested_msg.options.deprecated),
           nested_msg, visitor) for index, nested_msg in enumerate(msg_proto.nested_type)
   ]
   nested_enums = [
-      TraverseEnum(
-          type_context.ExtendNestedEnum(index, nested_enum.name, nested_enum.options.deprecated),
+      traverse_enum(
+          type_context.extend_nested_enum(index, nested_enum.name, nested_enum.options.deprecated),
           nested_enum, visitor) for index, nested_enum in enumerate(msg_proto.enum_type)
   ]
-  return visitor.VisitMessage(msg_proto, type_context, nested_msgs, nested_enums)
+  return visitor.visit_message(msg_proto, type_context, nested_msgs, nested_enums)
 
 
-def TraverseFile(file_proto, visitor):
+def traverse_file(file_proto, visitor):
   """Traverse a proto file definition.
 
   Args:
@@ -75,15 +75,15 @@ def TraverseFile(file_proto, visitor):
   source_code_info = type_context.SourceCodeInfo(file_proto.name, file_proto.source_code_info)
   package_type_context = type_context.TypeContext(source_code_info, file_proto.package)
   services = [
-      TraverseService(package_type_context.ExtendService(index, service.name), service, visitor)
+      traverse_service(package_type_context.extend_service(index, service.name), service, visitor)
       for index, service in enumerate(file_proto.service)
   ]
   msgs = [
-      TraverseMessage(package_type_context.ExtendMessage(index, msg.name, msg.options.deprecated),
-                      msg, visitor) for index, msg in enumerate(file_proto.message_type)
+      traverse_message(package_type_context.extend_message(index, msg.name, msg.options.deprecated),
+                       msg, visitor) for index, msg in enumerate(file_proto.message_type)
   ]
   enums = [
-      TraverseEnum(package_type_context.ExtendEnum(index, enum.name, enum.options.deprecated), enum,
-                   visitor) for index, enum in enumerate(file_proto.enum_type)
+      traverse_enum(package_type_context.extend_enum(index, enum.name, enum.options.deprecated),
+                    enum, visitor) for index, enum in enumerate(file_proto.enum_type)
   ]
-  return visitor.VisitFile(file_proto, package_type_context, services, msgs, enums)
+  return visitor.visit_file(file_proto, package_type_context, services, msgs, enums)

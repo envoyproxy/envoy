@@ -3,7 +3,7 @@
 from udpa.annotations import versioning_pb2
 
 
-def AddHideOption(options):
+def add_hide_option(options):
   """Mark message/enum/field/enum value as hidden.
 
   Hidden messages are ignored when generating output.
@@ -15,7 +15,7 @@ def AddHideOption(options):
   hide_option.name.add().name_part = 'protoxform_hide'
 
 
-def HasHideOption(options):
+def has_hide_option(options):
   """Is message/enum/field/enum value hidden?
 
   Hidden messages are ignored when generating output.
@@ -29,7 +29,7 @@ def HasHideOption(options):
       option.name[0].name_part == 'protoxform_hide' for option in options.uninterpreted_option)
 
 
-def SetVersioningAnnotation(options, previous_message_type):
+def set_versioning_annotation(options, previous_message_type):
   """Set the udpa.annotations.versioning option.
 
   Used by Envoy to chain back through the message type history.
@@ -41,7 +41,7 @@ def SetVersioningAnnotation(options, previous_message_type):
   options.Extensions[versioning_pb2.versioning].previous_message_type = previous_message_type
 
 
-def GetVersioningAnnotation(options):
+def get_versioning_annotation(options):
   """Get the udpa.annotations.versioning option.
 
   Used by Envoy to chain back through the message type history.

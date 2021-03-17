@@ -45,11 +45,11 @@ class ExtensionDbError(Exception):
   pass
 
 
-def IsMissing(value):
+def is_missing(value):
   return value == '(missing)'
 
 
-def NumReadFiltersFuzzed():
+def num_read_filters_fuzzed():
   data = pathlib.Path(
       os.path.join(
           ENVOY_SRCDIR,
@@ -58,7 +58,7 @@ def NumReadFiltersFuzzed():
   return len(re.findall('NetworkFilterNames::get()', ''.join(data.splitlines()[:50])))
 
 
-def NumRobustToDownstreamNetworkFilters(db):
+def num_robust_to_downstream_network_filters(db):
   # Count number of network filters robust to untrusted downstreams.
   return len([
       ext for ext, data in db.items()
@@ -66,7 +66,7 @@ def NumRobustToDownstreamNetworkFilters(db):
   ])
 
 
-def GetExtensionMetadata(target):
+def get_extension_metadata(target):
   if not BUILDOZER_PATH:
     raise ExtensionDbError('Buildozer not found!')
   r = subprocess.run(
@@ -76,11 +76,11 @@ def GetExtensionMetadata(target):
   rout = r.stdout.decode('utf-8').strip().split(' ')
   security_posture, status, undocumented = rout[:3]
   categories = ' '.join(rout[3:])
-  if IsMissing(security_posture):
+  if is_missing(security_posture):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
-  if IsMissing(categories):
+  if is_missing(categories):
     raise ExtensionDbError(
         'Missing extension category for %s. Please make sure the target is an envoy_cc_extension and category is set'
         % target)
@@ -90,8 +90,8 @@ def GetExtensionMetadata(target):
                 ('[' in categories or '(' in categories) else [categories])
   return {
       'security_posture': security_posture,
-      'undocumented': False if IsMissing(undocumented) else bool(undocumented),
-      'status': 'stable' if IsMissing(status) else status,
+      'undocumented': False if is_missing(undocumented) else bool(undocumented),
+      'status': 'stable' if is_missing(status) else status,
       'categories': categories,
   }
 
@@ -108,8 +108,8 @@ if __name__ == '__main__':
   all_extensions = {}
   all_extensions.update(extensions_build_config.EXTENSIONS)
   for extension, target in all_extensions.items():
-    extension_db[extension] = GetExtensionMetadata(target)
-  if NumRobustToDownstreamNetworkFilters(extension_db) != NumReadFiltersFuzzed():
+    extension_db[extension] = get_extension_metadata(target)
+  if num_robust_to_downstream_network_filters(extension_db) != num_read_filters_fuzzed():
     raise ExtensionDbError('Check that all network filters robust against untrusted'
                            'downstreams are fuzzed by adding them to filterNames() in'
                            'test/extensions/filters/network/common/uber_per_readfilter.cc')
@@ -117,15 +117,15 @@ if __name__ == '__main__':
   # not in source/extensions/extensions_build_config.bzl
   # TODO(mattklein123): Read these special keys from all_extensions.bzl or a shared location to
   # avoid duplicate logic.
-  extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
+  extension_db['envoy.transport_sockets.tls'] = get_extension_metadata(
       '//source/extensions/transport_sockets/tls:config')
-  extension_db['envoy.upstreams.http.generic'] = GetExtensionMetadata(
+  extension_db['envoy.upstreams.http.generic'] = get_extension_metadata(
       '//source/extensions/upstreams/http/generic:config')
-  extension_db['envoy.upstreams.tcp.generic'] = GetExtensionMetadata(
+  extension_db['envoy.upstreams.tcp.generic'] = get_extension_metadata(
       '//source/extensions/upstreams/tcp/generic:config')
-  extension_db['envoy.upstreams.http.http_protocol_options'] = GetExtensionMetadata(
+  extension_db['envoy.upstreams.http.http_protocol_options'] = get_extension_metadata(
       '//source/extensions/upstreams/http:config')
-  extension_db['envoy.request_id.uuid'] = GetExtensionMetadata(
+  extension_db['envoy.request_id.uuid'] = get_extension_metadata(
       '//source/extensions/request_id/uuid:config')
 
   pathlib.Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)

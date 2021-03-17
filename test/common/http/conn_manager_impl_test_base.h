@@ -5,7 +5,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/original_ip_detection/custom_header/custom_header.h"
 #include "extensions/original_ip_detection/xff/xff.h"
 

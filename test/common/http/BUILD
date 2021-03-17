@@ -215,7 +215,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
-        "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/original_ip_detection/custom_header:custom_header_lib",
         "//source/extensions/original_ip_detection/xff:xff_lib",
         "//source/extensions/request_id/uuid:config",
