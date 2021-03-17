@@ -770,7 +770,8 @@ class FormatChecker:
       reportError("Don't use std::variant; use absl::variant instead")
     if self.tokenInLine("std::visit", line):
       reportError("Don't use std::visit; use absl::visit instead")
-    if " try {" in line and file_path.startswith("./source") and not self.allowlistedForRawTry(file_path):
+    if " try {" in line and file_path.startswith(
+        "./source") and not self.allowlistedForRawTry(file_path):
       reportError(
           "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
       )
