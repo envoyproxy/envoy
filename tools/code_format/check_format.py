@@ -431,8 +431,6 @@ class FormatChecker:
     return file_path in GRPC_INIT_ALLOWLIST
 
   def allow_listed_for_unpack_to(self, file_path):
-
-  def allowlistedForUnpackTo(self, file_path):
     return file_path.startswith("./test") or file_path in [
         "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
     ]
