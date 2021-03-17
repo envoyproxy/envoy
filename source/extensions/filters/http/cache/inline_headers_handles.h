@@ -9,46 +9,39 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// Request headers inline handles
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle(Http::CustomHeaders::get().Authorization);
+struct CacheCustomHeaders {
+  static CacheCustomHeaders& get();
+  CacheCustomHeaders();
 
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    pragma_handle(Http::CustomHeaders::get().Pragma);
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      authorization_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      pragma_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      request_cache_control_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      if_match_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      if_none_match_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      if_modified_since_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      if_unmodified_since_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+      if_range_handle;
 
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+      response_cache_control_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+      last_modified_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+      etag_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+      age_handle;
+  Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+      expires_handle;
 
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_match_handle(Http::CustomHeaders::get().IfMatch);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_none_match_handle(Http::CustomHeaders::get().IfNoneMatch);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_modified_since_handle(Http::CustomHeaders::get().IfModifiedSince);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_unmodified_since_handle(Http::CustomHeaders::get().IfUnmodifiedSince);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_range_handle(Http::CustomHeaders::get().IfRange);
-
-// Response headers inline handles
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    last_modified_handle(Http::CustomHeaders::get().LastModified);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    etag_handle(Http::CustomHeaders::get().Etag);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    age_handle(Http::CustomHeaders::get().Age);
-
-inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    expires_handle(Http::CustomHeaders::get().Expires);
+}; // Request headers inline handles
 
 } // namespace Cache
 } // namespace HttpFilters
