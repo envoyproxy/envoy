@@ -447,6 +447,7 @@ class FormatChecker:
         or self.is_in_subdir(file_path, 'tools/testdata')
 
   def allow_listed_for_raw_try(self, file_path):
+    # TODO(chaoqin-li1123): Exclude some important extensions from ALLOWLIST.
     return file_path in RAW_TRY_ALLOWLIST or file_path.startswith("./source/extensions")
 
   def allow_listed_for_build_urls(self, file_path):
