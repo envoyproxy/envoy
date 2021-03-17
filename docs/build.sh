@@ -62,6 +62,7 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 rm -rf bazel-bin/external/envoy_api_canonical
 
 EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+rm -rf "${EXTENSION_DB_PATH}"
 GENERATED_RST_DIR="$(realpath "${GENERATED_RST_DIR}")"
 export EXTENSION_DB_PATH
 export GENERATED_RST_DIR
@@ -76,11 +77,10 @@ BAZEL_BUILD_OPTIONS+=(
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
-mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
-PYTHONPATH=. ./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst
 
 function generate_api_rst() {
   local proto_target
@@ -92,9 +92,13 @@ function generate_api_rst() {
     tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst
 
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
-  # config.
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-    "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+  # config. We only have v2 support here for version history anchors, which don't point at any empty
+  # configs.
+  if [[ "${API_VERSION}" != "v2" ]]
+  then
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
+      "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+  fi
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
@@ -122,10 +126,17 @@ function generate_api_rst() {
     declare DST="${GENERATED_RST_DIR}/api-${API_VERSION}/${PROTO_FILE_CANONICAL#envoy/}".rst
 
     mkdir -p "$(dirname "${DST}")"
-    cp -f "${SRC}" "$(dirname "${DST}")"
+    if [[ "${API_VERSION}" == "v2" ]]
+    then
+      cat docs/v2-api-header.rst "${SRC}" > "$(dirname "${DST}")/$(basename "${SRC}")"
+    else
+      cp -f "${SRC}" "$(dirname "${DST}")"
+    fi
   done
 }
 
+# TODO(htuch): remove v2 support once we have a good story for version history RST links that refer
+# to v2 APIs.
 generate_api_rst v2
 generate_api_rst v3
 

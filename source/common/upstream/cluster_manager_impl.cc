@@ -105,10 +105,12 @@ void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
   }
 
   // It is possible that the cluster we are removing has already been initialized, and is not
-  // present in the initializer map. If so, this is fine.
-  absl::string_view cluster_name = cluster.cluster().info()->name();
-  if (cluster_map->at(cluster_name) == &cluster) {
-    cluster_map->erase(cluster_name);
+  // present in the initializer map. If so, this is fine as a CDS update may happen for a
+  // cluster with the same name. See the case "UpdateAlreadyInitialized" of the
+  // target //test/common/upstream:cluster_manager_impl_test.
+  auto iter = cluster_map->find(cluster.cluster().info()->name());
+  if (iter != cluster_map->end() && iter->second == &cluster) {
+    cluster_map->erase(iter);
   }
   ENVOY_LOG(debug, "cm init: init complete: cluster={} primary={} secondary={}",
             cluster.cluster().info()->name(), primary_init_clusters_.size(),
@@ -691,7 +693,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     init_helper_.removeCluster(*existing_active_cluster->second);
     active_clusters_.erase(existing_active_cluster);
 
-    ENVOY_LOG(info, "removing cluster {}", cluster_name);
+    ENVOY_LOG(debug, "removing cluster {}", cluster_name);
     tls_.runOnAllThreads([cluster_name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
       ASSERT(cluster_manager->thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);

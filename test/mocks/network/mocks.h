@@ -8,6 +8,7 @@
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -67,6 +68,7 @@ public:
   ~MockReadFilterCallbacks() override;
 
   MOCK_METHOD(Connection&, connection, ());
+  MOCK_METHOD(const Socket&, socket, ());
   MOCK_METHOD(void, continueReading, ());
   MOCK_METHOD(void, injectReadDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
@@ -94,6 +96,7 @@ public:
   ~MockWriteFilterCallbacks() override;
 
   MOCK_METHOD(Connection&, connection, ());
+  MOCK_METHOD(const Socket&, socket, ());
   MOCK_METHOD(void, injectWriteDataToFilterChain, (Buffer::Instance & data, bool end_stream));
 
   testing::NiceMock<MockConnection> connection_;
@@ -142,6 +145,7 @@ public:
   ~MockUdpListenerCallbacks() override;
 
   MOCK_METHOD(void, onData, (UdpRecvData && data));
+  MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
   MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
@@ -354,6 +358,20 @@ public:
               (Network::IoHandle&, Stats::Scope&), ());
 };
 
+class MockUdpListenerConfig : public UdpListenerConfig {
+public:
+  MockUdpListenerConfig();
+  ~MockUdpListenerConfig() override;
+
+  MOCK_METHOD(ActiveUdpListenerFactory&, listenerFactory, ());
+  MOCK_METHOD(UdpPacketWriterFactory&, packetWriterFactory, ());
+  MOCK_METHOD(UdpListenerWorkerRouter&, listenerWorkerRouter, ());
+  MOCK_METHOD(const envoy::config::listener::v3::UdpListenerConfig&, config, ());
+
+  UdpListenerWorkerRouterPtr udp_listener_worker_router_;
+  envoy::config::listener::v3::UdpListenerConfig config_;
+};
+
 class MockListenerConfig : public ListenerConfig {
 public:
   MockListenerConfig();
@@ -370,9 +388,7 @@ public:
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(uint64_t, listenerTag, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
-  MOCK_METHOD(Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
-  MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
-  MOCK_METHOD(Network::UdpListenerWorkerRouterOptRef, udpListenerWorkerRouter, ());
+  MOCK_METHOD(Network::UdpListenerConfigOptRef, udpListenerConfig, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
@@ -389,7 +405,6 @@ public:
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   MockListenSocketFactory socket_factory_;
   SocketSharedPtr socket_;
-  UdpListenerWorkerRouterPtr udp_listener_worker_router_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -417,7 +432,6 @@ public:
   MOCK_METHOD(void, addListener,
               (absl::optional<uint64_t> overridden_listener, ListenerConfig& config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
-  MOCK_METHOD(UdpListenerCallbacksOptRef, getUdpListenerCallbacks, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
