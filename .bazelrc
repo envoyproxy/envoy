@@ -158,7 +158,7 @@ build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L7
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:ebf534b8aa505e8ff5663a31eed782942a742ae4d656b54f4236b00399f17911
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker

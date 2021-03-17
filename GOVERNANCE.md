@@ -38,7 +38,7 @@
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
 * Triage build issues - file issues for known flaky builds or bugs, and either fix or find someone
-  to fix any master build breakages.
+  to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -77,7 +77,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   "is:open is:issue milestone:[current milestone]" and either hold off until
   they are fixed or bump them to the next milestone.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we aim for master to be
+  particularly risky PRs until after the release is tagged. This is because we aim for main to be
   at release candidate quality at all times.
 * Do a final check of the [release notes](docs/root/intro/version_history.rst):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
@@ -95,7 +95,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   [stable releases](RELEASES.md#stable-releases).
 * Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
-  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
 * Contact rdl@ on Slack so that the website can be updated for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the

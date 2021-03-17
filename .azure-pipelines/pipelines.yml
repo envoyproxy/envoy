@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - "master"
+      - "main"
       - "release/v*"
   tags:
     include:

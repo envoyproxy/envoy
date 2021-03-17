@@ -4,19 +4,19 @@ Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
 ## Ubuntu Envoy image
 The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
-where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
+where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
 may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
 at [`envoyproxy/envoy:<hash>`](https://hub.docker.com/r/envoyproxy/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
-binary built from the latest tip of master that passed tests.
+corresponds to the main commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
+binary built from the latest tip of main that passed tests.
 
 ## Alpine Envoy image
 
 Minimal images based on Alpine Linux allow for quicker deployment of Envoy. Two Alpine based images are built,
 one with an Envoy binary with debug (`envoyproxy/envoy-alpine-debug`) symbols and one stripped of them (`envoyproxy/envoy-alpine`).
 Both images are pushed with two different tags: `<hash>` and `latest`. Parallel to the Ubuntu images above, `<hash>` corresponds to the
-master commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of master that passed tests.
+main commit at which the binary was compiled, and `latest` corresponds to a binary built from the latest tip of main that passed tests.
 
 # Build image base and compiler versions
 
@@ -34,7 +34,7 @@ We use the Clang compiler for all CI runs with tests. We have an additional CI r
 # C++ standard library
 
 As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859) the official released binary is
-[linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#linking-against-libc-on-linux).
+[linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#linking-against-libc-on-linux).
 To override the C++ standard library in your build, set environment variable `ENVOY_STDLIB` to `libstdc++` or `libc++` and
 run `./ci/do_ci.sh` as described below.
 
@@ -80,7 +80,7 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
-To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/master/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
+To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
 the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
