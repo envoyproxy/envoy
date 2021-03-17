@@ -36,7 +36,7 @@ Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransp
       tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
                                                              context, server_names);
 
-  return std::make_unique<StartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
+  return std::make_unique<StartTlsSocketFactory>(std::move(raw_socket_factory),
                                                  std::move(tls_socket_factory));
 }
 
@@ -45,7 +45,7 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
     Server::Configuration::TransportSocketFactoryContext& context) {
 
   const auto& outer_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&>(
+      const envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig&>(
       message, context.messageValidationVisitor());
 
   auto& raw_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
@@ -61,14 +61,18 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
 
   Network::TransportSocketFactoryPtr tls_socket_factory =
       tls_socket_config_factory.createTransportSocketFactory(
-          outer_config.upstream_tls_socket_config(), context);
+          outer_config.tls_socket_config(), context);
 
-  return std::make_unique<StartTlsSocketFactory>(outer_config, std::move(raw_socket_factory),
+  return std::make_unique<StartTlsSocketFactory>(std::move(raw_socket_factory),
                                                  std::move(tls_socket_factory));
 }
 
-ProtobufTypes::MessagePtr BaseStartTlsSocketFactory::createEmptyConfigProto() {
+ProtobufTypes::MessagePtr DownstreamStartTlsSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig>();
+}
+
+ProtobufTypes::MessagePtr UpstreamStartTlsSocketFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig>();
 }
 
 REGISTER_FACTORY(DownstreamStartTlsSocketFactory,

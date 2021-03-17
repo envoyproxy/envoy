@@ -31,9 +31,18 @@ message StartTlsConfig {
 
   // Configuration for a downstream TLS socket.
   transport_sockets.tls.v3.DownstreamTlsContext tls_socket_config = 2
-      [(validate.rules).message = {required: false}];
+      [(validate.rules).message = {required: true}];
+}
 
-  // Configuration for a upstream TLS socket.
-  transport_sockets.tls.v3.UpstreamTlsContext upstream_tls_socket_config = 3
-      [(validate.rules).message = {required: false}];
+// Configuration for StartTls transport socket.
+// StartTls transport socket wraps two sockets:
+// - raw_buffer socket which is used at the beginning of the session
+// - TLS socket used when a protocol negotiates a switch to encrypted traffic.
+message UpstreamStartTlsConfig {
+  // (optional) Configuration for clear-text socket used at the beginning of the session.
+  raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
+
+  // Configuration for an upstream TLS socket.
+  transport_sockets.tls.v3.UpstreamTlsContext tls_socket_config = 2
+      [(validate.rules).message = {required: true}];
 }

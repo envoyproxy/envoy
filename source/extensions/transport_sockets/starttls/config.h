@@ -13,7 +13,6 @@ namespace StartTls {
 class BaseStartTlsSocketFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override { return TransportSocketNames::get().StartTls; }
 };
 
@@ -21,6 +20,7 @@ class DownstreamStartTlsSocketFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
       public BaseStartTlsSocketFactory {
 public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
@@ -31,6 +31,7 @@ class UpstreamStartTlsSocketFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public BaseStartTlsSocketFactory {
 public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;

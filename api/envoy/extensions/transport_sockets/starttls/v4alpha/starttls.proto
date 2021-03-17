@@ -35,9 +35,21 @@ message StartTlsConfig {
 
   // Configuration for a downstream TLS socket.
   transport_sockets.tls.v4alpha.DownstreamTlsContext tls_socket_config = 2
-      [(validate.rules).message = {required: false}];
+      [(validate.rules).message = {required: true}];
+}
 
-  // Configuration for a upstream TLS socket.
-  transport_sockets.tls.v4alpha.UpstreamTlsContext upstream_tls_socket_config = 3
-      [(validate.rules).message = {required: false}];
+// Configuration for StartTls transport socket.
+// StartTls transport socket wraps two sockets:
+// - raw_buffer socket which is used at the beginning of the session
+// - TLS socket used when a protocol negotiates a switch to encrypted traffic.
+message UpstreamStartTlsConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig";
+
+  // (optional) Configuration for clear-text socket used at the beginning of the session.
+  raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
+
+  // Configuration for an upstream TLS socket.
+  transport_sockets.tls.v4alpha.UpstreamTlsContext tls_socket_config = 2
+      [(validate.rules).message = {required: true}];
 }
