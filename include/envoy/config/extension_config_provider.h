@@ -53,7 +53,17 @@ public:
    */
   virtual void onConfigRemoved(ConfigAppliedCb cb) PURE;
 
+  /**
+   * Sets the default configuration for this provider when no dynamic configuration is active.
+   * @param config the default configuration to use.
+   */
   virtual void setDefaultConfiguration(FactoryCallback config) PURE;
+
+  /**
+   * Applies the default configuration set via setDefaultConfiguration. Does nothing if no
+   * default configuration has been specified.
+   */
+  virtual void applyDefaultConfiguration() PURE;
 };
 
 } // namespace Config

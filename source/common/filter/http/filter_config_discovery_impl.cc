@@ -180,6 +180,8 @@ void FilterConfigSubscription::onConfigUpdate(
     }
 
     last_config_hash_ = 0;
+    last_config_ = absl::nullopt;
+    last_type_url_ = "";
   } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }
@@ -243,6 +245,26 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   }
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(subscription, require_type_urls,
                                                                     factory_context);
+
+  if (config_source.has_default_config()) {
+    auto* default_factory =
+        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
+            config_source.default_config());
+    if (default_factory == nullptr) {
+      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
+                                       "configuration with type URL {}.",
+                                       filter_config_name,
+                                       config_source.default_config().type_url()));
+    }
+    provider->validateTypeUrl(Config::Utility::getFactoryType(config_source.default_config()));
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config_source.default_config(), factory_context.messageValidationVisitor(),
+        *default_factory);
+    Envoy::Http::FilterFactoryCb default_config =
+        default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
+    provider->setDefaultConfiguration(default_config);
+  }
+
   // Ensure the subscription starts if it has not already.
   if (config_source.apply_default_config_without_warming()) {
     factory_context.initManager().add(provider->init_target_);
@@ -270,23 +292,8 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   }
 
   // Apply the default config if none has been applied.
-  if (config_source.has_default_config() && !last_config_valid) {
-    auto* default_factory =
-        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-            config_source.default_config());
-    if (default_factory == nullptr) {
-      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                       "configuration with type URL {}.",
-                                       filter_config_name,
-                                       config_source.default_config().type_url()));
-    }
-    provider->validateTypeUrl(Config::Utility::getFactoryType(config_source.default_config()));
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config_source.default_config(), factory_context.messageValidationVisitor(),
-        *default_factory);
-    Envoy::Http::FilterFactoryCb default_config =
-        default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
-    provider->setDefaultConfiguration(default_config);
+  if (!last_config_valid) {
+    provider->applyDefaultConfiguration();
   }
   return provider;
 }

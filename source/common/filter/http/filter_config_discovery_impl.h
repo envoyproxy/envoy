@@ -52,8 +52,11 @@ public:
   void setDefaultConfiguration(Envoy::Http::FilterFactoryCb config) override {
     ASSERT(!default_configuration_);
     default_configuration_ = config;
-
-    onConfigUpdate(config, "", nullptr);
+  }
+  void applyDefaultConfiguration() override {
+    if (default_configuration_) {
+      onConfigUpdate(*default_configuration_, "", nullptr);
+    }
   }
 
 private:
