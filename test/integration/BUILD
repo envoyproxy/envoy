@@ -853,6 +853,7 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/access_loggers/stdoutput:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",

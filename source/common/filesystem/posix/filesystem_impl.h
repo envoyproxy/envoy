@@ -12,7 +12,7 @@ namespace Filesystem {
 
 class FileImplPosix : public FileSharedImpl {
 public:
-  FileImplPosix(const std::string& path) : FileSharedImpl(path) {}
+  FileImplPosix(const FilePathAndType& file_info) : FileSharedImpl(file_info) {}
   ~FileImplPosix() override;
 
 protected:
@@ -33,7 +33,7 @@ private:
 class InstanceImplPosix : public Instance {
 public:
   // Filesystem::Instance
-  FilePtr createFile(const std::string& path) override;
+  FilePtr createFile(const FilePathAndType& file_info) override;
   bool fileExists(const std::string& path) override;
   bool directoryExists(const std::string& path) override;
   ssize_t fileSize(const std::string& path) override;

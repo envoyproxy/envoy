@@ -8,11 +8,12 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/config/utility.h"
 #include "common/formatter/substitution_format_string.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
@@ -62,7 +63,8 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
     break;
   }
 
-  return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
+  return std::make_shared<FileAccessLog>(file_info, std::move(filter), std::move(formatter),
                                          context.accessLogManager());
 }
 

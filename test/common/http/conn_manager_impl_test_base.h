@@ -5,7 +5,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"

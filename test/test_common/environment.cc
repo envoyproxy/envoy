@@ -411,7 +411,8 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
       fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
   unlink(out_path.c_str());
 
-  Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_path);
+  Filesystem::FilePathAndType out_file_info{Filesystem::DestinationType::File, out_path};
+  Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_file_info);
   const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
                                   1 << Filesystem::File::Operation::Create};
   const Api::IoCallBoolResult open_result = file->open(flags);

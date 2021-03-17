@@ -24,6 +24,7 @@ public:
   Api::IoCallBoolResult close() override;
   bool isOpen() const override { return is_open_; };
   MOCK_METHOD(std::string, path, (), (const));
+  MOCK_METHOD(DestinationType, destinationType, (), (const));
 
   // The first parameter here must be `const FlagSet&` otherwise it doesn't compile with libstdc++
   MOCK_METHOD(Api::IoCallBoolResult, open_, (const FlagSet& flag));
@@ -47,7 +48,7 @@ public:
   ~MockInstance() override;
 
   // Filesystem::Instance
-  MOCK_METHOD(FilePtr, createFile, (const std::string&));
+  MOCK_METHOD(FilePtr, createFile, (const FilePathAndType&));
   MOCK_METHOD(bool, fileExists, (const std::string&));
   MOCK_METHOD(bool, directoryExists, (const std::string&));
   MOCK_METHOD(ssize_t, fileSize, (const std::string&));

@@ -37,7 +37,7 @@
 #include "server/admin/utils.h"
 #include "server/listener_impl.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/request_id/uuid/config.h"
 
 #include "absl/strings/str_join.h"
@@ -128,8 +128,9 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
                                   Stats::ScopePtr&& listener_scope) {
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, access_log_path};
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);

@@ -18,6 +18,10 @@ public:
   const std::string File = "envoy.access_loggers.file";
   // HTTP gRPC access log
   const std::string HttpGrpc = "envoy.access_loggers.http_grpc";
+  // Standard error access log
+  const std::string Stderror = "envoy.access_loggers.stderror";
+  // Standard output access log
+  const std::string Stdoutput = "envoy.access_loggers.stdoutput";
   // TCP gRPC access log
   const std::string TcpGrpc = "envoy.access_loggers.tcp_grpc";
   // WASM access log
