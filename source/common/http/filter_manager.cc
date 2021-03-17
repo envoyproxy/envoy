@@ -181,7 +181,10 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
-    } else if (complete() && !hasTrailers() && !bufferedData()) {
+    } else if (complete() && !hasTrailers() && !bufferedData() &&
+               // If the stream is destroyed, no need to handle the data buffer or trailers.
+               // This can occur if the filter calls sendLocalReply.
+               !parent_.state_.destroyed_) {
       // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
       // byte data frame, we need to create an empty buffer to make sure that when commonContinue
       // is called, the pipeline resumes with an empty data frame with end_stream = true
