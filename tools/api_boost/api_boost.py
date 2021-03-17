@@ -28,12 +28,12 @@ BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 # Obtain the directory containing a path prefix, e.g. ./foo/bar.txt is ./foo,
 # ./foo/ba is ./foo, ./foo/bar/ is ./foo/bar.
-def PrefixDirectory(path_prefix):
+def prefix_directory(path_prefix):
   return path_prefix if os.path.isdir(path_prefix) else os.path.dirname(path_prefix)
 
 
 # Update a C++ file to the latest API.
-def ApiBoostFile(llvm_include_path, debug_log, path):
+def api_boost_file(llvm_include_path, debug_log, path):
   print('Processing %s' % path)
   if 'API_NO_BOOST_FILE' in pathlib.Path(path).read_text():
     if debug_log:
@@ -63,9 +63,9 @@ def ApiBoostFile(llvm_include_path, debug_log, path):
 # outside of the clang-ast-replacements. In theory we could either integrate
 # with this or with clang-include-fixer, but it's pretty simply to handle as done
 # below, we have more control over special casing as well, so ¯\_(ツ)_/¯.
-def RewriteIncludes(args):
+def rewrite_includes(args):
   path, api_includes = args
-  # Files with API_NO_BOOST_FILE will have None returned by ApiBoostFile.
+  # Files with API_NO_BOOST_FILE will have None returned by api_boost_file.
   if api_includes is None:
     return
   # We just dump the inferred API header includes at the start of the #includes
@@ -90,12 +90,12 @@ def RewriteIncludes(args):
 
 
 # Update the Envoy source tree the latest API.
-def ApiBoostTree(target_paths,
-                 generate_compilation_database=False,
-                 build_api_booster=False,
-                 debug_log=False,
-                 sequential=False):
-  dep_build_targets = ['//%s/...' % PrefixDirectory(prefix) for prefix in target_paths]
+def api_boost_tree(target_paths,
+                   generate_compilation_database=False,
+                   build_api_booster=False,
+                   debug_log=False,
+                   sequential=False):
+  dep_build_targets = ['//%s/...' % prefix_directory(prefix) for prefix in target_paths]
 
   # Optional setup of state. We need the compilation database and api_booster
   # tool in place before we can start boosting.
@@ -167,19 +167,19 @@ def ApiBoostTree(target_paths,
       # any mutation takes place.
       # TODO(htuch): we should move to run-clang-tidy.py once the headers fixups
       # are Clang-based.
-      api_includes = p.map(functools.partial(ApiBoostFile, llvm_include_path, debug_log),
+      api_includes = p.map(functools.partial(api_boost_file, llvm_include_path, debug_log),
                            file_paths)
       # Apply Clang replacements before header fixups, since the replacements
       # are all relative to the original file.
-      for prefix_dir in set(map(PrefixDirectory, target_paths)):
+      for prefix_dir in set(map(prefix_directory, target_paths)):
         sp.run(['clang-apply-replacements', prefix_dir], check=True)
       # Fixup headers.
-      p.map(RewriteIncludes, zip(file_paths, api_includes))
+      p.map(rewrite_includes, zip(file_paths, api_includes))
   finally:
     # Cleanup any stray **/*.clang-replacements.yaml.
     for prefix in target_paths:
       clang_replacements = pathlib.Path(
-          PrefixDirectory(prefix)).glob('**/*.clang-replacements.yaml')
+          prefix_directory(prefix)).glob('**/*.clang-replacements.yaml')
       for path in clang_replacements:
         path.unlink()
 
@@ -192,8 +192,8 @@ if __name__ == '__main__':
   parser.add_argument('--sequential', action='store_true')
   parser.add_argument('paths', nargs='*', default=['source', 'test', 'include'])
   args = parser.parse_args()
-  ApiBoostTree(args.paths,
-               generate_compilation_database=args.generate_compilation_database,
-               build_api_booster=args.build_api_booster,
-               debug_log=args.debug_log,
-               sequential=args.sequential)
+  api_boost_tree(args.paths,
+                 generate_compilation_database=args.generate_compilation_database,
+                 build_api_booster=args.build_api_booster,
+                 debug_log=args.debug_log,
+                 sequential=args.sequential)

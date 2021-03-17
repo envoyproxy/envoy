@@ -31,7 +31,7 @@ from google.protobuf import text_format
 from envoy.data.tap.v2alpha import wrapper_pb2
 
 
-def DumpEvent(direction, timestamp, data):
+def dump_event(direction, timestamp, data):
   dump = io.StringIO()
   dump.write('%s\n' % direction)
   # Adjust to local timezone
@@ -43,7 +43,7 @@ def DumpEvent(direction, timestamp, data):
   return dump.getvalue()
 
 
-def Tap2Pcap(tap_path, pcap_path):
+def tap2pcap(tap_path, pcap_path):
   wrapper = wrapper_pb2.TraceWrapper()
   if tap_path.endswith('.pb_text'):
     with open(tap_path, 'r') as f:
@@ -61,9 +61,9 @@ def Tap2Pcap(tap_path, pcap_path):
   dumps = []
   for event in trace.events:
     if event.HasField('read'):
-      dumps.append(DumpEvent('I', event.timestamp, event.read.data.as_bytes))
+      dumps.append(dump_event('I', event.timestamp, event.read.data.as_bytes))
     elif event.HasField('write'):
-      dumps.append(DumpEvent('O', event.timestamp, event.write.data.as_bytes))
+      dumps.append(dump_event('O', event.timestamp, event.write.data.as_bytes))
 
   ipv6 = False
   try:
@@ -85,4 +85,4 @@ if __name__ == '__main__':
   if len(sys.argv) != 3:
     print('Usage: %s <tap .pb/.pb_text> <pcap path>' % sys.argv[0])
     sys.exit(1)
-  Tap2Pcap(sys.argv[1], sys.argv[2])
+  tap2pcap(sys.argv[1], sys.argv[2])

@@ -36,22 +36,22 @@ class ProtoFormatVisitor(visitor.Visitor):
 
   def __init__(self, active_or_frozen, params):
     if params['type_db_path']:
-      utils.LoadTypeDb(params['type_db_path'])
+      utils.load_type_db(params['type_db_path'])
     self._freeze = 'extra_args' in params and params['extra_args'] == 'freeze'
     self._active_or_frozen = active_or_frozen
 
-  def VisitService(self, service_proto, type_context):
+  def visit_service(self, service_proto, type_context):
     return None
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     return None
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     return None
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     # Freeze protos that have next major version candidates.
-    typedb = utils.GetTypeDb()
+    typedb = utils.get_type_db()
     output_proto = copy.deepcopy(file_proto)
     existing_pkg_version_status = output_proto.options.Extensions[
         status_pb2.file_status].package_version_status
@@ -61,7 +61,7 @@ class ProtoFormatVisitor(visitor.Visitor):
     if existing_pkg_version_status == status_pb2.UNKNOWN and not pkg_version_status_exempt:
       raise ProtoXformError('package_version_status must be set in %s' % file_proto.name)
     # Only update package_version_status for .active_or_frozen.proto,
-    # migrate.VersionUpgradeXform has taken care of next major version
+    # migrate.version_upgrade_xform has taken care of next major version
     # candidates.
     if self._active_or_frozen and not pkg_version_status_exempt:
       # Freeze if this is an active package with a next major version. Preserve
@@ -78,21 +78,21 @@ class ProtoFormatVisitor(visitor.Visitor):
     return str(output_proto)
 
 
-def Main():
-  plugin.Plugin([
-      plugin.DirectOutputDescriptor('.active_or_frozen.proto',
-                                    functools.partial(ProtoFormatVisitor, True),
-                                    want_params=True),
+def main():
+  plugin.plugin([
+      plugin.direct_output_descriptor('.active_or_frozen.proto',
+                                      functools.partial(ProtoFormatVisitor, True),
+                                      want_params=True),
       plugin.OutputDescriptor('.next_major_version_candidate.proto',
                               functools.partial(ProtoFormatVisitor, False),
-                              functools.partial(migrate.VersionUpgradeXform, 2, False),
+                              functools.partial(migrate.version_upgrade_xform, 2, False),
                               want_params=True),
       plugin.OutputDescriptor('.next_major_version_candidate.envoy_internal.proto',
                               functools.partial(ProtoFormatVisitor, False),
-                              functools.partial(migrate.VersionUpgradeXform, 2, True),
+                              functools.partial(migrate.version_upgrade_xform, 2, True),
                               want_params=True)
   ])
 
 
 if __name__ == '__main__':
-  Main()
+  main()

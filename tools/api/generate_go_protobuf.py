@@ -22,7 +22,7 @@ USER_NAME = 'go-control-plane(Azure Pipelines)'
 USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
-def generateProtobufs(output):
+def generate_protobufs(output):
   bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).decode().strip()
   go_protos = check_output([
       'bazel',
@@ -69,12 +69,12 @@ def git(repo, *args):
   return check_output(cmd).decode()
 
 
-def cloneGoProtobufs(repo):
+def clone_go_protobufs(repo):
   # Create a local clone of go-control-plane
   git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo, '-b', BRANCH)
 
 
-def findLastSyncSHA(repo):
+def find_last_sync_sha(repo):
   # Determine last envoyproxy/envoy SHA in envoyproxy/go-control-plane
   last_commit = git(repo, 'log', '--grep=' + MIRROR_MSG, '-n', '1', '--format=%B').strip()
   # Initial SHA from which the APIs start syncing. Prior to that it was done manually.
@@ -84,19 +84,19 @@ def findLastSyncSHA(repo):
   return m.group(1)
 
 
-def updatedSinceSHA(repo, last_sha):
+def updated_since_sha(repo, last_sha):
   # Determine if there are changes to API since last SHA
   return git(None, 'rev-list', '%s..HEAD' % last_sha).split()
 
 
-def writeRevisionInfo(repo, sha):
+def write_revision_info(repo, sha):
   # Put a file in the generated code root containing the latest mirrored SHA
   dst = os.path.join(repo, 'envoy', 'COMMIT')
   with open(dst, 'w') as fh:
     fh.write(sha)
 
 
-def syncGoProtobufs(output, repo):
+def sync_go_protobufs(output, repo):
   # Sync generated content against repo and return true if there is a commit necessary
   dst = os.path.join(repo, 'envoy')
   # Remove subtree at envoy in repo
@@ -106,7 +106,7 @@ def syncGoProtobufs(output, repo):
   git(repo, 'add', 'envoy')
 
 
-def publishGoProtobufs(repo, sha):
+def publish_go_protobufs(repo, sha):
   # Publish generated files with the last SHA changes to API
   git(repo, 'config', 'user.name', USER_NAME)
   git(repo, 'config', 'user.email', USER_EMAIL)
@@ -123,14 +123,14 @@ def updated(repo):
 if __name__ == "__main__":
   workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
   output = os.path.join(workspace, OUTPUT_BASE)
-  generateProtobufs(output)
+  generate_protobufs(output)
   repo = os.path.join(workspace, REPO_BASE)
-  cloneGoProtobufs(repo)
-  syncGoProtobufs(output, repo)
-  last_sha = findLastSyncSHA(repo)
-  changes = updatedSinceSHA(repo, last_sha)
+  clone_go_protobufs(repo)
+  sync_go_protobufs(output, repo)
+  last_sha = find_last_sync_sha(repo)
+  changes = updated_since_sha(repo, last_sha)
   if updated(repo):
     print('Changes detected: %s' % changes)
     new_sha = changes[0]
-    writeRevisionInfo(repo, new_sha)
-    publishGoProtobufs(repo, new_sha)
+    write_revision_info(repo, new_sha)
+    publish_go_protobufs(repo, new_sha)

@@ -1,7 +1,7 @@
 import os
 
 
-def ProtoFileCanonicalFromLabel(label):
+def proto_file_canonical_from_label(label):
   """Compute path from API root to a proto file from a Bazel proto label.
 
   Args:
@@ -15,7 +15,7 @@ def ProtoFileCanonicalFromLabel(label):
   return label[len('@envoy_api_canonical//'):].replace(':', '/')
 
 
-def BazelBinPathForOutputArtifact(label, suffix, root=''):
+def bazel_bin_path_for_output_artifact(label, suffix, root=''):
   """Find the location in bazel-bin/ for an api_proto_plugin output file.
 
   Args:
@@ -26,6 +26,6 @@ def BazelBinPathForOutputArtifact(label, suffix, root=''):
   Returns:
     Path in bazel-bin/external/envoy_api_canonical for label output with given suffix.
   """
-  proto_file_path = ProtoFileCanonicalFromLabel(label)
+  proto_file_path = proto_file_canonical_from_label(label)
   return os.path.join(root, 'bazel-bin/external/envoy_api_canonical',
                       os.path.dirname(proto_file_path), 'pkg', proto_file_path + suffix)

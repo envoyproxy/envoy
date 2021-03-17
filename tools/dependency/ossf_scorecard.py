@@ -47,7 +47,7 @@ class OssfScorecardError(Exception):
 
 
 # We skip build, test, etc.
-def IsScoredUseCategory(use_category):
+def is_scored_use_category(use_category):
   return len(
       set(use_category).intersection([
           'dataplane_core', 'dataplane_ext', 'controlplane', 'observability_core',
@@ -55,14 +55,14 @@ def IsScoredUseCategory(use_category):
       ])) > 0
 
 
-def Score(scorecard_path, repository_locations):
+def score(scorecard_path, repository_locations):
   results = {}
   for dep, metadata in sorted(repository_locations.items()):
-    if not IsScoredUseCategory(metadata['use_category']):
+    if not is_scored_use_category(metadata['use_category']):
       continue
     results_key = metadata['project_name']
     formatted_name = '=HYPERLINK("%s", "%s")' % (metadata['project_url'], results_key)
-    github_project_url = utils.GetGitHubProjectUrl(metadata['urls'])
+    github_project_url = utils.get_github_project_url(metadata['urls'])
     if not github_project_url:
       na = 'Not Scorecard compatible'
       results[results_key] = Scorecard(name=formatted_name,
@@ -81,17 +81,17 @@ def Score(scorecard_path, repository_locations):
     checks = {c['CheckName']: c for c in raw_scorecard['Checks']}
 
     # Generic check format.
-    def Format(key):
+    def _format(key):
       score = checks[key]
       status = score['Pass']
       confidence = score['Confidence']
       return f'{status} ({confidence})'
 
     # Releases need to be extracted from Signed-Releases.
-    def ReleaseFormat():
+    def release_format():
       score = checks['Signed-Releases']
       if score['Pass']:
-        return Format('Signed-Releases')
+        return _format('Signed-Releases')
       details = score['Details']
       release_found = details is not None and any('release found:' in d for d in details)
       if release_found:
@@ -100,20 +100,20 @@ def Score(scorecard_path, repository_locations):
         return 'False (10)'
 
     results[results_key] = Scorecard(name=formatted_name,
-                                     contributors=Format('Contributors'),
-                                     active=Format('Active'),
-                                     ci_tests=Format('CI-Tests'),
-                                     pull_requests=Format('Pull-Requests'),
-                                     code_review=Format('Code-Review'),
-                                     fuzzing=Format('Fuzzing'),
-                                     security_policy=Format('Security-Policy'),
-                                     releases=ReleaseFormat())
+                                     contributors=_format('Contributors'),
+                                     active=_format('Active'),
+                                     ci_tests=_format('CI-Tests'),
+                                     pull_requests=_format('Pull-Requests'),
+                                     code_review=_format('Code-Review'),
+                                     fuzzing=_format('Fuzzing'),
+                                     security_policy=_format('Security-Policy'),
+                                     releases=release_format())
     print(raw_scorecard)
     print(results[results_key])
   return results
 
 
-def PrintCsvResults(csv_output_path, results):
+def print_csv_results(csv_output_path, results):
   headers = Scorecard._fields
   with open(csv_output_path, 'w') as f:
     writer = csv.writer(f)
@@ -136,10 +136,10 @@ if __name__ == '__main__':
   scorecard_path = sys.argv[2]
   csv_output_path = sys.argv[3]
   spec_loader = exports.repository_locations_utils.load_repository_locations_spec
-  path_module = exports.LoadModule('repository_locations', path)
+  path_module = exports.load_module('repository_locations', path)
   try:
-    results = Score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
-    PrintCsvResults(csv_output_path, results)
+    results = score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
+    print_csv_results(csv_output_path, results)
   except OssfScorecardError as e:
     print(f'An error occurred while processing {path}, please verify the correctness of the '
           f'metadata: {e}')

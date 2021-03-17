@@ -70,7 +70,7 @@ class RequiresReformatError(ProtoSyncError):
         % message)
 
 
-def GetDirectoryFromPackage(package):
+def get_directory_from_package(package):
   """Get directory path from package name or full qualified message name
 
   Args:
@@ -79,7 +79,7 @@ def GetDirectoryFromPackage(package):
   return '/'.join(s for s in package.split('.') if s and s[0].islower())
 
 
-def GetDestinationPath(src):
+def get_destination_path(src):
   """Obtain destination path from a proto file path by reading its package statement.
 
   Args:
@@ -91,11 +91,11 @@ def GetDestinationPath(src):
   if len(matches) != 1:
     raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
         src, len(matches)))
-  return pathlib.Path(GetDirectoryFromPackage(
+  return pathlib.Path(get_directory_from_package(
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
-def GetAbsRelDestinationPath(dst_root, src):
+def get_abs_rel_destination_path(dst_root, src):
   """Obtain absolute path from a proto file path combined with destination root.
 
   Creates the parent directory if necessary.
@@ -104,20 +104,20 @@ def GetAbsRelDestinationPath(dst_root, src):
     dst_root: destination root path.
     src: source path.
   """
-  rel_dst_path = GetDestinationPath(src)
+  rel_dst_path = get_destination_path(src)
   dst = dst_root.joinpath(rel_dst_path)
   dst.parent.mkdir(0o755, parents=True, exist_ok=True)
   return dst, rel_dst_path
 
 
-def ProtoPrint(src, dst):
+def proto_print(src, dst):
   """Pretty-print FileDescriptorProto to a destination file.
 
   Args:
     src: source path for FileDescriptorProto.
     dst: destination path for formatted proto.
   """
-  print('ProtoPrint %s' % dst)
+  print('proto_print %s' % dst)
   subprocess.check_output([
       'bazel-bin/tools/protoxform/protoprint', src,
       str(dst),
@@ -125,7 +125,7 @@ def ProtoPrint(src, dst):
   ])
 
 
-def MergeActiveShadow(active_src, shadow_src, dst):
+def merge_active_shadow(active_src, shadow_src, dst):
   """Merge active/shadow FileDescriptorProto to a destination file.
 
   Args:
@@ -133,7 +133,7 @@ def MergeActiveShadow(active_src, shadow_src, dst):
     shadow_src: source path for active FileDescriptorProto.
     dst: destination path for FileDescriptorProto.
   """
-  print('MergeActiveShadow %s' % dst)
+  print('merge_active_shadow %s' % dst)
   subprocess.check_output([
       'bazel-bin/tools/protoxform/merge_active_shadow',
       active_src,
@@ -142,13 +142,13 @@ def MergeActiveShadow(active_src, shadow_src, dst):
   ])
 
 
-def SyncProtoFile(dst_srcs):
+def sync_proto_file(dst_srcs):
   """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
 
   In the case where we are generating an Envoy internal shadow, it may be
   necessary to combine the current active proto, subject to hand editing, with
   shadow artifacts from the previous verion; this is done via
-  MergeActiveShadow().
+  merge_active_shadow().
 
   Args:
     dst_srcs: destination/sources path tuple.
@@ -158,7 +158,7 @@ def SyncProtoFile(dst_srcs):
   # If we only have one candidate source for a destination, just pretty-print.
   if len(srcs) == 1:
     src = srcs[0]
-    ProtoPrint(src, dst)
+    proto_print(src, dst)
   else:
     # We should only see an active and next major version candidate from
     # previous version today.
@@ -172,16 +172,16 @@ def SyncProtoFile(dst_srcs):
     if len(shadow_srcs) > 0:
       assert (len(shadow_srcs) == 1)
       with tempfile.NamedTemporaryFile() as f:
-        MergeActiveShadow(active_src, shadow_srcs[0], f.name)
-        ProtoPrint(f.name, dst)
+        merge_active_shadow(active_src, shadow_srcs[0], f.name)
+        proto_print(f.name, dst)
     else:
-      ProtoPrint(active_src, dst)
+      proto_print(active_src, dst)
     src = active_src
-  rel_dst_path = GetDestinationPath(src)
+  rel_dst_path = get_destination_path(src)
   return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
-def GetImportDeps(proto_path):
+def get_import_deps(proto_path):
   """Obtain the Bazel dependencies for the import paths from a .proto file.
 
   Args:
@@ -223,7 +223,7 @@ def GetImportDeps(proto_path):
   return imports
 
 
-def GetPreviousMessageTypeDeps(proto_path):
+def get_previous_message_type_deps(proto_path):
   """Obtain the Bazel dependencies for the previous version of messages in a .proto file.
 
   We need to link in earlier proto descriptors to support Envoy reflection upgrades.
@@ -238,12 +238,12 @@ def GetPreviousMessageTypeDeps(proto_path):
   matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
   deps = []
   for m in matches:
-    target = '//%s:pkg' % GetDirectoryFromPackage(m)
+    target = '//%s:pkg' % get_directory_from_package(m)
     deps.append(target)
   return deps
 
 
-def HasServices(proto_path):
+def has_services(proto_path):
   """Does a .proto file have any service definitions?
 
   Args:
@@ -260,11 +260,11 @@ def HasServices(proto_path):
 
 
 # Key sort function to achieve consistent results with buildifier.
-def BuildOrderKey(key):
+def build_order_key(key):
   return key.replace(':', '!')
 
 
-def BuildFileContents(root, files):
+def build_file_contents(root, files):
   """Compute the canonical BUILD contents for an api/ proto directory.
 
   Args:
@@ -274,25 +274,26 @@ def BuildFileContents(root, files):
   Returns:
     A string containing the canonical BUILD file content for root.
   """
-  import_deps = set(sum([GetImportDeps(os.path.join(root, f)) for f in files], []))
-  history_deps = set(sum([GetPreviousMessageTypeDeps(os.path.join(root, f)) for f in files], []))
+  import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
+  history_deps = set(sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files],
+                         []))
   deps = import_deps.union(history_deps)
-  has_services = any(HasServices(os.path.join(root, f)) for f in files)
+  _has_services = any(has_services(os.path.join(root, f)) for f in files)
   fields = []
-  if has_services:
+  if _has_services:
     fields.append('    has_services = True,')
   if deps:
     if len(deps) == 1:
       formatted_deps = '"%s"' % list(deps)[0]
     else:
       formatted_deps = '\n' + '\n'.join(
-          '        "%s",' % dep for dep in sorted(deps, key=BuildOrderKey)) + '\n    '
+          '        "%s",' % dep for dep in sorted(deps, key=build_order_key)) + '\n    '
     fields.append('    deps = [%s],' % formatted_deps)
   formatted_fields = '\n' + '\n'.join(fields) + '\n' if fields else ''
   return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
 
 
-def SyncBuildFiles(cmd, dst_root):
+def sync_build_files(cmd, dst_root):
   """Diff or in-place update api/ BUILD files.
 
   Args:
@@ -302,13 +303,13 @@ def SyncBuildFiles(cmd, dst_root):
     is_proto_dir = any(f.endswith('.proto') for f in files)
     if not is_proto_dir:
       continue
-    build_contents = BuildFileContents(root, files)
+    build_contents = build_file_contents(root, files)
     build_path = os.path.join(root, 'BUILD')
     with open(build_path, 'w') as f:
       f.write(build_contents)
 
 
-def GenerateCurrentApiDir(api_dir, dst_dir):
+def generate_current_api_dir(api_dir, dst_dir):
   """Helper function to generate original API repository to be compared with diff.
   This copies the original API repository and deletes file we don't want to compare.
 
@@ -326,11 +327,11 @@ def GenerateCurrentApiDir(api_dir, dst_dir):
   shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
 
-def GitStatus(path):
+def git_status(path):
   return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
 
 
-def GitModifiedFiles(path, suffix):
+def git_modified_files(path, suffix):
   """Obtain a list of modified files since the last commit merged by GitHub.
 
   Args:
@@ -353,7 +354,7 @@ def GitModifiedFiles(path, suffix):
 # then try and see if we can skip reformatting based on some simple path
 # heuristics. This saves a ton of time, since proto format and sync is not
 # running under Bazel and can't do change detection.
-def ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
+def should_sync(path, api_proto_modified_files, py_tools_modified_files):
   if os.getenv('FORCE_PROTO_FORMAT') == 'yes':
     return True
   # If tools change, safest thing to do is rebuild everything.
@@ -371,36 +372,36 @@ def ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
   return False
 
 
-def Sync(api_root, mode, labels, shadow):
-  api_proto_modified_files = GitModifiedFiles('api', 'proto')
-  py_tools_modified_files = GitModifiedFiles('tools', 'py')
+def sync(api_root, mode, labels, shadow):
+  api_proto_modified_files = git_modified_files('api', 'proto')
+  py_tools_modified_files = git_modified_files('tools', 'py')
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
     paths = []
     for label in labels:
-      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active_or_frozen.proto'))
+      paths.append(utils.bazel_bin_path_for_output_artifact(label, '.active_or_frozen.proto'))
       paths.append(
-          utils.BazelBinPathForOutputArtifact(
+          utils.bazel_bin_path_for_output_artifact(
               label, '.next_major_version_candidate.envoy_internal.proto'
               if shadow else '.next_major_version_candidate.proto'))
     dst_src_paths = defaultdict(list)
     for path in paths:
       if os.stat(path).st_size > 0:
-        abs_dst_path, rel_dst_path = GetAbsRelDestinationPath(dst_dir, path)
-        if ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
+        abs_dst_path, rel_dst_path = get_abs_rel_destination_path(dst_dir, path)
+        if should_sync(path, api_proto_modified_files, py_tools_modified_files):
           dst_src_paths[abs_dst_path].append(path)
         else:
           print('Skipping sync of %s' % path)
           src_path = str(pathlib.Path(api_root, rel_dst_path))
           shutil.copy(src_path, abs_dst_path)
     with mp.Pool() as p:
-      pkg_deps = p.map(SyncProtoFile, dst_src_paths.items())
-    SyncBuildFiles(mode, dst_dir)
+      pkg_deps = p.map(sync_proto_file, dst_src_paths.items())
+    sync_build_files(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
     current_api_dir.mkdir(0o755, True, True)
     api_root_path = pathlib.Path(api_root)
-    GenerateCurrentApiDir(api_root_path, current_api_dir)
+    generate_current_api_dir(api_root_path, current_api_dir)
 
     # These support files are handled manually.
     for f in [
@@ -419,9 +420,9 @@ def Sync(api_root, mode, labels, shadow):
         print(diff.decode(), file=sys.stderr)
         sys.exit(1)
       if mode == "fix":
-        git_status = GitStatus(api_root)
-        if git_status:
-          print('git status indicates a dirty API tree:\n%s' % git_status)
+        _git_status = git_status(api_root)
+        if _git_status:
+          print('git status indicates a dirty API tree:\n%s' % _git_status)
           print(
               'Proto formatting may overwrite or delete files in the above list with no git backup.'
           )
@@ -451,5 +452,5 @@ if __name__ == '__main__':
   parser.add_argument('labels', nargs='*')
   args = parser.parse_args()
 
-  Sync(args.api_root, args.mode, args.labels, False)
-  Sync(args.api_shadow_root, args.mode, args.labels, True)
+  sync(args.api_root, args.mode, args.labels, False)
+  sync(args.api_shadow_root, args.mode, args.labels, True)

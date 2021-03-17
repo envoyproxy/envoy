@@ -419,6 +419,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   ./tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_flake8 "$(pwd)"
 
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then

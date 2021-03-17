@@ -20,15 +20,15 @@ class TypeWhispererVisitor(visitor.Visitor):
     super(TypeWhispererVisitor, self).__init__()
     self._types = Types()
 
-  def VisitService(self, service_proto, type_context):
+  def visit_service(self, service_proto, type_context):
     pass
 
-  def VisitEnum(self, enum_proto, type_context):
+  def visit_enum(self, enum_proto, type_context):
     type_desc = self._types.types[type_context.name]
     type_desc.next_version_upgrade = any(v.options.deprecated for v in enum_proto.value)
     type_desc.deprecated_type = type_context.deprecated
 
-  def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
     type_desc = self._types.types[type_context.name]
     type_desc.map_entry = msg_proto.options.map_entry
     type_desc.deprecated_type = type_context.deprecated
@@ -40,7 +40,7 @@ class TypeWhispererVisitor(visitor.Visitor):
         type_desc.next_version_upgrade = True
     type_desc.type_dependencies.extend(type_deps)
 
-  def VisitFile(self, file_proto, type_context, services, msgs, enums):
+  def visit_file(self, file_proto, type_context, services, msgs, enums):
     next_version_package = ''
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
       next_version_package = file_proto.options.Extensions[migrate_pb2.file_migrate].move_to_package
@@ -57,11 +57,11 @@ class TypeWhispererVisitor(visitor.Visitor):
     return str(self._types)
 
 
-def Main():
-  plugin.Plugin([
-      plugin.DirectOutputDescriptor('.types.pb_text', TypeWhispererVisitor),
+def main():
+  plugin.plugin([
+      plugin.direct_output_descriptor('.types.pb_text', TypeWhispererVisitor),
   ])
 
 
 if __name__ == '__main__':
-  Main()
+  main()

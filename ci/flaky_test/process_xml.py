@@ -12,7 +12,7 @@ section_delimiter = "-----------------------------------------------------------
 
 
 # Returns a boolean indicating if a test passed.
-def didTestPass(file):
+def did_test_pass(file):
   tree = ET.parse(file)
   root = tree.getroot()
   for testsuite in root:
@@ -22,7 +22,7 @@ def didTestPass(file):
 
 
 # Returns a pretty-printed string of a test case failure.
-def printTestCaseFailure(testcase, testsuite, failure_msg, log_path):
+def print_test_case_failure(testcase, testsuite, failure_msg, log_path):
   ret = "Test flake details:\n"
   ret += "- Test suite:   {}\n".format(testsuite)
   ret += "- Test case:    {}\n".format(testcase)
@@ -35,7 +35,7 @@ def printTestCaseFailure(testcase, testsuite, failure_msg, log_path):
 
 
 # Returns a pretty-printed string of a test suite error, such as an exception or a timeout.
-def printTestSuiteError(testsuite, testcase, log_path, duration, time, error_msg, output):
+def print_test_suite_error(testsuite, testcase, log_path, duration, time, error_msg, output):
   ret = "Test flake details:\n"
   ret += "- Test suite:   {}\n".format(testsuite)
   ret += "- Test case:    {}\n".format(testcase)
@@ -76,7 +76,7 @@ def printTestSuiteError(testsuite, testcase, log_path, duration, time, error_msg
 # Parses a test suite error, such as an exception or a timeout, and returns a pretty-printed
 # string of the error. This function is dependent on the structure of the XML and the contents
 # of the test log and will need to be adjusted should those change.
-def parseAndPrintTestSuiteError(testsuite, log_path):
+def parse_and_print_test_suite_error(testsuite, log_path):
   error_msg = ""
   test_duration = 0
   test_time = 0
@@ -107,15 +107,15 @@ def parseAndPrintTestSuiteError(testsuite, log_path):
       last_testcase = last_test_fullname.split('.')[1]
 
   if error_msg != "":
-    return printTestSuiteError(last_testsuite, last_testcase, log_path, test_duration, test_time,
-                               error_msg, test_output)
+    return print_test_suite_error(last_testsuite, last_testcase, log_path, test_duration, test_time,
+                                  error_msg, test_output)
 
   return ""
 
 
 # Parses a failed test's XML, adds any flaky tests found to the visited set, and returns a
 # well-formatted string describing all failures and errors.
-def parseXML(file, visited):
+def parse_xml(file, visited):
   # This is dependent on the fact that log files reside in the same directory
   # as their corresponding xml files.
   log_file = file.split('.')
@@ -135,15 +135,15 @@ def parseXML(file, visited):
       for testcase in testsuite:
         for failure_msg in testcase:
           if (testcase.attrib['name'], testsuite.attrib['name']) not in visited:
-            ret += printTestCaseFailure(testcase.attrib['name'], testsuite.attrib['name'],
-                                        failure_msg.text, log_file_path)
+            ret += print_test_case_failure(testcase.attrib['name'], testsuite.attrib['name'],
+                                           failure_msg.text, log_file_path)
             visited.add((testcase.attrib['name'], testsuite.attrib['name']))
     elif testsuite.attrib['errors'] != '0':
       # If an unexpected error occurred, such as an exception or a timeout, the test suite was
       # likely not parsed into XML properly, including the suite's name and the test case that
       # caused the error. More parsing is needed to extract details about the error.
       if (testsuite.attrib['name'], testsuite.attrib['name']) not in visited:
-        ret += parseAndPrintTestSuiteError(testsuite, log_file_path)
+        ret += parse_and_print_test_suite_error(testsuite, log_file_path)
         visited.add((testsuite.attrib['name'], testsuite.attrib['name']))
 
   return ret
@@ -151,7 +151,7 @@ def parseXML(file, visited):
 
 # The following function links the filepath of 'test.xml' (the result for the last attempt) with
 # that of its 'attempt_n.xml' file and stores it in a dictionary for easy lookup.
-def processFindOutput(f, problematic_tests):
+def process_find_output(f, problematic_tests):
   for line in f:
     lineList = line.split('/')
     filepath = ""
@@ -166,7 +166,7 @@ def processFindOutput(f, problematic_tests):
 # Returns helpful information on the run using Git.
 # Should Git change the output of the used commands in the future,
 # this will likely need adjustments as well.
-def getGitInfo(CI_TARGET):
+def get_git_info(CI_TARGET):
   ret = ""
 
   if CI_TARGET != "":
@@ -239,7 +239,7 @@ if __name__ == "__main__":
   # filepath.
   problematic_tests = {}
   with open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+') as f:
-    processFindOutput(f, problematic_tests)
+    process_find_output(f, problematic_tests)
 
   # The logic here goes as follows: If there is a test suite that has run multiple times,
   # which produces attempt_*.xml files, it means that the end result of that test
@@ -249,12 +249,12 @@ if __name__ == "__main__":
   failure_output = ""
   flaky_tests_visited = set()
   for k in problematic_tests.keys():
-    if didTestPass(k):
+    if did_test_pass(k):
       has_flaky_test = True
-      failure_output += parseXML(problematic_tests[k], flaky_tests_visited)
+      failure_output += parse_xml(problematic_tests[k], flaky_tests_visited)
 
   if has_flaky_test:
-    output_msg = "``` \n" + getGitInfo(CI_TARGET) + "\n" + failure_output + "``` \n"
+    output_msg = "``` \n" + get_git_info(CI_TARGET) + "\n" + failure_output + "``` \n"
 
     if os.getenv("SLACK_TOKEN"):
       SLACKTOKEN = os.environ["SLACK_TOKEN"]

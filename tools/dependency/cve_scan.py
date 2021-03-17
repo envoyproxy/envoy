@@ -65,7 +65,7 @@ class Cpe(namedtuple('CPE', ['part', 'vendor', 'product', 'version'])):
   '''Model a subset of CPE fields that are used in CPE matching.'''
 
   @classmethod
-  def FromString(cls, cpe_str):
+  def from_string(cls, cpe_str):
     assert (cpe_str.startswith('cpe:2.3:'))
     components = cpe_str.split(':')
     assert (len(components) >= 6)
@@ -74,12 +74,12 @@ class Cpe(namedtuple('CPE', ['part', 'vendor', 'product', 'version'])):
   def __str__(self):
     return f'cpe:2.3:{self.part}:{self.vendor}:{self.product}:{self.version}'
 
-  def VendorNormalized(self):
+  def vendor_normalized(self):
     '''Return a normalized CPE where only part and vendor are significant.'''
     return Cpe(self.part, self.vendor, '*', '*')
 
 
-def ParseCveJson(cve_json, cves, cpe_revmap):
+def parse_cve_json(cve_json, cves, cpe_revmap):
   '''Parse CVE JSON dictionary.
 
   Args:
@@ -93,36 +93,36 @@ def ParseCveJson(cve_json, cves, cpe_revmap):
   # observed. Generally we expect that most of Envoy's CVE-CPE matches to be
   # simple, plus it's interesting to consumers of this data to understand when a
   # CPE pops up, even in a conditional setting.
-  def GatherCpes(nodes, cpe_set):
+  def gather_cpes(nodes, cpe_set):
     for node in nodes:
       for cpe_match in node.get('cpe_match', []):
-        cpe_set.add(Cpe.FromString(cpe_match['cpe23Uri']))
-      GatherCpes(node.get('children', []), cpe_set)
+        cpe_set.add(Cpe.from_string(cpe_match['cpe23Uri']))
+      gather_cpes(node.get('children', []), cpe_set)
 
   for cve in cve_json['CVE_Items']:
     cve_id = cve['cve']['CVE_data_meta']['ID']
     description = cve['cve']['description']['description_data'][0]['value']
     cpe_set = set()
-    GatherCpes(cve['configurations']['nodes'], cpe_set)
+    gather_cpes(cve['configurations']['nodes'], cpe_set)
     if len(cpe_set) == 0:
       continue
     cvss_v3_score = cve['impact']['baseMetricV3']['cvssV3']['baseScore']
     cvss_v3_severity = cve['impact']['baseMetricV3']['cvssV3']['baseSeverity']
 
-    def ParseCveDate(date_str):
+    def parse_cve_date(date_str):
       assert (date_str.endswith('Z'))
       return dt.date.fromisoformat(date_str.split('T')[0])
 
-    published_date = ParseCveDate(cve['publishedDate'])
-    last_modified_date = ParseCveDate(cve['lastModifiedDate'])
+    published_date = parse_cve_date(cve['publishedDate'])
+    last_modified_date = parse_cve_date(cve['lastModifiedDate'])
     cves[cve_id] = Cve(cve_id, description, cpe_set, cvss_v3_score, cvss_v3_severity,
                        published_date, last_modified_date)
     for cpe in cpe_set:
-      cpe_revmap[str(cpe.VendorNormalized())].add(cve_id)
+      cpe_revmap[str(cpe.vendor_normalized())].add(cve_id)
   return cves, cpe_revmap
 
 
-def DownloadCveData(urls):
+def download_cve_data(urls):
   '''Download NIST CVE JSON databases from given URLs and parse.
 
   Args:
@@ -137,11 +137,11 @@ def DownloadCveData(urls):
     print(f'Loading NIST CVE database from {url}...')
     with urllib.request.urlopen(url) as request:
       with gzip.GzipFile(fileobj=request) as json_data:
-        ParseCveJson(json.loads(json_data.read()), cves, cpe_revmap)
+        parse_cve_json(json.loads(json_data.read()), cves, cpe_revmap)
   return cves, cpe_revmap
 
 
-def FormatCveDetails(cve, deps):
+def format_cve_details(cve, deps):
   formatted_deps = ', '.join(sorted(deps))
   wrapped_description = '\n  '.join(textwrap.wrap(cve.description))
   return f'''
@@ -160,7 +160,7 @@ FUZZY_DATE_RE = re.compile('(\d{4}).?(\d{2}).?(\d{2})')
 FUZZY_SEMVER_RE = re.compile('(\d+)[:\.\-_](\d+)[:\.\-_](\d+)')
 
 
-def RegexGroupsMatch(regex, lhs, rhs):
+def regex_groups_match(regex, lhs, rhs):
   '''Do two strings match modulo a regular expression?
 
   Args:
@@ -178,7 +178,7 @@ def RegexGroupsMatch(regex, lhs, rhs):
   return False
 
 
-def CpeMatch(cpe, dep_metadata):
+def cpe_match(cpe, dep_metadata):
   '''Heuristically match dependency metadata against CPE.
 
   We have a number of rules below that should are easy to compute without having
@@ -195,7 +195,7 @@ def CpeMatch(cpe, dep_metadata):
   Returns:
     A boolean indicating a match.
   '''
-  dep_cpe = Cpe.FromString(dep_metadata['cpe'])
+  dep_cpe = Cpe.from_string(dep_metadata['cpe'])
   dep_version = dep_metadata['version']
   # The 'part' and 'vendor' must be an exact match.
   if cpe.part != dep_cpe.part:
@@ -217,16 +217,16 @@ def CpeMatch(cpe, dep_metadata):
   if cpe.version == dep_metadata['release_date']:
     return True
   # Try a fuzzy date match to deal with versions like fips-20190304 in dependency version.
-  if RegexGroupsMatch(FUZZY_DATE_RE, dep_version, cpe.version):
+  if regex_groups_match(FUZZY_DATE_RE, dep_version, cpe.version):
     return True
   # Try a fuzzy semver match to deal with things like 2.1.0-beta3.
-  if RegexGroupsMatch(FUZZY_SEMVER_RE, dep_version, cpe.version):
+  if regex_groups_match(FUZZY_SEMVER_RE, dep_version, cpe.version):
     return True
   # Fall-thru.
   return False
 
 
-def CveMatch(cve, dep_metadata):
+def cve_match(cve, dep_metadata):
   '''Heuristically match dependency metadata against CVE.
 
   In general, we allow false positives but want to keep the noise low, to avoid
@@ -241,7 +241,7 @@ def CveMatch(cve, dep_metadata):
   wildcard_version_match = False
   # Consider each CPE attached to the CVE for a match against the dependency CPE.
   for cpe in cve.cpes:
-    if CpeMatch(cpe, dep_metadata):
+    if cpe_match(cpe, dep_metadata):
       # Wildcard version matches need additional heuristics unrelated to CPE to
       # qualify, e.g. last updated date.
       if cpe.version == '*':
@@ -257,12 +257,12 @@ def CveMatch(cve, dep_metadata):
   return False
 
 
-def CveScan(cves, cpe_revmap, cve_allowlist, repository_locations):
+def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
   '''Scan for CVEs in a parsed NIST CVE database.
 
   Args:
-    cves: CVE dictionary as provided by DownloadCveData().
-    cve_revmap: CPE-CVE reverse map as provided by DownloadCveData().
+    cves: CVE dictionary as provided by download_cve_data().
+    cve_revmap: CPE-CVE reverse map as provided by download_cve_data().
     cve_allowlist: an allowlist of CVE IDs to ignore.
     repository_locations: a dictionary of dependency metadata in the format
       described in api/bazel/external_deps.bzl.
@@ -276,12 +276,12 @@ def CveScan(cves, cpe_revmap, cve_allowlist, repository_locations):
     cpe = metadata.get('cpe', 'N/A')
     if cpe == 'N/A':
       continue
-    candidate_cve_ids = cpe_revmap.get(str(Cpe.FromString(cpe).VendorNormalized()), [])
+    candidate_cve_ids = cpe_revmap.get(str(Cpe.from_string(cpe).vendor_normalized()), [])
     for cve_id in candidate_cve_ids:
       cve = cves[cve_id]
       if cve.id in cve_allowlist:
         continue
-      if CveMatch(cve, metadata):
+      if cve_match(cve, metadata):
         possible_cves[cve_id] = cve
         cve_deps[cve_id].append(dep)
   return possible_cves, cve_deps
@@ -297,10 +297,11 @@ if __name__ == '__main__':
     urls = [
         f'https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.json.gz' for year in scan_years
     ]
-  cves, cpe_revmap = DownloadCveData(urls)
-  possible_cves, cve_deps = CveScan(cves, cpe_revmap, IGNORES_CVES, dep_utils.RepositoryLocations())
+  cves, cpe_revmap = download_cve_data(urls)
+  possible_cves, cve_deps = cve_scan(cves, cpe_revmap, IGNORES_CVES,
+                                     dep_utils.repository_locations())
   if possible_cves:
     print('\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:')
     for cve_id in sorted(possible_cves):
-      print(f'{FormatCveDetails(possible_cves[cve_id], cve_deps[cve_id])}')
+      print(f'{format_cve_details(possible_cves[cve_id], cve_deps[cve_id])}')
     sys.exit(1)

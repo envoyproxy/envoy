@@ -3,7 +3,7 @@ import subprocess
 
 # Echoes and runs an OS command, returning exit status and the captured
 # stdout and stderr as a string array.
-def runCommand(command):
+def run_command(command):
   proc = subprocess.run([command], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
   return proc.returncode, proc.stdout.decode('utf-8').split('\n'), proc.stderr.decode(

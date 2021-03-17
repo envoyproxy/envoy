@@ -22,7 +22,7 @@ from bazel_tools.tools.python.runfiles import runfiles
 import argparse
 
 
-def ValidateFragment(type_name, fragment):
+def validate_fragment(type_name, fragment):
   """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
 
   Throws Protobuf errors on parsing exceptions, successful validations produce
@@ -52,7 +52,7 @@ def ValidateFragment(type_name, fragment):
   json_format.Parse(json_fragment, msg, descriptor_pool=pool)
 
 
-def ParseArgs():
+def parse_args():
   parser = argparse.ArgumentParser(
       description='Validate a YAML fragment against an Envoy API proto3 type.')
   parser.add_argument(
@@ -65,8 +65,8 @@ def ParseArgs():
 
 
 if __name__ == '__main__':
-  parsed_args = ParseArgs()
+  parsed_args = parse_args()
   message_type = parsed_args.message_type
   content = parsed_args.s if (parsed_args.fragment_path is None) else pathlib.Path(
       parsed_args.fragment_path).read_text()
-  ValidateFragment(message_type, yaml.safe_load(content))
+  validate_fragment(message_type, yaml.safe_load(content))

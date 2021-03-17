@@ -22,7 +22,7 @@ $extension
 """)
 
 
-def GenerateEmptyExtensionsDocs(extension, details, api_extensions_root):
+def generate_empty_extension_docs(extension, details, api_extensions_root):
   extension_root = pathlib.Path(details['path'])
   path = pathlib.Path(api_extensions_root, extension_root, 'empty', extension_root.name + '.rst')
   path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,12 +30,12 @@ def GenerateEmptyExtensionsDocs(extension, details, api_extensions_root):
   reflink = ''
   if 'ref' in details:
     reflink = '%s %s.' % (details['title'],
-                          protodoc.FormatInternalLink('configuration overview', details['ref']))
-  content = EMPTY_EXTENSION_DOCS_TEMPLATE.substitute(header=protodoc.FormatHeader(
+                          protodoc.format_internal_link('configuration overview', details['ref']))
+  content = EMPTY_EXTENSION_DOCS_TEMPLATE.substitute(header=protodoc.format_header(
       '=', details['title']),
                                                      description=description,
                                                      reflink=reflink,
-                                                     extension=protodoc.FormatExtension(extension))
+                                                     extension=protodoc.format_extension(extension))
   path.write_text(content)
 
 
@@ -45,4 +45,4 @@ if __name__ == '__main__':
 
   empty_extensions = json.loads(pathlib.Path(empty_extensions_path).read_text())
   for extension, details in empty_extensions.items():
-    GenerateEmptyExtensionsDocs(extension, details, api_extensions_root)
+    generate_empty_extension_docs(extension, details, api_extensions_root)

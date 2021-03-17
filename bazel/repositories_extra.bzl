@@ -79,6 +79,11 @@ def _python_deps():
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
     pip_install(
+        name = "pylint_pip3",
+        requirements = "@envoy//tools/code_format:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "thrift_pip3",
         requirements = "@envoy//test/extensions/filters/network/thrift_proxy:requirements.txt",
         extra_pip_args = ["--require-hashes"],

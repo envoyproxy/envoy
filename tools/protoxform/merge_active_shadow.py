@@ -28,7 +28,7 @@ from udpa.annotations import versioning_pb2 as _
 
 # Set reserved_range in target_proto to reflect previous_reserved_range skipping
 # skip_reserved_numbers.
-def AdjustReservedRange(target_proto, previous_reserved_range, skip_reserved_numbers):
+def adjust_reserved_range(target_proto, previous_reserved_range, skip_reserved_numbers):
   del target_proto.reserved_range[:]
   for rr in previous_reserved_range:
     # We can only handle singleton ranges today.
@@ -38,7 +38,7 @@ def AdjustReservedRange(target_proto, previous_reserved_range, skip_reserved_num
 
 
 # Add dependencies for envoy.annotations.disallowed_by_default
-def AddDeprecationDependencies(target_proto_dependencies, proto_field, is_enum):
+def add_deprecation_dependencies(target_proto_dependencies, proto_field, is_enum):
   if is_enum:
     if proto_field.options.HasExtension(deprecation_pb2.disallowed_by_default_enum) and \
         "envoy/annotations/deprecation.proto" not in target_proto_dependencies:
@@ -53,7 +53,7 @@ def AddDeprecationDependencies(target_proto_dependencies, proto_field, is_enum):
 
 
 # Merge active/shadow EnumDescriptorProtos to a fresh target EnumDescriptorProto.
-def MergeActiveShadowEnum(active_proto, shadow_proto, target_proto, target_proto_dependencies):
+def merge_active_shadow_enum(active_proto, shadow_proto, target_proto, target_proto_dependencies):
   target_proto.MergeFrom(active_proto)
   if not shadow_proto:
     return
@@ -66,12 +66,12 @@ def MergeActiveShadowEnum(active_proto, shadow_proto, target_proto, target_proto
     hidden_n = 'hidden_envoy_deprecated_' + n
     if hidden_n in shadow_values:
       v = shadow_values[hidden_n]
-      AddDeprecationDependencies(target_proto_dependencies, v, True)
+      add_deprecation_dependencies(target_proto_dependencies, v, True)
       skip_reserved_numbers.append(v.number)
       target_proto.value.add().MergeFrom(v)
     else:
       target_proto.reserved_name.append(n)
-  AdjustReservedRange(target_proto, active_proto.reserved_range, skip_reserved_numbers)
+  adjust_reserved_range(target_proto, active_proto.reserved_range, skip_reserved_numbers)
   # Special fixup for deprecation of default enum values.
   for tv in target_proto.value:
     if tv.name == 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE':
@@ -83,21 +83,21 @@ def MergeActiveShadowEnum(active_proto, shadow_proto, target_proto, target_proto
 
 # Adjust source code info comments path to reflect insertions of oneof fields
 # inside the middle of an existing collection of fields.
-def AdjustSourceCodeInfo(type_context, field_index, field_adjustment):
+def adjust_source_code_info(type_context, field_index, field_adjustment):
 
-  def HasPathPrefix(s, t):
+  def has_path_prefix(s, t):
     return len(s) <= len(t) and all(p[0] == p[1] for p in zip(s, t))
 
   for loc in type_context.source_code_info.proto.location:
-    if HasPathPrefix(type_context.path + [2], loc.path):
+    if has_path_prefix(type_context.path + [2], loc.path):
       path_field_index = len(type_context.path) + 1
       if path_field_index < len(loc.path) and loc.path[path_field_index] >= field_index:
         loc.path[path_field_index] += field_adjustment
 
 
 # Merge active/shadow DescriptorProtos to a fresh target DescriptorProto.
-def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_proto,
-                             target_proto_dependencies):
+def merge_active_shadow_message(type_context, active_proto, shadow_proto, target_proto,
+                                target_proto_dependencies):
   target_proto.MergeFrom(active_proto)
   if not shadow_proto:
     return
@@ -115,7 +115,7 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
     hidden_n = 'hidden_envoy_deprecated_' + n
     if hidden_n in shadow_fields:
       f = shadow_fields[hidden_n]
-      AddDeprecationDependencies(target_proto_dependencies, f, False)
+      add_deprecation_dependencies(target_proto_dependencies, f, False)
       skip_reserved_numbers.append(f.number)
       missing_field = copy.deepcopy(f)
       # oneof fields from the shadow need to have their index set to the
@@ -143,7 +143,7 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
   # expects that oneof fields are consecutive, so need to sort for this.
   current_oneof_index = None
 
-  def AppendExtraOneofFields(current_oneof_index, last_oneof_field_index):
+  def append_extra_oneof_fields(current_oneof_index, last_oneof_field_index):
     # Add fields from extra_oneof_fields for current_oneof_index.
     for oneof_f in extra_oneof_fields[current_oneof_index]:
       target_proto.field.add().MergeFrom(oneof_f)
@@ -152,7 +152,7 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
     # inefficient, O(N^2) in the worst case, but since we have relatively few
     # deprecated fields, is the easiest to implement method.
     if last_oneof_field_index is not None:
-      AdjustSourceCodeInfo(type_context, last_oneof_field_index, field_adjustment)
+      adjust_source_code_info(type_context, last_oneof_field_index, field_adjustment)
     del extra_oneof_fields[current_oneof_index]
     return field_adjustment
 
@@ -162,7 +162,7 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
       field_oneof_index = f.oneof_index if f.HasField('oneof_index') else None
       # Are we exiting the oneof? If so, add the respective extra_one_fields.
       if field_oneof_index != current_oneof_index:
-        field_index += AppendExtraOneofFields(current_oneof_index, field_index)
+        field_index += append_extra_oneof_fields(current_oneof_index, field_index)
         current_oneof_index = field_oneof_index
     elif f.HasField('oneof_index'):
       current_oneof_index = f.oneof_index
@@ -171,7 +171,7 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
   if current_oneof_index is not None:
     # No need to adjust source code info here, since there are no comments for
     # trailing deprecated fields, so just set field index to None.
-    AppendExtraOneofFields(current_oneof_index, None)
+    append_extra_oneof_fields(current_oneof_index, None)
   # Non-oneof fields are easy to treat, we just append them to the existing
   # fields. They don't get any comments, but that's fine in the generated
   # shadows.
@@ -181,20 +181,20 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
     for f in extra_oneof_fields[oneof_index]:
       target_proto.field.add().MergeFrom(f)
   # Same is true for oneofs that are exclusively from the shadow.
-  AdjustReservedRange(target_proto, active_proto.reserved_range, skip_reserved_numbers)
+  adjust_reserved_range(target_proto, active_proto.reserved_range, skip_reserved_numbers)
   # Visit nested message types
   del target_proto.nested_type[:]
   shadow_msgs = {msg.name: msg for msg in shadow_proto.nested_type}
   for index, msg in enumerate(active_proto.nested_type):
-    MergeActiveShadowMessage(
-        type_context.ExtendNestedMessage(index, msg.name, msg.options.deprecated), msg,
+    merge_active_shadow_message(
+        type_context.extend_nested_message(index, msg.name, msg.options.deprecated), msg,
         shadow_msgs.get(msg.name), target_proto.nested_type.add(), target_proto_dependencies)
   # Visit nested enum types
   del target_proto.enum_type[:]
   shadow_enums = {msg.name: msg for msg in shadow_proto.enum_type}
   for enum in active_proto.enum_type:
-    MergeActiveShadowEnum(enum, shadow_enums.get(enum.name), target_proto.enum_type.add(),
-                          target_proto_dependencies)
+    merge_active_shadow_enum(enum, shadow_enums.get(enum.name), target_proto.enum_type.add(),
+                             target_proto_dependencies)
   # Ensure target has any deprecated sub-message types in case they are needed.
   active_msg_names = set([msg.name for msg in active_proto.nested_type])
   for msg in shadow_proto.nested_type:
@@ -203,7 +203,7 @@ def MergeActiveShadowMessage(type_context, active_proto, shadow_proto, target_pr
 
 
 # Merge active/shadow FileDescriptorProtos, returning the resulting FileDescriptorProto.
-def MergeActiveShadowFile(active_file_proto, shadow_file_proto):
+def merge_active_shadow_file(active_file_proto, shadow_file_proto):
   target_file_proto = copy.deepcopy(active_file_proto)
   source_code_info = api_type_context.SourceCodeInfo(target_file_proto.name,
                                                      target_file_proto.source_code_info)
@@ -212,16 +212,16 @@ def MergeActiveShadowFile(active_file_proto, shadow_file_proto):
   del target_file_proto.message_type[:]
   shadow_msgs = {msg.name: msg for msg in shadow_file_proto.message_type}
   for index, msg in enumerate(active_file_proto.message_type):
-    MergeActiveShadowMessage(
-        package_type_context.ExtendMessage(index, msg.name, msg.options.deprecated), msg,
+    merge_active_shadow_message(
+        package_type_context.extend_message(index, msg.name, msg.options.deprecated), msg,
         shadow_msgs.get(msg.name), target_file_proto.message_type.add(),
         target_file_proto.dependency)
   # Visit enum types
   del target_file_proto.enum_type[:]
   shadow_enums = {msg.name: msg for msg in shadow_file_proto.enum_type}
   for enum in active_file_proto.enum_type:
-    MergeActiveShadowEnum(enum, shadow_enums.get(enum.name), target_file_proto.enum_type.add(),
-                          target_file_proto.dependency)
+    merge_active_shadow_enum(enum, shadow_enums.get(enum.name), target_file_proto.enum_type.add(),
+                             target_file_proto.dependency)
   # Ensure target has any deprecated message types in case they are needed.
   active_msg_names = set([msg.name for msg in active_file_proto.message_type])
   for msg in shadow_file_proto.message_type:
@@ -236,4 +236,4 @@ if __name__ == '__main__':
   text_format.Merge(pathlib.Path(active_src).read_text(), active_proto)
   shadow_proto = descriptor_pb2.FileDescriptorProto()
   text_format.Merge(pathlib.Path(shadow_src).read_text(), shadow_proto)
-  pathlib.Path(dst).write_text(str(MergeActiveShadowFile(active_proto, shadow_proto)))
+  pathlib.Path(dst).write_text(str(merge_active_shadow_file(active_proto, shadow_proto)))

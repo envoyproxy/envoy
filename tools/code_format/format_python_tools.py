@@ -8,7 +8,7 @@ from yapf.yapflib.yapf_api import FormatFile
 EXCLUDE_LIST = ['generated', 'venv']
 
 
-def collectFiles():
+def collect_files():
   """Collect all Python files in the tools directory.
 
   Returns: A collection of python files in the tools directory excluding
@@ -28,7 +28,7 @@ def collectFiles():
   return matches
 
 
-def validateFormat(fix=False):
+def validate_format(fix=False):
   """Check the format of python files in the tools directory.
 
     Arguments:
@@ -37,7 +37,7 @@ def validateFormat(fix=False):
   fixes_required = False
   failed_update_files = set()
   successful_update_files = set()
-  for python_file in collectFiles():
+  for python_file in collect_files():
     reformatted_source, encoding, changed = FormatFile(python_file,
                                                        style_config='tools/code_format/.style.yapf',
                                                        in_place=fix,
@@ -50,12 +50,12 @@ def validateFormat(fix=False):
     file_list = failed_update_files if reformatted_source else successful_update_files
     file_list.add(python_file)
   if fix:
-    displayFixResults(successful_update_files, failed_update_files)
+    display_fix_results(successful_update_files, failed_update_files)
     fixes_required = len(failed_update_files) > 0
   return not fixes_required
 
 
-def displayFixResults(successful_files, failed_files):
+def display_fix_results(successful_files, failed_files):
   if successful_files:
     print('Successfully fixed {} files'.format(len(successful_files)))
 
@@ -72,5 +72,5 @@ if __name__ == '__main__':
                       default='check',
                       help='Fix invalid syntax in files.')
   args = parser.parse_args()
-  is_valid = validateFormat(args.action == 'fix')
+  is_valid = validate_format(args.action == 'fix')
   sys.exit(0 if is_valid else 1)

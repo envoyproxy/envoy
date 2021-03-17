@@ -10,7 +10,7 @@ from google.protobuf import descriptor_pb2
 from udpa.annotations import migrate_pb2
 
 
-def Decode(path):
+def decode(path):
   with open(path, 'rb') as f:
     file_set = descriptor_pb2.FileDescriptorSet()
     file_set.ParseFromString(f.read())
@@ -20,6 +20,6 @@ def Decode(path):
 if __name__ == '__main__':
   output_path = sys.argv[1]
   input_paths = sys.argv[2:]
-  pb_text = '\n'.join(Decode(path) for path in input_paths)
+  pb_text = '\n'.join(decode(path) for path in input_paths)
   with open(output_path, 'w') as f:
     f.write(pb_text)

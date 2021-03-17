@@ -9,7 +9,7 @@ import re
 import sys
 
 
-def PrintProfile(f):
+def print_profile(f):
   prev_cmd = None
   prev_timestamp = None
   for line in f:
@@ -22,4 +22,4 @@ def PrintProfile(f):
 
 
 if __name__ == '__main__':
-  PrintProfile(sys.stdin)
+  print_profile(sys.stdin)

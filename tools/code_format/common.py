@@ -1,4 +1,4 @@
-def includeDirOrder():
+def include_dir_order():
   return (
       "envoy",
       "common",

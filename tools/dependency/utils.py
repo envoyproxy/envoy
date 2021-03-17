@@ -8,7 +8,7 @@ from exports import (api_repository_locations, envoy_repository_locations,
 
 
 # All repository location metadata in the Envoy repository.
-def RepositoryLocations():
+def repository_locations():
   spec_loader = repository_locations_utils.load_repository_locations_spec
   locations = spec_loader(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
   locations.update(spec_loader(api_repository_locations.REPOSITORY_LOCATIONS_SPEC))
@@ -16,7 +16,7 @@ def RepositoryLocations():
 
 
 # Obtain GitHub project URL from a list of URLs.
-def GetGitHubProjectUrl(urls):
+def get_github_project_url(urls):
   for url in urls:
     if not url.startswith('https://github.com/'):
       continue
@@ -32,7 +32,7 @@ GitHubRelease = namedtuple('GitHubRelease', ['organization', 'project', 'version
 # Search through a list of URLs and determine if any contain a GitHub URL. If
 # so, use heuristics to extract the release version and repo details, return
 # this, otherwise return None.
-def GetGitHubReleaseFromUrls(urls):
+def get_github_release_from_urls(urls):
   for url in urls:
     if not url.startswith('https://github.com/'):
       continue

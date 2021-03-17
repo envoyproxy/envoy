@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
-def generateCompilationDatabase(args):
+def generate_compilation_database(args):
   # We need to download all remote outputs for generated source code. This option lives here to override those
   # specified in bazelrc.
   bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
@@ -34,16 +34,16 @@ def generateCompilationDatabase(args):
   return compdb
 
 
-def isHeader(filename):
+def is_header(filename):
   for ext in (".h", ".hh", ".hpp", ".hxx"):
     if filename.endswith(ext):
       return True
   return False
 
 
-def isCompileTarget(target, args):
+def is_compile_target(target, args):
   filename = target["file"]
-  if not args.include_headers and isHeader(filename):
+  if not args.include_headers and is_header(filename):
     return False
 
   if not args.include_genfiles:
@@ -57,7 +57,7 @@ def isCompileTarget(target, args):
   return True
 
 
-def modifyCompileCommand(target, args):
+def modify_compile_command(target, args):
   cc, options = target["command"].split(" ", 1)
 
   # Workaround for bazel added C++11 options, those doesn't affect build itself but
@@ -70,7 +70,7 @@ def modifyCompileCommand(target, args):
     # old-style "-I".
     options = options.replace("-iquote ", "-I ")
 
-  if isHeader(target["file"]):
+  if is_header(target["file"]):
     options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
     options += " -Wno-unused-function"
     if not target["file"].startswith("external/"):
@@ -81,8 +81,8 @@ def modifyCompileCommand(target, args):
   return target
 
 
-def fixCompilationDatabase(args, db):
-  db = [modifyCompileCommand(target, args) for target in db if isCompileTarget(target, args)]
+def fix_compilation_database(args, db):
+  db = [modify_compile_command(target, args) for target in db if is_compile_target(target, args)]
 
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
@@ -98,4 +98,4 @@ if __name__ == "__main__":
                       nargs='*',
                       default=["//source/...", "//test/...", "//tools/..."])
   args = parser.parse_args()
-  fixCompilationDatabase(args, generateCompilationDatabase(args))
+  fix_compilation_database(args, generate_compilation_database(args))
