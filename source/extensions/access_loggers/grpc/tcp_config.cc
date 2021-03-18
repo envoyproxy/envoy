@@ -22,7 +22,7 @@ namespace TcpGrpc {
 
 AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::CommonFactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

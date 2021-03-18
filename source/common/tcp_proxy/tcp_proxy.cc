@@ -177,8 +177,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
-    access_logs_.emplace_back(
-        AccessLog::AccessLogFactory::fromProto(log_config, context.getServerFactoryContext()));
+    access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 
   if (!config.hash_policy().empty()) {

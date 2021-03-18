@@ -198,7 +198,7 @@ public:
                      context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(
-          AccessLog::AccessLogFactory::fromProto(upstream_log, context.getServerFactoryContext()));
+          AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
   using HeaderVector = std::vector<Http::LowerCaseString>;

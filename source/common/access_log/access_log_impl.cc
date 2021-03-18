@@ -304,7 +304,7 @@ bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
 
 InstanceSharedPtr
 AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::ServerFactoryContext& context) {
+                            Server::Configuration::CommonFactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context.runtime(),

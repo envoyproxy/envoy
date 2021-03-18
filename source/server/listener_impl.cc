@@ -375,8 +375,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
 
 void ListenerImpl::buildAccessLog() {
   for (const auto& access_log : config_.access_log()) {
-    AccessLog::InstanceSharedPtr current_access_log = AccessLog::AccessLogFactory::fromProto(
-        access_log, listener_factory_context_->getServerFactoryContext());
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, *listener_factory_context_);
     access_logs_.push_back(current_access_log);
   }
 }

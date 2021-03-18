@@ -24,7 +24,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -204,10 +204,10 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     admin_.access_logs_.emplace_back(current_access_log);
   }
 
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, admin.access_log_path()};
   if (!admin.access_log_path().empty()) {
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        admin.access_log_path(), {},
-        Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
         server.accessLogManager()));
   }
 

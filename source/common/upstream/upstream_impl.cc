@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
@@ -657,6 +658,27 @@ public:
     // Not used.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+
+  AccessLog::AccessLogManager& accessLogManager() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  Server::ServerLifecycleNotifier& lifecycleNotifier() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  Init::Manager& initManager() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   Api::Api& api() override { return api_; }
 
 private:
