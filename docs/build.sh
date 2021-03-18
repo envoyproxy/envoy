@@ -7,6 +7,9 @@
 
 set -e
 
+ENVOY_SRCDIR=$(pwd)
+export ENVOY_SRCDIR
+
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then

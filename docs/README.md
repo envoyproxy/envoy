@@ -9,7 +9,6 @@ In both cases, the generated output can be found in `generated/docs`.
 If you have an [existing Envoy development environment](https://github.com/envoyproxy/envoy/tree/main/bazel#quick-start-bazel-build-for-developers), you should have the necessary dependencies and requirements and be able to build the documentation directly.
 
 ```bash
-export ENVOY_SRCDIR=$(pwd)
 ./docs/build.sh
 ```
 
