@@ -9,7 +9,8 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-# openssl bug workaround
+# TODO(phlax): remove openssl bug workaround when openssl/ubuntu are updated
+#    see #15555 for more info
 touch ~/.rnd
 
 interact_ws () {

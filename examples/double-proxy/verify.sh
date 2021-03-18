@@ -9,7 +9,8 @@ export DELAY=5
 
 mkdir -p certs
 
-# openssl bug workaround
+# TODO(phlax): remove openssl bug workaround when openssl/ubuntu are updated
+#    see #15555 for more info
 touch ~/.rnd
 
 run_log "Create a cert authority"
