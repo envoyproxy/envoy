@@ -14,7 +14,7 @@ By enabling compression in Envoy you can save some network bandwidth, at the exp
 
 Envoy supports compression and decompression for both requests and responses.
 
-This sandbox provides an example of response compression served over HTTP. Although HTTPS is not demonstrated, compression can be used for this also.
+This sandbox provides an example of response compression served over ``HTTP``. Although ``HTTPS`` is not demonstrated, compression can be used for this also.
 
 The sandbox covers two scenarios:
 
@@ -34,11 +34,11 @@ Change to the ``examples/gzip`` directory and bring up the docker composition.
     $ docker-compose up -d
     $ docker-compose ps
            Name                     Command               State                                                                    Ports
-    -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    gzip_envoy-stats_1   /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp,:::10000->10000/tcp, 0.0.0.0:9901->9901/tcp,:::9901->9901/tcp, 0.0.0.0:9902->9902/tcp,:::9902->9902/tcp
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    gzip_envoy-stats_1   /docker-entrypoint.sh /usr ...   Up      0.0.0.0:10000->10000/tcp,:::10000->10000/tcp, 0.0.0.0:9901->9901/tcp,:::9901->9901/tcp, 0.0.0.0:9902->9902/tcp,:::9902->9902/tcp
     gzip_service_1       python3 /code/service.py         Up
 
-Step 2: Test Envoy's compression capabilities for upstream
+Step 2: Test Envoy’s compression of upstream files
 **********************************************************
 
 The sandbox is configured with two endpoints on port ``10000`` for serving upstream files:
@@ -63,7 +63,7 @@ As only files with a content-type of ``application/json`` are configured to be g
 
     $ curl -siv -H "Accept-Encoding: gzip" localhost:10000/file.txt -o file.txt 2>&1 | grep "content-encoding"
 
-Step 3: Test Envoy's compression capabilities for Envoy's statistics
+Step 3: Test compression of Envoy’s statistics
 ********************************************************************
 
 The sandbox is configured with two ports serving Envoy’s admin and statistics interface:
@@ -71,7 +71,7 @@ The sandbox is configured with two ports serving Envoy’s admin and statistics 
 - ``9901`` exposes the standard admin interface
 - ``9902`` exposes a compressed version of the admin interface
 
-Use ``curl`` to make a request for uncompressed statistics on port ``9901``, it should not contain the content-encoding header in the response:
+Use ``curl`` to make a request for uncompressed statistics on port ``9901``, it should not contain the ``content-encoding`` header in the response:
 
 .. code-block:: console
 

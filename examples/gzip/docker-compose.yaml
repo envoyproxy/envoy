@@ -4,8 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-gzip
-    networks:
-      - envoymesh
     ports:
       - "9901:9901"
       - "9902:9902"
@@ -15,8 +13,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-service
-    networks:
-      - envoymesh
-
-networks:
-  envoymesh: {}

@@ -2,41 +2,29 @@
 
 export NAME=gzip
 
-PWD="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=examples/verify-common.sh                                                                                                                                   
+. "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-# shellcheck source=examples/verify-common.sh
-. "${PWD}/../verify-common.sh"
-
-run_log "Test service: localhost:10000/file.txt with compress"
+run_log "Test service: localhost:10000/file.json with compression"
 responds_with_header \
-    "content-length" \
-    http://localhost:10000/file.txt \
-    -si -H "Accept-Encoding: gzip"
-
-run_log "Test service: localhost:10000/file.json with compress"
-responds_without_header \
-    "content-length" \
+    "content-encoding: gzip" \
     http://localhost:10000/file.json \
-    -si -H "Accept-Encoding: gzip"
+    -i -H "Accept-Encoding: gzip"
 
-run_log "Test service: localhost:9901/stats/prometheus without compress"
+run_log "Test service: localhost:10000/file.txt with compression"
+responds_without_header \
+    "content-encoding: gzip" \
+    http://localhost:10000/file.txt \
+    -i -H "Accept-Encoding: gzip"
+
+run_log "Test service: localhost:9901/stats/prometheus with compression"
 responds_without_header \
     "content-encoding: gzip" \
     http://localhost:9901/stats/prometheus \
+    -i -H "Accept-Encoding: gzip"
 
-run_log "Test service: localhost:9901/stats/prometheus with compress"
-responds_without_header \
-    "content-encoding: gzip" \
-    http://localhost:9901/stats/prometheus \
-    -si -H "Accept-Encoding: gzip"
-
-run_log "Test service: localhost:9902/stats/prometheus without compress"
-responds_without_header \
-    "content-encoding: gzip" \
-    http://localhost:9902/stats/prometheus \
-
-run_log "Test service: localhost:9902/stats/prometheus with compress"
+run_log "Test service: localhost:9902/stats/prometheus with compression"
 responds_with_header \
     "content-encoding: gzip" \
     http://localhost:9902/stats/prometheus \
-    -si -H "Accept-Encoding: gzip"
+    -i -H "Accept-Encoding: gzip"
