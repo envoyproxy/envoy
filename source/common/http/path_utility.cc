@@ -107,6 +107,8 @@ PathTransformer::PathTransformer(
     uint64_t operation_hash = MessageUtil::hash(operation);
     if (find(operation_hashes.begin(), operation_hashes.end(), operation_hash) !=
         operation_hashes.end()) {
+      // Currently we only have RFC normalization and merge slashes, don't expect duplicates for
+      // these transformations.
       throw EnvoyException("Duplicate path transformation");
     }
     if (operation.has_normalize_path_rfc_3986()) {

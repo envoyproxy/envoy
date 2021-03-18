@@ -807,6 +807,7 @@ class RequestHeaderMap
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
+private:
   virtual void setForwardingPath(absl::string_view path) PURE;
   virtual absl::string_view getForwardingPath() PURE;
   virtual void setFilterPath(absl::string_view path) PURE;

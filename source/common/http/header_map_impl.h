@@ -462,11 +462,6 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
-  void setForwardingPath(absl::string_view path) override { forwarding_path_ = path; }
-  absl::string_view getForwardingPath() override { return forwarding_path_; }
-  void setFilterPath(absl::string_view path) override { filter_path_ = path; }
-  absl::string_view getFilterPath() override { return filter_path_; }
-
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the
   // most derived class. This forces the definition of the following three functions to also be
@@ -483,10 +478,14 @@ private:
     INLINE_REQ_RESP_STRING_HEADERS(DEFINE_HEADER_HANDLE)
     INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
   };
-
-  using HeaderHandles = ConstSingleton<HeaderHandleValues>;
+  void setForwardingPath(absl::string_view path) override { forwarding_path_ = path; }
+  absl::string_view getForwardingPath() override { return forwarding_path_; }
+  void setFilterPath(absl::string_view path) override { filter_path_ = path; }
+  absl::string_view getFilterPath() override { return filter_path_; }
   std::string forwarding_path_;
   std::string filter_path_;
+  friend class HttpConnectionManagerConfig;
+  using HeaderHandles = ConstSingleton<HeaderHandleValues>;
   RequestHeaderMapImpl() { clearInline(); }
 
   HeaderEntryImpl* inline_headers_[];
