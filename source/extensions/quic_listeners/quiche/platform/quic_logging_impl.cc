@@ -19,16 +19,17 @@ namespace {
 class QuicLogVerbosityManager {
 public:
   // Gets QUICHE log verbosity threshold.
-  static int GetThreshold() { return Get()->verbosity_threshold_.load(std::memory_order_relaxed); }
+  static int getThreshold() {
+    return getSingleton()->verbosity_threshold_.load(std::memory_order_relaxed);
+  }
 
   // Sets QUICHE log verbosity threshold.
-  static void SetThreshold(int new_verbosity) {
-    Get()->verbosity_threshold_.store(new_verbosity, std::memory_order_relaxed);
+  static void setThreshold(int new_verbosity) {
+    getSingleton()->verbosity_threshold_.store(new_verbosity, std::memory_order_relaxed);
   }
 
 private:
-  // Returns singleton.
-  static QuicLogVerbosityManager* Get() {
+  static QuicLogVerbosityManager* getSingleton() {
     static QuicLogVerbosityManager manager = QuicLogVerbosityManager();
     return &manager;
   }
@@ -54,10 +55,10 @@ std::atomic<QuicLogSink*> g_quic_log_sink;
 absl::Mutex g_quic_log_sink_mutex;
 } // namespace
 
-int GetVerbosityLogThreshold() { return QuicLogVerbosityManager::GetThreshold(); }
+int getVerbosityLogThreshold() { return QuicLogVerbosityManager::getThreshold(); }
 
-void SetVerbosityLogThreshold(int new_verbosity) {
-  QuicLogVerbosityManager::SetThreshold(new_verbosity);
+void setVerbosityLogThreshold(int new_verbosity) {
+  QuicLogVerbosityManager::setThreshold(new_verbosity);
 }
 
 QuicLogEmitter::QuicLogEmitter(QuicLogLevel level, const char* file_name, int line,
@@ -102,9 +103,9 @@ QuicLogEmitter::~QuicLogEmitter() {
   }
 }
 
-bool IsDFatalExitDisabled() { return g_dfatal_exit_disabled.load(std::memory_order_relaxed); }
+bool isDFatalExitDisabled() { return g_dfatal_exit_disabled.load(std::memory_order_relaxed); }
 
-void SetDFatalExitDisabled(bool is_disabled) {
+void setDFatalExitDisabled(bool is_disabled) {
   g_dfatal_exit_disabled.store(is_disabled, std::memory_order_relaxed);
 }
 

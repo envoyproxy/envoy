@@ -45,7 +45,7 @@
 
 #define QUICHE_VLOG_IF_IMPL(verbosity, condition)                                                  \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
-      quic::IsVerboseLogEnabled(verbosity) && (condition),                                         \
+      quic::isVerboseLogEnabled(verbosity) && (condition),                                         \
       quic::QuicLogEmitter(quic::INFO, __FILE__, __LINE__, __func__).stream())
 
 #define QUICHE_VLOG_IMPL(verbosity) QUICHE_VLOG_IF_IMPL(verbosity, true)
@@ -180,26 +180,26 @@ inline spdlog::logger& GetLogger() {
 }
 
 // This allows us to use QUICHE_CHECK(condition) from constexpr functions.
-#define QUICHE_IS_LOG_LEVEL_ENABLED(severity) quic::IsLogLevelEnabled##severity()
+#define QUICHE_IS_LOG_LEVEL_ENABLED(severity) quic::isLogLevelEnabled##severity()
 #define QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(severity)                                                 \
-  inline bool IsLogLevelEnabled##severity() { return quic::severity >= GetLogger().level(); }
+  inline bool isLogLevelEnabled##severity() { return quic::severity >= GetLogger().level(); }
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(TRACE)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(DEBUG)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(INFO)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(WARNING)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(ERROR)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(DFATAL)
-inline bool constexpr IsLogLevelEnabledFATAL() { return true; }
+inline bool constexpr isLogLevelEnabledFATAL() { return true; }
 
-int GetVerbosityLogThreshold();
-void SetVerbosityLogThreshold(int new_verbosity);
+int getVerbosityLogThreshold();
+void setVerbosityLogThreshold(int new_verbosity);
 
-inline bool IsVerboseLogEnabled(int verbosity) {
-  return QUICHE_IS_LOG_LEVEL_ENABLED(INFO) && verbosity <= GetVerbosityLogThreshold();
+inline bool isVerboseLogEnabled(int verbosity) {
+  return QUICHE_IS_LOG_LEVEL_ENABLED(INFO) && verbosity <= getVerbosityLogThreshold();
 }
 
-bool IsDFatalExitDisabled();
-void SetDFatalExitDisabled(bool is_disabled);
+bool isDFatalExitDisabled();
+void setDFatalExitDisabled(bool is_disabled);
 
 // QuicLogSink is used to capture logs emitted from the QUICHE_LOG... macros.
 class QuicLogSink {
