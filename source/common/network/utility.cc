@@ -730,7 +730,12 @@ ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
     const envoy::config::core::v3::UdpSocketConfig& config, bool use_gro_default)
     : max_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_rx_datagram_size,
                                                             DEFAULT_UDP_MAX_DATAGRAM_SIZE)),
-      use_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_gro, use_gro_default)) {}
+      use_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_gro, use_gro_default)) {
+  if (use_gro_ && !Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    ENVOY_LOG_MISC(
+        warn, "GRO requested but not supported by the OS. Check OS config or disable use_gro.");
+  }
+}
 
 } // namespace Network
 } // namespace Envoy
