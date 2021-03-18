@@ -8,7 +8,7 @@ import os
 
 
 def main():
-  """
+    """
   Kafka code generator script
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Generates C++ code from Kafka protocol specification for Kafka codec.
@@ -38,14 +38,14 @@ def main():
   - to create '${MESSAGE_TYPE}_metrics.h': ${MESSAGE_TYPE}_metrics_h.j2.
   """
 
-  type = sys.argv[1]
-  main_header_file = os.path.abspath(sys.argv[2])
-  resolver_cc_file = os.path.abspath(sys.argv[3])
-  metrics_h_file = os.path.abspath(sys.argv[4])
-  input_files = sys.argv[5:]
-  generator.generate_main_code(type, main_header_file, resolver_cc_file, metrics_h_file,
-                               input_files)
+    type = sys.argv[1]
+    main_header_file = os.path.abspath(sys.argv[2])
+    resolver_cc_file = os.path.abspath(sys.argv[3])
+    metrics_h_file = os.path.abspath(sys.argv[4])
+    input_files = sys.argv[5:]
+    generator.generate_main_code(type, main_header_file, resolver_cc_file, metrics_h_file,
+                                 input_files)
 
 
 if __name__ == "__main__":
-  main()
+    main()
