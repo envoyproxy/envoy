@@ -137,18 +137,6 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-          quic_transport_socket_config;
-      auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-      ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
-                                  *tls_context->mutable_common_tls_context());
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
-
-      bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
-
       const std::string overload_config =
           fmt::format(R"EOF(
         refresh_interval:

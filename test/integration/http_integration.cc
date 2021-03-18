@@ -313,32 +313,8 @@ void HttpIntegrationTest::initialize() {
   quic_transport_socket_factory_ =
       IntegrationUtil::createQuicClientTransportSocketFactory(mock_factory_ctx, san_to_match_);
 
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-        quic_transport_socket_config;
-    auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-    ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
-                                *tls_context->mutable_common_tls_context());
-    for (auto& listener : *bootstrap.mutable_static_resources()->mutable_listeners()) {
-      if (listener.udp_listener_config().listener_config().typed_config().type_url() ==
-          "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
-        auto* filter_chain = listener.mutable_filter_chains(0);
-        auto* transport_socket = filter_chain->mutable_transport_socket();
-        transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  config_helper_.addQuicDownstreamTransportSocketConfig(set_reuse_port_);
 
-        listener.set_reuse_port(set_reuse_port_);
-      }
-    }
-  });
-
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        hcm.mutable_drain_timeout()->clear_seconds();
-        hcm.mutable_drain_timeout()->set_nanos(500 * 1000 * 1000);
-        EXPECT_EQ(hcm.codec_type(), envoy::extensions::filters::network::http_connection_manager::
-                                        v3::HttpConnectionManager::HTTP3);
-      });
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"});
 
