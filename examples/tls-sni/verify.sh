@@ -6,6 +6,8 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+# openssl bug workaround
+touch ~/.rnd
 
 create_self_signed_certs () {
     local domain="$1"

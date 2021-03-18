@@ -9,6 +9,8 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+# openssl bug workaround
+touch ~/.rnd
 
 interact_ws () {
     local port="$1" \
