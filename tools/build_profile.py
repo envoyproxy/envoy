@@ -10,16 +10,16 @@ import sys
 
 
 def print_profile(f):
-  prev_cmd = None
-  prev_timestamp = None
-  for line in f:
-    sr = re.match('\++ (\d+\.\d+) (.*)', line)
-    if sr:
-      timestamp, cmd = sr.groups()
-      if prev_cmd:
-        print('%.2f %s' % (float(timestamp) - float(prev_timestamp), prev_cmd))
-      prev_timestamp, prev_cmd = timestamp, cmd
+    prev_cmd = None
+    prev_timestamp = None
+    for line in f:
+        sr = re.match('\++ (\d+\.\d+) (.*)', line)
+        if sr:
+            timestamp, cmd = sr.groups()
+            if prev_cmd:
+                print('%.2f %s' % (float(timestamp) - float(prev_timestamp), prev_cmd))
+            prev_timestamp, prev_cmd = timestamp, cmd
 
 
 if __name__ == '__main__':
-  print_profile(sys.stdin)
+    print_profile(sys.stdin)

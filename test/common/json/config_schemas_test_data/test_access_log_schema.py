@@ -42,93 +42,93 @@ ACCESS_LOG_BLOB = {
 
 
 def test(writer):
-  for idx, item in enumerate(ACCESS_LOG_BLOB["access_log"]):
+    for idx, item in enumerate(ACCESS_LOG_BLOB["access_log"]):
+        writer.write_test_file(
+            'Valid_idx_' + str(idx),
+            schema='ACCESS_LOG_SCHEMA',
+            data=get_blob(item),
+            throws=False,
+        )
+
+    blob = get_blob(ACCESS_LOG_BLOB)['access_log'][1]
+    blob['filter']['filters'][0]['op'] = '<'
     writer.write_test_file(
-        'Valid_idx_' + str(idx),
+        'FilterOperatorIsNotSupportedLessThan',
         schema='ACCESS_LOG_SCHEMA',
-        data=get_blob(item),
-        throws=False,
+        data=blob,
+        throws=True,
     )
 
-  blob = get_blob(ACCESS_LOG_BLOB)['access_log'][1]
-  blob['filter']['filters'][0]['op'] = '<'
-  writer.write_test_file(
-      'FilterOperatorIsNotSupportedLessThan',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = get_blob(ACCESS_LOG_BLOB)['access_log'][1]
+    blob['filter']['filters'][0]['op'] = '<='
+    writer.write_test_file(
+        'FilterOperatorIsNotSupportedLessThanEqual',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )
 
-  blob = get_blob(ACCESS_LOG_BLOB)['access_log'][1]
-  blob['filter']['filters'][0]['op'] = '<='
-  writer.write_test_file(
-      'FilterOperatorIsNotSupportedLessThanEqual',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = get_blob(ACCESS_LOG_BLOB)['access_log'][1]
+    blob['filter']['filters'][0]['op'] = '>'
+    writer.write_test_file(
+        'FilterOperatorIsNotSupportedGreaterThan',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )
 
-  blob = get_blob(ACCESS_LOG_BLOB)['access_log'][1]
-  blob['filter']['filters'][0]['op'] = '>'
-  writer.write_test_file(
-      'FilterOperatorIsNotSupportedGreaterThan',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = {"path": "/dev/null", "filter": {"type": "unknown"}}
+    writer.write_test_file(
+        'FilterTypeIsNotSupported',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )
 
-  blob = {"path": "/dev/null", "filter": {"type": "unknown"}}
-  writer.write_test_file(
-      'FilterTypeIsNotSupported',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = {"path": "/dev/null", "filter": {"type": "logical_or", "filters": []}}
+    writer.write_test_file(
+        'LessThanTwoFiltersInListNoneLogicalOrThrows',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )
 
-  blob = {"path": "/dev/null", "filter": {"type": "logical_or", "filters": []}}
-  writer.write_test_file(
-      'LessThanTwoFiltersInListNoneLogicalOrThrows',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = {"path": "/dev/null", "filter": {"type": "logical_and", "filters": []}}
+    writer.write_test_file(
+        'LessThanTwoFiltersInListNoneLogicalAndThrows',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )
 
-  blob = {"path": "/dev/null", "filter": {"type": "logical_and", "filters": []}}
-  writer.write_test_file(
-      'LessThanTwoFiltersInListNoneLogicalAndThrows',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = {
+        "path": "/dev/null",
+        "filter": {
+            "type": "logical_or",
+            "filters": [{
+                "type": "not_healthcheck"
+            }]
+        }
+    }
+    writer.write_test_file(
+        'LessThanTwoFiltersInListOneLogicalOrThrows',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )
 
-  blob = {
-      "path": "/dev/null",
-      "filter": {
-          "type": "logical_or",
-          "filters": [{
-              "type": "not_healthcheck"
-          }]
-      }
-  }
-  writer.write_test_file(
-      'LessThanTwoFiltersInListOneLogicalOrThrows',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
-
-  blob = {
-      "path": "/dev/null",
-      "filter": {
-          "type": "logical_and",
-          "filters": [{
-              "type": "not_healthcheck"
-          }]
-      }
-  }
-  writer.write_test_file(
-      'LessThanTwoFiltersInListOneLogicalAndThrows',
-      schema='ACCESS_LOG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = {
+        "path": "/dev/null",
+        "filter": {
+            "type": "logical_and",
+            "filters": [{
+                "type": "not_healthcheck"
+            }]
+        }
+    }
+    writer.write_test_file(
+        'LessThanTwoFiltersInListOneLogicalAndThrows',
+        schema='ACCESS_LOG_SCHEMA',
+        data=blob,
+        throws=True,
+    )

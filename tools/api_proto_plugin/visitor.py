@@ -2,10 +2,10 @@
 
 
 class Visitor(object):
-  """Abstract visitor interface for api_proto_plugin implementation."""
+    """Abstract visitor interface for api_proto_plugin implementation."""
 
-  def visit_service(self, service_proto, type_context):
-    """Visit a service definition.
+    def visit_service(self, service_proto, type_context):
+        """Visit a service definition.
 
     Args:
       service_proto: ServiceDescriptorProto for service.
@@ -14,10 +14,10 @@ class Visitor(object):
     Returns:
       Plugin specific output.
     """
-    pass
+        pass
 
-  def visit_enum(self, enum_proto, type_context):
-    """Visit an enum definition.
+    def visit_enum(self, enum_proto, type_context):
+        """Visit an enum definition.
 
     Args:
       enum_proto: EnumDescriptorProto for enum.
@@ -26,10 +26,10 @@ class Visitor(object):
     Returns:
       Plugin specific output.
     """
-    pass
+        pass
 
-  def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
-    """Visit a message definition.
+    def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
+        """Visit a message definition.
 
     Args:
       msg_proto: DescriptorProto for message.
@@ -40,10 +40,10 @@ class Visitor(object):
     Returns:
       Plugin specific output.
     """
-    pass
+        pass
 
-  def visit_file(self, file_proto, type_context, services, msgs, enums):
-    """Visit a proto file definition.
+    def visit_file(self, file_proto, type_context, services, msgs, enums):
+        """Visit a proto file definition.
 
     Args:
       file_proto: FileDescriptorProto for file.
@@ -55,4 +55,4 @@ class Visitor(object):
     Returns:
       Plugin specific output.
     """
-    pass
+        pass

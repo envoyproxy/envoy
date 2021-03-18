@@ -97,12 +97,12 @@ mongos_servers = {
 
 
 def generate_config(template_path, template, output_file, **context):
-  """ Generate a final config file based on a template and some context. """
-  env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path, followlinks=True),
-                           undefined=jinja2.StrictUndefined)
-  raw_output = env.get_template(template).render(**context)
-  with open(output_file, 'w') as fh:
-    fh.write(raw_output)
+    """ Generate a final config file based on a template and some context. """
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path, followlinks=True),
+                             undefined=jinja2.StrictUndefined)
+    raw_output = env.get_template(template).render(**context)
+    with open(output_file, 'w') as fh:
+        fh.write(raw_output)
 
 
 # TODO(sunjayBhatia, wrowe): Avoiding tracing extensions until they build on Windows

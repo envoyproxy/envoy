@@ -18,36 +18,36 @@ import github
 
 
 def get_confirmation():
-  """Obtain stdin confirmation to add users in GH."""
-  return input('Add users to envoyproxy/assignable ? [yN] ').strip().lower() in ('y', 'yes')
+    """Obtain stdin confirmation to add users in GH."""
+    return input('Add users to envoyproxy/assignable ? [yN] ').strip().lower() in ('y', 'yes')
 
 
 def sync_assignable(access_token):
-  organization = github.Github(access_token).get_organization('envoyproxy')
-  team = organization.get_team_by_slug('assignable')
-  organization_members = set(organization.get_members())
-  assignable_members = set(team.get_members())
-  missing = organization_members.difference(assignable_members)
+    organization = github.Github(access_token).get_organization('envoyproxy')
+    team = organization.get_team_by_slug('assignable')
+    organization_members = set(organization.get_members())
+    assignable_members = set(team.get_members())
+    missing = organization_members.difference(assignable_members)
 
-  if not missing:
-    print('envoyproxy/assignable is consistent with organization membership.')
-    return 0
+    if not missing:
+        print('envoyproxy/assignable is consistent with organization membership.')
+        return 0
 
-  print('The following organization members are missing from envoyproxy/assignable:')
-  for m in missing:
-    print(m.login)
+    print('The following organization members are missing from envoyproxy/assignable:')
+    for m in missing:
+        print(m.login)
 
-  if not get_confirmation():
-    return 1
+    if not get_confirmation():
+        return 1
 
-  for m in missing:
-    team.add_membership(m, 'member')
+    for m in missing:
+        team.add_membership(m, 'member')
 
 
 if __name__ == '__main__':
-  access_token = os.getenv('GITHUB_TOKEN')
-  if not access_token:
-    print('Missing GITHUB_TOKEN')
-    sys.exit(1)
+    access_token = os.getenv('GITHUB_TOKEN')
+    if not access_token:
+        print('Missing GITHUB_TOKEN')
+        sys.exit(1)
 
-  sys.exit(sync_assignable(access_token))
+    sys.exit(sync_assignable(access_token))

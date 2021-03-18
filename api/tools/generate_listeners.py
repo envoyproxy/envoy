@@ -22,44 +22,44 @@ from envoy.config.filter.network.http_connection_manager.v2 import http_connecti
 
 # Convert an arbitrary proto object to its Struct proto representation.
 def proto_to_struct(proto):
-  json_rep = json_format.MessageToJson(proto)
-  parsed_msg = struct_pb2.Struct()
-  json_format.Parse(json_rep, parsed_msg)
-  return parsed_msg
+    json_rep = json_format.MessageToJson(proto)
+    parsed_msg = struct_pb2.Struct()
+    json_format.Parse(json_rep, parsed_msg)
+    return parsed_msg
 
 
 # Parse a proto from the filesystem.
 def parse_proto(path, filter_name):
-  # We only know about some filter config protos ahead of time.
-  KNOWN_FILTERS = {
-      'http_connection_manager': lambda: http_connection_manager_pb2.HttpConnectionManager()
-  }
-  filter_config = KNOWN_FILTERS[filter_name]()
-  with open(path, 'r') as f:
-    text_format.Merge(f.read(), filter_config)
-  return filter_config
+    # We only know about some filter config protos ahead of time.
+    KNOWN_FILTERS = {
+        'http_connection_manager': lambda: http_connection_manager_pb2.HttpConnectionManager()
+    }
+    filter_config = KNOWN_FILTERS[filter_name]()
+    with open(path, 'r') as f:
+        text_format.Merge(f.read(), filter_config)
+    return filter_config
 
 
 def generate_listeners(listeners_pb_path, output_pb_path, output_json_path, fragments):
-  listener = lds_pb2.Listener()
-  with open(listeners_pb_path, 'r') as f:
-    text_format.Merge(f.read(), listener)
+    listener = lds_pb2.Listener()
+    with open(listeners_pb_path, 'r') as f:
+        text_format.Merge(f.read(), listener)
 
-  for filter_chain in listener.filter_chains:
-    for f in filter_chain.filters:
-      f.config.CopyFrom(proto_to_struct(parse_proto(next(fragments), f.name)))
+    for filter_chain in listener.filter_chains:
+        for f in filter_chain.filters:
+            f.config.CopyFrom(proto_to_struct(parse_proto(next(fragments), f.name)))
 
-  with open(output_pb_path, 'w') as f:
-    f.write(str(listener))
+    with open(output_pb_path, 'w') as f:
+        f.write(str(listener))
 
-  with open(output_json_path, 'w') as f:
-    f.write(json_format.MessageToJson(listener))
+    with open(output_json_path, 'w') as f:
+        f.write(json_format.MessageToJson(listener))
 
 
 if __name__ == '__main__':
-  if len(sys.argv) < 4:
-    print('Usage: %s <path to listeners.pb> <output listeners.pb> <output '
-          'listeners.json> <filter config fragment paths>') % sys.argv[0]
-    sys.exit(1)
+    if len(sys.argv) < 4:
+        print('Usage: %s <path to listeners.pb> <output listeners.pb> <output '
+              'listeners.json> <filter config fragment paths>') % sys.argv[0]
+        sys.exit(1)
 
-  generate_listeners(sys.argv[1], sys.argv[2], sys.argv[3], iter(sys.argv[4:]))
+    generate_listeners(sys.argv[1], sys.argv[2], sys.argv[3], iter(sys.argv[4:]))

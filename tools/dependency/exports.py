@@ -8,10 +8,10 @@ from importlib.machinery import SourceFileLoader
 # Shared Starlark/Python files must have a .bzl suffix for Starlark import, so
 # we are forced to do this workaround.
 def load_module(name, path):
-  spec = spec_from_loader(name, SourceFileLoader(name, path))
-  module = module_from_spec(spec)
-  spec.loader.exec_module(module)
-  return module
+    spec = spec_from_loader(name, SourceFileLoader(name, path))
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 # this is the relative path in a bazel build

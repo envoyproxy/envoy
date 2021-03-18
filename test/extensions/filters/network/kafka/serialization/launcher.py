@@ -8,7 +8,7 @@ import os
 
 
 def main():
-  """
+    """
   Serialization composite test generator
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Generates test source files for composite deserializers.
@@ -24,9 +24,9 @@ def main():
 
   Template used is 'serialization_composite_test_cc.j2'.
   """
-  serialization_composite_test_cc_file = os.path.abspath(sys.argv[1])
-  generator.generate_test_code(serialization_composite_test_cc_file)
+    serialization_composite_test_cc_file = os.path.abspath(sys.argv[1])
+    generator.generate_test_code(serialization_composite_test_cc_file)
 
 
 if __name__ == "__main__":
-  main()
+    main()

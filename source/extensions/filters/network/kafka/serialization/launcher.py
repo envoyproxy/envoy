@@ -8,7 +8,7 @@ import os
 
 
 def main():
-  """
+    """
   Serialization composite code generator
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Generates main source code files for composite deserializers.
@@ -25,9 +25,9 @@ def main():
 
   Template used: 'serialization_composite_h.j2'.
   """
-  serialization_composite_h_file = os.path.abspath(sys.argv[1])
-  generator.generate_main_code(serialization_composite_h_file)
+    serialization_composite_h_file = os.path.abspath(sys.argv[1])
+    generator.generate_main_code(serialization_composite_h_file)
 
 
 if __name__ == "__main__":
-  main()
+    main()
