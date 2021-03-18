@@ -492,6 +492,9 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
                             end_stream ? JNI_TRUE : JNI_FALSE));
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
+  if (j_in_data != NULL) {
+    env->DeleteLocalRef(j_in_data);
+  }
 
   jobject status = env->GetObjectArrayElement(result, 0);
   jobjectArray j_headers = static_cast<jobjectArray>(env->GetObjectArrayElement(result, 1));
