@@ -63,15 +63,6 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
   }
 }
 
-Event::Dispatcher::CreateUdpListenerParams
-ActiveUdpListenerBase::configToUdpListenerParams(Network::ListenerConfig& config) {
-  const auto& udp_socket_config = config.udpListenerConfig()->config().downstream_socket_config();
-  Event::Dispatcher::CreateUdpListenerParams params;
-  params.max_rx_datagram_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      udp_socket_config, max_rx_datagram_size, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
-  return params;
-}
-
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
@@ -93,10 +84,11 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(
-          worker_index, concurrency, parent, listen_socket,
-          dispatcher.createUdpListener(listen_socket_ptr, *this, configToUdpListenerParams(config)),
-          config) {}
+    : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
+                           dispatcher.createUdpListener(
+                               listen_socket_ptr, *this,
+                               config.udpListenerConfig()->config().downstream_socket_config()),
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,

@@ -10,12 +10,16 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Network {
@@ -564,6 +568,15 @@ TEST(AbslUint128, TestByteOrder) {
     absl::uint128 random_number = absl::MakeUint128(rand.random(), rand.random());
     EXPECT_EQ(random_number, Utility::Ip6htonl(Utility::Ip6ntohl(random_number)));
   }
+}
+
+TEST(ResolvedUdpSocketConfig, Warning) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillOnce(Return(false));
+  EXPECT_LOG_CONTAINS(
+      "warn", "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.",
+      ResolvedUdpSocketConfig resolved_config(envoy::config::core::v3::UdpSocketConfig(), true));
 }
 
 } // namespace

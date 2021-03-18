@@ -36,8 +36,9 @@ ActiveQuicListener::ActiveQuicListener(
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
-          dispatcher.createUdpListener(listen_socket, *this,
-                                       configToUdpListenerParams(listener_config)),
+          dispatcher.createUdpListener(
+              listen_socket, *this,
+              listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing) {

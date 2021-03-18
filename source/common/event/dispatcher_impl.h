@@ -75,9 +75,9 @@ public:
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, bool bind_to_port,
                                       uint32_t backlog_size) override;
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb,
-                                            const CreateUdpListenerParams& params) override;
+  Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) override;
   TimerPtr createTimer(TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override;

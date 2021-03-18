@@ -71,10 +71,10 @@ public:
     return impl_.createListener(std::move(socket), cb, bind_to_port, backlog_size);
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb,
-                                            const CreateUdpListenerParams& params) override {
-    return impl_.createUdpListener(std::move(socket), cb, params);
+  Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) override {
+    return impl_.createUdpListener(std::move(socket), cb, config);
   }
 
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }

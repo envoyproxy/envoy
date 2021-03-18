@@ -23,7 +23,8 @@ class UdpListenerImpl : public BaseListenerImpl,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  UdpListenerCallbacks& cb, TimeSource& time_source, uint64_t max_rx_datagram_size);
+                  UdpListenerCallbacks& cb, TimeSource& time_source,
+                  const envoy::config::core::v3::UdpSocketConfig& config);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
 
@@ -43,7 +44,7 @@ public:
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
                      MonotonicTime receive_time) override;
-  uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
+  uint64_t maxDatagramSize() const override { return config_.max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
 
 protected:
@@ -58,7 +59,7 @@ private:
   void disableEvent();
 
   TimeSource& time_source_;
-  const uint64_t max_rx_datagram_size_;
+  const ResolvedUdpSocketConfig config_;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

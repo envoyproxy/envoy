@@ -205,12 +205,13 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
       *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
-                                                          Network::UdpListenerCallbacks& cb,
-                                                          const CreateUdpListenerParams& params) {
+Network::UdpListenerPtr
+DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
+                                  Network::UdpListenerCallbacks& cb,
+                                  const envoy::config::core::v3::UdpSocketConfig& config) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
-                                                    params.max_rx_datagram_size_);
+                                                    config);
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

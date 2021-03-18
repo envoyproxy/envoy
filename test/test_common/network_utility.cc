@@ -222,7 +222,7 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
                                        uint64_t max_rx_datagram_size) {
   SyncPacketProcessor processor(data, max_rx_datagram_size);
   return Network::Utility::readFromSocket(handle, local_address, processor,
-                                          MonotonicTime(std::chrono::seconds(0)), nullptr);
+                                          MonotonicTime(std::chrono::seconds(0)), false, nullptr);
 }
 
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)

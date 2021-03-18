@@ -242,11 +242,11 @@ public:
           }));
     } else {
       EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
-          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
-                                      const Event::Dispatcher::CreateUdpListenerParams&)
-                               -> Network::UdpListener* {
-            return dynamic_cast<Network::UdpListener*>(listener);
-          }));
+          .WillOnce(Invoke(
+              [listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
+                         const envoy::config::core::v3::UdpSocketConfig&) -> Network::UdpListener* {
+                return dynamic_cast<Network::UdpListener*>(listener);
+              }));
       listeners_.back()->udp_listener_config_->listener_worker_router_ =
           std::make_unique<Network::UdpListenerWorkerRouterImpl>(1);
     }
