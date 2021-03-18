@@ -232,7 +232,8 @@ bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
   // We must not have san_names == nullptr here because this function is called after the
   // SPIFFE cert validation algorithm succeeded, which requires exactly one URI SAN in the leaf
   // cert.
-  assert(san_names != nullptr);
+  ASSERT(san_names != nullptr,
+         "san_names should have at least one name after SPIFFE cert validation")
 
   // Only match against URI SAN since SPIFFE specification does not restrict values in other SAN
   // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
