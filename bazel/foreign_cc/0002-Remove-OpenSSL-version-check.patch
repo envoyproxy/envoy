@@ -1,0 +1,35 @@
+From 1a73bc5eee7ad7ea8f92d5f07fd98e11c0834063 Mon Sep 17 00:00:00 2001
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Fri, 23 Apr 2021 14:45:55 +0300
+Subject: [PATCH 2/5] Remove OpenSSL version check.
+
+CMake's find_package(OpenSSL) doesn't seem to be able to find a
+non-empty version string for BoringSSL. If "BoringSSL" is set (off by
+default), do not require an OpenSSL version but assume that the caller
+uses a compatible version.
+---
+ sources/ippcp/crypto_mb/CMakeLists.txt | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/sources/ippcp/crypto_mb/CMakeLists.txt b/sources/ippcp/crypto_mb/CMakeLists.txt
+index d1f39940..7cd31dd3 100644
+--- a/sources/ippcp/crypto_mb/CMakeLists.txt
++++ b/sources/ippcp/crypto_mb/CMakeLists.txt
+@@ -64,7 +64,13 @@ else()
+     set(MB_STATIC_LIB_TARGET "${MB_STATIC_LIB_TARGET}" PARENT_SCOPE)
+ endif()
+ 
+-find_package(OpenSSL 1.1.0 REQUIRED) # set -DOPENSSL_INCLUDE_DIR= -DOPENSSL_LIBRARIES= -DOPENSSL_ROOT_DIR= to use patched
++if(BORINGSSL) # off by default
++    # BoringSSL doesn't appear to have version information found
++    # by find_package(OpenSSL)
++    find_package(OpenSSL REQUIRED)
++else()
++    find_package(OpenSSL 1.1.0 REQUIRED) # set -DOPENSSL_INCLUDE_DIR= -DOPENSSL_LIBRARIES= -DOPENSSL_ROOT_DIR= to use patched
++endif()
+ list(APPEND MB_INCLUDE_DIRS "${OPENSSL_INCLUDE_DIR}")
+ 
+ if(BN_OPENSSL_PATCH)
+-- 
+2.25.1
+

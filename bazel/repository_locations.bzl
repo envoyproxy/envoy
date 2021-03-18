@@ -247,6 +247,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-07",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
+    com_github_intel_ipp_crypto_crypto_mb = dict(
+        project_name = "libipp-crypto",
+        project_desc = "Intel® Integrated Performance Primitives Cryptography",
+        project_url = "https://github.com/intel/ipp-crypto",
+        version = "2021.2",
+        sha256 = "d358e2665d100935f036d84eba70724a12b9e3e5b597ba850d79064a42e6ed5d",
+        strip_prefix = "ipp-crypto-ippcp_2021.2",
+        urls = ["https://github.com/intel/ipp-crypto/archive/ippcp_2021.2.tar.gz"],
+        release_date = "2021-04-19",
+        use_category = ["dataplane_core", "controlplane"],
+        cpe = "N/A",
+    ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",

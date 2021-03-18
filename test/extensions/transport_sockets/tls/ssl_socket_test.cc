@@ -4,6 +4,7 @@
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/private_key_providers/cryptomb/v3/cryptomb.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/network/transport_socket.h"
 
@@ -16,11 +17,13 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/private_key_providers/cryptomb/config.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/extensions/private_key_providers/crypto_mb/fake_factory.h"
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
@@ -42,6 +45,7 @@
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -285,13 +289,22 @@ void testUtil(const TestUtilOptions& options) {
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
+  testing::NiceMock<ThreadLocal::MockInstance> tls;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
+  ON_CALL(server_factory_context, threadLocal()).WillByDefault(ReturnRef(tls));
 
   // For private key method testing.
   NiceMock<Ssl::MockContextManager> context_manager;
+
   Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
       test_private_key_method_factory(test_factory);
+
+  Extensions::PrivateKeyProviders::CryptoMb::FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(
+      true);
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      cryptomb_private_key_method_factory(cryptomb_factory);
+
   PrivateKeyMethodManagerImpl private_key_method_manager;
   if (options.expectedPrivateKeyMethod()) {
     EXPECT_CALL(server_factory_context, sslContextManager())
@@ -5944,6 +5957,65 @@ TEST_P(SslSocketTest, TestConnectionFailsOnMultipleCertificatesNonePassOcspPolic
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(test_options.setExpectedServerStats("ssl.ocsp_staple_failed").enableOcspStapling());
+}
+
+TEST_P(SslSocketTest, RsaMBPrivateKeyProviderAsyncSign) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key_provider:
+        provider_name: cryptomb
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
+          poll_delay: 0
+          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          GetParam());
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+}
+
+TEST_P(SslSocketTest, EcdsaMBPrivateKeyProviderAsyncSign) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
+      private_key_provider:
+        provider_name: cryptomb
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
+          poll_delay: 0
+          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+)EOF";
+
+  const std::string successful_client_ctx_yaml =
+      absl::StrCat(R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-ECDSA-AES128-GCM-SHA256
+    validation_context:
+      verify_certificate_hash: )EOF",
+                   TEST_SELFSIGNED_ECDSA_P256_CERT_256_HASH);
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          GetParam());
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
 }
 
 } // namespace Tls

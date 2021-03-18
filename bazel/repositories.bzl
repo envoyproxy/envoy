@@ -137,6 +137,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -309,6 +310,20 @@ def _com_github_google_libprotobuf_mutator():
     external_http_archive(
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+
+def _com_github_intel_ipp_crypto_crypto_mb():
+    external_http_archive(
+        name = "com_github_intel_ipp_crypto_crypto_mb",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel/foreign_cc:0001-BoringSSL-compatibility-fix.patch",
+            "@envoy//bazel/foreign_cc:0002-Remove-OpenSSL-version-check.patch",
+            "@envoy//bazel/foreign_cc:0003-Allow-overriding-FORTIFY_SOURCE.patch",
+            "@envoy//bazel/foreign_cc:0004-Always-install-the-static-library.patch",
+            "@envoy//bazel/foreign_cc:0005-Set-default-CMAKE_BUILD_TYPE-to-Release.patch",
+        ],
     )
 
 def _com_github_jbeder_yaml_cpp():

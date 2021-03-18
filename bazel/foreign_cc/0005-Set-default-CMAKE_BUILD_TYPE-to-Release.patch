@@ -1,0 +1,28 @@
+From 67a325491bd00cd50edfdf50bacdbf7cdb09595e Mon Sep 17 00:00:00 2001
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Wed, 23 Jun 2021 07:06:33 -0700
+Subject: [PATCH 5/5] Set default CMAKE_BUILD_TYPE to "Release".
+
+By default Envoy sets "Bazel" build type.
+---
+ sources/ippcp/crypto_mb/CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sources/ippcp/crypto_mb/CMakeLists.txt b/sources/ippcp/crypto_mb/CMakeLists.txt
+index 7cd31dd3..19b76034 100644
+--- a/sources/ippcp/crypto_mb/CMakeLists.txt
++++ b/sources/ippcp/crypto_mb/CMakeLists.txt
+@@ -30,8 +30,8 @@ if ((NOT DEFINED MBX_VER_MAJOR) OR
+ endif()
+ 
+ set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+-if("${CMAKE_BUILD_TYPE}" STREQUAL "")
+-    message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to Release")
++if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
++    message(STATUS "CMAKE_BUILD_TYPE is not set to Debug explicitly, defaulting to Release")
+     set(CMAKE_BUILD_TYPE "Release")
+ endif()
+ 
+-- 
+2.25.1
+

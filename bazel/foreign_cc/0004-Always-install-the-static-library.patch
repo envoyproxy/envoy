@@ -1,0 +1,28 @@
+From e3e1bd6db2730fb898663c5584af4ef5facf0ebf Mon Sep 17 00:00:00 2001
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Fri, 23 Apr 2021 15:00:40 +0300
+Subject: [PATCH 4/5] Always install the static library.
+
+---
+ sources/ippcp/crypto_mb/src/CMakeLists.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/sources/ippcp/crypto_mb/src/CMakeLists.txt b/sources/ippcp/crypto_mb/src/CMakeLists.txt
+index f00c0f24..9c348e27 100644
+--- a/sources/ippcp/crypto_mb/src/CMakeLists.txt
++++ b/sources/ippcp/crypto_mb/src/CMakeLists.txt
+@@ -115,8 +115,9 @@ else()
+ endif()
+ 
+ # Static lib installation
+-if(NOT DYNAMIC_LIB AND NOT MB_STANDALONE)
+-    install(TARGETS ${MB_STATIC_LIB_TARGET} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
++if(MB_STANDALONE)
++    set(PUBLIC_HEADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../include/crypto_mb/)
++    install(TARGETS ${MB_STATIC_LIB_TARGET} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib PUBLIC_HEADER DESTINATION include)
+ endif()
+ 
+ # Public headers installation
+-- 
+2.25.1
+

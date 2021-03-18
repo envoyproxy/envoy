@@ -240,6 +240,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/common/lua",
   "extensions/filters/listener/original_dst",
   "extensions/filters/listener/proxy_protocol",
+  "extensions/private_key_providers/cryptomb",
   "extensions/stat_sinks/statsd",
   "extensions/stat_sinks/common",
   "extensions/stat_sinks/common/statsd",

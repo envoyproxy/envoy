@@ -1,0 +1,27 @@
+From 6af3dfc2a367cfb006b4aa1c971744800182781b Mon Sep 17 00:00:00 2001
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Mon, 22 Mar 2021 14:59:39 +0200
+Subject: [PATCH 3/5] Allow overriding FORTIFY_SOURCE.
+
+---
+ sources/ippcp/crypto_mb/src/cmake/linux/Clang.cmake | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/sources/ippcp/crypto_mb/src/cmake/linux/Clang.cmake b/sources/ippcp/crypto_mb/src/cmake/linux/Clang.cmake
+index 48dc2fd8..233a0c7f 100644
+--- a/sources/ippcp/crypto_mb/src/cmake/linux/Clang.cmake
++++ b/sources/ippcp/crypto_mb/src/cmake/linux/Clang.cmake
+@@ -30,7 +30,9 @@ set(CMAKE_C_FLAGS_SECURITY "${CMAKE_C_FLAGS_SECURITY} -Wformat -Wformat-security
+ 
+ if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+     # Security flag that adds compile-time and run-time checks. 
+-    set(CMAKE_C_FLAGS_SECURITY "${CMAKE_C_FLAGS_SECURITY} -D_FORTIFY_SOURCE=2")
++    if(NOT DEFINED NO_FORTIFY_SOURCE)
++        set(CMAKE_C_FLAGS_SECURITY "${CMAKE_C_FLAGS_SECURITY} -D_FORTIFY_SOURCE=2")
++    endif()
+ endif()
+ 
+ # Stack-based Buffer Overrun Detection
+-- 
+2.25.1
+

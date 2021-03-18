@@ -294,6 +294,11 @@ EXTENSIONS = {
     #
 
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
+
+    # Private key providers
+    #
+
+    "envoy.private_key_providers.cryptomb":                 "//source/extensions/private_key_providers/cryptomb:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

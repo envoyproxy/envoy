@@ -193,6 +193,20 @@ envoy_cmake_external(
 )
 
 envoy_cmake_external(
+    name = "ipp-crypto",
+    cache_entries = {
+        "BORINGSSL": "on",
+    },
+    defines = [
+        "OPENSSL_USE_STATIC_LIBS=TRUE",
+    ],
+    lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
+    static_libraries = ["libcrypto_mb.a"],
+    working_directory = "sources/ippcp/crypto_mb",
+    deps = ["@boringssl//:ssl"],
+)
+
+envoy_cmake_external(
     name = "llvm",
     cache_entries = {
         # Disable both: BUILD and INCLUDE, since some of the INCLUDE
