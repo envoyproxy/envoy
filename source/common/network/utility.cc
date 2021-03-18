@@ -576,10 +576,10 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool use_gro,
+                                                MonotonicTime receive_time, bool prefer_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (use_gro && handle.supportsUdpGro()) {
+  if (prefer_gro && handle.supportsUdpGro()) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
@@ -694,13 +694,13 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, bool use_gro,
+                                               TimeSource& time_source, bool prefer_gro,
                                                uint32_t& packets_dropped) {
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, prefer_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -727,13 +727,13 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
 }
 
 ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
-    const envoy::config::core::v3::UdpSocketConfig& config, bool use_gro_default)
+    const envoy::config::core::v3::UdpSocketConfig& config, bool prefer_gro_default)
     : max_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_rx_datagram_size,
                                                             DEFAULT_UDP_MAX_DATAGRAM_SIZE)),
-      use_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_gro, use_gro_default)) {
-  if (use_gro_ && !Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      prefer_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, prefer_gro, prefer_gro_default)) {
+  if (prefer_gro_ && !Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     ENVOY_LOG_MISC(
-        warn, "GRO requested but not supported by the OS. Check OS config or disable use_gro.");
+        warn, "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.");
   }
 }
 

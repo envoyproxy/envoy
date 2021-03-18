@@ -72,7 +72,7 @@ public:
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)),
-        // Default use_gro to true for upstream client traffic.
+        // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true) {
     if (use_original_src_ip_ && !Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
       ExceptionUtil::throwEnvoyException(

@@ -575,7 +575,7 @@ TEST(ResolvedUdpSocketConfig, Warning) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillOnce(Return(false));
   EXPECT_LOG_CONTAINS(
-      "warn", "GRO requested but not supported by the OS. Check OS config or disable use_gro.",
+      "warn", "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.",
       ResolvedUdpSocketConfig resolved_config(envoy::config::core::v3::UdpSocketConfig(), true));
 }
 

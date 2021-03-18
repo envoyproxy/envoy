@@ -345,7 +345,7 @@ TEST_F(UdpProxyFilterTest, BasicFlow) {
 stat_prefix: foo
 cluster: fake_cluster
 upstream_socket_config:
-  use_gro: false
+  prefer_gro: false
   )EOF",
         true, false);
 

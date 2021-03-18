@@ -51,7 +51,7 @@ public:
 
 class UdpListenerImplTest : public UdpListenerImplTestBase {
 public:
-  void setup(bool use_gro = false) {
+  void setup(bool prefer_gro = false) {
     ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(false));
     // Return the real version by default.
     ON_CALL(override_syscall_, supportsMmsg())
@@ -64,8 +64,8 @@ public:
       server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
     }
     envoy::config::core::v3::UdpSocketConfig config;
-    if (use_gro) {
-      config.mutable_use_gro()->set_value(use_gro);
+    if (prefer_gro) {
+      config.mutable_prefer_gro()->set_value(prefer_gro);
     }
     listener_ =
         std::make_unique<UdpListenerImpl>(dispatcherImpl(), server_socket_, listener_callbacks_,

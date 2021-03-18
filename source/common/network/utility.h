@@ -72,10 +72,10 @@ static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
  */
 struct ResolvedUdpSocketConfig {
   ResolvedUdpSocketConfig(const envoy::config::core::v3::UdpSocketConfig& config,
-                          bool use_gro_default);
+                          bool prefer_gro_default);
 
   uint64_t max_rx_datagram_size_;
-  bool use_gro_;
+  bool prefer_gro_;
 };
 
 /**
@@ -355,14 +355,14 @@ public:
    * @param udp_packet_processor is the callback to receive the packet.
    * @param receive_time is the timestamp passed to udp_packet_processor for the
    * receive time of the packet.
-   * @param use_gro supplies whether to use GRO if the OS supports it.
+   * @param prefer_gro supplies whether to use GRO if the OS supports it.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
    * caller is not interested in it, nullptr can be passed in.
    */
   static Api::IoCallUint64Result readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool use_gro,
+                                                MonotonicTime receive_time, bool prefer_gro,
                                                 uint32_t* packets_dropped);
 
   /**
@@ -372,7 +372,7 @@ public:
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
    * @param time_source is the time source used to generate the time stamp of the received packets.
-   * @param use_gro supplies whether to use GRO if the OS supports it.
+   * @param prefer_gro supplies whether to use GRO if the OS supports it.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
    *
    * TODO(mattklein123): Allow the number of packets read to be limited for fairness. Currently
@@ -385,7 +385,7 @@ public:
   static Api::IoErrorPtr readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, bool use_gro,
+                                               TimeSource& time_source, bool prefer_gro,
                                                uint32_t& packets_dropped);
 
 private:
