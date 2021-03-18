@@ -114,10 +114,13 @@ const std::vector<ProtobufWkt::Struct>
 JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& replacements) const {
   std::vector<ProtobufWkt::Struct> spans;
   spans.reserve(zipkin_span.annotations().size());
+
+  // This holds the annotation entries from logs.
+  std::vector<ProtobufWkt::Value> annotation_entries;
+
   for (const auto& annotation : zipkin_span.annotations()) {
     ProtobufWkt::Struct span;
     auto* fields = span.mutable_fields();
-
     if (annotation.value() == CLIENT_SEND) {
       (*fields)[SPAN_KIND] = ValueUtil::stringValue(KIND_CLIENT);
     } else if (annotation.value() == SERVER_RECV) {
@@ -126,6 +129,12 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       }
       (*fields)[SPAN_KIND] = ValueUtil::stringValue(KIND_SERVER);
     } else {
+      ProtobufWkt::Struct annotation_entry;
+      auto* annotation_entry_fields = annotation_entry.mutable_fields();
+      (*annotation_entry_fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(annotation.value());
+      (*annotation_entry_fields)[ANNOTATION_TIMESTAMP] =
+          Util::uint64Value(annotation.timestamp(), annotation.value(), replacements);
+      annotation_entries.push_back(ValueUtil::structValue(annotation_entry));
       continue;
     }
 
@@ -174,6 +183,15 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
 
     spans.push_back(std::move(span));
   }
+
+  // Fill up annotation entries from logs.
+  for (auto& span : spans) {
+    auto* fields = span.mutable_fields();
+    if (!annotation_entries.empty()) {
+      (*fields)[ANNOTATIONS] = ValueUtil::listValue(annotation_entries);
+    }
+  }
+
   return spans;
 }
 
@@ -214,6 +232,10 @@ std::string ProtobufSerializer::serialize(const std::vector<Span>& zipkin_spans)
 
 const zipkin::proto3::ListOfSpans ProtobufSerializer::toListOfSpans(const Span& zipkin_span) const {
   zipkin::proto3::ListOfSpans spans;
+
+  // This holds the annotation entries from logs.
+  std::vector<Annotation> annotation_entries;
+
   for (const auto& annotation : zipkin_span.annotations()) {
     zipkin::proto3::Span span;
     if (annotation.value() == CLIENT_SEND) {
@@ -222,6 +244,7 @@ const zipkin::proto3::ListOfSpans ProtobufSerializer::toListOfSpans(const Span& 
       span.set_shared(shared_span_context_ && zipkin_span.annotations().size() > 1);
       span.set_kind(zipkin::proto3::Span::SERVER);
     } else {
+      annotation_entries.push_back(annotation);
       continue;
     }
 
@@ -250,6 +273,16 @@ const zipkin::proto3::ListOfSpans ProtobufSerializer::toListOfSpans(const Span& 
     auto* mutable_span = spans.add_spans();
     mutable_span->MergeFrom(span);
   }
+
+  // Fill up annotation entries from logs.
+  for (auto& span : *spans.mutable_spans()) {
+    for (const auto& annotation_entry : annotation_entries) {
+      const auto entry = span.mutable_annotations()->Add();
+      entry->set_value(annotation_entry.value());
+      entry->set_timestamp(annotation_entry.timestamp());
+    }
+  }
+
   return spans;
 }
 
