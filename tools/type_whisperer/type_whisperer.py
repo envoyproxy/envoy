@@ -13,8 +13,8 @@ from udpa.annotations import status_pb2
 class TypeWhispererVisitor(visitor.Visitor):
     """Visitor to compute type information from a FileDescriptor proto.
 
-  See visitor.Visitor for visitor method docs comments.
-  """
+    See visitor.Visitor for visitor method docs comments.
+    """
 
     def __init__(self):
         super(TypeWhispererVisitor, self).__init__()
