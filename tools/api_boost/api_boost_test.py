@@ -35,56 +35,58 @@ TESTDATA_PATH = 'tools/api_boost/testdata'
 
 
 def diff(some_path, other_path):
-  result = subprocess.run(['diff', '-u', some_path, other_path], capture_output=True)
-  if result.returncode == 0:
-    return None
-  return result.stdout.decode('utf-8') + result.stderr.decode('utf-8')
+    result = subprocess.run(['diff', '-u', some_path, other_path], capture_output=True)
+    if result.returncode == 0:
+        return None
+    return result.stdout.decode('utf-8') + result.stderr.decode('utf-8')
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Golden C++ source tests for api_boost.py')
-  parser.add_argument('tests', nargs='*')
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Golden C++ source tests for api_boost.py')
+    parser.add_argument('tests', nargs='*')
+    args = parser.parse_args()
 
-  # Accumulated error messages.
-  logging.basicConfig(format='%(message)s')
-  messages = []
+    # Accumulated error messages.
+    logging.basicConfig(format='%(message)s')
+    messages = []
 
-  def should_run_test(test_name):
-    return len(args.tests) == 0 or test_name in args.tests
+    def should_run_test(test_name):
+        return len(args.tests) == 0 or test_name in args.tests
 
-  # Run API booster against test artifacts in a directory relative to workspace.
-  # We use a temporary copy as the API booster does in-place rewriting.
-  with tempfile.TemporaryDirectory(dir=pathlib.Path.cwd()) as path:
-    # Setup temporary tree.
-    shutil.copy(os.path.join(TESTDATA_PATH, 'BUILD'), path)
-    for test in TESTS:
-      if should_run_test(test.name):
-        shutil.copy(os.path.join(TESTDATA_PATH, test.name + '.cc'), path)
-      else:
-        # Place an empty file to make Bazel happy.
-        pathlib.Path(path, test.name + '.cc').write_text('')
+    # Run API booster against test artifacts in a directory relative to workspace.
+    # We use a temporary copy as the API booster does in-place rewriting.
+    with tempfile.TemporaryDirectory(dir=pathlib.Path.cwd()) as path:
+        # Setup temporary tree.
+        shutil.copy(os.path.join(TESTDATA_PATH, 'BUILD'), path)
+        for test in TESTS:
+            if should_run_test(test.name):
+                shutil.copy(os.path.join(TESTDATA_PATH, test.name + '.cc'), path)
+            else:
+                # Place an empty file to make Bazel happy.
+                pathlib.Path(path, test.name + '.cc').write_text('')
 
-    # Run API booster.
-    relpath_to_testdata = str(pathlib.Path(path).relative_to(pathlib.Path.cwd()))
-    api_boost.api_boost_tree([
-        os.path.join(relpath_to_testdata, test.name) for test in TESTS if should_run_test(test.name)
-    ],
-                             generate_compilation_database=True,
-                             build_api_booster=True,
-                             debug_log=True,
-                             sequential=True)
+        # Run API booster.
+        relpath_to_testdata = str(pathlib.Path(path).relative_to(pathlib.Path.cwd()))
+        api_boost.api_boost_tree([
+            os.path.join(relpath_to_testdata, test.name)
+            for test in TESTS
+            if should_run_test(test.name)
+        ],
+                                 generate_compilation_database=True,
+                                 build_api_booster=True,
+                                 debug_log=True,
+                                 sequential=True)
 
-    # Validate output against golden files.
-    for test in TESTS:
-      if should_run_test(test.name):
-        delta = diff(os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
-                     os.path.join(path, test.name + '.cc'))
-        if delta is not None:
-          messages.append('Non-empty diff for %s (%s):\n%s\n' %
-                          (test.name, test.description, delta))
+        # Validate output against golden files.
+        for test in TESTS:
+            if should_run_test(test.name):
+                delta = diff(os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
+                             os.path.join(path, test.name + '.cc'))
+                if delta is not None:
+                    messages.append('Non-empty diff for %s (%s):\n%s\n' %
+                                    (test.name, test.description, delta))
 
-  if len(messages) > 0:
-    logging.error('FAILED:\n{}'.format('\n'.join(messages)))
-    sys.exit(1)
-  logging.warning('PASS')
+    if len(messages) > 0:
+        logging.error('FAILED:\n{}'.format('\n'.join(messages)))
+        sys.exit(1)
+    logging.warning('PASS')

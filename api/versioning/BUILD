@@ -38,6 +38,7 @@ proto_library(
         "//envoy/data/tap/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
+        "//envoy/extensions/access_loggers/open_telemetry/v3alpha:pkg",
         "//envoy/extensions/access_loggers/stderror/v3:pkg",
         "//envoy/extensions/access_loggers/stdoutput/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
