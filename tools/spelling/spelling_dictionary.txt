@@ -17,13 +17,16 @@ ASCII
 ASM
 ASSERTs
 AST
+AVX
 AWS
 BACKTRACE
+Bitlen
 BSON
 BPF
 btree
 CAS
 CB
+CBB
 CDN
 CDS
 CEL
@@ -186,6 +189,7 @@ LBs
 LC
 LDS
 LEDS
+Lenstra
 LEV
 LF
 LHS
@@ -246,6 +250,7 @@ PEM
 PERF
 PGV
 PID
+PKCS
 PKTINFO
 PNG
 PostCBs
@@ -255,6 +260,7 @@ PROT
 Postgre
 Postgres
 Prereq
+PSS
 QDCOUNT
 QPACK
 QUIC
@@ -304,6 +310,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIMD
 SMTP
 SNI
 SOTW
@@ -498,6 +505,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
@@ -630,6 +638,7 @@ exe
 execlp
 exprfor
 expectable
+extern
 extrahelp
 faceplant
 facto
@@ -737,6 +746,7 @@ ints
 invariance
 iovec
 iovecs
+ipp
 ips
 iptables
 ish
@@ -799,6 +809,7 @@ matcher
 matchers
 maxage
 maxbuffer
+mbx
 megamiss
 mem
 memcmp
