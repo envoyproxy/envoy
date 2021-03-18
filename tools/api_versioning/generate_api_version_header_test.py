@@ -33,7 +33,7 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
 
     # General success pattern when valid file contents is detected.
     def successful_test_template(self, output_string, current_version: ApiVersion,
-                               oldest_version: ApiVersion):
+                                 oldest_version: ApiVersion):
         pathlib.Path(self._temp_fname).write_text(output_string)
 
         # Read the string from the file, and parse the version.
