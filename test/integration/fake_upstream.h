@@ -136,7 +136,11 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForEndStream(Event::Dispatcher& client_dispatcher,
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+                   std::chrono::milliseconds timeout = 3 * TestUtility::DefaultTimeout);
+#else
                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+#endif
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
