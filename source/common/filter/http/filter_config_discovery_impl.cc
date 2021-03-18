@@ -18,7 +18,7 @@ namespace Http {
 
 namespace {
 void validateTypeUrlHelper(const std::string& type_url,
-                           absl::flat_hash_set<std::string> require_type_urls) {
+                           const absl::flat_hash_set<std::string> require_type_urls) {
   if (!require_type_urls.contains(type_url)) {
     throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
                                      type_url, absl::StrJoin(require_type_urls, ", ")));
