@@ -20,7 +20,7 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
 } // namespace Envoy""")
 
 
-def GenerateHeaderFile(input_path):
+def generate_header_file(input_path):
     """Generates a c++ header file containing the api_version variable with the
   correct value.
 
@@ -35,7 +35,7 @@ def GenerateHeaderFile(input_path):
 
     # Mapping each field to int verifies it is a valid version
     version = ApiVersion(*map(int, lines[0].split('.')))
-    oldest_version = ComputeOldestApiVersion(version)
+    oldest_version = compute_oldest_api_version(version)
 
     header_file_contents = FILE_TEMPLATE.substitute({
         'major': version.major,
@@ -48,7 +48,7 @@ def GenerateHeaderFile(input_path):
     return header_file_contents
 
 
-def ComputeOldestApiVersion(current_version: ApiVersion):
+def compute_oldest_api_version(current_version: ApiVersion):
     """Computest the oldest API version the client supports. According to the
   specification (see: api/API_VERSIONING.md), Envoy supports up to 2 most
   recent minor versions. Therefore if the latest API version "X.Y.Z", Envoy's
@@ -68,6 +68,6 @@ def ComputeOldestApiVersion(current_version: ApiVersion):
 
 if __name__ == '__main__':
     input_path = sys.argv[1]
-    output = GenerateHeaderFile(input_path)
+    output = generate_header_file(input_path)
     # Print output to stdout
     print(output)
