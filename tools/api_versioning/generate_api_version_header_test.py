@@ -32,12 +32,12 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
         pathlib.Path(self._temp_fname).unlink()
 
     # General success pattern when valid file contents is detected.
-    def SuccessfulTestTemplate(self, output_string, current_version: ApiVersion,
-                               oldest_version: ApiVersion):
+    def successful_test_template(self, output_string, current_version: ApiVersion,
+                                 oldest_version: ApiVersion):
         pathlib.Path(self._temp_fname).write_text(output_string)
 
         # Read the string from the file, and parse the version.
-        output = generate_api_version_header.GenerateHeaderFile(self._temp_fname)
+        output = generate_api_version_header.generate_header_file(self._temp_fname)
         expected_output = GenerateApiVersionHeaderTest.EXPECTED_TEMPLATE.substitute({
             'major': current_version.major,
             'minor': current_version.minor,
@@ -49,33 +49,33 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
         self.assertEqual(expected_output, output)
 
     # General failure pattern when invalid file contents is detected.
-    def FailedTestTemplate(self, output_string, assertion_error_type):
+    def failed_test_template(self, output_string, assertion_error_type):
         pathlib.Path(self._temp_fname).write_text(output_string)
 
         # Read the string from the file, and expect version parsing to fail.
         with self.assertRaises(
                 assertion_error_type,
-                msg='The call to GenerateHeaderFile should have thrown an exception'):
-            generate_api_version_header.GenerateHeaderFile(self._temp_fname)
+                msg='The call to generate_header_file should have thrown an exception'):
+            generate_api_version_header.generate_header_file(self._temp_fname)
 
     def test_valid_version(self):
-        self.SuccessfulTestTemplate('1.2.3', ApiVersion(1, 2, 3), ApiVersion(1, 1, 0))
+        self.successful_test_template('1.2.3', ApiVersion(1, 2, 3), ApiVersion(1, 1, 0))
 
     def test_valid_version_newline(self):
-        self.SuccessfulTestTemplate('3.2.1\n', ApiVersion(3, 2, 1), ApiVersion(3, 1, 0))
+        self.successful_test_template('3.2.1\n', ApiVersion(3, 2, 1), ApiVersion(3, 1, 0))
 
     def test_invalid_version_string(self):
-        self.FailedTestTemplate('1.2.abc3', ValueError)
+        self.failed_test_template('1.2.abc3', ValueError)
 
     def test_invalid_version_partial(self):
-        self.FailedTestTemplate('1.2.', ValueError)
+        self.failed_test_template('1.2.', ValueError)
 
     def test_empty_file(self):
         # Not writing anything to the file
-        self.FailedTestTemplate('', AssertionError)
+        self.failed_test_template('', AssertionError)
 
     def test_invalid_multiple_lines(self):
-        self.FailedTestTemplate('1.2.3\n1.2.3', AssertionError)
+        self.failed_test_template('1.2.3\n1.2.3', AssertionError)
 
     def test_valid_oldest_api_version(self):
         expected_latest_oldest_pairs = [(ApiVersion(3, 2, 2), ApiVersion(3, 1, 0)),
@@ -85,7 +85,7 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
 
         for latest_version, expected_oldest_version in expected_latest_oldest_pairs:
             self.assertEqual(expected_oldest_version,
-                             generate_api_version_header.ComputeOldestApiVersion(latest_version))
+                             generate_api_version_header.compute_oldest_api_version(latest_version))
 
 
 if __name__ == '__main__':
