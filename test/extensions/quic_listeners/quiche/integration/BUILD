@@ -33,7 +33,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_http_integration_test",
-    size = "medium",
+    size = "large",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
