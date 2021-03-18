@@ -8,14 +8,14 @@ Pulse (Stats)
 ---------------
 
 Pulse is Envoy Mobile's stats library, used for capturing client application time series
-metrics. Currently two types of metrics are supported: ``Counter`` and ``Gauge``.
+metrics. Currently the following types of metrics are supported: ``Counter``, ``Gauge``, ``Timer``, and ``Distribution``.
 
 This library (like all of Envoy Mobile) is under active development.
 
 To leverage Pulse, obtain an instance of a ``PulseClient`` from an Envoy Mobile ``Engine``
 (refer to :ref:`api_starting_envoy` for building an engine instance), and use it to
-create ``Counter`` or ``Gauge`` instances. The following code examples show how to create
-a ``Counter``, and the same approach is used to create a ``Gauge``.
+create an instance of the type of metric you desire. The following code examples show how to create
+a ``Counter``. Similar approaches can be used to create the rest of the types.
 
 **Kotlin example**::
 
@@ -31,7 +31,7 @@ The ``counter`` method from the ``PulseClient`` takes a variable number of eleme
 serves as the identifier of the counter. The string formed from the example code above is
 ``foo.bar``.
 
-Store the instance of the counter or gauge, then use it to increment as necessary.
+Store the instance of the counter, then use it to increment as necessary.
 
 -----------
 ``Counter``
