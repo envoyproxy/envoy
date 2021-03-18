@@ -1,7 +1,8 @@
 """Tests the api version header file generation.
 """
 import generate_api_version_header
-from generate_api_version_header import ApiVersion
+import utils
+from utils import ApiVersion
 import os
 import pathlib
 import string
@@ -85,7 +86,7 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
 
         for latest_version, expected_oldest_version in expected_latest_oldest_pairs:
             self.assertEqual(expected_oldest_version,
-                             generate_api_version_header.compute_oldest_api_version(latest_version))
+                             utils.compute_oldest_api_version(latest_version))
 
 
 if __name__ == '__main__':

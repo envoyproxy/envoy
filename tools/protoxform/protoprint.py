@@ -5,7 +5,8 @@
 # See https://github.com/google/protobuf/blob/master/src/google/protobuf/descriptor.proto
 # for the underlying protos mentioned in this file.
 #
-# Usage: protoprint.py <source file path> <type database path>
+# Usage: protoprint.py <source file path> <type database path> <load type db path>
+#                      <api version file path>
 
 from collections import deque
 import copy
@@ -21,6 +22,7 @@ from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
+import tools.api_versioning.utils as api_version_utils
 from tools.protoxform import options as protoxform_options
 from tools.protoxform import utils
 from tools.type_whisperer import type_whisperer
@@ -33,7 +35,7 @@ from google.protobuf import text_format
 # this also serves as allowlist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
-from envoy.annotations import deprecation_pb2 as _
+from envoy.annotations import deprecation_pb2
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 from udpa.annotations import security_pb2 as _
@@ -171,13 +173,16 @@ def format_type_context_comments(type_context, annotation_xforms=None):
     return leading, trailing
 
 
-def format_header_from_file(source_code_info, file_proto, empty_file):
+def format_header_from_file(source_code_info, file_proto, empty_file, import_deprecation_proto,
+                            frozen_proto):
     """Format proto header.
 
   Args:
     source_code_info: SourceCodeInfo object.
     file_proto: FileDescriptorProto for file.
     empty_file: are there no message/enum/service defs in file?
+    import_deprecation_proto: should the "envoy/annotation/deprecation.proto" be imported?
+    frozen_proto: is the proto file frozen?
 
   Returns:
     Formatted proto header as a string.
@@ -260,6 +265,10 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
             public_imports.append(d)
             continue
         elif d.startswith('envoy/annotations') or d.startswith('udpa/annotations'):
+            if d == 'envoy/annotations/deprecation.proto' and not frozen_proto:
+                # Skip adding, as deprecation proto should be added if
+                # import_deprecation_proto is True or the proto if frozen.
+                continue
             infra_imports.append(d)
         elif d.startswith('envoy/'):
             # We ignore existing envoy/ imports, since these are computed explicitly
@@ -274,6 +283,9 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
             pass
         else:
             misc_imports.append(d)
+
+    if import_deprecation_proto:
+        infra_imports.append('envoy/annotations/deprecation.proto')
 
     if options.HasExtension(status_pb2.file_status):
         infra_imports.append('udpa/annotations/status.proto')
@@ -515,7 +527,6 @@ def format_options(options):
   Returns:
     Formatted options as a string.
   """
-
     formatted_options = []
     for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
         option_name = '({})'.format(option_descriptor.full_name
@@ -562,11 +573,42 @@ def format_reserved(enum_or_msg_proto):
     return reserved_fields
 
 
+def validate_deprecation_version(version: str):
+    """Validates that a given version string is of format X.Y, where X and Y are
+  integers, X>0, and Y>=0.
+
+  Args:
+    version: a minor version deprecation annotation value (see api/envoy/annotations/deprecation.proto)
+
+  Returns:
+    True iff the given string represents a valid X.Y version.
+  """
+    if version.count('.') != 1:
+        return False
+    # Validate major and minor parts.
+    try:
+        major, minor = [int(x) for x in version.split('.')]
+        if major <= 0:
+            return False
+        if minor < 0:
+            return False
+    except:
+        return False
+    return True
+
+
 class ProtoFormatVisitor(visitor.Visitor):
     """Visitor to generate a proto representation from a FileDescriptor proto.
 
   See visitor.Visitor for visitor method docs comments.
   """
+
+    def __init__(self, api_version_file_path, frozen_proto):
+        current_api_version = api_version_utils.GetApiVersion(api_version_file_path)
+        self._deprecated_annotation_version_value = '{}.{}'.format(current_api_version.major,
+                                                                   current_api_version.minor)
+        self._needs_deprecation_annotation_import = False
+        self._frozen_proto = frozen_proto
 
     def visit_service(self, service_proto, type_context):
         leading_comment, trailing_comment = format_type_context_comments(type_context)
@@ -580,6 +622,27 @@ class ProtoFormatVisitor(visitor.Visitor):
     def visit_enum(self, enum_proto, type_context):
         if protoxform_options.has_hide_option(enum_proto.options):
             return ''
+        # Verify that not hidden deprecated enum values of non-frozen protos have valid version
+        # annotations.
+        for v in enum_proto.value:
+            if v.options.deprecated and not self._frozen_proto and \
+                    not protoxform_options.has_hide_option(v.options):
+                # If the enum value has annotation from deprecation.proto, need to import it.
+                if v.options.HasExtension(deprecation_pb2.deprecated_at_minor_version_enum) or \
+                        v.options.HasExtension(deprecation_pb2.disallowed_by_default_enum):
+                    self._needs_deprecation_annotation_import = True
+                if v.name != 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE':
+                    if v.options.HasExtension(deprecation_pb2.deprecated_at_minor_version_enum):
+                        if not validate_deprecation_version(v.options.Extensions[
+                                deprecation_pb2.deprecated_at_minor_version_enum]):
+                            raise ProtoPrintError(
+                                'Error while parsing "deprecated_at_minor_version_enum" annotation value for enum value %s.'
+                                % v.name)
+                    else:
+                        self._needs_deprecation_annotation_import = True
+                        v.options.Extensions[
+                            deprecation_pb2.
+                            deprecated_at_minor_version_enum] = self._deprecated_annotation_version_value
         leading_comment, trailing_comment = format_type_context_comments(type_context)
         formatted_options = format_options(enum_proto.options)
         reserved_fields = format_reserved(enum_proto)
@@ -625,6 +688,21 @@ class ProtoFormatVisitor(visitor.Visitor):
                 fields += '%soneof %s {\n%s%s' % (oneof_leading_comment, oneof_proto.name,
                                                   oneof_trailing_comment,
                                                   format_options(oneof_proto.options))
+            # Verify that deprecated fields (that are not hidden and are not of frozen protos)
+            # have a minor version annotation.
+            if field.options.deprecated and not self._frozen_proto and \
+                    not protoxform_options.has_hide_option(field.options):
+                self._needs_deprecation_annotation_import = True
+                if field.options.HasExtension(deprecation_pb2.deprecated_at_minor_version):
+                    if not validate_deprecation_version(
+                            field.options.Extensions[deprecation_pb2.deprecated_at_minor_version]):
+                        raise ProtoPrintError(
+                            'Error while parsing "deprecated_at_minor_version" annotation value for field %s.'
+                            % field.name)
+                else:
+                    field.options.Extensions[
+                        deprecation_pb2.
+                        deprecated_at_minor_version] = self._deprecated_annotation_version_value
             fields += format_block(format_field(type_context.extend_field(index, field.name),
                                                 field))
         if oneof_index is not None:
@@ -635,7 +713,9 @@ class ProtoFormatVisitor(visitor.Visitor):
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
         empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
-        header = format_header_from_file(type_context.source_code_info, file_proto, empty_file)
+        header = format_header_from_file(type_context.source_code_info, file_proto, empty_file,
+                                         self._needs_deprecation_annotation_import,
+                                         self._frozen_proto)
         formatted_services = format_block('\n'.join(services))
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))
@@ -651,4 +731,8 @@ if __name__ == '__main__':
     text_format.Merge(input_text, file_proto)
     dst_path = pathlib.Path(sys.argv[2])
     utils.load_type_db(sys.argv[3])
-    dst_path.write_bytes(traverse.traverse_file(file_proto, ProtoFormatVisitor()))
+    api_version_file_path = pathlib.Path(sys.argv[4])
+    frozen_proto = file_proto.options.Extensions[
+        status_pb2.file_status].package_version_status == status_pb2.FROZEN
+    dst_path.write_bytes(
+        traverse.traverse_file(file_proto, ProtoFormatVisitor(api_version_file_path, frozen_proto)))
