@@ -49,7 +49,7 @@ All paths are matched and routed to the ``service_envoyproxy_io``
 ``clusters``
 ------------
 
-The ``service_envoyproxy_io`` :ref:`cluster <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+The ``service_envoyproxy_io`` :ref:`cluster <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`
 proxies over ``TLS`` to https://www.envoyproxy.io.
 
 .. literalinclude:: _include/envoy-demo.yaml
