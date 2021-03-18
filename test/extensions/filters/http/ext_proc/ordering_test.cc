@@ -4,6 +4,7 @@
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -25,12 +26,14 @@ using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
+using Event::MockTimer;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
 using testing::Invoke;
+using testing::Return;
 using testing::Unused;
 
 using namespace std::chrono_literals;
@@ -41,16 +44,22 @@ using namespace std::chrono_literals;
 
 class OrderingTest : public testing::Test {
 protected:
+  static constexpr std::chrono::milliseconds kMessageTimeout = 200ms;
+  static constexpr auto kMessageTimeoutNanos =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(kMessageTimeout).count();
+
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
 
     ExternalProcessor proto_config;
     proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
     if (cb) {
       (*cb)(proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
+    config_.reset(new FilterConfig(proto_config, kMessageTimeout, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -59,8 +68,7 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const std::chrono::milliseconds&) {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -175,6 +183,7 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
@@ -198,6 +207,35 @@ TEST_F(OrderingTest, DefaultOrderingGet) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseHeadersReply();
+  Buffer::OwnedImpl req_body("Hello!");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(req_body, true));
+  sendResponseTrailers();
+}
+
+// A normal call with the default configuration, with a mock timer so that we can
+// verify timer behavior.
+TEST_F(OrderingTest, DefaultOrderingGetWithTimer) {
+  initialize([](ExternalProcessor& proto_config) {
+    proto_config.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+  });
+
+  // MockTimer constructor sets up expectations in the Dispatcher class to wire it up
+  MockTimer* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersGet(true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(*request_timer, disableTimer());
+  sendRequestHeadersReply();
+  sendRequestTrailers();
+
+  MockTimer* response_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseHeaders(true);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  EXPECT_CALL(*response_timer, disableTimer());
   sendResponseHeadersReply();
   Buffer::OwnedImpl req_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(req_body, true));
@@ -469,11 +507,17 @@ TEST_F(OrderingTest, ExtraAfterImmediateResponse) {
 
 // gRPC error in response to message calls results in an error
 TEST_F(OrderingTest, GrpcErrorInline) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& proto_config) {
+    proto_config.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+  });
 
+  auto* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*request_timer, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(*request_timer, disableTimer());
   sendGrpcError();
   // The rest of the filter isn't called after this.
 }
@@ -481,11 +525,18 @@ TEST_F(OrderingTest, GrpcErrorInline) {
 // gRPC error in response to message results in connection being dropped
 // if failures are ignored
 TEST_F(OrderingTest, GrpcErrorInlineIgnored) {
-  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
+  initialize([](ExternalProcessor& cfg) {
+    cfg.set_failure_mode_allow(true);
+    cfg.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+  });
 
+  auto* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(*request_timer, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(*request_timer, disableTimer());
   sendGrpcError();
 
   // After that we ignore the processor
@@ -498,15 +549,21 @@ TEST_F(OrderingTest, GrpcErrorInlineIgnored) {
 
 // gRPC error in between calls should still be delivered
 TEST_F(OrderingTest, GrpcErrorOutOfLine) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) {
+    cfg.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+  });
 
+  auto* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(*request_timer, disableTimer());
   sendRequestHeadersReply();
   sendRequestTrailers();
 
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*request_timer, enabled()).WillOnce(Return(false));
   sendGrpcError();
 }
 
@@ -526,6 +583,110 @@ TEST_F(OrderingTest, GrpcCloseAfter) {
   Buffer::OwnedImpl resp_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
   sendResponseTrailers();
+}
+
+// gRPC error might be received after a message timeout has fired
+TEST_F(OrderingTest, GrpcErrorAfterTimeout) {
+  initialize([](ExternalProcessor& proto_config) {
+    proto_config.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+  });
+
+  auto* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersGet(true);
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  request_timer->invokeCallback();
+  // Nothing should happen now despite the gRPC error
+  sendGrpcError();
+}
+
+// Allow the timeout to expire before the response body response can be sent
+TEST_F(OrderingTest, TimeoutOnResponseBody) {
+  initialize([](ExternalProcessor& cfg) {
+    cfg.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_body_mode(ProcessingMode::BUFFERED);
+    pm->set_response_body_mode(ProcessingMode::BUFFERED);
+  });
+
+  auto* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersPost(true);
+  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestHeadersReply();
+
+  Buffer::OwnedImpl req_body;
+  req_body.add("Dummy data 1");
+  Buffer::OwnedImpl buffered_request;
+  expectBufferedRequest(buffered_request);
+
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body, true));
+  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestBodyReply();
+  sendRequestTrailers();
+
+  Buffer::OwnedImpl resp_body("Dummy response");
+  Buffer::OwnedImpl buffered_response;
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buffered_response));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillRepeatedly(Invoke([&buffered_response](Buffer::Instance& new_chunk, Unused) {
+        buffered_response.add(new_chunk);
+      }));
+  auto* response_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseHeaders(true);
+  EXPECT_CALL(*response_timer, disableTimer());
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseHeadersReply();
+  EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body, true));
+
+  // Now, fire the timeout, which will end everything
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  response_timer->invokeCallback();
+}
+
+// Allow the timeout to expire before the request body response can be sent
+TEST_F(OrderingTest, TimeoutOnRequestBody) {
+  initialize([](ExternalProcessor& cfg) {
+    cfg.mutable_message_timeout()->set_nanos(kMessageTimeoutNanos);
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_body_mode(ProcessingMode::BUFFERED);
+    pm->set_response_body_mode(ProcessingMode::BUFFERED);
+  });
+
+  auto* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersPost(true);
+  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestHeadersReply();
+
+  Buffer::OwnedImpl req_body;
+  req_body.add("Dummy data 1");
+  Buffer::OwnedImpl buffered_request;
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buffered_request));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
+      .WillRepeatedly(Invoke([&buffered_request](Buffer::Instance& new_chunk, Unused) {
+        buffered_request.add(new_chunk);
+      }));
+
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_body, true));
+
+  // Now fire the timeout and expect a 500 error
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  request_timer->invokeCallback();
 }
 
 } // namespace

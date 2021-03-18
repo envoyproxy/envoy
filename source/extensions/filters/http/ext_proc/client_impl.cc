@@ -15,21 +15,18 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(
 }
 
 ExternalProcessorStreamPtr
-ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
-                                   const std::chrono::milliseconds& timeout) {
+ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(factory_->create());
-  return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks, timeout);
+  return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks);
 }
 
 ExternalProcessorStreamImpl::ExternalProcessorStreamImpl(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const std::chrono::milliseconds& timeout)
+    ExternalProcessorCallbacks& callbacks)
     : callbacks_(callbacks) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
   Http::AsyncClient::StreamOptions options;
-  options.setTimeout(timeout);
-
   stream_ = client_.start(*descriptor, *this, options);
 }
 

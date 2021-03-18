@@ -29,6 +29,8 @@ using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
 using Http::LowerCaseString;
 
+using namespace std::chrono_literals;
+
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
@@ -141,7 +143,7 @@ protected:
 
   void processRequestHeadersMessage(
       bool first_message,
-      absl::optional<std::function<void(const HttpHeaders&, HeadersResponse&)>> cb) {
+      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(
@@ -155,15 +157,15 @@ protected:
     }
     ProcessingResponse response;
     auto* headers = response.mutable_request_headers();
-    if (cb) {
-      (*cb)(request.request_headers(), *headers);
+    const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
     }
-    processor_stream_->sendGrpcMessage(response);
   }
 
   void processResponseHeadersMessage(
       bool first_message,
-      absl::optional<std::function<void(const HttpHeaders&, HeadersResponse&)>> cb) {
+      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(
@@ -177,14 +179,14 @@ protected:
     }
     ProcessingResponse response;
     auto* headers = response.mutable_response_headers();
-    if (cb) {
-      (*cb)(request.response_headers(), *headers);
+    const bool sendReply = !cb || (*cb)(request.response_headers(), *headers);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
     }
-    processor_stream_->sendGrpcMessage(response);
   }
 
   void processRequestBodyMessage(
-      bool first_message, absl::optional<std::function<void(const HttpBody&, BodyResponse&)>> cb) {
+      bool first_message, absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(
@@ -198,14 +200,14 @@ protected:
     }
     ProcessingResponse response;
     auto* body = response.mutable_request_body();
-    if (cb) {
-      (*cb)(request.request_body(), *body);
+    const bool sendReply = !cb || (*cb)(request.request_body(), *body);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
     }
-    processor_stream_->sendGrpcMessage(response);
   }
 
   void processResponseBodyMessage(
-      bool first_message, absl::optional<std::function<void(const HttpBody&, BodyResponse&)>> cb) {
+      bool first_message, absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(
@@ -219,10 +221,10 @@ protected:
     }
     ProcessingResponse response;
     auto* body = response.mutable_response_body();
-    if (cb) {
-      (*cb)(request.response_body(), *body);
+    const bool sendReply = !cb || (*cb)(request.response_body(), *body);
+    if (sendReply) {
+      processor_stream_->sendGrpcMessage(response);
     }
-    processor_stream_->sendGrpcMessage(response);
   }
 
   void processAndRespondImmediately(bool first_message,
@@ -398,6 +400,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
     mut1->mutable_header()->set_key("x-new-header");
     mut1->mutable_header()->set_value("new");
     response_header_mutation->add_remove_headers("x-remove-this");
+    return true;
   });
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -413,6 +416,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   processResponseHeadersMessage(false, [](const HttpHeaders& headers, HeadersResponse&) {
     Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+    return true;
   });
 
   verifyDownstreamResponse(*response, 200);
@@ -433,6 +437,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
     auto* add1 = response_mutation->add_set_headers();
     add1->mutable_header()->set_key("x-response-processed");
     add1->mutable_header()->set_value("1");
+    return true;
   });
 
   verifyDownstreamResponse(*response, 200);
@@ -455,6 +460,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
         headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
     content_length->mutable_header()->set_key("content-length");
     content_length->mutable_header()->set_value("13");
+    return true;
   });
 
   // Should get just one message with the body
@@ -462,6 +468,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
     EXPECT_TRUE(body.end_of_stream());
     auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
     body_mut->set_body("Hello, World!");
+    return true;
   });
 
   verifyDownstreamResponse(*response, 200);
@@ -484,12 +491,14 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
         headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
     content_length->mutable_header()->set_key("content-length");
     content_length->mutable_header()->set_value("13");
+    return true;
   });
 
   processRequestBodyMessage(false, [](const HttpBody& body, BodyResponse& body_resp) {
     EXPECT_TRUE(body.end_of_stream());
     auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
     body_mut->set_body("Hello, World!");
+    return true;
   });
 
   handleUpstreamRequest();
@@ -497,11 +506,13 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
   processResponseHeadersMessage(false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
     headers_resp.mutable_response()->mutable_header_mutation()->add_remove_headers(
         "content-length");
+    return true;
   });
 
   processResponseBodyMessage(false, [](const HttpBody& body, BodyResponse& body_resp) {
     EXPECT_TRUE(body.end_of_stream());
     body_resp.mutable_response()->mutable_body_mutation()->set_body("123");
+    return true;
   });
 
   verifyDownstreamResponse(*response, 200);
@@ -522,6 +533,7 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
     auto* add1 = response_mutation->add_set_headers();
     add1->mutable_header()->set_key("x-response-processed");
     add1->mutable_header()->set_value("1");
+    return true;
   });
 
   verifyDownstreamResponse(*response, 200);
@@ -618,6 +630,89 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   // The stream should have been reset here before the complete
   // response was received.
   response->waitForReset();
+}
+
+// Send a request, but wait longer than the "message timeout" before sending a response
+// from the external processor. This should trigger the timeout and result
+// in a 500 error.
+TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, [this](const HttpHeaders&, HeadersResponse&) {
+    // Travel forward 400 ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Same as the previous test but on the response path, since there are separate
+// timers for each.
+TEST_P(ExtProcIntegrationTest, ResponseMessageTimeout) {
+  // ensure 200 ms timeout
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, [this](const HttpHeaders&, HeadersResponse&) {
+    // Travel forward 400 ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Send a request,  wait longer than the "message timeout" before sending a response
+// from the external processor, but nothing should happen because we are ignoring
+// the timeout.
+TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutIgnoreError) {
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, [this](const HttpHeaders&, HeadersResponse&) {
+    // Travel forward 400 ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
+
+  // We should be able to continue from here since the error was ignored
+  handleUpstreamRequest();
+  // Since we are ignoring errors, the late response to the request headers
+  // message meant that subsequent messages are spurious and the response
+  // headers message was never sent.
+  // Despite the timeout the request should succeed.
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Same as the previous test but on the response path, since there are separate
+// timers for each.
+TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutIgnoreError) {
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(false, [this](const HttpHeaders&, HeadersResponse&) {
+    // Travel forward 400 ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
+
+  // We should still succeed despite the timeout
+  verifyDownstreamResponse(*response, 200);
 }
 
 } // namespace Envoy

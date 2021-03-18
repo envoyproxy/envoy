@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":mutation_utils_lib",
+        "//include/envoy/event:timer_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stats:stats_macros",

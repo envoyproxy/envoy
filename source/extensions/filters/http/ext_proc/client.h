@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -35,8 +34,7 @@ public:
 class ExternalProcessorClient {
 public:
   virtual ~ExternalProcessorClient() = default;
-  virtual ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
-                                           const std::chrono::milliseconds& timeout) PURE;
+  virtual ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

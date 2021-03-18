@@ -27,9 +27,17 @@ static const std::string kErrorPrefix = "ext_proc error";
 void Filter::openStream() {
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
-    stream_ = client_->start(*this, config_->grpcTimeout());
+    stream_ = client_->start(*this);
     stats_.streams_started_.inc();
   }
+}
+
+void Filter::startMessageTimer(Event::TimerPtr& timer) {
+  if (!timer) {
+    timer =
+        decoder_callbacks_->dispatcher().createTimer(std::bind(&Filter::onMessageTimeout, this));
+  }
+  timer->enableTimer(config_->messageTimeout());
 }
 
 void Filter::onDestroy() {
@@ -60,6 +68,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   request_state_ = FilterState::Headers;
+  startMessageTimer(request_message_timer_);
   ENVOY_LOG(debug, "Sending request_headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -83,6 +92,7 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
       decoder_callbacks_->addDecodedData(data, false);
       // The body has been buffered and we need to send the buffer
       request_state_ = FilterState::BufferedBody;
+      startMessageTimer(request_message_timer_);
       sendBodyChunk(true, *decoder_callbacks_->decodingBuffer(), true);
     } else {
       ENVOY_LOG(trace, "decodeData: Buffering");
@@ -116,6 +126,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
   response_state_ = FilterState::Headers;
+  startMessageTimer(response_message_timer_);
   ENVOY_LOG(debug, "Sending response_headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -136,6 +147,7 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
       ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on response path");
       encoder_callbacks_->addEncodedData(data, false);
       response_state_ = FilterState::BufferedBody;
+      startMessageTimer(response_message_timer_);
       sendBodyChunk(false, *encoder_callbacks_->encodingBuffer(), true);
     } else {
       ENVOY_LOG(trace, "encodeData: Buffering");
@@ -194,7 +206,10 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     message_handled = handleResponseBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    handleImmediateResponse(response->immediate_response());
+    // We won't be sending anything more to the stream after we
+    // receive this message.
+    processing_complete_ = true;
+    sendImmediateResponse(response->immediate_response());
     message_handled = true;
     break;
   default:
@@ -211,7 +226,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
               response->response_case());
-    cleanupState();
+    clearAsyncState();
     processing_complete_ = true;
   }
 }
@@ -222,6 +237,7 @@ bool Filter::handleRequestHeadersResponse(const HeadersResponse& response) {
     MutationUtils::applyCommonHeaderResponse(response, *request_headers_);
     request_headers_ = nullptr;
     request_state_ = FilterState::Idle;
+    request_message_timer_->disableTimer();
     decoder_callbacks_->continueDecoding();
     return true;
   }
@@ -234,6 +250,7 @@ bool Filter::handleResponseHeadersResponse(const HeadersResponse& response) {
     MutationUtils::applyCommonHeaderResponse(response, *response_headers_);
     response_headers_ = nullptr;
     response_state_ = FilterState::Idle;
+    response_message_timer_->disableTimer();
     encoder_callbacks_->continueEncoding();
     return true;
   }
@@ -247,6 +264,7 @@ bool Filter::handleRequestBodyResponse(const BodyResponse& response) {
       MutationUtils::applyCommonBodyResponse(response, data);
     });
     request_state_ = FilterState::Idle;
+    request_message_timer_->disableTimer();
     decoder_callbacks_->continueDecoding();
     return true;
   }
@@ -262,23 +280,20 @@ bool Filter::handleResponseBodyResponse(const BodyResponse& response) {
       MutationUtils::applyCommonBodyResponse(response, data);
     });
     response_state_ = FilterState::Idle;
+    response_message_timer_->disableTimer();
     encoder_callbacks_->continueEncoding();
     return true;
   }
   return false;
 }
 
-void Filter::handleImmediateResponse(const ImmediateResponse& response) {
-  // We don't want to process any more stream messages after this.
-  // Close the stream before sending because "sendLocalResponse" may trigger
-  // additional calls to this filter.
-  processing_complete_ = true;
-  sendImmediateResponse(response);
-}
-
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
   ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
   stats_.streams_failed_.inc();
+
+  if (processing_complete_) {
+    return;
+  }
 
   if (config_->failureModeAllow()) {
     // Ignore this and treat as a successful close
@@ -287,10 +302,13 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
+    // Since the stream failed, there is no need to handle timeouts, so
+    // make sure that they do not fire now.
+    cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
-    handleImmediateResponse(errorResponse);
+    sendImmediateResponse(errorResponse);
   }
 }
 
@@ -300,10 +318,36 @@ void Filter::onGrpcClose() {
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
-  cleanupState();
+  clearAsyncState();
 }
 
-void Filter::cleanupState() {
+void Filter::onMessageTimeout() {
+  ENVOY_LOG(debug, "message timeout reached");
+  stats_.message_timeouts_.inc();
+  if (config_->failureModeAllow()) {
+    // The user would like a timeout to not cause message processing to fail.
+    // However, we don't know if the external processor will send a response later,
+    // and we can't wait any more. So, as we do for a spurious message, ignore
+    // the external processor for the rest of the request.
+    processing_complete_ = true;
+    stats_.failure_mode_allowed_.inc();
+    clearAsyncState();
+
+  } else {
+    // Return an error and stop processing the current stream.
+    processing_complete_ = true;
+    request_state_ = FilterState::Idle;
+    response_state_ = FilterState::Idle;
+    ImmediateResponse errorResponse;
+    errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", kErrorPrefix));
+    sendImmediateResponse(errorResponse);
+  }
+}
+
+// Regardless of the current filter state, reset it to "IDLE", continue
+// the current callback, and reset timers. This is used in a few error-handling situations.
+void Filter::clearAsyncState() {
   if (request_state_ != FilterState::Idle) {
     request_state_ = FilterState::Idle;
     decoder_callbacks_->continueDecoding();
@@ -311,6 +355,18 @@ void Filter::cleanupState() {
   if (response_state_ != FilterState::Idle) {
     response_state_ = FilterState::Idle;
     encoder_callbacks_->continueEncoding();
+  }
+  cleanUpTimers();
+}
+
+// Regardless of the current state, ensure that the timers won't fire
+// again.
+void Filter::cleanUpTimers() {
+  if (request_message_timer_ && request_message_timer_->enabled()) {
+    request_message_timer_->disableTimer();
+  }
+  if (response_message_timer_ && response_message_timer_->enabled()) {
+    response_message_timer_->disableTimer();
   }
 }
 
