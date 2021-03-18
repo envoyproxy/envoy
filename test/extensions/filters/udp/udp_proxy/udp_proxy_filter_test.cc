@@ -167,6 +167,7 @@ public:
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
+    EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
