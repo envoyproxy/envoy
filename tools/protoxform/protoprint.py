@@ -17,28 +17,19 @@ import re
 import subprocess
 import sys
 
-from tools.api_proto_plugin import annotations
-from tools.api_proto_plugin import plugin
-from tools.api_proto_plugin import traverse
-from tools.api_proto_plugin import visitor
-from tools.protoxform import options as protoxform_options
-from tools.protoxform import utils
-from tools.type_whisperer import type_whisperer
-from tools.type_whisperer.types_pb2 import Types
+from tools.api_proto_plugin import annotations, traverse, visitor
+from tools.protoxform import options as protoxform_options, utils
+from tools.type_whisperer import type_whisperer, types_pb2
 
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
-# Note: we have to include those proto definitions to make format_options work,
-# this also serves as allowlist of extended options.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
-from envoy.annotations import deprecation_pb2 as _
-from envoy.annotations import resource_pb2
-from udpa.annotations import migrate_pb2
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
-from udpa.annotations import status_pb2
+from udpa.annotations import migrate_pb2, status_pb2
+
+PROTO_PACKAGES = ("google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
+                  "envoy.annotations.resource", "udpa.annotations.migrate",
+                  "udpa.annotations.security", "udpa.annotations.status",
+                  "udpa.annotations.versioning", "udpa.annotations.sensitive")
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -185,7 +176,7 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
     # Load the type database.
     typedb = utils.get_type_db()
     # Figure out type dependencies in this .proto.
-    types = Types()
+    types = types_pb2.Types()
     text_format.Merge(traverse.traverse_file(file_proto, type_whisperer.TypeWhispererVisitor()),
                       types)
     type_dependencies = sum([list(t.type_dependencies) for t in types.types.values()], [])
@@ -644,6 +635,9 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 if __name__ == '__main__':
     proto_desc_path = sys.argv[1]
+
+    utils.load_protos(PROTO_PACKAGES)
+
     file_proto = descriptor_pb2.FileDescriptorProto()
     input_text = pathlib.Path(proto_desc_path).read_text()
     if not input_text:

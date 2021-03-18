@@ -17,7 +17,7 @@ py_binary(
 
 py_test(
     name = "merge_active_shadow_test",
-    srcs = ["merge_active_shadow_test.py"],
+    srcs = ["merge_active_shadow_test.py", "utils.py"],
     deps = [
         ":merge_active_shadow",
         "//tools/api_proto_plugin",
