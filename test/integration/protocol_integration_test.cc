@@ -160,8 +160,15 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
 
   initialize();
 
+  std::string ip;
+  if (GetParam().version == Network::Address::IpVersion::v4) {
+    ip = "127.0.0.1";
+  } else {
+    ip = "::1";
+  }
   const std::string ip_port_pair =
-      absl::StrCat("127.0.0.1:", fake_upstreams_[0]->localAddress()->ip()->port());
+      absl::StrCat(ip, ":", fake_upstreams_[0]->localAddress()->ip()->port());
+
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
       {":path", "/some/path"},
