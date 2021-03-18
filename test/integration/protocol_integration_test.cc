@@ -129,54 +129,63 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
 }
 
 // Add a filter that overrides the cached route/cluster selection with a DelegatingRoute
-TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
+TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   config_helper_.addFilter(R"EOF(
   name: set-route-filter
   )EOF");
 
-  // Fake upstream clusters: integration, cluster_0, cluster_override
-  setUpstreamCount(3);
+  // Upstreams: cluster_0, cluster_override
+  setUpstreamCount(2);
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* co_cluster = bootstrap.mutable_static_resources()->add_clusters();
-    co_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-    co_cluster->set_name("cluster_override");
-    co_cluster->set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
-    // Necessary for ORIGINAL_DST clusters
-    co_cluster->clear_load_assignment();
-    co_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-    ConfigHelper::setHttp2(*co_cluster);
+    std::string cluster_yaml = R"EOF(
+            name: cluster_override
+            connect_timeout: 1.250s
+            type: ORIGINAL_DST
+            lb_policy: CLUSTER_PROVIDED
+            original_dst_lb_config:
+              use_http_header: true
+          )EOF";
+    envoy::config::cluster::v3::Cluster cluster_config;
+    TestUtility::loadFromYaml(cluster_yaml, cluster_config);
+    auto* orig_dst_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    orig_dst_cluster->MergeFrom(cluster_config);
   });
 
-  auto host_foo = config_helper_.createVirtualHost("foo.com", "/", "cluster_0");
-  host_foo.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
-  config_helper_.addVirtualHost(host_foo);
-
-  auto host_co = config_helper_.createVirtualHost("cluster_override", "/", "cluster_override");
-  host_co.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  auto host_co =
+      config_helper_.createVirtualHost("cluster_override vhost", "/some/path", "cluster_override");
   config_helper_.addVirtualHost(host_co);
+
+  auto host_foo = config_helper_.createVirtualHost("cluster_0 vhost", "/some/path", "cluster_0");
+  config_helper_.addVirtualHost(host_foo);
 
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string ip_port_pair =
+      absl::StrCat("127.0.0.1:", fake_upstreams_[0]->localAddress()->ip()->port());
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
-      {":path", "/"},
+      {":path", "/some/path"},
       {":scheme", "http"},
       {":authority", "cluster_0"},
+      {"x-envoy-original-dst-host", ip_port_pair},
   };
 
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  response->waitForEndStream();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Even though headers specify cluster_0, set_route_filter modifies cached route to
   // cluster_override
-  // TODO: DEBUG These aren't working, changing values doesn't affect anything?
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_200")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
+  test_server_->waitForCounterGe("cluster.cluster_override.upstream_cx_total", 1,
+                                 std::chrono::milliseconds(30000));
+  test_server_->waitForCounterGe("cluster.cluster_override.upstream_rq_200", 1,
+                                 std::chrono::milliseconds(30000));
 
-  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_total")->value());
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
