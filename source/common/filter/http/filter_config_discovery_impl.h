@@ -36,7 +36,8 @@ class DynamicFilterConfigProviderImpl : public DynamicFilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(FilterConfigSubscriptionSharedPtr& subscription,
                                   const absl::flat_hash_set<std::string>& require_type_urls,
-                                  Server::Configuration::FactoryContext& factory_context);
+                                  Server::Configuration::FactoryContext& factory_context,
+                                  Envoy::Http::FilterFactoryCb default_config);
   ~DynamicFilterConfigProviderImpl() override;
 
   void validateTypeUrl(const std::string& type_url) const;
@@ -49,10 +50,6 @@ public:
   void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
                       Config::ConfigAppliedCb cb) override;
   void onConfigRemoved(Config::ConfigAppliedCb cb) override;
-  void setDefaultConfiguration(Envoy::Http::FilterFactoryCb config) override {
-    ASSERT(!default_configuration_);
-    default_configuration_ = config;
-  }
   void applyDefaultConfiguration() override {
     if (default_configuration_) {
       onConfigUpdate(*default_configuration_, "", nullptr);
@@ -70,7 +67,7 @@ private:
   // Currently applied configuration to ensure that the main thread deletes the last reference to
   // it.
   absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
-  absl::optional<Envoy::Http::FilterFactoryCb> default_configuration_{absl::nullopt};
+  const absl::optional<Envoy::Http::FilterFactoryCb> default_configuration_;
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
   // Local initialization target to ensure that the subscription starts in

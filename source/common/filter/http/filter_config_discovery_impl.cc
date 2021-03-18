@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/extension_config_provider.h"
+#include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/utility.h"
@@ -15,17 +16,31 @@ namespace Envoy {
 namespace Filter {
 namespace Http {
 
+namespace {
+void validateTypeUrlHelper(const std::string& type_url,
+                           absl::flat_hash_set<std::string> require_type_urls) {
+  if (!require_type_urls.contains(type_url)) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls, ", ")));
+  }
+}
+} // namespace
+
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
     FilterConfigSubscriptionSharedPtr& subscription,
     const absl::flat_hash_set<std::string>& require_type_urls,
-    Server::Configuration::FactoryContext& factory_context)
+    Server::Configuration::FactoryContext& factory_context,
+    Envoy::Http::FilterFactoryCb default_config)
     : subscription_(subscription), require_type_urls_(require_type_urls),
+      default_configuration_(default_config ? absl::make_optional(default_config) : absl::nullopt),
       tls_(factory_context.threadLocal()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
-        // This init target is used to activate the subscription but not wait
-        // for a response. It is used whenever a default config is provided to be
-        // used while waiting for a response.
+        // This init target is used to activate
+        // the subscription but not wait for a
+        // response. It is used whenever a default
+        // config is provided to be used while
+        // waiting for a response.
         init_target_.ready();
       }) {
   subscription_->filter_config_providers_.insert(this);
@@ -37,10 +52,7 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
 }
 
 void DynamicFilterConfigProviderImpl::validateTypeUrl(const std::string& type_url) const {
-  if (!require_type_urls_.contains(type_url)) {
-    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls_, ", ")));
-  }
+  validateTypeUrlHelper(type_url, require_type_urls_);
 }
 
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
@@ -243,9 +255,7 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
     auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
     require_type_urls.emplace(factory_type_url);
   }
-  auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(subscription, require_type_urls,
-                                                                    factory_context);
-
+  Envoy::Http::FilterFactoryCb default_config = nullptr;
   if (config_source.has_default_config()) {
     auto* default_factory =
         Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -256,14 +266,17 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
                                        filter_config_name,
                                        config_source.default_config().type_url()));
     }
-    provider->validateTypeUrl(Config::Utility::getFactoryType(config_source.default_config()));
+    validateTypeUrlHelper(Config::Utility::getFactoryType(config_source.default_config()),
+                          require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config_source.default_config(), factory_context.messageValidationVisitor(),
         *default_factory);
-    Envoy::Http::FilterFactoryCb default_config =
+    default_config =
         default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
-    provider->setDefaultConfiguration(default_config);
   }
+
+  auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
+      subscription, require_type_urls, factory_context, default_config);
 
   // Ensure the subscription starts if it has not already.
   if (config_source.apply_default_config_without_warming()) {
