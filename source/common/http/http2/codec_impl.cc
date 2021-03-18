@@ -16,6 +16,7 @@
 #include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
@@ -789,8 +790,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
-    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
-    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    safeMemcpy(&data, &(frame->ping.opaque_data));
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();

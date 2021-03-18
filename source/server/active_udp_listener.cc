@@ -17,7 +17,8 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
                                              Network::ListenerConfig* config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
-      udp_listener_(std::move(listener)) {
+      udp_listener_(std::move(listener)),
+      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}) {
   ASSERT(worker_index_ < concurrency_);
   config_->udpListenerConfig()->listenerWorkerRouter().registerWorkerForListener(*this);
 }
@@ -64,10 +65,10 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
 
 Event::Dispatcher::CreateUdpListenerParams
 ActiveUdpListenerBase::configToUdpListenerParams(Network::ListenerConfig& config) {
+  const auto& udp_socket_config = config.udpListenerConfig()->config().downstream_socket_config();
   Event::Dispatcher::CreateUdpListenerParams params;
   params.max_rx_datagram_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config.udpListenerConfig()->config(), max_downstream_rx_datagram_size,
-      Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+      udp_socket_config, max_rx_datagram_size, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
   return params;
 }
 

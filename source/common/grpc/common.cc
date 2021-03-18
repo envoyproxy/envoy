@@ -13,6 +13,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -136,7 +137,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
-  std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  safeMemcpyUnsafeDst(current, &nsize);
   current += sizeof(uint32_t);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
@@ -288,7 +289,7 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
-  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  safeMemcpyUnsafeDst(&header[1], &nsize);
   buffer.prepend(absl::string_view(&header[0], 5));
 }
 

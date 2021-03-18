@@ -89,3 +89,4 @@ to the common subscription statistics, it also provides the following:
 
   config_reload, Counter, Total number of successful configuration updates
   config_fail, Counter, Total number of failed configuration updates
+  config_conflict, Counter, Total number of conflicting applications of configuration updates; this may happen when a new listener cannot reuse a subscribed extension configuration due to an invalid type URL.
