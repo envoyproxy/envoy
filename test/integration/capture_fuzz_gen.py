@@ -38,7 +38,8 @@ def ToTestEvent(direction, event):
     if event.HasField('read'):
         setattr(test_event, '%s_send_bytes' % direction, event.read.data)
     elif event.HasField('write'):
-        getattr(test_event, '%s_recv_bytes' % direction).MergeFrom(empty_pb2.Empty())
+        getattr(test_event,
+                '%s_recv_bytes' % direction).MergeFrom(empty_pb2.Empty())
     return test_event
 
 
@@ -64,7 +65,8 @@ def TestCaseGen(listener_events, cluster_events):
         if not cluster_events:
             test_case.events.extend(map(ToDownstreamTestEvent, listener_events))
             return test_case
-        if listener_events[0].timestamp.ToDatetime() < cluster_events[0].timestamp.ToDatetime():
+        if listener_events[0].timestamp.ToDatetime(
+        ) < cluster_events[0].timestamp.ToDatetime():
             test_case.events.extend([ToDownstreamTestEvent(listener_events[0])])
             del listener_events[0]
         test_case.events.extend([ToUpstreamTestEvent(cluster_events[0])])

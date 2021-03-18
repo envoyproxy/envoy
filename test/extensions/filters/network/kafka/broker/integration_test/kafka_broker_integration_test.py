@@ -57,9 +57,12 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     This test verifies that consumer sends fetches correctly, and receives nothing.
     """
 
-        consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
-                                 fetch_max_wait_ms=500)
-        consumer.assign([TopicPartition('test_kafka_consumer_with_no_messages_received', 0)])
+        consumer = KafkaConsumer(
+            bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
+            fetch_max_wait_ms=500)
+        consumer.assign([
+            TopicPartition('test_kafka_consumer_with_no_messages_received', 0)
+        ])
         for _ in range(10):
             records = consumer.poll(timeout_ms=1000)
             self.assertEqual(len(records), 0)
@@ -81,7 +84,8 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
         messages_to_send = 100
         partition = TopicPartition('test_kafka_producer_and_consumer', 0)
 
-        producer = KafkaProducer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address())
+        producer = KafkaProducer(
+            bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address())
         for _ in range(messages_to_send):
             future = producer.send(value=b'some_message_bytes',
                                    topic=partition.topic,
@@ -89,9 +93,10 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
             send_status = future.get()
             self.assertTrue(send_status.offset >= 0)
 
-        consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
-                                 auto_offset_reset='earliest',
-                                 fetch_max_bytes=100)
+        consumer = KafkaConsumer(
+            bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
+            auto_offset_reset='earliest',
+            fetch_max_bytes=100)
         consumer.assign([partition])
         received_messages = []
         while (len(received_messages) < messages_to_send):
@@ -116,15 +121,17 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
         consumer_count = 10
         consumers = []
         for id in range(consumer_count):
-            consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
-                                     group_id='test',
-                                     client_id='test-%s' % id)
+            consumer = KafkaConsumer(
+                bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
+                group_id='test',
+                client_id='test-%s' % id)
             consumer.subscribe(['test_consumer_with_consumer_groups'])
             consumers.append(consumer)
 
         worker_threads = []
         for consumer in consumers:
-            thread = Thread(target=KafkaBrokerIntegrationTest.worker, args=(consumer,))
+            thread = Thread(target=KafkaBrokerIntegrationTest.worker,
+                            args=(consumer,))
             thread.start()
             worker_threads.append(thread)
 
@@ -161,14 +168,17 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
             bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address())
 
         # Create a topic with 3 partitions.
-        new_topic_spec = NewTopic(name='test_admin_client', num_partitions=3, replication_factor=1)
+        new_topic_spec = NewTopic(name='test_admin_client',
+                                  num_partitions=3,
+                                  replication_factor=1)
         create_response = admin_client.create_topics([new_topic_spec])
         error_data = create_response.topic_errors
         self.assertEqual(len(error_data), 1)
         self.assertEqual(error_data[0], (new_topic_spec.name, 0, None))
 
         # Alter topic (change some Kafka-level property).
-        config_resource = ConfigResource(ConfigResourceType.TOPIC, new_topic_spec.name,
+        config_resource = ConfigResource(ConfigResourceType.TOPIC,
+                                         new_topic_spec.name,
                                          {'flush.messages': 42})
         alter_response = admin_client.alter_configs([config_resource])
         error_data = alter_response.resources
@@ -177,7 +187,8 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
 
         # Add 2 more partitions to topic.
         new_partitions_spec = {new_topic_spec.name: NewPartitions(5)}
-        new_partitions_response = admin_client.create_partitions(new_partitions_spec)
+        new_partitions_response = admin_client.create_partitions(
+            new_partitions_spec)
         error_data = create_response.topic_errors
         self.assertEqual(len(error_data), 1)
         self.assertEqual(error_data[0], (new_topic_spec.name, 0, None))
@@ -204,12 +215,14 @@ class MetricsHolder:
 
     def __init__(self, owner):
         self.owner = owner
-        self.initial_requests, self.inital_responses = MetricsHolder.get_envoy_stats()
+        self.initial_requests, self.inital_responses = MetricsHolder.get_envoy_stats(
+        )
         self.final_requests = None
         self.final_responses = None
 
     def collect_final_metrics(self):
-        self.final_requests, self.final_responses = MetricsHolder.get_envoy_stats()
+        self.final_requests, self.final_responses = MetricsHolder.get_envoy_stats(
+        )
 
     def assert_metric_increase(self, message_type, count):
         request_type = message_type + '_request'
@@ -217,11 +230,13 @@ class MetricsHolder:
 
         initial_request_value = self.initial_requests.get(request_type, 0)
         final_request_value = self.final_requests.get(request_type, 0)
-        self.owner.assertGreaterEqual(final_request_value, initial_request_value + count)
+        self.owner.assertGreaterEqual(final_request_value,
+                                      initial_request_value + count)
 
         initial_response_value = self.inital_responses.get(response_type, 0)
         final_response_value = self.final_responses.get(response_type, 0)
-        self.owner.assertGreaterEqual(final_response_value, initial_response_value + count)
+        self.owner.assertGreaterEqual(final_response_value,
+                                      initial_response_value + count)
 
     @staticmethod
     def get_envoy_stats():
@@ -287,7 +302,8 @@ class ServicesHolder:
         launcher_environment = os.environ.copy()
         # Make `java` visible to build script:
         # https://github.com/apache/kafka/blob/2.2.0/bin/kafka-run-class.sh#L226
-        new_path = os.path.abspath(java_directory) + os.pathsep + launcher_environment['PATH']
+        new_path = os.path.abspath(
+            java_directory) + os.pathsep + launcher_environment['PATH']
         launcher_environment['PATH'] = new_path
         # Both ZK & Kafka use Kafka launcher script.
         # By default it sets up JMX options:
@@ -312,7 +328,8 @@ class ServicesHolder:
         os.mkdir(kafka_store_dir)
 
         # Find the Kafka server 'bin' directory.
-        kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary', 'bin')
+        kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary',
+                                     'bin')
 
         # Main initialization block:
         # - generate random ports,
@@ -346,14 +363,20 @@ class ServicesHolder:
 
             # Render config file for Zookeeper.
             template = RenderingHelper.get_template('zookeeper_properties.j2')
-            contents = template.render(data={'data_dir': zookeeper_store_dir, 'zk_port': zk_port})
-            zookeeper_config_file = os.path.join(config_dir, 'zookeeper.properties')
+            contents = template.render(data={
+                'data_dir': zookeeper_store_dir,
+                'zk_port': zk_port
+            })
+            zookeeper_config_file = os.path.join(config_dir,
+                                                 'zookeeper.properties')
             with open(zookeeper_config_file, 'w') as fd:
                 fd.write(contents)
-                print('Zookeeper config file rendered at: ' + zookeeper_config_file)
+                print('Zookeeper config file rendered at: ' +
+                      zookeeper_config_file)
 
             # Render config file for Kafka.
-            template = RenderingHelper.get_template('kafka_server_properties.j2')
+            template = RenderingHelper.get_template(
+                'kafka_server_properties.j2')
             contents = template.render(
                 data={
                     'data_dir': kafka_store_dir,
@@ -361,7 +384,8 @@ class ServicesHolder:
                     'kafka_real_port': kafka_real_port,
                     'kafka_envoy_port': kafka_envoy_port
                 })
-            kafka_config_file = os.path.join(config_dir, 'kafka_server.properties')
+            kafka_config_file = os.path.join(config_dir,
+                                             'kafka_server.properties')
             with open(kafka_config_file, 'w') as fd:
                 fd.write(contents)
                 print('Kafka config file rendered at: ' + kafka_config_file)
@@ -373,28 +397,32 @@ class ServicesHolder:
                 envoy_binary = ServicesHolder.find_envoy()
                 # --base-id is added to allow multiple Envoy instances to run at the same time.
                 envoy_args = [
-                    os.path.abspath(envoy_binary), '-c', envoy_config_file, '--base-id',
+                    os.path.abspath(envoy_binary), '-c', envoy_config_file,
+                    '--base-id',
                     str(random.randint(1, 999999))
                 ]
                 envoy_handle = subprocess.Popen(envoy_args,
                                                 stdout=subprocess.PIPE,
                                                 stderr=subprocess.PIPE)
-                self.envoy_worker = ProcessWorker(envoy_handle, 'Envoy',
-                                                  'starting main dispatch loop')
+                self.envoy_worker = ProcessWorker(
+                    envoy_handle, 'Envoy', 'starting main dispatch loop')
                 self.envoy_worker.await_startup()
 
                 # Start Zookeeper in background, pointing to rendered config file.
-                zk_binary = os.path.join(kafka_bin_dir, 'zookeeper-server-start.sh')
+                zk_binary = os.path.join(kafka_bin_dir,
+                                         'zookeeper-server-start.sh')
                 zk_args = [os.path.abspath(zk_binary), zookeeper_config_file]
                 zk_handle = subprocess.Popen(zk_args,
                                              env=launcher_environment,
                                              stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE)
-                self.zk_worker = ProcessWorker(zk_handle, 'Zookeeper', 'binding to port')
+                self.zk_worker = ProcessWorker(zk_handle, 'Zookeeper',
+                                               'binding to port')
                 self.zk_worker.await_startup()
 
                 # Start Kafka in background, pointing to rendered config file.
-                kafka_binary = os.path.join(kafka_bin_dir, 'kafka-server-start.sh')
+                kafka_binary = os.path.join(kafka_bin_dir,
+                                            'kafka-server-start.sh')
                 kafka_args = [os.path.abspath(kafka_binary), kafka_config_file]
                 kafka_handle = subprocess.Popen(kafka_args,
                                                 env=launcher_environment,
@@ -447,7 +475,8 @@ class ServicesHolder:
         candidate = os.path.join('.', 'source', 'exe', 'envoy-static')
         if os.path.isfile(candidate):
             return candidate
-        candidate = os.path.join('.', 'external', 'envoy', 'source', 'exe', 'envoy-static')
+        candidate = os.path.join('.', 'external', 'envoy', 'source', 'exe',
+                                 'envoy-static')
         if os.path.isfile(candidate):
             return candidate
         raise Exception("Could not find Envoy")
@@ -500,7 +529,8 @@ class ProcessWorker:
         self.initialization_semaphore = Semaphore(value=0)
         self.initialization_ok = False
 
-        self.state_worker = Thread(target=ProcessWorker.initialization_worker, args=(self,))
+        self.state_worker = Thread(target=ProcessWorker.initialization_worker,
+                                   args=(self,))
         self.state_worker.start()
         self.out_worker = Thread(target=ProcessWorker.pipe_handler,
                                  args=(self, self.process_handle.stdout, 'out'))
@@ -522,7 +552,8 @@ class ProcessWorker:
             status = owner.process_handle.poll()
             if status:
                 # Service died.
-                print('%s did not initialize properly - finished with: %s' % (owner.name, status))
+                print('%s did not initialize properly - finished with: %s' %
+                      (owner.name, status))
                 owner.initialization_ok = False
                 owner.initialization_semaphore.release()
                 break
@@ -534,9 +565,10 @@ class ProcessWorker:
                     # some time has passed and mark the service as running.
                     current_time = int(round(time.time()))
                     if current_time - startup_message_ts >= ProcessWorker.INITIALIZATION_WAIT_SECONDS:
-                        print('Startup message seen %s seconds ago, and service is still running' %
-                              (ProcessWorker.INITIALIZATION_WAIT_SECONDS),
-                              flush=True)
+                        print(
+                            'Startup message seen %s seconds ago, and service is still running'
+                            % (ProcessWorker.INITIALIZATION_WAIT_SECONDS),
+                            flush=True)
                         owner.initialization_ok = True
                         owner.initialization_semaphore.release()
                         break

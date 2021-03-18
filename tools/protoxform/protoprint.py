@@ -74,7 +74,8 @@ def extract_clang_proto_style(clang_format_text):
 
 
 # Ensure we are using the canonical clang-format proto style.
-CLANG_FORMAT_STYLE = extract_clang_proto_style(pathlib.Path('.clang-format').read_text())
+CLANG_FORMAT_STYLE = extract_clang_proto_style(
+    pathlib.Path('.clang-format').read_text())
 
 
 def clang_format(contents):
@@ -86,11 +87,12 @@ def clang_format(contents):
   Returns:
     clang-formatted string
   """
-    return subprocess.run(
-        ['clang-format',
-         '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
-        input=contents.encode('utf-8'),
-        stdout=subprocess.PIPE).stdout
+    return subprocess.run([
+        'clang-format',
+        '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'
+    ],
+                          input=contents.encode('utf-8'),
+                          stdout=subprocess.PIPE).stdout
 
 
 def format_block(block):
@@ -127,10 +129,11 @@ def format_comments(comments):
     def fixup_trailing_backslash(s):
         return s[:-1].rstrip() if s.endswith('\\') else s
 
-    comments = '\n\n'.join(
-        '\n'.join(['//%s' % fixup_trailing_backslash(line)
-                   for line in comment.split('\n')[:-1]])
-        for comment in comments)
+    comments = '\n\n'.join('\n'.join([
+        '//%s' % fixup_trailing_backslash(line)
+        for line in comment.split('\n')[:-1]
+    ])
+                           for comment in comments)
     return format_block(comments)
 
 
@@ -165,8 +168,10 @@ def format_type_context_comments(type_context, annotation_xforms=None):
   """
     leading_comment = type_context.leading_comment
     if annotation_xforms:
-        leading_comment = leading_comment.get_comment_with_transforms(annotation_xforms)
-    leading = format_comments(list(type_context.leading_detached_comments) + [leading_comment.raw])
+        leading_comment = leading_comment.get_comment_with_transforms(
+            annotation_xforms)
+    leading = format_comments(
+        list(type_context.leading_detached_comments) + [leading_comment.raw])
     trailing = format_block(format_comments([type_context.trailing_comment]))
     return leading, trailing
 
@@ -186,17 +191,19 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
     typedb = utils.get_type_db()
     # Figure out type dependencies in this .proto.
     types = Types()
-    text_format.Merge(traverse.traverse_file(file_proto, type_whisperer.TypeWhispererVisitor()),
-                      types)
-    type_dependencies = sum([list(t.type_dependencies) for t in types.types.values()], [])
+    text_format.Merge(
+        traverse.traverse_file(file_proto,
+                               type_whisperer.TypeWhispererVisitor()), types)
+    type_dependencies = sum(
+        [list(t.type_dependencies) for t in types.types.values()], [])
     for service in file_proto.service:
         for m in service.method:
             type_dependencies.extend([m.input_type[1:], m.output_type[1:]])
     # Determine the envoy/ import paths from type deps.
-    envoy_proto_paths = set(
-        typedb.types[t].proto_path
-        for t in type_dependencies
-        if t.startswith('envoy.') and typedb.types[t].proto_path != file_proto.name)
+    envoy_proto_paths = set(typedb.types[t].proto_path
+                            for t in type_dependencies
+                            if t.startswith('envoy.') and
+                            typedb.types[t].proto_path != file_proto.name)
 
     def camel_case(s):
         return ''.join(t.capitalize() for t in re.split('[\._]', s))
@@ -223,7 +230,8 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
     # TODO(htuch): remove once v3 fixes this naming issue in
     # https://github.com/envoyproxy/envoy/issues/8120.
     if file_proto.package in ['envoy.api.v2.listener', 'envoy.api.v2.cluster']:
-        qualified_package = '.'.join(s.capitalize() for s in file_proto.package.split('.')) + 'NS'
+        qualified_package = '.'.join(
+            s.capitalize() for s in file_proto.package.split('.')) + 'NS'
         options.csharp_namespace = qualified_package
         options.ruby_package = qualified_package
 
@@ -241,13 +249,15 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
 
     if not empty_file:
         options.Extensions[
-            status_pb2.file_status].package_version_status = file_proto.options.Extensions[
+            status_pb2.
+            file_status].package_version_status = file_proto.options.Extensions[
                 status_pb2.file_status].package_version_status
 
     options_block = format_options(options)
 
     requires_versioning_import = any(
-        protoxform_options.get_versioning_annotation(m.options) for m in file_proto.message_type)
+        protoxform_options.get_versioning_annotation(m.options)
+        for m in file_proto.message_type)
 
     envoy_imports = list(envoy_proto_paths)
     google_imports = []
@@ -259,7 +269,8 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
         if idx in file_proto.public_dependency:
             public_imports.append(d)
             continue
-        elif d.startswith('envoy/annotations') or d.startswith('udpa/annotations'):
+        elif d.startswith('envoy/annotations') or d.startswith(
+                'udpa/annotations'):
             infra_imports.append(d)
         elif d.startswith('envoy/'):
             # We ignore existing envoy/ imports, since these are computed explicitly
@@ -269,7 +280,10 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
             google_imports.append(d)
         elif d.startswith('validate/'):
             infra_imports.append(d)
-        elif d in ['udpa/annotations/versioning.proto', 'udpa/annotations/status.proto']:
+        elif d in [
+                'udpa/annotations/versioning.proto',
+                'udpa/annotations/status.proto'
+        ]:
             # Skip, we decide to add this based on requires_versioning_import and options.
             pass
         else:
@@ -284,19 +298,24 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
     def format_import_block(xs):
         if not xs:
             return ''
-        return format_block('\n'.join(sorted('import "%s";' % x for x in set(xs) if x)))
+        return format_block('\n'.join(
+            sorted('import "%s";' % x for x in set(xs) if x)))
 
     def format_public_import_block(xs):
         if not xs:
             return ''
-        return format_block('\n'.join(sorted('import public "%s";' % x for x in xs)))
+        return format_block('\n'.join(
+            sorted('import public "%s";' % x for x in xs)))
 
     import_block = '\n'.join(
-        map(format_import_block, [envoy_imports, google_imports, misc_imports, infra_imports]))
+        map(format_import_block,
+            [envoy_imports, google_imports, misc_imports, infra_imports]))
     import_block += '\n' + format_public_import_block(public_imports)
     comment_block = format_comments(source_code_info.file_level_comments)
 
-    return ''.join(map(format_block, [file_block, import_block, options_block, comment_block]))
+    return ''.join(
+        map(format_block,
+            [file_block, import_block, options_block, comment_block]))
 
 
 def normalize_field_type_name(type_context, field_fqn):
@@ -358,18 +377,21 @@ def normalize_field_type_name(type_context, field_fqn):
             while type_context_splits_tmp:
                 # If we're in a.b.c and the FQN is a.d.Foo, we want to return true once
                 # we have type_context_splits_tmp as [a] and splits as [d, Foo].
-                if list(type_context_splits_tmp) + list(splits) == field_fqn_splits:
+                if list(type_context_splits_tmp) + list(
+                        splits) == field_fqn_splits:
                     return True
                 # If we're in a.b.c.d.e.f and the FQN is a.b.d.e.Foo, we want to return True
                 # once we have type_context_splits_tmp as [a] and splits as [b, d, e, Foo], but
                 # not when type_context_splits_tmp is [a, b, c] and FQN is [d, e, Foo].
-                if len(splits) > 1 and '.'.join(type_context_splits_tmp).endswith('.'.join(
-                        list(splits)[:-1])):
+                if len(splits) > 1 and '.'.join(
+                        type_context_splits_tmp).endswith('.'.join(
+                            list(splits)[:-1])):
                     return False
                 type_context_splits_tmp.pop()
             return False
 
-        while remaining_field_fqn_splits and not equivalent_in_type_context(normalized_splits):
+        while remaining_field_fqn_splits and not equivalent_in_type_context(
+                normalized_splits):
             normalized_splits.appendleft(remaining_field_fqn_splits.pop())
 
         # `extensions` is a keyword in proto2, and protoc will throw error if a type name
@@ -402,8 +424,10 @@ def format_field_type(type_context, field):
         if type_context.map_typenames and type_name_from_fqn(
                 field.type_name) in type_context.map_typenames:
             return 'map<%s, %s>' % tuple(
-                map(functools.partial(format_field_type, type_context),
-                    type_context.map_typenames[type_name_from_fqn(field.type_name)]))
+                map(
+                    functools.partial(format_field_type, type_context),
+                    type_context.map_typenames[type_name_from_fqn(
+                        field.type_name)]))
         return type_name
     elif field.type_name:
         return type_name
@@ -444,12 +468,15 @@ def format_service_method(type_context, method):
     def format_streaming(s):
         return 'stream ' if s else ''
 
-    leading_comment, trailing_comment = format_type_context_comments(type_context)
+    leading_comment, trailing_comment = format_type_context_comments(
+        type_context)
     return '%srpc %s(%s%s%s) returns (%s%s) {%s}\n' % (
-        leading_comment, method.name, trailing_comment, format_streaming(
-            method.client_streaming), normalize_field_type_name(
-                type_context, method.input_type), format_streaming(method.server_streaming),
-        normalize_field_type_name(type_context, method.output_type), format_options(method.options))
+        leading_comment, method.name, trailing_comment,
+        format_streaming(method.client_streaming),
+        normalize_field_type_name(type_context, method.input_type),
+        format_streaming(method.server_streaming),
+        normalize_field_type_name(
+            type_context, method.output_type), format_options(method.options))
 
 
 def format_field(type_context, field):
@@ -464,11 +491,12 @@ def format_field(type_context, field):
   """
     if protoxform_options.has_hide_option(field.options):
         return ''
-    leading_comment, trailing_comment = format_type_context_comments(type_context)
+    leading_comment, trailing_comment = format_type_context_comments(
+        type_context)
 
-    return '%s%s %s = %d%s;\n%s' % (leading_comment, format_field_type(
-        type_context, field), field.name, field.number, format_options(
-            field.options), trailing_comment)
+    return '%s%s %s = %d%s;\n%s' % (
+        leading_comment, format_field_type(type_context, field), field.name,
+        field.number, format_options(field.options), trailing_comment)
 
 
 def format_enum_value(type_context, value):
@@ -483,10 +511,11 @@ def format_enum_value(type_context, value):
   """
     if protoxform_options.has_hide_option(value.options):
         return ''
-    leading_comment, trailing_comment = format_type_context_comments(type_context)
+    leading_comment, trailing_comment = format_type_context_comments(
+        type_context)
     formatted_annotations = format_options(value.options)
-    return '%s%s = %d%s;\n%s' % (leading_comment, value.name, value.number, formatted_annotations,
-                                 trailing_comment)
+    return '%s%s = %d%s;\n%s' % (leading_comment, value.name, value.number,
+                                 formatted_annotations, trailing_comment)
 
 
 def text_format_value(field, value):
@@ -517,24 +546,29 @@ def format_options(options):
   """
 
     formatted_options = []
-    for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
-        option_name = '({})'.format(option_descriptor.full_name
-                                   ) if option_descriptor.is_extension else option_descriptor.name
+    for option_descriptor, option_value in sorted(options.ListFields(),
+                                                  key=lambda x: x[0].number):
+        option_name = '({})'.format(
+            option_descriptor.full_name
+        ) if option_descriptor.is_extension else option_descriptor.name
         if option_descriptor.message_type and option_descriptor.label != option_descriptor.LABEL_REPEATED:
             formatted_options.extend([
-                '{}.{} = {}'.format(option_name, subfield.name, text_format_value(subfield, value))
+                '{}.{} = {}'.format(option_name, subfield.name,
+                                    text_format_value(subfield, value))
                 for subfield, value in option_value.ListFields()
             ])
         else:
             formatted_options.append('{} = {}'.format(
-                option_name, text_format_value(option_descriptor, option_value)))
+                option_name, text_format_value(option_descriptor,
+                                               option_value)))
 
     if formatted_options:
         if options.DESCRIPTOR.name in ('EnumValueOptions', 'FieldOptions'):
             return '[{}]'.format(','.join(formatted_options))
         else:
             return format_block(''.join(
-                'option {};\n'.format(formatted_option) for formatted_option in formatted_options))
+                'option {};\n'.format(formatted_option)
+                for formatted_option in formatted_options))
     return ''
 
 
@@ -553,12 +587,13 @@ def format_reserved(enum_or_msg_proto):
     for rr in rrs:
         if rr.start == rr.end:
             rr.end += 1
-    reserved_fields = format_block(
-        'reserved %s;\n' %
-        ','.join(map(str, sum([list(range(rr.start, rr.end)) for rr in rrs], [])))) if rrs else ''
+    reserved_fields = format_block('reserved %s;\n' % ','.join(
+        map(str, sum([list(range(rr.start, rr.end))
+                      for rr in rrs], [])))) if rrs else ''
     if enum_or_msg_proto.reserved_name:
         reserved_fields += format_block(
-            'reserved %s;\n' % ', '.join('"%s"' % n for n in enum_or_msg_proto.reserved_name))
+            'reserved %s;\n' %
+            ', '.join('"%s"' % n for n in enum_or_msg_proto.reserved_name))
     return reserved_fields
 
 
@@ -569,27 +604,33 @@ class ProtoFormatVisitor(visitor.Visitor):
   """
 
     def visit_service(self, service_proto, type_context):
-        leading_comment, trailing_comment = format_type_context_comments(type_context)
+        leading_comment, trailing_comment = format_type_context_comments(
+            type_context)
         methods = '\n'.join(
             format_service_method(type_context.extend_method(index, m.name), m)
             for index, m in enumerate(service_proto.method))
         options = format_block(format_options(service_proto.options))
-        return '%sservice %s {\n%s%s%s\n}\n' % (leading_comment, service_proto.name, options,
+        return '%sservice %s {\n%s%s%s\n}\n' % (leading_comment,
+                                                service_proto.name, options,
                                                 trailing_comment, methods)
 
     def visit_enum(self, enum_proto, type_context):
         if protoxform_options.has_hide_option(enum_proto.options):
             return ''
-        leading_comment, trailing_comment = format_type_context_comments(type_context)
+        leading_comment, trailing_comment = format_type_context_comments(
+            type_context)
         formatted_options = format_options(enum_proto.options)
         reserved_fields = format_reserved(enum_proto)
         values = [
-            format_enum_value(type_context.extend_field(index, value.name), value)
+            format_enum_value(type_context.extend_field(index, value.name),
+                              value)
             for index, value in enumerate(enum_proto.value)
         ]
-        joined_values = ('\n' if any('//' in v for v in values) else '').join(values)
-        return '%senum %s {\n%s%s%s%s\n}\n' % (leading_comment, enum_proto.name, trailing_comment,
-                                               formatted_options, reserved_fields, joined_values)
+        joined_values = ('\n' if any(
+            '//' in v for v in values) else '').join(values)
+        return '%senum %s {\n%s%s%s%s\n}\n' % (
+            leading_comment, enum_proto.name, trailing_comment,
+            formatted_options, reserved_fields, joined_values)
 
     def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
         # Skip messages synthesized to represent map types.
@@ -598,7 +639,8 @@ class ProtoFormatVisitor(visitor.Visitor):
         if protoxform_options.has_hide_option(msg_proto.options):
             return ''
         annotation_xforms = {
-            annotations.NEXT_FREE_FIELD_ANNOTATION: create_next_free_field_xform(msg_proto)
+            annotations.NEXT_FREE_FIELD_ANNOTATION:
+                create_next_free_field_xform(msg_proto)
         }
         leading_comment, trailing_comment = format_type_context_comments(
             type_context, annotation_xforms)
@@ -613,7 +655,8 @@ class ProtoFormatVisitor(visitor.Visitor):
         oneof_index = None
         for index, field in enumerate(msg_proto.field):
             if oneof_index is not None:
-                if not field.HasField('oneof_index') or field.oneof_index != oneof_index:
+                if not field.HasField(
+                        'oneof_index') or field.oneof_index != oneof_index:
                     fields += '}\n\n'
                     oneof_index = None
             if oneof_index is None and field.HasField('oneof_index'):
@@ -622,24 +665,28 @@ class ProtoFormatVisitor(visitor.Visitor):
                 oneof_proto = msg_proto.oneof_decl[oneof_index]
                 oneof_leading_comment, oneof_trailing_comment = format_type_context_comments(
                     type_context.extend_oneof(oneof_index, field.name))
-                fields += '%soneof %s {\n%s%s' % (oneof_leading_comment, oneof_proto.name,
-                                                  oneof_trailing_comment,
-                                                  format_options(oneof_proto.options))
-            fields += format_block(format_field(type_context.extend_field(index, field.name),
-                                                field))
+                fields += '%soneof %s {\n%s%s' % (
+                    oneof_leading_comment, oneof_proto.name,
+                    oneof_trailing_comment, format_options(oneof_proto.options))
+            fields += format_block(
+                format_field(type_context.extend_field(index, field.name),
+                             field))
         if oneof_index is not None:
             fields += '}\n\n'
         return '%smessage %s {\n%s%s%s%s%s%s\n}\n' % (
-            leading_comment, msg_proto.name, trailing_comment, formatted_options, formatted_enums,
-            formatted_msgs, reserved_fields, fields)
+            leading_comment, msg_proto.name, trailing_comment,
+            formatted_options, formatted_enums, formatted_msgs, reserved_fields,
+            fields)
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
         empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
-        header = format_header_from_file(type_context.source_code_info, file_proto, empty_file)
+        header = format_header_from_file(type_context.source_code_info,
+                                         file_proto, empty_file)
         formatted_services = format_block('\n'.join(services))
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))
-        return clang_format(header + formatted_services + formatted_enums + formatted_msgs)
+        return clang_format(header + formatted_services + formatted_enums +
+                            formatted_msgs)
 
 
 if __name__ == '__main__':
@@ -651,4 +698,5 @@ if __name__ == '__main__':
     text_format.Merge(input_text, file_proto)
     dst_path = pathlib.Path(sys.argv[2])
     utils.load_type_db(sys.argv[3])
-    dst_path.write_bytes(traverse.traverse_file(file_proto, ProtoFormatVisitor()))
+    dst_path.write_bytes(
+        traverse.traverse_file(file_proto, ProtoFormatVisitor()))

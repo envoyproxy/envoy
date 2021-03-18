@@ -26,13 +26,15 @@ class ValidatingCodeBlock(CodeBlock):
         'type-name': directives.unchanged,
     }
     option_spec.update(CodeBlock.option_spec)
-    skip_validation = (os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or 'false').lower() == 'true'
+    skip_validation = (os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or
+                       'false').lower() == 'true'
 
     def run(self):
         source, line = self.state_machine.get_source_and_line(self.lineno)
         # built-in directives.unchanged_required option validator produces a confusing error message
         if self.options.get('type-name') == None:
-            raise ExtensionError("Expected type name in: {0} line: {1}".format(source, line))
+            raise ExtensionError("Expected type name in: {0} line: {1}".format(
+                source, line))
 
         if not ValidatingCodeBlock.skip_validation:
             args = [
@@ -45,8 +47,9 @@ class ValidatingCodeBlock(CodeBlock):
                                        encoding='utf-8')
             if completed.returncode != 0:
                 raise ExtensionError(
-                    "Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(
-                        self.options.get('type-name'), source, line, completed.stderr))
+                    "Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}"
+                    .format(self.options.get('type-name'), source, line,
+                            completed.stderr))
 
         self.options.pop('type-name', None)
         return list(CodeBlock.run(self))

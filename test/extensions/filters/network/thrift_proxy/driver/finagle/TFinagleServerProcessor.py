@@ -19,7 +19,8 @@ class TFinagleServerProcessor(TProcessor):
             if iprot.upgraded() is not None:
                 return self._underlying.process(iprot, oprot)
         except AttributeError as e:
-            logging.exception("underlying protocol object is not a TFinagleServerProtocol", e)
+            logging.exception(
+                "underlying protocol object is not a TFinagleServerProtocol", e)
             return self._underlying.process(iprot, oprot)
 
         (name, ttype, seqid) = iprot.readMessageBegin()
@@ -46,7 +47,8 @@ class TFinagleServerProcessor(TProcessor):
         iprot.set_upgraded(False)
         oprot.set_upgraded(False)
         msg = (name, ttype, seqid)
-        return self._underlying.process(StoredMessageProtocol(iprot, msg), oprot)
+        return self._underlying.process(StoredMessageProtocol(iprot, msg),
+                                        oprot)
 
 
 class StoredMessageProtocol(TProtocolDecorator.TProtocolDecorator):

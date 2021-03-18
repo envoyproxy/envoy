@@ -30,7 +30,8 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
     #     ${backtrace_marker} #10: SYMBOL [0xADDR]
     # or:
     #     ${backtrace_marker} #10: [0xADDR]
-    stackaddr_re = re.compile("%s #\d+:(?: .*)? \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
+    stackaddr_re = re.compile("%s #\d+:(?: .*)? \[(0x[0-9a-fA-F]+)\]$" %
+                              backtrace_marker)
     # Match something like:
     #     #10 0xLOCATION (BINARY+0xADDR)
     asan_re = re.compile(" *#\d+ *0x[0-9a-fA-F]+ *\([^+]*\+(0x[0-9a-fA-F]+)\)")
@@ -50,9 +51,12 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
                 file_and_line_number = run_addr2line(object_file, address)
                 file_and_line_number = trim_proc_cwd(file_and_line_number)
                 if address_offset != 0:
-                    sys.stdout.write("%s->[%s] %s" % (line.strip(), address, file_and_line_number))
+                    sys.stdout.write(
+                        "%s->[%s] %s" %
+                        (line.strip(), address, file_and_line_number))
                 else:
-                    sys.stdout.write("%s %s" % (line.strip(), file_and_line_number))
+                    sys.stdout.write("%s %s" %
+                                     (line.strip(), file_and_line_number))
                 continue
             else:
                 # Pass through print all other log lines:
@@ -66,8 +70,8 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
 #
 # Returns list of result lines
 def run_addr2line(obj_file, addr_to_resolve):
-    return subprocess.check_output(["addr2line", "-Cpie", obj_file,
-                                    addr_to_resolve]).decode('utf-8')
+    return subprocess.check_output(
+        ["addr2line", "-Cpie", obj_file, addr_to_resolve]).decode('utf-8')
 
 
 # Because of how bazel compiles, addr2line reports file names that begin with
@@ -82,7 +86,8 @@ def trim_proc_cwd(file_and_line_number):
 #
 # Returns list of extended process memory information.
 def run_pmap(pid):
-    return subprocess.check_output(['pmap', '-qX', str(pid)]).decode('utf-8')[1:]
+    return subprocess.check_output(['pmap', '-qX',
+                                    str(pid)]).decode('utf-8')[1:]
 
 
 # Find the virtual address offset of the process. This may be needed due ASLR.
@@ -125,10 +130,13 @@ if __name__ == "__main__":
                                     stderr=subprocess.STDOUT,
                                     universal_newlines=True)
         offset = find_address_offset(rununder.pid)
-        decode_stacktrace_log(sys.argv[1], ignore_decoding_errors(rununder.stdout), offset)
+        decode_stacktrace_log(sys.argv[1],
+                              ignore_decoding_errors(rununder.stdout), offset)
         rununder.wait()
         sys.exit(rununder.returncode)  # Pass back test pass/fail result
     else:
-        print("Usage (execute subprocess): stack_decode.py executable_file [additional args]")
+        print(
+            "Usage (execute subprocess): stack_decode.py executable_file [additional args]"
+        )
         print("Usage (read from stdin): stack_decode.py -s executable_file")
         sys.exit(1)

@@ -33,15 +33,18 @@ ENVOY_RULE_REGEX = re.compile(r'envoy[_\w]+\(')
 
 # Match a load() statement for the envoy_package macros.
 PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
-EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_extension_package".*?\)\n)', re.DOTALL)
+EXTENSION_PACKAGE_LOAD_BLOCK_REGEX = re.compile(
+    '("envoy_extension_package".*?\)\n)', re.DOTALL)
 
 # Match Buildozer 'print' output. Example of Buildozer print output:
 # cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
 BUILDOZER_PRINT_REGEX = re.compile(
-    '\s*([\w_]+)\s+([\w_]+)\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]')
+    '\s*([\w_]+)\s+([\w_]+)\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]\s+[(\[](.*?)[)\]]'
+)
 
 # Match API header include in Envoy source file?
-API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+API_INCLUDE_REGEX = re.compile(
+    '#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
 
 
 class EnvoyBuildFixerError(Exception):
@@ -90,9 +93,11 @@ def fix_package_and_license(path, contents):
         # envoy_package import.
         package_and_parens = package_string + '()'
         if package_and_parens[:-1] not in contents:
-            contents = re.sub(regex_to_use, r'\1\n%s\n\n' % package_and_parens, contents)
+            contents = re.sub(regex_to_use, r'\1\n%s\n\n' % package_and_parens,
+                              contents)
             if package_and_parens not in contents:
-                raise EnvoyBuildFixerError('Unable to insert %s' % package_and_parens)
+                raise EnvoyBuildFixerError('Unable to insert %s' %
+                                           package_and_parens)
 
     # Delete old licenses.
     if re.search(OLD_LICENSES_REGEX, contents):
@@ -104,10 +109,11 @@ def fix_package_and_license(path, contents):
 
 # Run Buildifier commands on a string with lint mode.
 def buildifier_lint(contents):
-    r = subprocess.run([BUILDIFIER_PATH, '-lint=fix', '-mode=fix', '-type=build'],
-                       input=contents.encode(),
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE)
+    r = subprocess.run(
+        [BUILDIFIER_PATH, '-lint=fix', '-mode=fix', '-type=build'],
+        input=contents.encode(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
     if r.returncode != 0:
         raise EnvoyBuildFixerError('buildozer execution failed: %s' % r)
     return r.stdout.decode('utf-8')
@@ -158,13 +164,16 @@ def fix_api_deps(path, contents):
                 if f.endswith('.cc') or f.endswith('.h'))
         if hdrs != 'missing':
             source_paths.extend(
-                os.path.join(source_dirname, f) for f in hdrs.split() if f.endswith('.h'))
+                os.path.join(source_dirname, f)
+                for f in hdrs.split()
+                if f.endswith('.h'))
         api_hdrs = set([])
         for p in source_paths:
             # We're not smart enough to infer on generated files.
             if os.path.exists(p):
                 api_hdrs = api_hdrs.union(find_api_headers(p))
-        actual_api_deps = set(['@envoy_api//%s:pkg_cc_proto' % h for h in api_hdrs])
+        actual_api_deps = set(
+            ['@envoy_api//%s:pkg_cc_proto' % h for h in api_hdrs])
         existing_api_deps = set([])
         if deps != 'missing':
             existing_api_deps = set([
@@ -174,10 +183,12 @@ def fix_api_deps(path, contents):
             ])
         deps_to_remove = existing_api_deps.difference(actual_api_deps)
         if deps_to_remove:
-            deps_mutation_cmds.append(('remove deps %s' % ' '.join(deps_to_remove), name))
+            deps_mutation_cmds.append(
+                ('remove deps %s' % ' '.join(deps_to_remove), name))
         deps_to_add = actual_api_deps.difference(existing_api_deps)
         if deps_to_add:
-            deps_mutation_cmds.append(('add deps %s' % ' '.join(deps_to_add), name))
+            deps_mutation_cmds.append(
+                ('add deps %s' % ' '.join(deps_to_add), name))
     return run_buildozer(deps_mutation_cmds, contents)
 
 
@@ -203,5 +214,6 @@ if __name__ == '__main__':
         with open(sys.argv[2], 'w') as f:
             f.write(reorderd_source)
         sys.exit(0)
-    print('Usage: %s <source file path> [<destination file path>]' % sys.argv[0])
+    print('Usage: %s <source file path> [<destination file path>]' %
+          sys.argv[0])
     sys.exit(1)

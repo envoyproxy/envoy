@@ -28,4 +28,5 @@ def bazel_bin_path_for_output_artifact(label, suffix, root=''):
   """
     proto_file_path = proto_file_canonical_from_label(label)
     return os.path.join(root, 'bazel-bin/external/envoy_api_canonical',
-                        os.path.dirname(proto_file_path), 'pkg', proto_file_path + suffix)
+                        os.path.dirname(proto_file_path), 'pkg',
+                        proto_file_path + suffix)

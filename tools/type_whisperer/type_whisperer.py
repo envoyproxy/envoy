@@ -25,7 +25,8 @@ class TypeWhispererVisitor(visitor.Visitor):
 
     def visit_enum(self, enum_proto, type_context):
         type_desc = self._types.types[type_context.name]
-        type_desc.next_version_upgrade = any(v.options.deprecated for v in enum_proto.value)
+        type_desc.next_version_upgrade = any(
+            v.options.deprecated for v in enum_proto.value)
         type_desc.deprecated_type = type_context.deprecated
 
     def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
@@ -49,7 +50,8 @@ class TypeWhispererVisitor(visitor.Visitor):
             t.qualified_package = file_proto.package
             t.proto_path = file_proto.name
             t.active = file_proto.options.Extensions[
-                status_pb2.file_status].package_version_status == status_pb2.ACTIVE
+                status_pb2.
+                file_status].package_version_status == status_pb2.ACTIVE
             if next_version_package:
                 t.next_version_package = next_version_package
                 t.next_version_upgrade = True

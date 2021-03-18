@@ -85,7 +85,13 @@ def test(writer):
         throws=True,
     )
 
-    blob = {"path": "/dev/null", "filter": {"type": "logical_or", "filters": []}}
+    blob = {
+        "path": "/dev/null",
+        "filter": {
+            "type": "logical_or",
+            "filters": []
+        }
+    }
     writer.write_test_file(
         'LessThanTwoFiltersInListNoneLogicalOrThrows',
         schema='ACCESS_LOG_SCHEMA',
@@ -93,7 +99,13 @@ def test(writer):
         throws=True,
     )
 
-    blob = {"path": "/dev/null", "filter": {"type": "logical_and", "filters": []}}
+    blob = {
+        "path": "/dev/null",
+        "filter": {
+            "type": "logical_and",
+            "filters": []
+        }
+    }
     writer.write_test_file(
         'LessThanTwoFiltersInListNoneLogicalAndThrows',
         schema='ACCESS_LOG_SCHEMA',

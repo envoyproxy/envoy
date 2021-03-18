@@ -29,7 +29,8 @@ from importlib.machinery import SourceFileLoader
 # import, so we are forced to this workaround.
 _external_proto_deps_spec = spec_from_loader(
     'external_proto_deps',
-    SourceFileLoader('external_proto_deps', 'api/bazel/external_proto_deps.bzl'))
+    SourceFileLoader('external_proto_deps',
+                     'api/bazel/external_proto_deps.bzl'))
 external_proto_deps = module_from_spec(_external_proto_deps_spec)
 _external_proto_deps_spec.loader.exec_module(external_proto_deps)
 
@@ -55,7 +56,8 @@ api_proto_package($fields)
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
 PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
-PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
+PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(
+    r'previous_message_type\s+=\s+"([^"]*)";')
 
 
 class ProtoSyncError(Exception):
@@ -89,8 +91,9 @@ def get_destination_path(src):
     contents = src_path.read_text(encoding='utf8')
     matches = re.findall(PACKAGE_REGEX, contents)
     if len(matches) != 1:
-        raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
-            src, len(matches)))
+        raise RequiresReformatError(
+            "Expect {} has only one package declaration but has {}".format(
+                src, len(matches)))
     return pathlib.Path(get_directory_from_package(
         matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
@@ -164,9 +167,11 @@ def sync_proto_file(dst_srcs):
         # previous version today.
         assert (len(srcs) == 2)
         shadow_srcs = [
-            s for s in srcs if s.endswith('.next_major_version_candidate.envoy_internal.proto')
+            s for s in srcs
+            if s.endswith('.next_major_version_candidate.envoy_internal.proto')
         ]
-        active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
+        active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')
+                     ][0]
         # If we're building the shadow, we need to combine the next major version
         # candidate shadow with the potentially hand edited active version.
         if len(shadow_srcs) > 0:
@@ -197,11 +202,14 @@ def get_import_deps(proto_path):
             if match:
                 import_path = match.group(1)
                 # We can ignore imports provided implicitly by api_proto_package().
-                if any(import_path.startswith(p) for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
+                if any(
+                        import_path.startswith(p)
+                        for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
                     continue
                 # Special case handling for UDPA annotations.
                 if import_path.startswith('udpa/annotations/'):
-                    imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
+                    imports.append(
+                        '@com_github_cncf_udpa//udpa/annotations:pkg')
                     continue
                 # Special case handling for UDPA core.
                 if import_path.startswith('xds/core/v3/'):
@@ -210,11 +218,13 @@ def get_import_deps(proto_path):
                 # Explicit remapping for external deps, compute paths for envoy/*.
                 if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
                     imports.append(
-                        external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
+                        external_proto_deps.
+                        EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
                     continue
                 if import_path.startswith('envoy/'):
                     # Ignore package internal imports.
-                    if os.path.dirname(proto_path).endswith(os.path.dirname(import_path)):
+                    if os.path.dirname(proto_path).endswith(
+                            os.path.dirname(import_path)):
                         continue
                     imports.append('//%s:pkg' % os.path.dirname(import_path))
                     continue
@@ -275,9 +285,12 @@ def build_file_contents(root, files):
   Returns:
     A string containing the canonical BUILD file content for root.
   """
-    import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
+    import_deps = set(
+        sum([get_import_deps(os.path.join(root, f)) for f in files], []))
     history_deps = set(
-        sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
+        sum([
+            get_previous_message_type_deps(os.path.join(root, f)) for f in files
+        ], []))
     deps = import_deps.union(history_deps)
     _has_services = any(has_services(os.path.join(root, f)) for f in files)
     fields = []
@@ -288,7 +301,8 @@ def build_file_contents(root, files):
             formatted_deps = '"%s"' % list(deps)[0]
         else:
             formatted_deps = '\n' + '\n'.join(
-                '        "%s",' % dep for dep in sorted(deps, key=build_order_key)) + '\n    '
+                '        "%s",' % dep
+                for dep in sorted(deps, key=build_order_key)) + '\n    '
         fields.append('    deps = [%s],' % formatted_deps)
     formatted_fields = '\n' + '\n'.join(fields) + '\n' if fields else ''
     return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
@@ -329,7 +343,8 @@ def generate_current_api_dir(api_dir, dst_dir):
 
 
 def git_status(path):
-    return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
+    return subprocess.check_output(['git', 'status', '--porcelain',
+                                    str(path)]).decode()
 
 
 def git_modified_files(path, suffix):
@@ -343,7 +358,8 @@ def git_modified_files(path, suffix):
   """
     try:
         modified_files = subprocess.check_output(
-            ['tools/git/modified_since_last_github_commit.sh', 'api', 'proto']).decode().split()
+            ['tools/git/modified_since_last_github_commit.sh', 'api',
+             'proto']).decode().split()
         return modified_files
     except subprocess.CalledProcessError as e:
         if e.returncode == 1:
@@ -380,7 +396,9 @@ def sync(api_root, mode, labels, shadow):
         dst_dir = pathlib.Path(tmp).joinpath("b")
         paths = []
         for label in labels:
-            paths.append(utils.bazel_bin_path_for_output_artifact(label, '.active_or_frozen.proto'))
+            paths.append(
+                utils.bazel_bin_path_for_output_artifact(
+                    label, '.active_or_frozen.proto'))
             paths.append(
                 utils.bazel_bin_path_for_output_artifact(
                     label, '.next_major_version_candidate.envoy_internal.proto'
@@ -388,8 +406,10 @@ def sync(api_root, mode, labels, shadow):
         dst_src_paths = defaultdict(list)
         for path in paths:
             if os.stat(path).st_size > 0:
-                abs_dst_path, rel_dst_path = get_abs_rel_destination_path(dst_dir, path)
-                if should_sync(path, api_proto_modified_files, py_tools_modified_files):
+                abs_dst_path, rel_dst_path = get_abs_rel_destination_path(
+                    dst_dir, path)
+                if should_sync(path, api_proto_modified_files,
+                               py_tools_modified_files):
                     dst_src_paths[abs_dst_path].append(path)
                 else:
                     print('Skipping sync of %s' % path)
@@ -406,36 +426,43 @@ def sync(api_root, mode, labels, shadow):
 
         # These support files are handled manually.
         for f in [
-                'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
-                'envoy/annotations/BUILD'
+                'envoy/annotations/resource.proto',
+                'envoy/annotations/deprecation.proto', 'envoy/annotations/BUILD'
         ]:
             copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
             copy_dst_dir.mkdir(exist_ok=True)
             shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
 
-        diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
+        diff = subprocess.run(['diff', '-Npur', "a", "b"],
+                              cwd=tmp,
+                              stdout=subprocess.PIPE).stdout
 
         if diff.strip():
             if mode == "check":
-                print("Please apply following patch to directory '{}'".format(api_root),
+                print("Please apply following patch to directory '{}'".format(
+                    api_root),
                       file=sys.stderr)
                 print(diff.decode(), file=sys.stderr)
                 sys.exit(1)
             if mode == "fix":
                 _git_status = git_status(api_root)
                 if _git_status:
-                    print('git status indicates a dirty API tree:\n%s' % _git_status)
+                    print('git status indicates a dirty API tree:\n%s' %
+                          _git_status)
                     print(
                         'Proto formatting may overwrite or delete files in the above list with no git backup.'
                     )
                     if input('Continue? [yN] ').strip().lower() != 'y':
                         sys.exit(1)
                 src_files = set(
-                    str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
-                dst_files = set(str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
+                    str(p.relative_to(current_api_dir))
+                    for p in current_api_dir.rglob('*'))
+                dst_files = set(
+                    str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
                 deleted_files = src_files.difference(dst_files)
                 if deleted_files:
-                    print('The following files will be deleted: %s' % sorted(deleted_files))
+                    print('The following files will be deleted: %s' %
+                          sorted(deleted_files))
                     print(
                         'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
                     )
@@ -446,7 +473,9 @@ def sync(api_root, mode, labels, shadow):
                     else:
                         sys.exit(1)
                 else:
-                    subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
+                    subprocess.run(['patch', '-p1'],
+                                   input=diff,
+                                   cwd=str(api_root_path.resolve()))
 
 
 if __name__ == '__main__':

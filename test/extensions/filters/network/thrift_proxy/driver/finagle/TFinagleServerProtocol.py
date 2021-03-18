@@ -25,11 +25,13 @@ class TFinagleServerProtocol(TBinaryProtocol.TBinaryProtocol):
         if self._upgraded:
             header = ResponseHeader()  # .. TODO set some fields
             header.write(self)
-        return TBinaryProtocol.TBinaryProtocol.writeMessageBegin(self, *args, **kwargs)
+        return TBinaryProtocol.TBinaryProtocol.writeMessageBegin(
+            self, *args, **kwargs)
 
     def readMessageBegin(self, *args, **kwargs):
         if self._upgraded:
             header = RequestHeader()
             header.read(self)
             self._last_request = header
-        return TBinaryProtocol.TBinaryProtocol.readMessageBegin(self, *args, **kwargs)
+        return TBinaryProtocol.TBinaryProtocol.readMessageBegin(
+            self, *args, **kwargs)

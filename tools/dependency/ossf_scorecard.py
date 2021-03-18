@@ -50,8 +50,8 @@ class OssfScorecardError(Exception):
 def is_scored_use_category(use_category):
     return len(
         set(use_category).intersection([
-            'dataplane_core', 'dataplane_ext', 'controlplane', 'observability_core',
-            'observability_ext'
+            'dataplane_core', 'dataplane_ext', 'controlplane',
+            'observability_core', 'observability_ext'
         ])) > 0
 
 
@@ -61,7 +61,8 @@ def score(scorecard_path, repository_locations):
         if not is_scored_use_category(metadata['use_category']):
             continue
         results_key = metadata['project_name']
-        formatted_name = '=HYPERLINK("%s", "%s")' % (metadata['project_url'], results_key)
+        formatted_name = '=HYPERLINK("%s", "%s")' % (metadata['project_url'],
+                                                     results_key)
         github_project_url = utils.get_github_project_url(metadata['urls'])
         if not github_project_url:
             na = 'Not Scorecard compatible'
@@ -76,9 +77,10 @@ def score(scorecard_path, repository_locations):
                                              releases=na)
             continue
         raw_scorecard = json.loads(
-            sp.check_output(
-                [scorecard_path, f'--repo={github_project_url}', '--show-details',
-                 '--format=json']))
+            sp.check_output([
+                scorecard_path, f'--repo={github_project_url}',
+                '--show-details', '--format=json'
+            ]))
         checks = {c['CheckName']: c for c in raw_scorecard['Checks']}
 
         # Generic check format.
@@ -94,21 +96,23 @@ def score(scorecard_path, repository_locations):
             if score['Pass']:
                 return _format('Signed-Releases')
             details = score['Details']
-            release_found = details is not None and any('release found:' in d for d in details)
+            release_found = details is not None and any(
+                'release found:' in d for d in details)
             if release_found:
                 return 'True (10)'
             else:
                 return 'False (10)'
 
-        results[results_key] = Scorecard(name=formatted_name,
-                                         contributors=_format('Contributors'),
-                                         active=_format('Active'),
-                                         ci_tests=_format('CI-Tests'),
-                                         pull_requests=_format('Pull-Requests'),
-                                         code_review=_format('Code-Review'),
-                                         fuzzing=_format('Fuzzing'),
-                                         security_policy=_format('Security-Policy'),
-                                         releases=release_format())
+        results[results_key] = Scorecard(
+            name=formatted_name,
+            contributors=_format('Contributors'),
+            active=_format('Active'),
+            ci_tests=_format('CI-Tests'),
+            pull_requests=_format('Pull-Requests'),
+            code_review=_format('Code-Review'),
+            fuzzing=_format('Fuzzing'),
+            security_policy=_format('Security-Policy'),
+            releases=release_format())
         print(raw_scorecard)
         print(results[results_key])
     return results
@@ -139,8 +143,10 @@ if __name__ == '__main__':
     spec_loader = exports.repository_locations_utils.load_repository_locations_spec
     path_module = exports.load_module('repository_locations', path)
     try:
-        results = score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
+        results = score(scorecard_path,
+                        spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
         print_csv_results(csv_output_path, results)
     except OssfScorecardError as e:
-        print(f'An error occurred while processing {path}, please verify the correctness of the '
-              f'metadata: {e}')
+        print(
+            f'An error occurred while processing {path}, please verify the correctness of the '
+            f'metadata: {e}')

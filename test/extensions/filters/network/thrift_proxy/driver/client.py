@@ -8,7 +8,8 @@ from generated.example import Example
 from generated.example.ttypes import (Param, TheWorks, AppException)
 
 from thrift import Thrift
-from thrift.protocol import (TBinaryProtocol, TCompactProtocol, TJSONProtocol, TMultiplexedProtocol)
+from thrift.protocol import (TBinaryProtocol, TCompactProtocol, TJSONProtocol,
+                             TMultiplexedProtocol)
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from fbthrift import THeaderTransport
@@ -93,7 +94,8 @@ def main(cfg, reqhandle, resphandle):
         elif cfg.protocol == "compact":
             transport.set_protocol_id(THeaderTransport.T_COMPACT_PROTOCOL)
         else:
-            sys.exit("header transport cannot be used with protocol {0}".format(cfg.protocol))
+            sys.exit("header transport cannot be used with protocol {0}".format(
+                cfg.protocol))
     else:
         sys.exit("unknown transport {0}".format(cfg.transport))
 
@@ -111,7 +113,8 @@ def main(cfg, reqhandle, resphandle):
         sys.exit("unknown protocol {0}".format(cfg.protocol))
 
     if cfg.service is not None:
-        protocol = TMultiplexedProtocol.TMultiplexedProtocol(protocol, cfg.service)
+        protocol = TMultiplexedProtocol.TMultiplexedProtocol(
+            protocol, cfg.service)
 
     client = Example.Client(protocol)
 
@@ -155,7 +158,8 @@ def main(cfg, reqhandle, resphandle):
                 result = client.execute(param)
                 print("client: executed {0}: {1}".format(param, result))
             except AppException as e:
-                print("client: execute failed with IDL Exception: {0}".format(e.why))
+                print("client: execute failed with IDL Exception: {0}".format(
+                    e.why))
         else:
             sys.exit("unknown method {0}".format(cfg.method))
     except Thrift.TApplicationException as e:
@@ -165,7 +169,8 @@ def main(cfg, reqhandle, resphandle):
         req = "".join(["%02X " % ord(x) for x in reqhandle.getvalue()]).strip()
         print("request: {}".format(req))
     if cfg.response is None:
-        resp = "".join(["%02X " % ord(x) for x in resphandle.getvalue()]).strip()
+        resp = "".join(["%02X " % ord(x) for x in resphandle.getvalue()
+                       ]).strip()
         print("response: {}".format(resp))
 
     transport.close()
@@ -190,8 +195,9 @@ if __name__ == "__main__":
         metavar="ADDR",
         dest="addr",
         required=True,
-        help="Target address for requests in the form host:port. The host is optional. If --unix" +
-        " is set, the address is the socket name.",
+        help=
+        "Target address for requests in the form host:port. The host is optional. If --unix"
+        + " is set, the address is the socket name.",
     )
     parser.add_argument(
         "-m",
@@ -238,7 +244,8 @@ if __name__ == "__main__":
         "--headers",
         dest="headers",
         metavar="KEY=VALUE[,KEY=VALUE]",
-        help="list of comma-delimited, key value pairs to include as transport headers.",
+        help=
+        "list of comma-delimited, key value pairs to include as transport headers.",
     )
 
     cfg = parser.parse_args()

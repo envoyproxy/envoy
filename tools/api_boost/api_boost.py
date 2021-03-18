@@ -20,7 +20,8 @@ import shlex
 import subprocess as sp
 
 # Detect API #includes.
-API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+API_INCLUDE_REGEX = re.compile(
+    '#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
 
 # Needed for CI to pass down bazel options.
 BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
@@ -29,7 +30,8 @@ BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 # Obtain the directory containing a path prefix, e.g. ./foo/bar.txt is ./foo,
 # ./foo/ba is ./foo, ./foo/bar/ is ./foo/bar.
 def prefix_directory(path_prefix):
-    return path_prefix if os.path.isdir(path_prefix) else os.path.dirname(path_prefix)
+    return path_prefix if os.path.isdir(path_prefix) else os.path.dirname(
+        path_prefix)
 
 
 # Update a C++ file to the latest API.
@@ -44,13 +46,15 @@ def api_boost_file(llvm_include_path, debug_log, path):
         result = sp.run([
             './bazel-bin/external/envoy_dev/clang_tools/api_booster/api_booster',
             '--extra-arg-before=-xc++',
-            '--extra-arg=-isystem%s' % llvm_include_path, '--extra-arg=-Wno-undefined-internal',
+            '--extra-arg=-isystem%s' % llvm_include_path,
+            '--extra-arg=-Wno-undefined-internal',
             '--extra-arg=-Wno-old-style-cast', path
         ],
                         capture_output=True,
                         check=True)
     except sp.CalledProcessError as e:
-        print('api_booster failure for %s: %s %s' % (path, e, e.stderr.decode('utf-8')))
+        print('api_booster failure for %s: %s %s' %
+              (path, e, e.stderr.decode('utf-8')))
         raise
     if debug_log:
         print(result.stderr.decode('utf-8'))
@@ -82,7 +86,8 @@ def rewrite_includes(args):
         # Exclude API includes, except for a special case related to v2alpha
         # ext_authz; this is needed to include the service descriptor in the build
         # and is a hack that will go away when we remove v2.
-        if re.match(API_INCLUDE_REGEX, line) and 'envoy/service/auth/v2alpha' not in line:
+        if re.match(API_INCLUDE_REGEX,
+                    line) and 'envoy/service/auth/v2alpha' not in line:
             continue
         output_lines.append(line)
     # Rewrite file.
@@ -95,13 +100,16 @@ def api_boost_tree(target_paths,
                    build_api_booster=False,
                    debug_log=False,
                    sequential=False):
-    dep_build_targets = ['//%s/...' % prefix_directory(prefix) for prefix in target_paths]
+    dep_build_targets = [
+        '//%s/...' % prefix_directory(prefix) for prefix in target_paths
+    ]
 
     # Optional setup of state. We need the compilation database and api_booster
     # tool in place before we can start boosting.
     if generate_compilation_database:
         print('Building compilation database for %s' % dep_build_targets)
-        sp.run(['./tools/gen_compilation_database.py', '--include_headers'] + dep_build_targets,
+        sp.run(['./tools/gen_compilation_database.py', '--include_headers'] +
+               dep_build_targets,
                check=True)
 
     if build_api_booster:
@@ -112,10 +120,12 @@ def api_boost_tree(target_paths,
         # Figure out some cc_libraries that cover most of our external deps. This is
         # the same logic as in gen_compilation_database.py.
         query = 'kind(cc_library, {})'.format(' union '.join(dep_build_targets))
-        dep_lib_build_targets = sp.check_output(['bazel', 'query', query]).decode().splitlines()
+        dep_lib_build_targets = sp.check_output(['bazel', 'query',
+                                                 query]).decode().splitlines()
         # We also need some misc. stuff such as test binaries for setup of benchmark
         # dep.
-        query = 'attr("tags", "compilation_db_dep", {})'.format(' union '.join(dep_build_targets))
+        query = 'attr("tags", "compilation_db_dep", {})'.format(
+            ' union '.join(dep_build_targets))
         dep_lib_build_targets.extend(
             sp.check_output(['bazel', 'query', query]).decode().splitlines())
         extra_api_booster_args = []
@@ -143,8 +153,8 @@ def api_boost_tree(target_paths,
     # TODO(htuch): this is fragile and depends on Clang version, should figure out
     # a cleaner approach.
     llvm_include_path = os.path.join(
-        sp.check_output([os.getenv('LLVM_CONFIG'), '--libdir']).decode().rstrip(),
-        'clang/11.0.1/include')
+        sp.check_output([os.getenv('LLVM_CONFIG'),
+                         '--libdir']).decode().rstrip(), 'clang/11.0.1/include')
 
     # Determine the files in the target dirs eligible for API boosting, based on
     # known files in the compilation database.
@@ -168,8 +178,9 @@ def api_boost_tree(target_paths,
             # any mutation takes place.
             # TODO(htuch): we should move to run-clang-tidy.py once the headers fixups
             # are Clang-based.
-            api_includes = p.map(functools.partial(api_boost_file, llvm_include_path, debug_log),
-                                 file_paths)
+            api_includes = p.map(
+                functools.partial(api_boost_file, llvm_include_path, debug_log),
+                file_paths)
             # Apply Clang replacements before header fixups, since the replacements
             # are all relative to the original file.
             for prefix_dir in set(map(prefix_directory, target_paths)):
@@ -186,15 +197,19 @@ def api_boost_tree(target_paths,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Update Envoy tree to the latest API')
+    parser = argparse.ArgumentParser(
+        description='Update Envoy tree to the latest API')
     parser.add_argument('--generate_compilation_database', action='store_true')
     parser.add_argument('--build_api_booster', action='store_true')
     parser.add_argument('--debug_log', action='store_true')
     parser.add_argument('--sequential', action='store_true')
-    parser.add_argument('paths', nargs='*', default=['source', 'test', 'include'])
+    parser.add_argument('paths',
+                        nargs='*',
+                        default=['source', 'test', 'include'])
     args = parser.parse_args()
-    api_boost_tree(args.paths,
-                   generate_compilation_database=args.generate_compilation_database,
-                   build_api_booster=args.build_api_booster,
-                   debug_log=args.debug_log,
-                   sequential=args.sequential)
+    api_boost_tree(
+        args.paths,
+        generate_compilation_database=args.generate_compilation_database,
+        build_api_booster=args.build_api_booster,
+        debug_log=args.debug_log,
+        sequential=args.sequential)

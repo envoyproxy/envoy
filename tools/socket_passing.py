@@ -34,7 +34,8 @@ def generate_new_config(original_yaml, admin_address, updated_json):
             admin_response = admin_conn.getresponse()
             if not admin_response.status == 200:
                 return False
-            discovered_listeners = json.loads(admin_response.read().decode('utf-8'))
+            discovered_listeners = json.loads(
+                admin_response.read().decode('utf-8'))
         except Exception as e:
             sys.stderr.write('Cannot connect to admin: %s\n' % e)
             return False
@@ -46,32 +47,39 @@ def generate_new_config(original_yaml, admin_address, updated_json):
                 if 'pipe' in discovered['local_address']:
                     path = discovered['local_address']['pipe']['path']
                     for index in range(index + 1, len(raw_yaml) - 1):
-                        if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
-                            raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + path + '"',
-                                                         raw_yaml[index + 1])
+                        if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[
+                                index + 1]:
+                            raw_yaml[index + 1] = re.sub(
+                                'path:.*', 'path: "' + path + '"',
+                                raw_yaml[index + 1])
                             replaced = True
                             break
                 else:
-                    addr = discovered['local_address']['socket_address']['address']
-                    port = str(discovered['local_address']['socket_address']['port_value'])
+                    addr = discovered['local_address']['socket_address'][
+                        'address']
+                    port = str(discovered['local_address']['socket_address']
+                               ['port_value'])
                     if addr[0] == '[':
                         addr = addr[1:-1]  # strip [] from ipv6 address.
                     for index in range(index + 1, len(raw_yaml) - 2):
                         if ('socket_address:' in raw_yaml[index] and
                                 'address:' in raw_yaml[index + 1] and
                                 'port_value:' in raw_yaml[index + 2]):
-                            raw_yaml[index + 1] = re.sub('address:.*', 'address: "' + addr + '"',
-                                                         raw_yaml[index + 1])
-                            raw_yaml[index + 2] = re.sub('port_value:.*', 'port_value: ' + port,
-                                                         raw_yaml[index + 2])
+                            raw_yaml[index + 1] = re.sub(
+                                'address:.*', 'address: "' + addr + '"',
+                                raw_yaml[index + 1])
+                            raw_yaml[index + 2] = re.sub(
+                                'port_value:.*', 'port_value: ' + port,
+                                raw_yaml[index + 2])
                             replaced = True
                             break
                 if replaced:
-                    sys.stderr.write('replaced listener at line ' + str(index) + ' with ' +
-                                     str(discovered) + '\n')
+                    sys.stderr.write('replaced listener at line ' + str(index) +
+                                     ' with ' + str(discovered) + '\n')
                 else:
-                    sys.stderr.write('Failed to replace a discovered listener ' + str(discovered) +
-                                     '\n')
+                    sys.stderr.write(
+                        'Failed to replace a discovered listener ' +
+                        str(discovered) + '\n')
                     return False
             with open(updated_json, 'w') as outfile:
                 outfile.writelines(raw_yaml)
@@ -82,7 +90,8 @@ def generate_new_config(original_yaml, admin_address, updated_json):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Replace listener addressses in json file.')
+    parser = argparse.ArgumentParser(
+        description='Replace listener addressses in json file.')
     parser.add_argument('-o',
                         '--original_json',
                         type=str,
@@ -115,7 +124,8 @@ if __name__ == '__main__':
     with open(admin_address_path, 'r') as admin_address_file:
         admin_address = admin_address_file.read()
 
-    success = generate_new_config(args.original_json, admin_address, args.updated_json)
+    success = generate_new_config(args.original_json, admin_address,
+                                  args.updated_json)
 
     if not success:
         sys.exit(1)

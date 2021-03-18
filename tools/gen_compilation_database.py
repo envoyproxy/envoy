@@ -30,7 +30,10 @@ def generate_compilation_database(args):
     compdb = []
     for compdb_file in Path(execroot).glob("**/*.compile_commands.json"):
         compdb.extend(
-            json.loads("[" + compdb_file.read_text().replace("__EXEC_ROOT__", execroot) + "]"))
+            json.loads(
+                "[" +
+                compdb_file.read_text().replace("__EXEC_ROOT__", execroot) +
+                "]"))
     return compdb
 
 
@@ -82,14 +85,19 @@ def modify_compile_command(target, args):
 
 
 def fix_compilation_database(args, db):
-    db = [modify_compile_command(target, args) for target in db if is_compile_target(target, args)]
+    db = [
+        modify_compile_command(target, args)
+        for target in db
+        if is_compile_target(target, args)
+    ]
 
     with open("compile_commands.json", "w") as db_file:
         json.dump(db, db_file, indent=2)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Generate JSON compilation database')
+    parser = argparse.ArgumentParser(
+        description='Generate JSON compilation database')
     parser.add_argument('--include_external', action='store_true')
     parser.add_argument('--include_genfiles', action='store_true')
     parser.add_argument('--include_headers', action='store_true')

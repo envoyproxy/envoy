@@ -146,7 +146,8 @@ def main(cfg):
             transport_factory = THeaderTransport.THeaderTransportFactory(
                 THeaderTransport.T_COMPACT_PROTOCOL)
         else:
-            sys.exit("header transport cannot be used with protocol {0}".format(cfg.protocol))
+            sys.exit("header transport cannot be used with protocol {0}".format(
+                cfg.protocol))
     else:
         sys.exit("unknown transport {0}".format(cfg.transport))
 
@@ -157,7 +158,8 @@ def main(cfg):
     elif cfg.protocol == "json":
         protocol_factory = TJSONProtocol.TJSONProtocolFactory()
     elif cfg.protocol == "finagle":
-        protocol_factory = TFinagleServerProtocol.TFinagleServerProtocolFactory()
+        protocol_factory = TFinagleServerProtocol.TFinagleServerProtocolFactory(
+        )
     else:
         sys.exit("unknown protocol {0}".format(cfg.protocol))
 
@@ -170,7 +172,8 @@ def main(cfg):
     elif cfg.response == "exception":
         print("Thrift Server will throw Thrift exceptions for all messages")
 
-    server = TServer.TThreadedServer(processor, transport, transport_factory, protocol_factory)
+    server = TServer.TThreadedServer(processor, transport, transport_factory,
+                                     protocol_factory)
     try:
         server.serve()
     except KeyboardInterrupt:
@@ -179,15 +182,17 @@ def main(cfg):
 
 if __name__ == "__main__":
     logging.basicConfig()
-    parser = argparse.ArgumentParser(description="Thrift server to match client.py.")
+    parser = argparse.ArgumentParser(
+        description="Thrift server to match client.py.")
     parser.add_argument(
         "-a",
         "--addr",
         metavar="ADDR",
         dest="addr",
         default=":0",
-        help="Listener address for server in the form host:port. The host is optional. If --unix" +
-        " is set, the address is the socket name.",
+        help=
+        "Listener address for server in the form host:port. The host is optional. If --unix"
+        + " is set, the address is the socket name.",
     )
     parser.add_argument(
         "-m",

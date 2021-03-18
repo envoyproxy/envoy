@@ -65,7 +65,9 @@ def extract_annotations(s, inherited_annotations=None):
     Annotation map.
   """
     annotations = {
-        k: v for k, v in (inherited_annotations or {}).items() if k in INHERITED_ANNOTATIONS
+        k: v
+        for k, v in (inherited_annotations or {}).items()
+        if k in INHERITED_ANNOTATIONS
     }
     # Extract annotations.
     groups = re.findall(ANNOTATION_REGEX, s)
@@ -99,7 +101,8 @@ def xform_annotation(s, annotation_xforms):
         annotation_xform = annotation_xforms.get(annotation)
         if annotation_xform:
             value = annotation_xform(annotation)
-            return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
+            return '[#%s: %s]%s' % (annotation, value,
+                                    trailing) if value is not None else ''
         else:
             return match.group(0)
 

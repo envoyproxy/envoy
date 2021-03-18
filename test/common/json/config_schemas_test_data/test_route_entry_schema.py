@@ -17,7 +17,11 @@ def test(writer):
         throws=False,
     )
 
-    blob = {"prefix": "/foo", "cluster": "local_service_grpc", "priority": "foo"}
+    blob = {
+        "prefix": "/foo",
+        "cluster": "local_service_grpc",
+        "priority": "foo"
+    }
     writer.write_test_file(
         'InvalidPriority',
         schema='ROUTE_ENTRY_CONFIGURATION_SCHEMA',

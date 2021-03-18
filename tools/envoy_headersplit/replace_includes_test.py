@@ -12,20 +12,25 @@ class ReplaceIncludesTest(unittest.TestCase):
 
     def test_to_classname(self):
         # Test file name with whole path
-        self.assertEqual(replace_includes.to_classname("test/mocks/server/admin_stream.h"),
-                         "MockAdminStream")
+        self.assertEqual(
+            replace_includes.to_classname("test/mocks/server/admin_stream.h"),
+            "MockAdminStream")
         # Test file name without .h extension
-        self.assertEqual(replace_includes.to_classname("cluster_mock_priority_set"),
-                         "MockClusterMockPrioritySet")
+        self.assertEqual(
+            replace_includes.to_classname("cluster_mock_priority_set"),
+            "MockClusterMockPrioritySet")
 
     def test_to_bazelname(self):
         # Test file name with whole path
         self.assertEqual(
-            replace_includes.to_bazelname("test/mocks/server/admin_stream.h", "server"),
+            replace_includes.to_bazelname("test/mocks/server/admin_stream.h",
+                                          "server"),
             "//test/mocks/server:admin_stream_mocks")
         # Test file name without .h extension
-        self.assertEqual(replace_includes.to_bazelname("cluster_mock_priority_set", "upstream"),
-                         "//test/mocks/upstream:cluster_mock_priority_set_mocks")
+        self.assertEqual(
+            replace_includes.to_bazelname("cluster_mock_priority_set",
+                                          "upstream"),
+            "//test/mocks/upstream:cluster_mock_priority_set_mocks")
 
     class FakeDir():
         # fake directory to test get_filenames
@@ -44,9 +49,11 @@ class ReplaceIncludesTest(unittest.TestCase):
         ])
 
     def test_replace_includes(self):
-        fake_source_code = open("tools/envoy_headersplit/code_corpus/fake_source_code.cc",
-                                "r").read()
-        fake_build_file = open("tools/envoy_headersplit/code_corpus/fake_build", "r").read()
+        fake_source_code = open(
+            "tools/envoy_headersplit/code_corpus/fake_source_code.cc",
+            "r").read()
+        fake_build_file = open("tools/envoy_headersplit/code_corpus/fake_build",
+                               "r").read()
         os.mkdir("test")
         os.mkdir("test/mocks")
         os.mkdir("test/mocks/upstream")
@@ -62,11 +69,14 @@ class ReplaceIncludesTest(unittest.TestCase):
             source_code = f.read()
         with open("test/BUILD", "r") as f:
             build_file = f.read()
-        self.assertEqual(source_code,
-                         fake_source_code.replace("upstream/mocks", "upstream/cluster_manager"))
+        self.assertEqual(
+            source_code,
+            fake_source_code.replace("upstream/mocks",
+                                     "upstream/cluster_manager"))
         self.assertEqual(
             build_file,
-            fake_build_file.replace("upstream:upstream_mocks", "upstream:cluster_manager_mocks"))
+            fake_build_file.replace("upstream:upstream_mocks",
+                                    "upstream:cluster_manager_mocks"))
 
 
 if __name__ == "__main__":

@@ -31,7 +31,8 @@ OutputDescriptor = namedtuple(
 
 def direct_output_descriptor(output_suffix, visitor, want_params=False):
     return OutputDescriptor(output_suffix, visitor,
-                            (lambda x, _: x) if want_params else lambda x: x, want_params)
+                            (lambda x, _: x) if want_params else lambda x: x,
+                            want_params)
 
 
 # TODO(phlax): make this into a class
@@ -58,7 +59,9 @@ def plugin(output_descriptors):
     # by the aspect and we only want to generate docs for the current node.
     for file_to_generate in request.file_to_generate:
         # Find the FileDescriptorProto for the file we actually are generating.
-        file_proto = [pf for pf in request.proto_file if pf.name == file_to_generate][0]
+        file_proto = [
+            pf for pf in request.proto_file if pf.name == file_to_generate
+        ][0]
         if cprofile_enabled:
             pr = cProfile.Profile()
             pr.enable()
@@ -69,14 +72,15 @@ def plugin(output_descriptors):
             if not file_proto.package.startswith('envoy.'):
                 continue
             if request.HasField("parameter") and od.want_params:
-                params = dict(param.split('=') for param in request.parameter.split(','))
+                params = dict(
+                    param.split('=') for param in request.parameter.split(','))
                 xformed_proto = od.xform(file_proto, params)
                 visitor_factory = od.visitor_factory(params)
             else:
                 xformed_proto = od.xform(file_proto)
                 visitor_factory = od.visitor_factory()
-            f.content = traverse.traverse_file(xformed_proto,
-                                               visitor_factory) if xformed_proto else ''
+            f.content = traverse.traverse_file(
+                xformed_proto, visitor_factory) if xformed_proto else ''
         if cprofile_enabled:
             pr.disable()
             stats_stream = io.StringIO()

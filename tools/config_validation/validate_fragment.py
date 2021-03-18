@@ -54,12 +54,19 @@ def validate_fragment(type_name, fragment):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Validate a YAML fragment against an Envoy API proto3 type.')
+        description='Validate a YAML fragment against an Envoy API proto3 type.'
+    )
     parser.add_argument(
         'message_type',
-        help='a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.')
-    parser.add_argument('fragment_path', nargs='?', help='Path to a YAML configuration fragment.')
-    parser.add_argument('-s', required=False, help='YAML configuration fragment.')
+        help=
+        'a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.'
+    )
+    parser.add_argument('fragment_path',
+                        nargs='?',
+                        help='Path to a YAML configuration fragment.')
+    parser.add_argument('-s',
+                        required=False,
+                        help='YAML configuration fragment.')
 
     return parser.parse_args()
 
@@ -67,6 +74,7 @@ def parse_args():
 if __name__ == '__main__':
     parsed_args = parse_args()
     message_type = parsed_args.message_type
-    content = parsed_args.s if (parsed_args.fragment_path is None) else pathlib.Path(
-        parsed_args.fragment_path).read_text()
+    content = parsed_args.s if (
+        parsed_args.fragment_path is None) else pathlib.Path(
+            parsed_args.fragment_path).read_text()
     validate_fragment(message_type, yaml.safe_load(content))

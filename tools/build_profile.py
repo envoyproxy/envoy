@@ -17,7 +17,8 @@ def print_profile(f):
         if sr:
             timestamp, cmd = sr.groups()
             if prev_cmd:
-                print('%.2f %s' % (float(timestamp) - float(prev_timestamp), prev_cmd))
+                print('%.2f %s' %
+                      (float(timestamp) - float(prev_timestamp), prev_cmd))
             prev_timestamp, prev_cmd = timestamp, cmd
 
 

@@ -16,7 +16,8 @@ def did_test_pass(file):
     tree = ET.parse(file)
     root = tree.getroot()
     for testsuite in root:
-        if testsuite.attrib['failures'] != '0' or testsuite.attrib['errors'] != '0':
+        if testsuite.attrib['failures'] != '0' or testsuite.attrib[
+                'errors'] != '0':
             return False
     return True
 
@@ -35,14 +36,16 @@ def print_test_case_failure(testcase, testsuite, failure_msg, log_path):
 
 
 # Returns a pretty-printed string of a test suite error, such as an exception or a timeout.
-def print_test_suite_error(testsuite, testcase, log_path, duration, time, error_msg, output):
+def print_test_suite_error(testsuite, testcase, log_path, duration, time,
+                           error_msg, output):
     ret = "Test flake details:\n"
     ret += "- Test suite:   {}\n".format(testsuite)
     ret += "- Test case:    {}\n".format(testcase)
     ret += "- Log path:     {}\n".format(log_path)
 
     errno_string = os.strerror(int(error_msg.split(' ')[-1]))
-    ret += "- Error:        {} ({})\n".format(error_msg.capitalize(), errno_string)
+    ret += "- Error:        {} ({})\n".format(error_msg.capitalize(),
+                                              errno_string)
 
     if duration == time and duration in well_known_timeouts:
         ret += "- Note:         This error is likely a timeout (test duration == {}, a well known timeout value).\n".format(
@@ -102,13 +105,15 @@ def parse_and_print_test_suite_error(testsuite, log_path):
             # parsed into the XML metadata. Here we attempt to extract those names from the log by
             # finding the last test case to run. The expected format of that is:
             #     "[ RUN      ] <TestParams>/<TestSuite>.<TestCase>\n".
-            last_test_fullname = test_output.split('[ RUN      ]')[-1].splitlines()[0]
+            last_test_fullname = test_output.split(
+                '[ RUN      ]')[-1].splitlines()[0]
             last_testsuite = last_test_fullname.split('/')[1].split('.')[0]
             last_testcase = last_test_fullname.split('.')[1]
 
     if error_msg != "":
-        return print_test_suite_error(last_testsuite, last_testcase, log_path, test_duration,
-                                      test_time, error_msg, test_output)
+        return print_test_suite_error(last_testsuite, last_testcase, log_path,
+                                      test_duration, test_time, error_msg,
+                                      test_output)
 
     return ""
 
@@ -134,18 +139,24 @@ def parse_xml(file, visited):
         if testsuite.attrib['failures'] != '0':
             for testcase in testsuite:
                 for failure_msg in testcase:
-                    if (testcase.attrib['name'], testsuite.attrib['name']) not in visited:
+                    if (testcase.attrib['name'],
+                            testsuite.attrib['name']) not in visited:
                         ret += print_test_case_failure(testcase.attrib['name'],
-                                                       testsuite.attrib['name'], failure_msg.text,
+                                                       testsuite.attrib['name'],
+                                                       failure_msg.text,
                                                        log_file_path)
-                        visited.add((testcase.attrib['name'], testsuite.attrib['name']))
+                        visited.add(
+                            (testcase.attrib['name'], testsuite.attrib['name']))
         elif testsuite.attrib['errors'] != '0':
             # If an unexpected error occurred, such as an exception or a timeout, the test suite was
             # likely not parsed into XML properly, including the suite's name and the test case that
             # caused the error. More parsing is needed to extract details about the error.
-            if (testsuite.attrib['name'], testsuite.attrib['name']) not in visited:
-                ret += parse_and_print_test_suite_error(testsuite, log_file_path)
-                visited.add((testsuite.attrib['name'], testsuite.attrib['name']))
+            if (testsuite.attrib['name'],
+                    testsuite.attrib['name']) not in visited:
+                ret += parse_and_print_test_suite_error(testsuite,
+                                                        log_file_path)
+                visited.add(
+                    (testsuite.attrib['name'], testsuite.attrib['name']))
 
     return ret
 
@@ -173,18 +184,22 @@ def get_git_info(CI_TARGET):
     if CI_TARGET != "":
         ret += "Target:         {}\n".format(CI_TARGET)
 
-    if os.getenv('SYSTEM_STAGEDISPLAYNAME') and os.getenv('SYSTEM_STAGEJOBNAME'):
-        ret += "Stage:          {} {}\n".format(os.environ['SYSTEM_STAGEDISPLAYNAME'],
-                                                os.environ['SYSTEM_STAGEJOBNAME'])
+    if os.getenv('SYSTEM_STAGEDISPLAYNAME') and os.getenv(
+            'SYSTEM_STAGEJOBNAME'):
+        ret += "Stage:          {} {}\n".format(
+            os.environ['SYSTEM_STAGEDISPLAYNAME'],
+            os.environ['SYSTEM_STAGEJOBNAME'])
 
     if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv(
             'SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'):
         ret += "Pull request:   {}/pull/{}\n".format(
-            os.environ['REPO_URI'], os.environ['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'])
+            os.environ['REPO_URI'],
+            os.environ['SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'])
     elif os.getenv('BUILD_REASON'):
         ret += "Build reason:   {}\n".format(os.environ['BUILD_REASON'])
 
-    output = subprocess.check_output(['git', 'log', '--format=%H', '-n', '1'], encoding='utf-8')
+    output = subprocess.check_output(['git', 'log', '--format=%H', '-n', '1'],
+                                     encoding='utf-8')
     ret += "Commmit:        {}/commit/{}".format(os.environ['REPO_URI'], output)
 
     build_id = os.environ['BUILD_URI'].split('/')[-1]
@@ -192,17 +207,21 @@ def get_git_info(CI_TARGET):
 
     ret += "\n"
 
-    remotes = subprocess.check_output(['git', 'remote'], encoding='utf-8').splitlines()
+    remotes = subprocess.check_output(['git', 'remote'],
+                                      encoding='utf-8').splitlines()
 
     if ("origin" in remotes):
-        output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
+        output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'],
+                                         encoding='utf-8')
         ret += "Origin:         {}".format(output.replace('.git', ''))
 
     if ("upstream" in remotes):
-        output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
+        output = subprocess.check_output(
+            ['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
         ret += "Upstream:       {}".format(output.replace('.git', ''))
 
-    output = subprocess.check_output(['git', 'describe', '--all', '--always'], encoding='utf-8')
+    output = subprocess.check_output(['git', 'describe', '--all', '--always'],
+                                     encoding='utf-8')
     ret += "Latest ref:     {}".format(output)
 
     ret += "\n"
@@ -222,18 +241,22 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         CI_TARGET = sys.argv[1]
 
-    if os.getenv('TEST_TMPDIR') and os.getenv('REPO_URI') and os.getenv("BUILD_URI"):
+    if os.getenv('TEST_TMPDIR') and os.getenv('REPO_URI') and os.getenv(
+            "BUILD_URI"):
         os.environ["TMP_OUTPUT_PROCESS_XML"] = os.getenv(
             "TEST_TMPDIR") + "/tmp_output_process_xml.txt"
     else:
-        print("Set the env variables TEST_TMPDIR, REPO_URI, and BUILD_URI first.")
+        print(
+            "Set the env variables TEST_TMPDIR, REPO_URI, and BUILD_URI first.")
         sys.exit(0)
 
-    find_dir = "{}/**/**/**/**/bazel-testlogs/".format(os.environ['TEST_TMPDIR']).replace('\\', '/')
+    find_dir = "{}/**/**/**/**/bazel-testlogs/".format(
+        os.environ['TEST_TMPDIR']).replace('\\', '/')
     if CI_TARGET == "MacOS":
         find_dir = '${TEST_TMPDIR}/'
-    os.system('sh -c "/usr/bin/find {} -name attempt_*.xml > ${{TMP_OUTPUT_PROCESS_XML}}"'.format(
-        find_dir))
+    os.system(
+        'sh -c "/usr/bin/find {} -name attempt_*.xml > ${{TMP_OUTPUT_PROCESS_XML}}"'
+        .format(find_dir))
 
     # All output of find command should be either failed or flaky tests, as only then will
     # a test be rerun and have an 'attempt_n.xml' file. problematic_tests holds a lookup
@@ -253,10 +276,12 @@ if __name__ == "__main__":
     for k in problematic_tests.keys():
         if did_test_pass(k):
             has_flaky_test = True
-            failure_output += parse_xml(problematic_tests[k], flaky_tests_visited)
+            failure_output += parse_xml(problematic_tests[k],
+                                        flaky_tests_visited)
 
     if has_flaky_test:
-        output_msg = "``` \n" + get_git_info(CI_TARGET) + "\n" + failure_output + "``` \n"
+        output_msg = "``` \n" + get_git_info(
+            CI_TARGET) + "\n" + failure_output + "``` \n"
 
         if os.getenv("SLACK_TOKEN"):
             SLACKTOKEN = os.environ["SLACK_TOKEN"]
@@ -266,7 +291,9 @@ if __name__ == "__main__":
             # Due to a weird interaction between `websocket-client` and Slack client
             # we need to set the ssl context. See `slackapi/python-slack-sdk/issues/334`
             client = slack.WebClient(token=SLACKTOKEN, ssl=ssl_context)
-            client.chat_postMessage(channel='test-flaky', text=output_msg, as_user="true")
+            client.chat_postMessage(channel='test-flaky',
+                                    text=output_msg,
+                                    as_user="true")
         else:
             print(output_msg)
     else:

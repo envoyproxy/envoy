@@ -5,7 +5,8 @@ app = Flask(__name__)
 
 @app.route('/service')
 def hello():
-    return 'Hello ' + request.headers.get('x-current-user') + ' from behind Envoy!'
+    return 'Hello ' + request.headers.get(
+        'x-current-user') + ' from behind Envoy!'
 
 
 if __name__ == "__main__":

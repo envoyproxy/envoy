@@ -148,13 +148,16 @@ def sigchld_handler(signum, frame):
                 # restarter can know about this situation and restart the whole thing.
                 kill_all_and_exit = True
         elif os.WIFSIGNALED(exit_status):
-            print("PID={} was killed with signal={}".format(ret_pid, os.WTERMSIG(exit_status)))
+            print("PID={} was killed with signal={}".format(
+                ret_pid, os.WTERMSIG(exit_status)))
             kill_all_and_exit = True
         else:
             kill_all_and_exit = True
 
     if kill_all_and_exit:
-        print("Due to abnormal exit, force killing all child processes and exiting")
+        print(
+            "Due to abnormal exit, force killing all child processes and exiting"
+        )
 
         # First uninstall the SIGCHLD handler so that we don't get called again.
         signal.signal(signal.SIGCHLD, signal.SIG_DFL)
@@ -173,7 +176,8 @@ def fork_and_exec():
 
     global restart_epoch
     os.environ['RESTART_EPOCH'] = str(restart_epoch)
-    print("forking and execing new child process at epoch {}".format(restart_epoch))
+    print("forking and execing new child process at epoch {}".format(
+        restart_epoch))
     restart_epoch += 1
 
     child_pid = os.fork()

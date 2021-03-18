@@ -9,7 +9,8 @@ def generate_main_code(serialization_composite_h_file):
   Renders the header file for serialization composites.
   The location of output file is provided as argument.
   """
-    generate_code('serialization_composite_h.j2', serialization_composite_h_file)
+    generate_code('serialization_composite_h.j2',
+                  serialization_composite_h_file)
 
 
 def generate_test_code(serialization_composite_test_cc_file):
@@ -18,7 +19,8 @@ def generate_test_code(serialization_composite_test_cc_file):
   Renders the test file for serialization composites.
   The location of output file is provided as argument.
   """
-    generate_code('serialization_composite_test_cc.j2', serialization_composite_test_cc_file)
+    generate_code('serialization_composite_test_cc.j2',
+                  serialization_composite_test_cc_file)
 
 
 def generate_code(template_name, output_file):

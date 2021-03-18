@@ -74,13 +74,16 @@ NUMBER = re.compile(r'\d')
 HEX = re.compile(r'(?:^|\s|[(])([A-Fa-f0-9]{8,})(?:$|\s|[.,)])')
 HEX_SIG = re.compile(r'(?:\W|^)([A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2})+)(?:\W|$)')
 PREFIXED_HEX = re.compile(r'0x[A-Fa-f0-9]+')
-UUID = re.compile(r'[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}')
+UUID = re.compile(
+    r'[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}'
+)
 BIT_FIELDS = re.compile(r'[01]+[XxYy]+')
 AB_FIELDS = re.compile(r'\W([AB]+)\W')
 
 # Matches e.g. FC00::/8 or 2001::abcd/64. Does not match ::1/128, but
 # aspell ignores that anyway.
-IPV6_ADDR = re.compile(r'(?:\W|^)([A-Fa-f0-9]+:[A-Fa-f0-9:]+/[0-9]{1,3})(?:\W|$)')
+IPV6_ADDR = re.compile(
+    r'(?:\W|^)([A-Fa-f0-9]+:[A-Fa-f0-9:]+/[0-9]{1,3})(?:\W|$)')
 
 # Quoted words: "word", 'word', or *word*.
 QUOTED_WORD = re.compile(r'((["\'])[A-Za-z0-9.:-]+(\2))|(\*[A-Za-z0-9.:-]+\*)')
@@ -164,8 +167,10 @@ class SpellChecker:
         self.prefixes = prefixes
         self.suffixes = suffixes
 
-        self.prefix_re = re.compile("(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
-        self.suffix_re = re.compile("(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
+        self.prefix_re = re.compile("(?:\s|^)((%s)-)" % ("|".join(prefixes)),
+                                    re.IGNORECASE)
+        self.suffix_re = re.compile("(-(%s))(?:\s|$)" % ("|".join(suffixes)),
+                                    re.IGNORECASE)
 
         # Generate aspell personal dictionary.
         pws = os.path.join(CURR_DIR, '.aspell.en.pws')
@@ -174,7 +179,10 @@ class SpellChecker:
             f.writelines(words)
 
         # Start an aspell process.
-        aspell_args = ["aspell", "pipe", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws]
+        aspell_args = [
+            "aspell", "pipe", "--lang=en_US", "--encoding=utf-8",
+            "--personal=" + pws
+        ]
         self.aspell = subprocess.Popen(aspell_args,
                                        bufsize=4096,
                                        stdin=subprocess.PIPE,
@@ -199,7 +207,8 @@ class SpellChecker:
 
         self.aspell.poll()
         if self.aspell.returncode is not None:
-            print("aspell quit unexpectedly: return code %d" % (self.aspell.returncode))
+            print("aspell quit unexpectedly: return code %d" %
+                  (self.aspell.returncode))
             sys.exit(2)
 
         debug1("ASPELL< %s" % (line))
@@ -251,10 +260,15 @@ class SpellChecker:
             all_words = f.readlines()
 
         # Strip comments, invalid words, and blank lines.
-        words = [w for w in all_words if len(w.strip()) > 0 and re.match(DICTIONARY_WORD, w)]
+        words = [
+            w for w in all_words
+            if len(w.strip()) > 0 and re.match(DICTIONARY_WORD, w)
+        ]
 
         suffixes = [w.strip()[1:] for w in all_words if w.startswith('-')]
-        prefixes = [w.strip()[:-1] for w in all_words if w.strip().endswith('-')]
+        prefixes = [
+            w.strip()[:-1] for w in all_words if w.strip().endswith('-')
+        ]
 
         # Allow acronyms and abbreviations to be spelled in lowercase.
         # (e.g. Convert "HTTP" into "HTTP" and "http" which also matches
@@ -450,9 +464,14 @@ def check_comment(checker, offset, comment):
     errors = [(w, o + offset, s) for (w, o, s) in errors]
 
     # CamelCase words get split and re-checked
-    errors = [*chain.from_iterable(map(lambda err: check_camel_case(checker, err), errors))]
+    errors = [
+        *chain.from_iterable(
+            map(lambda err: check_camel_case(checker, err), errors))
+    ]
 
-    errors = [*chain.from_iterable(map(lambda err: check_affix(checker, err), errors))]
+    errors = [
+        *chain.from_iterable(map(lambda err: check_affix(checker, err), errors))
+    ]
 
     return errors
 
@@ -480,10 +499,13 @@ def print_fix_options(word, suggestions):
     print("%s:" % (word))
     print("  a: accept and add to dictionary")
     print("  A: accept and add to dictionary as ALLCAPS (for acronyms)")
-    print("  f <word>: replace with the given word without modifying dictionary")
+    print(
+        "  f <word>: replace with the given word without modifying dictionary")
     print("  i: ignore")
     print("  r <word>: replace with given word and add to dictionary")
-    print("  R <word>: replace with given word and add to dictionary as ALLCAPS (for acronyms)")
+    print(
+        "  R <word>: replace with given word and add to dictionary as ALLCAPS (for acronyms)"
+    )
     print("  x: abort")
 
     if not suggestions:
@@ -542,16 +564,18 @@ def fix_error(checker, file, line_offset, lines, errors):
             elif choice[:1] == "f":
                 replacement = choice[1:].strip()
                 if replacement == "":
-                    print("Invalid choice: '%s'. Must specify a replacement (e.g. 'f corrected')." %
-                          (choice))
+                    print(
+                        "Invalid choice: '%s'. Must specify a replacement (e.g. 'f corrected')."
+                        % (choice))
                     continue
             elif choice == "i":
                 replacement = word
             elif choice[:1] == "r" or choice[:1] == "R":
                 replacement = choice[1:].strip()
                 if replacement == "":
-                    print("Invalid choice: '%s'. Must specify a replacement (e.g. 'r corrected')." %
-                          (choice))
+                    print(
+                        "Invalid choice: '%s'. Must specify a replacement (e.g. 'r corrected')."
+                        % (choice))
                     continue
 
                 if choice[:1] == "R":
@@ -576,11 +600,12 @@ def fix_error(checker, file, line_offset, lines, errors):
                 additions += [add]
             else:
                 print(
-                    "Cannot add %s to the dictionary: it may only contain letter and apostrophes" %
-                    add)
+                    "Cannot add %s to the dictionary: it may only contain letter and apostrophes"
+                    % add)
 
     if len(errors) != len(replacements):
-        print("Internal error %d errors with %d replacements" % (len(errors), len(replacements)))
+        print("Internal error %d errors with %d replacements" %
+              (len(errors), len(replacements)))
         sys.exit(2)
 
     # Perform replacements on the line.
@@ -643,7 +668,11 @@ def extract_comments(lines):
         for idx, line_comment in enumerate(line_comments):
             col, text = line_comment
             last_on_line = idx + 1 >= len(line_comments)
-            comments.append(Comment(line=line_idx, col=col, text=text, last_on_line=last_on_line))
+            comments.append(
+                Comment(line=line_idx,
+                        col=col,
+                        text=text,
+                        last_on_line=last_on_line))
 
     # Handle control statements and filter out comments that are part of
     # RST code block directives.
@@ -661,8 +690,8 @@ def extract_comments(lines):
         pos = text.find(SPELLCHECK_ON)
         if pos != -1:
             # Ignored because spellchecking isn't disabled. Just mask out the command.
-            comments[n].text = text[:pos] + ' ' * len(SPELLCHECK_ON) + text[pos +
-                                                                            len(SPELLCHECK_ON):]
+            comments[n].text = text[:pos] + ' ' * len(
+                SPELLCHECK_ON) + text[pos + len(SPELLCHECK_ON):]
             result.append(comments[n])
             n += 1
         elif SPELLCHECK_OFF in text or SPELLCHECK_SKIP_BLOCK in text:
@@ -742,7 +771,8 @@ def execute(files, dictionary_file, fix):
         with open(path, 'r') as f:
             lines = f.readlines()
             total_files += 1
-            (num_comments, num_errors) = check_file(checker, path, lines, handler)
+            (num_comments, num_errors) = check_file(checker, path, lines,
+                                                    handler)
             total_comments += num_comments
             total_errors += num_errors
 
@@ -769,10 +799,11 @@ if __name__ == "__main__":
     default_dictionary = os.path.join(CURR_DIR, 'spelling_dictionary.txt')
 
     parser = argparse.ArgumentParser(description="Check comment spelling.")
-    parser.add_argument('operation_type',
-                        type=str,
-                        choices=['check', 'fix'],
-                        help="specify if the run should 'check' or 'fix' spelling.")
+    parser.add_argument(
+        'operation_type',
+        type=str,
+        choices=['check', 'fix'],
+        help="specify if the run should 'check' or 'fix' spelling.")
     parser.add_argument('target_paths',
                         type=str,
                         nargs="*",
@@ -785,15 +816,17 @@ if __name__ == "__main__":
     parser.add_argument('--mark',
                         action='store_true',
                         help="Emits extra output to mark misspelled words.")
-    parser.add_argument('--dictionary',
-                        type=str,
-                        default=default_dictionary,
-                        help="specify a location for Envoy-specific dictionary words")
-    parser.add_argument('--color',
-                        type=str,
-                        choices=['on', 'off', 'auto'],
-                        default="auto",
-                        help="Controls colorized output. Auto limits color to TTY devices.")
+    parser.add_argument(
+        '--dictionary',
+        type=str,
+        default=default_dictionary,
+        help="specify a location for Envoy-specific dictionary words")
+    parser.add_argument(
+        '--color',
+        type=str,
+        choices=['on', 'off', 'auto'],
+        default="auto",
+        help="Controls colorized output. Auto limits color to TTY devices.")
     parser.add_argument('--test-ignore-exts',
                         dest='test_ignore_exts',
                         action='store_true',
@@ -811,8 +844,8 @@ if __name__ == "__main__":
     # Exclude ./third_party/ directory from spell checking, even when requested through arguments.
     # Otherwise git pre-push hook checks it for merged commits.
     paths = [
-        path for path in paths
-        if not path.startswith('./third_party/') and not path.startswith('./third_party/')
+        path for path in paths if not path.startswith('./third_party/') and
+        not path.startswith('./third_party/')
     ]
 
     exts = ['.cc', '.h', '.proto']
@@ -827,7 +860,8 @@ if __name__ == "__main__":
                     for f in files
                     if (exts is None or os.path.splitext(f)[1] in exts)
                 ]
-        if os.path.isfile(p) and (exts is None or os.path.splitext(p)[1] in exts):
+        if os.path.isfile(p) and (exts is None or
+                                  os.path.splitext(p)[1] in exts):
             target_paths += [p]
 
     rv = execute(target_paths, args.dictionary, args.operation_type == 'fix')

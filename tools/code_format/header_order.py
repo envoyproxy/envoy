@@ -89,7 +89,8 @@ def reorder_headers(path):
     if len(misc_headers) > 0:
         blocks.append(misc_headers)
 
-    reordered_includes_lines = '\n\n'.join(['\n'.join(sorted(block)) for block in blocks])
+    reordered_includes_lines = '\n\n'.join(
+        ['\n'.join(sorted(block)) for block in blocks])
 
     if reordered_includes_lines:
         reordered_includes_lines += '\n'
@@ -104,8 +105,12 @@ def reorder_headers(path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Header reordering.')
-    parser.add_argument('--path', type=str, help='specify the path to the header file')
-    parser.add_argument('--rewrite', action='store_true', help='rewrite header file in-place')
+    parser.add_argument('--path',
+                        type=str,
+                        help='specify the path to the header file')
+    parser.add_argument('--rewrite',
+                        action='store_true',
+                        help='rewrite header file in-place')
     parser.add_argument('--include_dir_order',
                         type=str,
                         default=','.join(common.include_dir_order()),

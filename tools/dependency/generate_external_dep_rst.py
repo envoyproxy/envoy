@@ -72,13 +72,16 @@ if __name__ == '__main__':
         generated_rst_dir = os.getenv("GENERATED_RST_DIR") or sys.argv[1]
     except IndexError:
         raise SystemExit(
-            "Output dir path must be either specified as arg or with GENERATED_RST_DIR env var")
+            "Output dir path must be either specified as arg or with GENERATED_RST_DIR env var"
+        )
 
-    security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
+    security_rst_root = os.path.join(generated_rst_dir,
+                                     "intro/arch_overview/security")
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
 
-    Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
+    Dep = namedtuple('Dep',
+                     ['name', 'sort_name', 'version', 'cpe', 'release_date'])
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
     for k, v in dep_utils.repository_locations().items():
@@ -106,7 +109,11 @@ if __name__ == '__main__':
         for ext_name, deps in sorted(exts.items()):
             if ext_name != 'core':
                 content += render_title(ext_name)
-            output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
-            content += csv_table(['Name', 'Version', 'Release date', 'CPE'], [2, 1, 1, 2],
-                                 [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
+            output_path = pathlib.Path(security_rst_root,
+                                       f'external_dep_{category}.rst')
+            content += csv_table(['Name', 'Version', 'Release date', 'CPE'], [
+                2, 1, 1, 2
+            ], [
+                csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)
+            ])
         output_path.write_text(content)

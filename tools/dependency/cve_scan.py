@@ -56,9 +56,10 @@ IGNORES_CVES = set([
 ])
 
 # Subset of CVE fields that are useful below.
-Cve = namedtuple(
-    'Cve',
-    ['id', 'description', 'cpes', 'score', 'severity', 'published_date', 'last_modified_date'])
+Cve = namedtuple('Cve', [
+    'id', 'description', 'cpes', 'score', 'severity', 'published_date',
+    'last_modified_date'
+])
 
 
 class Cpe(namedtuple('CPE', ['part', 'vendor', 'product', 'version'])):
@@ -107,7 +108,8 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
         if len(cpe_set) == 0:
             continue
         cvss_v3_score = cve['impact']['baseMetricV3']['cvssV3']['baseScore']
-        cvss_v3_severity = cve['impact']['baseMetricV3']['cvssV3']['baseSeverity']
+        cvss_v3_severity = cve['impact']['baseMetricV3']['cvssV3'][
+            'baseSeverity']
 
         def parse_cve_date(date_str):
             assert (date_str.endswith('Z'))
@@ -115,8 +117,8 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
 
         published_date = parse_cve_date(cve['publishedDate'])
         last_modified_date = parse_cve_date(cve['lastModifiedDate'])
-        cves[cve_id] = Cve(cve_id, description, cpe_set, cvss_v3_score, cvss_v3_severity,
-                           published_date, last_modified_date)
+        cves[cve_id] = Cve(cve_id, description, cpe_set, cvss_v3_score,
+                           cvss_v3_severity, published_date, last_modified_date)
         for cpe in cpe_set:
             cpe_revmap[str(cpe.vendor_normalized())].add(cve_id)
     return cves, cpe_revmap
@@ -276,7 +278,8 @@ def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
         cpe = metadata.get('cpe', 'N/A')
         if cpe == 'N/A':
             continue
-        candidate_cve_ids = cpe_revmap.get(str(Cpe.from_string(cpe).vendor_normalized()), [])
+        candidate_cve_ids = cpe_revmap.get(
+            str(Cpe.from_string(cpe).vendor_normalized()), [])
         for cve_id in candidate_cve_ids:
             cve = cves[cve_id]
             if cve.id in cve_allowlist:
@@ -303,7 +306,10 @@ if __name__ == '__main__':
                                        dep_utils.repository_locations())
     if possible_cves:
         print(
-            '\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:')
+            '\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:'
+        )
         for cve_id in sorted(possible_cves):
-            print(f'{format_cve_details(possible_cves[cve_id], cve_deps[cve_id])}')
+            print(
+                f'{format_cve_details(possible_cves[cve_id], cve_deps[cve_id])}'
+            )
         sys.exit(1)

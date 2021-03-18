@@ -73,14 +73,16 @@ def validate_proto_paths(proto_paths):
         try:
             validate_proto_path(proto_path)
         except ValidationError as e:
-            error_msgs.append('Invalid .proto location [%s]: %s' % (proto_path, e))
+            error_msgs.append('Invalid .proto location [%s]: %s' %
+                              (proto_path, e))
     return error_msgs
 
 
 if __name__ == '__main__':
     api_root = 'api/envoy'
     api_protos = pathlib.Path(api_root).rglob('*.proto')
-    error_msgs = validate_proto_paths(p.relative_to(api_root) for p in api_protos)
+    error_msgs = validate_proto_paths(
+        p.relative_to(api_root) for p in api_protos)
     if error_msgs:
         for m in error_msgs:
             print(m)

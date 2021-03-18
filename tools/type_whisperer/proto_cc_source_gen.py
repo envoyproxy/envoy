@@ -21,4 +21,6 @@ if __name__ == '__main__':
     input_paths = sys.argv[3:]
     pb_text = '\n'.join(pathlib.Path(path).read_text() for path in input_paths)
     with open(output_path, 'w') as f:
-        f.write(CC_SOURCE_TEMPLATE.substitute(constant=constant_name, pb_text=pb_text))
+        f.write(
+            CC_SOURCE_TEMPLATE.substitute(constant=constant_name,
+                                          pb_text=pb_text))

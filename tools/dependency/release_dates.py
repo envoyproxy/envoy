@@ -39,19 +39,22 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
     try:
         latest_release = repo.get_latest_release()
         if latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
-            print(f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
-                  f'{latest_release.tag_name}@<{latest_release.created_at}>')
+            print(
+                f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
+                f'{latest_release.tag_name}@<{latest_release.created_at}>')
     except github.UnknownObjectException:
         pass
 
 
 # Print GitHub release date, throw ReleaseDateError on mismatch with metadata release date.
-def verify_and_print_release_date(dep, github_release_date, metadata_release_date):
+def verify_and_print_release_date(dep, github_release_date,
+                                  metadata_release_date):
     mismatch = ''
     iso_release_date = format_utc_date(github_release_date)
     print(f'{dep} has a GitHub release date {iso_release_date}')
     if iso_release_date != metadata_release_date:
-        raise ReleaseDateError(f'Mismatch with metadata release date of {metadata_release_date}')
+        raise ReleaseDateError(
+            f'Mismatch with metadata release date of {metadata_release_date}')
 
 
 # Extract release date from GitHub API.
@@ -77,17 +80,22 @@ def verify_and_print_release_dates(repository_locations, github_instance):
         if not github_release:
             print(f'{dep} is not a GitHub repository')
             continue
-        repo = github_instance.get_repo(f'{github_release.organization}/{github_release.project}')
-        release_date = get_release_date(repo, metadata['version'], github_release)
+        repo = github_instance.get_repo(
+            f'{github_release.organization}/{github_release.project}')
+        release_date = get_release_date(repo, metadata['version'],
+                                        github_release)
         if release_date:
             # Check whether there is a more recent version and warn if necessary.
-            verify_and_print_latest_release(dep, repo, github_release.version, release_date)
+            verify_and_print_latest_release(dep, repo, github_release.version,
+                                            release_date)
             # Verify that the release date in metadata and GitHub correspond,
             # otherwise throw ReleaseDateError.
-            verify_and_print_release_date(dep, release_date, metadata['release_date'])
+            verify_and_print_release_date(dep, release_date,
+                                          metadata['release_date'])
         else:
             raise ReleaseDateError(
-                f'{dep} is a GitHub repository with no no inferrable release date')
+                f'{dep} is a GitHub repository with no no inferrable release date'
+            )
 
 
 if __name__ == '__main__':
@@ -102,9 +110,11 @@ if __name__ == '__main__':
     spec_loader = exports.repository_locations_utils.load_repository_locations_spec
     path_module = exports.load_module('repository_locations', path)
     try:
-        verify_and_print_release_dates(spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC),
-                                       github.Github(access_token))
+        verify_and_print_release_dates(
+            spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC),
+            github.Github(access_token))
     except ReleaseDateError as e:
-        print(f'An error occurred while processing {path}, please verify the correctness of the '
-              f'metadata: {e}')
+        print(
+            f'An error occurred while processing {path}, please verify the correctness of the '
+            f'metadata: {e}')
         sys.exit(1)

@@ -31,7 +31,8 @@ def to_classname(filename: str) -> str:
       corresponding class name
   """
     classname_tokens = filename.split('/')[-1].replace('.h', '').split('_')
-    classname = "Mock" + ''.join(map(lambda x: x[:1].upper() + x[1:], classname_tokens))
+    classname = "Mock" + ''.join(
+        map(lambda x: x[:1].upper() + x[1:], classname_tokens))
     return classname
 
 
@@ -48,7 +49,8 @@ def to_bazelname(filename: str, mockname: str) -> str:
       corresponding bazel target name
   """
     bazelname = "//test/mocks/{}:".format(mockname)
-    bazelname += filename.split('/')[-1].replace('.h', '') + '_mocks'.format(mockname)
+    bazelname += filename.split('/')[-1].replace('.h',
+                                                 '') + '_mocks'.format(mockname)
     return bazelname
 
 
@@ -99,14 +101,16 @@ def replace_includes(mockname):
             changed_list.append(str(test_file.relative_to(Path('.'))) + '\n')
             with test_file.open(mode='w') as f:
                 f.write(
-                    content.replace('#include "test/mocks/{}/mocks.h"\n'.format(mockname),
-                                    replace_includes))
+                    content.replace(
+                        '#include "test/mocks/{}/mocks.h"\n'.format(mockname),
+                        replace_includes))
             with (test_file.parent / 'BUILD').open() as f:
                 # write building files
                 content = f.read()
                 split_content = content.split(test_file.name)
                 split_content[1] = split_content[1].replace(
-                    '"//test/mocks/{}:{}_mocks",'.format(mockname, mockname), bazel_targets, 1)
+                    '"//test/mocks/{}:{}_mocks",'.format(mockname, mockname),
+                    bazel_targets, 1)
                 content = split_content[0] + test_file.name + split_content[1]
             with (test_file.parent / 'BUILD').open('w') as f:
                 f.write(content)
@@ -116,6 +120,9 @@ def replace_includes(mockname):
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser()
-    PARSER.add_argument('-m', '--mockname', default="server", help="mock folder that been divided")
+    PARSER.add_argument('-m',
+                        '--mockname',
+                        default="server",
+                        help="mock folder that been divided")
     mockname = vars(PARSER.parse_args())['mockname']
     replace_includes(mockname)

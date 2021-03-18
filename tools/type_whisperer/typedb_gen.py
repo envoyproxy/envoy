@@ -63,14 +63,16 @@ def upgraded_type(type_name, type_desc):
 
 def upgraded_path(proto_path, upgraded_package):
     """Determine upgraded API .proto path."""
-    return '/'.join([upgraded_package.replace('.', '/'), proto_path.split('/')[-1]])
+    return '/'.join(
+        [upgraded_package.replace('.', '/'),
+         proto_path.split('/')[-1]])
 
 
 def upgraded_type_with_description(type_name, type_desc):
     upgrade_type_desc = TypeDescription()
     upgrade_type_desc.qualified_package = upgraded_package(type_desc)
-    upgrade_type_desc.proto_path = upgraded_path(type_desc.proto_path,
-                                                 upgrade_type_desc.qualified_package)
+    upgrade_type_desc.proto_path = upgraded_path(
+        type_desc.proto_path, upgrade_type_desc.qualified_package)
     upgrade_type_desc.deprecated_type = type_desc.deprecated_type
     upgrade_type_desc.map_entry = type_desc.map_entry
     return (upgraded_type(type_name, type_desc), upgrade_type_desc)
@@ -91,7 +93,10 @@ def load_types(path):
     return types
 
 
-def next_version_upgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
+def next_version_upgrade(type_name,
+                         type_map,
+                         next_version_upgrade_memo,
+                         visited=None):
     """Does a given type require upgrade between major version?
 
   Performs depth-first search through type dependency graph for any upgraded
@@ -142,7 +147,8 @@ if __name__ == '__main__':
 
     # Aggregate type descriptors to a single type map.
     type_map = dict(sum([list(t.types.items()) for t in type_whispers], []))
-    all_pkgs = set([type_desc.qualified_package for type_desc in type_map.values()])
+    all_pkgs = set(
+        [type_desc.qualified_package for type_desc in type_map.values()])
 
     # Determine via DFS on each type descriptor and its deps which packages require upgrade.
     next_version_upgrade_memo = {}
@@ -150,7 +156,11 @@ if __name__ == '__main__':
         type_desc.qualified_package
         for type_name, type_desc in type_map.items()
         if next_version_upgrade(type_name, type_map, next_version_upgrade_memo)
-    ]).union(set(['envoy.config.retry.previous_priorities', 'envoy.config.cluster.redis']))
+    ]).union(
+        set([
+            'envoy.config.retry.previous_priorities',
+            'envoy.config.cluster.redis'
+        ]))
 
     # Generate type map entries for upgraded types. We run this twice to allow
     # things like a v2 deprecated map field's synthesized map entry to forward
@@ -160,7 +170,8 @@ if __name__ == '__main__':
             upgraded_type_with_description(type_name, type_desc)
             for type_name, type_desc in type_map.items()
             if type_desc.qualified_package in next_versions_pkgs and
-            (type_desc.active or type_desc.deprecated_type or type_desc.map_entry)
+            (type_desc.active or type_desc.deprecated_type or
+             type_desc.map_entry)
         ])
 
     # Generate the type database proto. To provide some stability across runs, in
@@ -179,7 +190,8 @@ if __name__ == '__main__':
             next_proto_info[type_map[t].proto_path] = (
                 type_map[type_desc.next_version_type_name].proto_path,
                 type_map[type_desc.next_version_type_name].qualified_package)
-    for proto_path, (next_proto_path, next_package) in sorted(next_proto_info.items()):
+    for proto_path, (next_proto_path,
+                     next_package) in sorted(next_proto_info.items()):
         type_db.next_version_protos[proto_path].proto_path = next_proto_path
         type_db.next_version_protos[proto_path].qualified_package = next_package
 

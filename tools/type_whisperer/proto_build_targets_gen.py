@@ -127,7 +127,7 @@ if __name__ == '__main__':
             if accidental_v3_package(pkg):
                 v3_packages.add(pkg)
     # Generate BUILD file.
-    build_file_contents = API_BUILD_FILE_TEMPLATE.substitute(v2_deps=deps_format(v2_packages),
-                                                             v3_deps=deps_format(v3_packages))
+    build_file_contents = API_BUILD_FILE_TEMPLATE.substitute(
+        v2_deps=deps_format(v2_packages), v3_deps=deps_format(v3_packages))
     with open(output_path, 'w') as f:
         f.write(build_file_contents)

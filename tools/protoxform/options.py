@@ -25,8 +25,8 @@ def has_hide_option(options):
   Returns:
     Hidden status.
   """
-    return any(
-        option.name[0].name_part == 'protoxform_hide' for option in options.uninterpreted_option)
+    return any(option.name[0].name_part == 'protoxform_hide'
+               for option in options.uninterpreted_option)
 
 
 def set_versioning_annotation(options, previous_message_type):
@@ -38,7 +38,8 @@ def set_versioning_annotation(options, previous_message_type):
     options: MessageOptions message.
     previous_message_type: string with earlier API type name for the message.
   """
-    options.Extensions[versioning_pb2.versioning].previous_message_type = previous_message_type
+    options.Extensions[
+        versioning_pb2.versioning].previous_message_type = previous_message_type
 
 
 def get_versioning_annotation(options):

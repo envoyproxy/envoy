@@ -51,7 +51,8 @@ import tarfile
 import tempfile
 from six.moves import urllib
 
-DEFAULT_ENVOY_PATH = os.getenv('ENVOY_PATH', 'bazel-bin/source/exe/envoy-static')
+DEFAULT_ENVOY_PATH = os.getenv('ENVOY_PATH',
+                               'bazel-bin/source/exe/envoy-static')
 PERF_PATH = os.getenv('PERF_PATH', 'perf')
 
 PR_SET_PDEATHSIG = 1  # See prtcl(2).
@@ -87,7 +88,8 @@ def modify_envoy_config(config_path, perf, output_directory):
         for network_filter in listener['filters']:
             if network_filter['name'] == 'http_connection_manager':
                 config = network_filter['config']
-                access_log_path = os.path.join(output_directory, 'access_%d.log' % n)
+                access_log_path = os.path.join(output_directory,
+                                               'access_%d.log' % n)
                 access_log_config = {'path': access_log_path}
                 if 'access_log' in config:
                     config['access_log'].append(access_log_config)
@@ -103,7 +105,8 @@ def modify_envoy_config(config_path, perf, output_directory):
     return modified_envoy_config_path, access_log_paths
 
 
-def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handlers_paths):
+def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path,
+              dump_handlers_paths):
     """Run Envoy subprocess and trigger admin endpoint gathering on SIGINT.
 
   Args:
@@ -170,11 +173,14 @@ def envoy_collect(parse_result, unknown_args):
         # generate.
         modified_envoy_config_path, access_log_paths = modify_envoy_config(
             parse_result.config_path, perf, envoy_tmpdir)
-        dump_handlers_paths = {h: os.path.join(envoy_tmpdir, '%s.txt' % h) for h in DUMP_HANDLERS}
+        dump_handlers_paths = {
+            h: os.path.join(envoy_tmpdir, '%s.txt' % h) for h in DUMP_HANDLERS
+        }
         envoy_log_path = os.path.join(envoy_tmpdir, 'envoy.log')
         # The manifest of files that will be placed in the output .tar.
-        manifest = access_log_paths + list(
-            dump_handlers_paths.values()) + [modified_envoy_config_path, envoy_log_path]
+        manifest = access_log_paths + list(dump_handlers_paths.values()) + [
+            modified_envoy_config_path, envoy_log_path
+        ]
         # This is where we will find out where the admin endpoint is listening.
         admin_address_path = os.path.join(envoy_tmpdir, 'admin_address.txt')
 
@@ -205,8 +211,8 @@ def envoy_collect(parse_result, unknown_args):
         ] + unknown_args[1:]
 
         # Run the Envoy process (under 'perf record' if needed).
-        return_code = run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path,
-                                dump_handlers_paths)
+        return_code = run_envoy(envoy_shcmd_args, envoy_log_path,
+                                admin_address_path, dump_handlers_paths)
 
         # Collect manifest files and tar them.
         with tarfile.TarFile(parse_result.output_path, 'w') as output_tar:
@@ -224,9 +230,13 @@ def envoy_collect(parse_result, unknown_args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Envoy wrapper to collect stats/log/profile.')
-    default_output_path = 'envoy-%s.tar' % datetime.datetime.now().isoformat('-')
-    parser.add_argument('--output-path', default=default_output_path, help='path to output .tar.')
+    parser = argparse.ArgumentParser(
+        description='Envoy wrapper to collect stats/log/profile.')
+    default_output_path = 'envoy-%s.tar' % datetime.datetime.now().isoformat(
+        '-')
+    parser.add_argument('--output-path',
+                        default=default_output_path,
+                        help='path to output .tar.')
     # We either need to interpret or override these, so we declare them in
     # envoy_collect.py and always parse and present them again when invoking
     # Envoy.
@@ -234,14 +244,17 @@ if __name__ == '__main__':
                         '-c',
                         required=True,
                         help='Path to Envoy configuration file.')
-    parser.add_argument('--log-level',
-                        '-l',
-                        help='Envoy log level. This will be overridden when invoking Envoy.')
+    parser.add_argument(
+        '--log-level',
+        '-l',
+        help='Envoy log level. This will be overridden when invoking Envoy.')
     # envoy_collect specific args.
-    parser.add_argument('--performance',
-                        action='store_true',
-                        help='Performance mode (collect perf trace, minimize log verbosity).')
+    parser.add_argument(
+        '--performance',
+        action='store_true',
+        help='Performance mode (collect perf trace, minimize log verbosity).')
     parser.add_argument('--envoy-binary',
                         default=DEFAULT_ENVOY_PATH,
-                        help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
+                        help='Path to Envoy binary (%s by default).' %
+                        DEFAULT_ENVOY_PATH)
     sys.exit(envoy_collect(*parser.parse_known_args(sys.argv)))

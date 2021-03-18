@@ -48,8 +48,8 @@ def generate_protobufs(output):
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
         rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-        input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_',
-                                 IMPORT_BASE, rule_dir)
+        input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir,
+                                 proto + '_', IMPORT_BASE, rule_dir)
         input_files = glob.glob(os.path.join(input_dir, '*.go'))
         output_dir = os.path.join(output, rule_dir)
 
@@ -71,12 +71,14 @@ def git(repo, *args):
 
 def clone_go_protobufs(repo):
     # Create a local clone of go-control-plane
-    git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo, '-b', BRANCH)
+    git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo, '-b',
+        BRANCH)
 
 
 def find_last_sync_sha(repo):
     # Determine last envoyproxy/envoy SHA in envoyproxy/go-control-plane
-    last_commit = git(repo, 'log', '--grep=' + MIRROR_MSG, '-n', '1', '--format=%B').strip()
+    last_commit = git(repo, 'log', '--grep=' + MIRROR_MSG, '-n', '1',
+                      '--format=%B').strip()
     # Initial SHA from which the APIs start syncing. Prior to that it was done manually.
     if last_commit == "":
         return 'e7f0b7176efdc65f96eb1697b829d1e6187f4502'
@@ -117,7 +119,8 @@ def publish_go_protobufs(repo, sha):
 
 def updated(repo):
     return len([
-        f for f in git(repo, 'diff', 'HEAD', '--name-only').splitlines() if f != 'envoy/COMMIT'
+        f for f in git(repo, 'diff', 'HEAD', '--name-only').splitlines()
+        if f != 'envoy/COMMIT'
     ]) > 0
 
 

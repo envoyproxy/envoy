@@ -26,11 +26,13 @@ envoy_repository_locations = load_module('envoy_repository_locations',
                                          'bazel/repository_locations.bzl')
 api_repository_locations = load_module('api_repository_locations',
                                        'api/bazel/repository_locations.bzl')
-extensions_build_config = load_module('extensions_build_config',
-                                      'source/extensions/extensions_build_config.bzl')
+extensions_build_config = load_module(
+    'extensions_build_config', 'source/extensions/extensions_build_config.bzl')
 
-REPOSITORY_LOCATIONS_SPEC = dict(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
-REPOSITORY_LOCATIONS_SPEC.update(api_repository_locations.REPOSITORY_LOCATIONS_SPEC)
+REPOSITORY_LOCATIONS_SPEC = dict(
+    envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
+REPOSITORY_LOCATIONS_SPEC.update(
+    api_repository_locations.REPOSITORY_LOCATIONS_SPEC)
 
 BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile('@(\w+)//')
 EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
@@ -110,7 +112,8 @@ class BuildGraph(object):
         for dep, metadata in repository_locations_spec.items():
             implied_untracked_deps = metadata.get('implied_untracked_deps', [])
             for untracked_dep in implied_untracked_deps:
-                assert (untracked_dep not in self._implied_untracked_deps_revmap)
+                assert (untracked_dep
+                        not in self._implied_untracked_deps_revmap)
                 self._implied_untracked_deps_revmap[untracked_dep] = dep
 
     def query_external_deps(self, *targets):
@@ -124,8 +127,9 @@ class BuildGraph(object):
     """
         deps_query = ' union '.join(f'deps({l})' for l in targets)
         try:
-            deps = subprocess.check_output(['bazel', 'query', deps_query],
-                                           stderr=subprocess.PIPE).decode().splitlines()
+            deps = subprocess.check_output(
+                ['bazel', 'query', deps_query],
+                stderr=subprocess.PIPE).decode().splitlines()
         except subprocess.CalledProcessError as exc:
             print(
                 f'Bazel query failed with error code {exc.returncode} and std error: {exc.stderr.decode()}'
@@ -172,12 +176,14 @@ class Validator(object):
     """
         print('Validating build dependency structure...')
         queried_core_ext_deps = self._build_graph.query_external_deps(
-            '//source/exe:envoy_main_common_with_core_extensions_lib', '//source/extensions/...')
+            '//source/exe:envoy_main_common_with_core_extensions_lib',
+            '//source/extensions/...')
         queried_all_deps = self._build_graph.query_external_deps('//source/...')
         if queried_all_deps != queried_core_ext_deps:
-            raise DependencyError('Invalid build graph structure. deps(//source/...) != '
-                                  'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
-                                  'union deps(//source/extensions/...)')
+            raise DependencyError(
+                'Invalid build graph structure. deps(//source/...) != '
+                'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
+                'union deps(//source/extensions/...)')
 
     def validate_test_only_deps(self):
         """Validate that test-only dependencies aren't included in //source/...
@@ -187,22 +193,29 @@ class Validator(object):
     """
         print('Validating test-only dependencies...')
         # Validate that //source doesn't depend on test_only
-        queried_source_deps = self._build_graph.query_external_deps('//source/...')
-        expected_test_only_deps = self._dep_info.deps_by_use_category('test_only')
-        bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
+        queried_source_deps = self._build_graph.query_external_deps(
+            '//source/...')
+        expected_test_only_deps = self._dep_info.deps_by_use_category(
+            'test_only')
+        bad_test_only_deps = expected_test_only_deps.intersection(
+            queried_source_deps)
         if len(bad_test_only_deps) > 0:
             raise DependencyError(
-                f'//source depends on test-only dependencies: {bad_test_only_deps}')
+                f'//source depends on test-only dependencies: {bad_test_only_deps}'
+            )
         # Validate that //test deps additional to those of //source are captured in
         # test_only.
         test_only_deps = self._build_graph.query_external_deps('//test/...')
         source_deps = self._build_graph.query_external_deps('//source/...')
         marginal_test_deps = test_only_deps.difference(source_deps)
         bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
-        unknown_bad_test_deps = [dep for dep in bad_test_deps if not test_only_ignore(dep)]
+        unknown_bad_test_deps = [
+            dep for dep in bad_test_deps if not test_only_ignore(dep)
+        ]
         if len(unknown_bad_test_deps) > 0:
             raise DependencyError(
-                f'Missing deps in test_only "use_category": {unknown_bad_test_deps}')
+                f'Missing deps in test_only "use_category": {unknown_bad_test_deps}'
+            )
 
     def validate_data_plane_core_deps(self):
         """Validate dataplane_core dependencies.
@@ -221,11 +234,12 @@ class Validator(object):
             '//source/common/api/...', '//source/common/buffer/...',
             '//source/common/chromium_url/...', '//source/common/crypto/...',
             '//source/common/conn_pool/...', '//source/common/formatter/...',
-            '//source/common/http/...', '//source/common/ssl/...', '//source/common/tcp/...',
-            '//source/common/tcp_proxy/...', '//source/common/network/...')
+            '//source/common/http/...', '//source/common/ssl/...',
+            '//source/common/tcp/...', '//source/common/tcp_proxy/...',
+            '//source/common/network/...')
         # It's hard to disentangle API and dataplane today.
-        expected_dataplane_core_deps = self._dep_info.deps_by_use_category('dataplane_core').union(
-            self._dep_info.deps_by_use_category('api'))
+        expected_dataplane_core_deps = self._dep_info.deps_by_use_category(
+            'dataplane_core').union(self._dep_info.deps_by_use_category('api'))
         bad_dataplane_core_deps = queried_dataplane_core_min_deps.difference(
             expected_dataplane_core_deps)
         if len(bad_dataplane_core_deps) > 0:
@@ -251,8 +265,8 @@ class Validator(object):
         queried_controlplane_core_min_deps = self._build_graph.query_external_deps(
             '//source/common/config/...')
         # Controlplane will always depend on API.
-        expected_controlplane_core_deps = self._dep_info.deps_by_use_category('controlplane').union(
-            self._dep_info.deps_by_use_category('api'))
+        expected_controlplane_core_deps = self._dep_info.deps_by_use_category(
+            'controlplane').union(self._dep_info.deps_by_use_category('api'))
         bad_controlplane_core_deps = queried_controlplane_core_min_deps.difference(
             expected_controlplane_core_deps)
         if len(bad_controlplane_core_deps) > 0:
@@ -280,12 +294,13 @@ class Validator(object):
             if metadata:
                 use_category = metadata['use_category']
                 valid_use_category = any(
-                    c in use_category
-                    for c in ['dataplane_ext', 'observability_ext', 'other', 'api'])
+                    c in use_category for c in
+                    ['dataplane_ext', 'observability_ext', 'other', 'api'])
                 if not valid_use_category:
                     raise DependencyError(
                         f'Extensions {name} depends on {d} with "use_category" not including '
-                        '["dataplane_ext", "observability_ext", "api", "other"]')
+                        '["dataplane_ext", "observability_ext", "api", "other"]'
+                    )
                 if 'extensions' in metadata:
                     allowed_extensions = metadata['extensions']
                     if name not in allowed_extensions:
@@ -317,6 +332,7 @@ if __name__ == '__main__':
         validator.validate_all()
     except DependencyError as e:
         print(
-            'Dependency validation failed, please check metadata in bazel/repository_locations.bzl')
+            'Dependency validation failed, please check metadata in bazel/repository_locations.bzl'
+        )
         print(e)
         sys.exit(1)

@@ -63,7 +63,8 @@ def ComputeOldestApiVersion(current_version: ApiVersion):
   Returns:
     the oldest supported API version.
   """
-    return ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
+    return ApiVersion(current_version.major, max(current_version.minor - 1, 0),
+                      0)
 
 
 if __name__ == '__main__':

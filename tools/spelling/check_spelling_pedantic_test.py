@@ -13,7 +13,8 @@ import sys
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 tools = os.path.dirname(curr_dir)
 src = os.path.join(tools, 'testdata', 'spelling')
-check_spelling = sys.executable + " " + os.path.join(curr_dir, 'check_spelling_pedantic.py')
+check_spelling = sys.executable + " " + os.path.join(
+    curr_dir, 'check_spelling_pedantic.py')
 
 
 # Runs the 'check_spelling_pedanic' operation, on the specified file,
@@ -46,7 +47,8 @@ def expect_error(filename, status, stdout, expected_substrings):
                 found = True
                 break
         if not found:
-            logging.error("%s: Could not find '%s' in:\n" % (filename, expected_substring))
+            logging.error("%s: Could not find '%s' in:\n" %
+                          (filename, expected_substring))
             emit_stdout_as_error(stdout)
             errors += 1
 
@@ -54,14 +56,16 @@ def expect_error(filename, status, stdout, expected_substrings):
 
 
 def check_file_expecting_errors(filename, expected_substrings):
-    command, status, stdout = run_check_format("check", get_input_file(filename))
+    command, status, stdout = run_check_format("check",
+                                               get_input_file(filename))
     return expect_error(filename, status, stdout, expected_substrings)
 
 
 def check_file_path_expecting_ok(filename):
     command, status, stdout = run_check_format("check", filename)
     if status != 0:
-        logging.error("Expected %s to have no errors; status=%d, output:\n" % (filename, status))
+        logging.error("Expected %s to have no errors; status=%d, output:\n" %
+                      (filename, status))
         emit_stdout_as_error(stdout)
     return status
 
@@ -83,17 +87,22 @@ def run_checks():
     errors += check_file_expecting_errors(
         "typos", ["spacific", "reelistic", "Awwful", "combeenations", "woork"])
     errors += check_file_expecting_errors(
-        "skip_blocks", ["speelinga", "speelingb", "speelingc", "speelingd", "speelinge"])
+        "skip_blocks",
+        ["speelinga", "speelingb", "speelingc", "speelingd", "speelinge"])
     errors += check_file_expecting_errors("on_off", ["speelinga", "speelingb"])
-    errors += check_file_expecting_errors("rst_code_block", ["speelinga", "speelingb"])
-    errors += check_file_expecting_errors("word_splitting", ["Speeled", "Korrectly"])
+    errors += check_file_expecting_errors("rst_code_block",
+                                          ["speelinga", "speelingb"])
+    errors += check_file_expecting_errors("word_splitting",
+                                          ["Speeled", "Korrectly"])
 
     return errors
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='tester for check_format.py.')
-    parser.add_argument('--log', choices=['INFO', 'WARN', 'ERROR'], default='INFO')
+    parser.add_argument('--log',
+                        choices=['INFO', 'WARN', 'ERROR'],
+                        default='INFO')
     args = parser.parse_args()
     logging.basicConfig(format='%(message)s', level=args.log)
 

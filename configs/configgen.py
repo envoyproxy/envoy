@@ -22,7 +22,12 @@ OUT_DIR = sys.argv[1]
 # in envoy_router.template.json must be specified here. It is a dictionary of dictionaries.
 # Options can be specified for each cluster if needed. See make_route_internal() in
 # routing_helper.template.json for the types of options supported.
-front_envoy_clusters = {'service1': {}, 'service2': {}, 'service3': {}, 'ratelimit': {}}
+front_envoy_clusters = {
+    'service1': {},
+    'service2': {},
+    'service3': {},
+    'ratelimit': {}
+}
 
 # This is the set of internal services that local Envoys will route to. All services that will be
 # accessed via the 9001 egress port need to be listed here. It is a dictionary of dictionaries.
@@ -98,7 +103,8 @@ mongos_servers = {
 
 def generate_config(template_path, template, output_file, **context):
     """ Generate a final config file based on a template and some context. """
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path, followlinks=True),
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path,
+                                                            followlinks=True),
                              undefined=jinja2.StrictUndefined)
     raw_output = env.get_template(template).render(**context)
     with open(output_file, 'w') as fh:
@@ -139,7 +145,9 @@ generate_config(SCRIPT_DIR,
                 mongos_servers=mongos_servers)
 
 shutil.copy(os.path.join(SCRIPT_DIR, 'envoyproxy_io_proxy.yaml'), OUT_DIR)
-shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_http1_connect.yaml'), OUT_DIR)
-shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_http2_connect.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_http1_connect.yaml'),
+            OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_http2_connect.yaml'),
+            OUT_DIR)
 shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_http1_connect.yaml'), OUT_DIR)
 shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_http2_connect.yaml'), OUT_DIR)

@@ -35,14 +35,16 @@ TESTDATA_PATH = 'tools/api_boost/testdata'
 
 
 def diff(some_path, other_path):
-    result = subprocess.run(['diff', '-u', some_path, other_path], capture_output=True)
+    result = subprocess.run(['diff', '-u', some_path, other_path],
+                            capture_output=True)
     if result.returncode == 0:
         return None
     return result.stdout.decode('utf-8') + result.stderr.decode('utf-8')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Golden C++ source tests for api_boost.py')
+    parser = argparse.ArgumentParser(
+        description='Golden C++ source tests for api_boost.py')
     parser.add_argument('tests', nargs='*')
     args = parser.parse_args()
 
@@ -60,13 +62,15 @@ if __name__ == '__main__':
         shutil.copy(os.path.join(TESTDATA_PATH, 'BUILD'), path)
         for test in TESTS:
             if should_run_test(test.name):
-                shutil.copy(os.path.join(TESTDATA_PATH, test.name + '.cc'), path)
+                shutil.copy(os.path.join(TESTDATA_PATH, test.name + '.cc'),
+                            path)
             else:
                 # Place an empty file to make Bazel happy.
                 pathlib.Path(path, test.name + '.cc').write_text('')
 
         # Run API booster.
-        relpath_to_testdata = str(pathlib.Path(path).relative_to(pathlib.Path.cwd()))
+        relpath_to_testdata = str(
+            pathlib.Path(path).relative_to(pathlib.Path.cwd()))
         api_boost.api_boost_tree([
             os.path.join(relpath_to_testdata, test.name)
             for test in TESTS
@@ -80,8 +84,9 @@ if __name__ == '__main__':
         # Validate output against golden files.
         for test in TESTS:
             if should_run_test(test.name):
-                delta = diff(os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
-                             os.path.join(path, test.name + '.cc'))
+                delta = diff(
+                    os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
+                    os.path.join(path, test.name + '.cc'))
                 if delta is not None:
                     messages.append('Non-empty diff for %s (%s):\n%s\n' %
                                     (test.name, test.description, delta))

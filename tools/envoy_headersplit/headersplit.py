@@ -145,7 +145,8 @@ def class_implementations(cursor: Cursor) -> List[Cursor]:
     return impl_cursors
 
 
-def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str, List[str]]:
+def extract_definition(cursor: Cursor,
+                       classnames: List[str]) -> Tuple[str, str, List[str]]:
     """
   extracts class definition source code pointed by the cursor parameter.
   and find dependent mock classes by naming look up.
@@ -166,14 +167,16 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
     filename = cursor.location.file.name
     contents = read_file_contents(filename)
     class_name = cursor.spelling
-    class_defn = contents[cursor.extent.start.offset:cursor.extent.end.offset] + ";"
+    class_defn = contents[cursor.extent.start.offset:cursor.extent.end.
+                          offset] + ";"
     # need to know enclosing semantic parents (namespaces)
     # to generate corresponding definitions
     parent_cursor = cursor.semantic_parent
     while parent_cursor.kind == CursorKind.NAMESPACE:
         if parent_cursor.spelling == "":
             break
-        class_defn = "namespace {} {{\n".format(parent_cursor.spelling) + class_defn + "\n}\n"
+        class_defn = "namespace {} {{\n".format(
+            parent_cursor.spelling) + class_defn + "\n}\n"
         parent_cursor = parent_cursor.semantic_parent
     # resolve dependency
     # by simple naming look up
@@ -209,7 +212,8 @@ def get_implline(cursor: Cursor) -> int:
     return cursor.extent.start.line - 1
 
 
-def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dict[str, str]:
+def extract_implementations(impl_cursors: List[Cursor],
+                            source_code: str) -> Dict[str, str]:
     """
   extracts method function body for each cursor in list impl_cursors from source code
   groups those function bodies with class name to help generating the divided {classname}.cc
@@ -282,7 +286,8 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
     while parent_cursor.kind == CursorKind.NAMESPACE:
         if parent_cursor.spelling == "":
             break
-        namespace_prefix = "namespace {} {{\n".format(parent_cursor.spelling) + namespace_prefix
+        namespace_prefix = "namespace {} {{\n".format(
+            parent_cursor.spelling) + namespace_prefix
         namespace_suffix += "\n}"
         parent_cursor = parent_cursor.semantic_parent
     namespace_suffix += "\n"
@@ -309,7 +314,8 @@ envoy_cc_mock(
 
   ]
 )
-""".format(to_filename(class_name), to_filename(class_name), to_filename(class_name))
+""".format(to_filename(class_name), to_filename(class_name),
+           to_filename(class_name))
     with open("BUILD", "r+") as bazel_file:
         contents = bazel_file.read()
         if 'name = "{}_mocks"'.format(to_filename(class_name)) not in contents:
@@ -344,8 +350,8 @@ def main(args):
         if class_name not in classname_to_impl:
             print("Warning: empty class {}".format(class_name))
         else:
-            impl_include = impl_includes.replace(decl_filename,
-                                                 "{}.h".format(to_filename(class_name)))
+            impl_include = impl_includes.replace(
+                decl_filename, "{}.h".format(to_filename(class_name)))
             # we need to enclose methods with namespaces
             namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
             class_impl = impl_include + namespace_prefix + \
@@ -365,6 +371,7 @@ if __name__ == "__main__":
         "-i",
         "--impl",
         default="mocks.cc",
-        help="Path to the implementation code .cc file that needs to be splitted",
+        help=
+        "Path to the implementation code .cc file that needs to be splitted",
     )
     main(vars(PARSER.parse_args()))

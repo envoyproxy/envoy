@@ -3,7 +3,8 @@
 # Main library file containing all the protocol generation logic.
 
 
-def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_file, input_files):
+def generate_main_code(type, main_header_file, resolver_cc_file,
+                       metrics_header_file, input_files):
     """
   Main code generator.
 
@@ -19,7 +20,8 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
     # Parse provided input files.
     messages = processor.parse_messages(input_files)
 
-    complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
+    complex_type_template = RenderingHelper.get_template(
+        'complex_type_template.j2')
     parsers_template = RenderingHelper.get_template("%s_parser.j2" % type)
 
     main_header_contents = ''
@@ -28,7 +30,8 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
         # For each child structure that is used by request/response, render its matching C++ code.
         dependencies = message.compute_declaration_chain()
         for dependency in dependencies:
-            main_header_contents += complex_type_template.render(complex_type=dependency)
+            main_header_contents += complex_type_template.render(
+                complex_type=dependency)
         # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
         main_header_contents += parsers_template.render(complex_type=message)
 
@@ -53,8 +56,8 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
         fd.write(contents)
 
 
-def generate_test_code(type, header_test_cc_file, codec_test_cc_file, utilities_cc_file,
-                       input_files):
+def generate_test_code(type, header_test_cc_file, codec_test_cc_file,
+                       utilities_cc_file, input_files):
     """
   Test code generator.
 
@@ -77,7 +80,8 @@ def generate_test_code(type, header_test_cc_file, codec_test_cc_file, utilities_
         fd.write(contents)
 
     # Generate codec-test file.
-    template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" % (type, type))
+    template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" %
+                                            (type, type))
     contents = template.render(message_types=messages)
     with open(codec_test_cc_file, 'w') as fd:
         fd.write(contents)
@@ -145,12 +149,14 @@ class StatefulProcessor:
         self.currently_processed_message_type = spec['name']
 
         # Figure out all versions of this message type.
-        versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
+        versions = Statics.parse_version_string(spec['validVersions'],
+                                                2 << 16 - 1)
 
         # Figure out the flexible versions.
         flexible_versions_string = spec.get('flexibleVersions', 'none')
         if 'none' != flexible_versions_string:
-            flexible_versions = Statics.parse_version_string(flexible_versions_string, versions[-1])
+            flexible_versions = Statics.parse_version_string(
+                flexible_versions_string, versions[-1])
         else:
             flexible_versions = []
 
@@ -167,13 +173,14 @@ class StatefulProcessor:
                     common_struct_name = common_struct['name']
                     common_struct_versions = Statics.parse_version_string(
                         common_struct['versions'], versions[-1])
-                    parsed_complex = self.parse_complex_type(common_struct_name, common_struct,
-                                                             common_struct_versions)
+                    parsed_complex = self.parse_complex_type(
+                        common_struct_name, common_struct,
+                        common_struct_versions)
                     self.common_structs[parsed_complex.name] = parsed_complex
 
             # Parse the type itself.
-            complex_type = self.parse_complex_type(self.currently_processed_message_type, spec,
-                                                   versions)
+            complex_type = self.parse_complex_type(
+                self.currently_processed_message_type, spec, versions)
             complex_type.register_flexible_versions(flexible_versions)
 
             # Request / response types need to carry api key version.
@@ -226,10 +233,12 @@ class StatefulProcessor:
         version_usage = Statics.parse_version_string(field_spec['versions'],
                                                      highest_possible_version)
         version_usage_as_nullable = Statics.parse_version_string(
-            field_spec['nullableVersions'],
-            highest_possible_version) if 'nullableVersions' in field_spec else range(-1)
-        parsed_type = self.parse_type(field_spec['type'], field_spec, highest_possible_version)
-        return FieldSpec(field_spec['name'], parsed_type, version_usage, version_usage_as_nullable)
+            field_spec['nullableVersions'], highest_possible_version
+        ) if 'nullableVersions' in field_spec else range(-1)
+        parsed_type = self.parse_type(field_spec['type'], field_spec,
+                                      highest_possible_version)
+        return FieldSpec(field_spec['name'], parsed_type, version_usage,
+                         version_usage_as_nullable)
 
     def parse_type(self, type_name, field_spec, highest_possible_version):
         """
@@ -238,14 +247,15 @@ class StatefulProcessor:
         if (type_name.startswith('[]')):
             # In spec files, array types are defined as `[]underlying_type` instead of having its own
             # element with type inside.
-            underlying_type = self.parse_type(type_name[2:], field_spec, highest_possible_version)
+            underlying_type = self.parse_type(type_name[2:], field_spec,
+                                              highest_possible_version)
             return Array(underlying_type)
         else:
             if (type_name in Primitive.USABLE_PRIMITIVE_TYPE_NAMES):
                 return Primitive(type_name, field_spec.get('default'))
             else:
-                versions = Statics.parse_version_string(field_spec['versions'],
-                                                        highest_possible_version)
+                versions = Statics.parse_version_string(
+                    field_spec['versions'], highest_possible_version)
                 return self.parse_complex_type(type_name, field_spec, versions)
 
 
@@ -290,7 +300,8 @@ class FieldList:
     Multiple versions of the same structure can have identical signatures (due to version bumps in
     Kafka).
     """
-        parameter_spec = map(lambda x: x.parameter_declaration(self.version), self.used_fields())
+        parameter_spec = map(lambda x: x.parameter_declaration(self.version),
+                             self.used_fields())
         return ', '.join(parameter_spec)
 
     def constructor_init_list(self):
@@ -309,7 +320,8 @@ class FieldList:
                         init_list.append(init_list_item)
                     else:
                         # Field is optional<T>, and the parameter is T in this version.
-                        init_list_item = '%s_{absl::make_optional(%s)}' % (field.name, field.name)
+                        init_list_item = '%s_{absl::make_optional(%s)}' % (
+                            field.name, field.name)
                         init_list.append(init_list_item)
                 else:
                     # Field is T, so parameter cannot be optional<T>.
@@ -326,7 +338,9 @@ class FieldList:
         return len(list(self.used_fields()))
 
     def example_value(self):
-        return ', '.join(map(lambda x: x.example_value_for_test(self.version), self.used_fields()))
+        return ', '.join(
+            map(lambda x: x.example_value_for_test(self.version),
+                self.used_fields()))
 
 
 class FieldSpec:
@@ -382,14 +396,15 @@ class FieldSpec:
 
     def example_value_for_test(self, version):
         if self.is_nullable():
-            return 'absl::make_optional<%s>(%s)' % (self.type.name,
-                                                    self.type.example_value_for_test(version))
+            return 'absl::make_optional<%s>(%s)' % (
+                self.type.name, self.type.example_value_for_test(version))
         else:
             return str(self.type.example_value_for_test(version))
 
     def deserializer_name_in_version(self, version, compact):
         if self.is_nullable_in_version(version):
-            return 'Nullable%s' % self.type.deserializer_name_in_version(version, compact)
+            return 'Nullable%s' % self.type.deserializer_name_in_version(
+                version, compact)
         else:
             return self.type.deserializer_name_in_version(version, compact)
 
@@ -450,8 +465,10 @@ class Array(TypeSpecification):
 
     def deserializer_name_in_version(self, version, compact):
         # For arrays, deserializer name is (Compact)(Nullable)ArrayDeserializer<ElementDeserializer>.
-        element_deserializer_name = self.underlying.deserializer_name_in_version(version, compact)
-        return '%sArrayDeserializer<%s>' % ("Compact" if compact else "", element_deserializer_name)
+        element_deserializer_name = self.underlying.deserializer_name_in_version(
+            version, compact)
+        return '%sArrayDeserializer<%s>' % ("Compact" if compact else "",
+                                            element_deserializer_name)
 
     def default_value(self):
         return 'std::vector<%s>{}' % (self.underlying.name)
@@ -460,8 +477,9 @@ class Array(TypeSpecification):
         return True
 
     def example_value_for_test(self, version):
-        return 'std::vector<%s>{ %s }' % (self.underlying.name,
-                                          self.underlying.example_value_for_test(version))
+        return 'std::vector<%s>{ %s }' % (
+            self.underlying.name,
+            self.underlying.example_value_for_test(version))
 
     def is_printable(self):
         return self.underlying.is_printable()
@@ -472,7 +490,9 @@ class Primitive(TypeSpecification):
   Represents a Kafka primitive value.
   """
 
-    USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
+    USABLE_PRIMITIVE_TYPE_NAMES = [
+        'bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes'
+    ]
 
     KAFKA_TYPE_TO_ENVOY_TYPE = {
         'string': 'std::string',
@@ -550,23 +570,28 @@ class Primitive(TypeSpecification):
         return []
 
     def deserializer_name_in_version(self, version, compact):
-        if compact and self.original_name in Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER.keys():
-            return Primitive.compute(self.original_name,
-                                     Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER)
+        if compact and self.original_name in Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER.keys(
+        ):
+            return Primitive.compute(
+                self.original_name,
+                Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER)
         else:
-            return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
+            return Primitive.compute(self.original_name,
+                                     Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
     def default_value(self):
         if self.custom_default_value is not None:
             return self.custom_default_value
         else:
-            return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DEFAULT_VALUE)
+            return Primitive.compute(self.original_name,
+                                     Primitive.KAFKA_TYPE_TO_DEFAULT_VALUE)
 
     def has_flexible_handling(self):
         return self.original_name in ['string', 'bytes', 'tagged_fields']
 
     def example_value_for_test(self, version):
-        return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST)
+        return Primitive.compute(self.original_name,
+                                 Primitive.KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST)
 
     def is_printable(self):
         return self.name not in ['Bytes']
@@ -574,7 +599,8 @@ class Primitive(TypeSpecification):
 
 class FieldSerializationSpec():
 
-    def __init__(self, field, versions, compute_size_method_name, encode_method_name):
+    def __init__(self, field, versions, compute_size_method_name,
+                 encode_method_name):
         self.field = field
         self.versions = versions
         self.compute_size_method_name = compute_size_method_name
@@ -600,8 +626,9 @@ class Complex(TypeSpecification):
         for type in self.compute_declaration_chain():
             type.flexible_versions = flexible_versions
             if len(flexible_versions) > 0:
-                tagged_fields_field = FieldSpec('tagged_fields', Primitive('tagged_fields', None),
-                                                flexible_versions, [])
+                tagged_fields_field = FieldSpec(
+                    'tagged_fields', Primitive('tagged_fields', None),
+                    flexible_versions, [])
                 type.fields.append(tagged_fields_field)
 
     def compute_declaration_chain(self):
@@ -641,13 +668,15 @@ class Complex(TypeSpecification):
                 entry['signature'] = signature
                 if (len(signature) > 0):
                     entry['full_declaration'] = '%s(%s): %s {};' % (
-                        self.name, signature, field_list.constructor_init_list())
+                        self.name, signature,
+                        field_list.constructor_init_list())
                 else:
                     entry['full_declaration'] = '%s() {};' % self.name
                 signature_to_constructor[signature] = entry
             else:
                 constructor['versions'].append(field_list.version)
-        return sorted(signature_to_constructor.values(), key=lambda x: x['versions'][0])
+        return sorted(signature_to_constructor.values(),
+                      key=lambda x: x['versions'][0])
 
     def compute_field_lists(self):
         """
@@ -655,7 +684,8 @@ class Complex(TypeSpecification):
     """
         field_lists = []
         for version in self.versions:
-            field_list = FieldList(version, version in self.flexible_versions, self.fields)
+            field_list = FieldList(version, version in self.flexible_versions,
+                                   self.fields)
             field_lists.append(field_list)
         return field_lists
 
@@ -663,18 +693,26 @@ class Complex(TypeSpecification):
         result = []
         for field in self.fields:
             if field.type.has_flexible_handling():
-                flexible = [x for x in field.version_usage if x in self.flexible_versions]
-                non_flexible = [x for x in field.version_usage if x not in flexible]
+                flexible = [
+                    x for x in field.version_usage
+                    if x in self.flexible_versions
+                ]
+                non_flexible = [
+                    x for x in field.version_usage if x not in flexible
+                ]
                 if non_flexible:
                     result.append(
-                        FieldSerializationSpec(field, non_flexible, 'computeSize', 'encode'))
+                        FieldSerializationSpec(field, non_flexible,
+                                               'computeSize', 'encode'))
                 if flexible:
                     result.append(
-                        FieldSerializationSpec(field, flexible, 'computeCompactSize',
+                        FieldSerializationSpec(field, flexible,
+                                               'computeCompactSize',
                                                'encodeCompact'))
             else:
                 result.append(
-                    FieldSerializationSpec(field, field.version_usage, 'computeSize', 'encode'))
+                    FieldSerializationSpec(field, field.version_usage,
+                                           'computeSize', 'encode'))
         return result
 
     def deserializer_name_in_version(self, version, compact):
@@ -686,14 +724,17 @@ class Complex(TypeSpecification):
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
     def default_value(self):
-        raise NotImplementedError('unable to create default value of complex type')
+        raise NotImplementedError(
+            'unable to create default value of complex type')
 
     def has_flexible_handling(self):
         return False
 
     def example_value_for_test(self, version):
-        field_list = next(fl for fl in self.compute_field_lists() if fl.version == version)
-        example_values = map(lambda x: x.example_value_for_test(version), field_list.used_fields())
+        field_list = next(
+            fl for fl in self.compute_field_lists() if fl.version == version)
+        example_values = map(lambda x: x.example_value_for_test(version),
+                             field_list.used_fields())
         return '%s(%s)' % (self.name, ', '.join(example_values))
 
     def is_printable(self):

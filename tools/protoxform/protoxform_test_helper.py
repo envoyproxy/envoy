@@ -28,7 +28,9 @@ def path_and_filename(label):
         return label
     label = label.replace(":", "/")
     splitted_label = label.split('/')
-    return ['/'.join(splitted_label[:len(splitted_label) - 1]), splitted_label[-1]]
+    return [
+        '/'.join(splitted_label[:len(splitted_label) - 1]), splitted_label[-1]
+    ]
 
 
 def golden_proto_file(path, filename, version):
@@ -135,7 +137,8 @@ if __name__ == "__main__":
         path, filename = path_and_filename(target)
         messages += run(cmd, path, filename, 'active_or_frozen')
         messages += run(cmd, path, filename, 'next_major_version_candidate')
-        messages += run(cmd, path, filename, 'next_major_version_candidate.envoy_internal')
+        messages += run(cmd, path, filename,
+                        'next_major_version_candidate.envoy_internal')
 
     if len(messages) == 0:
         logging.warning("PASS")

@@ -32,7 +32,8 @@ def proto_to_struct(proto):
 def parse_proto(path, filter_name):
     # We only know about some filter config protos ahead of time.
     KNOWN_FILTERS = {
-        'http_connection_manager': lambda: http_connection_manager_pb2.HttpConnectionManager()
+        'http_connection_manager':
+            lambda: http_connection_manager_pb2.HttpConnectionManager()
     }
     filter_config = KNOWN_FILTERS[filter_name]()
     with open(path, 'r') as f:
@@ -40,14 +41,16 @@ def parse_proto(path, filter_name):
     return filter_config
 
 
-def generate_listeners(listeners_pb_path, output_pb_path, output_json_path, fragments):
+def generate_listeners(listeners_pb_path, output_pb_path, output_json_path,
+                       fragments):
     listener = lds_pb2.Listener()
     with open(listeners_pb_path, 'r') as f:
         text_format.Merge(f.read(), listener)
 
     for filter_chain in listener.filter_chains:
         for f in filter_chain.filters:
-            f.config.CopyFrom(proto_to_struct(parse_proto(next(fragments), f.name)))
+            f.config.CopyFrom(
+                proto_to_struct(parse_proto(next(fragments), f.name)))
 
     with open(output_pb_path, 'w') as f:
         f.write(str(listener))
@@ -62,4 +65,5 @@ if __name__ == '__main__':
               'listeners.json> <filter config fragment paths>') % sys.argv[0]
         sys.exit(1)
 
-    generate_listeners(sys.argv[1], sys.argv[2], sys.argv[3], iter(sys.argv[4:]))
+    generate_listeners(sys.argv[1], sys.argv[2], sys.argv[3],
+                       iter(sys.argv[4:]))

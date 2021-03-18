@@ -35,9 +35,13 @@ def dump_event(direction, timestamp, data):
     dump = io.StringIO()
     dump.write('%s\n' % direction)
     # Adjust to local timezone
-    adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(seconds=time.altzone)
+    adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(
+        seconds=time.altzone)
     dump.write('%s\n' % adjusted_dt)
-    od = sp.Popen(['od', '-Ax', '-tx1', '-v'], stdout=sp.PIPE, stdin=sp.PIPE, stderr=sp.PIPE)
+    od = sp.Popen(['od', '-Ax', '-tx1', '-v'],
+                  stdout=sp.PIPE,
+                  stdin=sp.PIPE,
+                  stderr=sp.PIPE)
     packet_dump = od.communicate(data)[0]
     dump.write(packet_dump.decode())
     return dump.getvalue()
@@ -61,9 +65,11 @@ def tap2pcap(tap_path, pcap_path):
     dumps = []
     for event in trace.events:
         if event.HasField('read'):
-            dumps.append(dump_event('I', event.timestamp, event.read.data.as_bytes))
+            dumps.append(
+                dump_event('I', event.timestamp, event.read.data.as_bytes))
         elif event.HasField('write'):
-            dumps.append(dump_event('O', event.timestamp, event.write.data.as_bytes))
+            dumps.append(
+                dump_event('O', event.timestamp, event.write.data.as_bytes))
 
     ipv6 = False
     try:

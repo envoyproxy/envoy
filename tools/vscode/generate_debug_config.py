@@ -32,13 +32,16 @@ def get_execution_root(workspace):
 
 def binary_path(bazel_bin, target):
     return pathlib.Path(
-        bazel_bin,
-        *[s for s in target.replace('@', 'external/').replace(':', '/').split('/') if s != ''])
+        bazel_bin, *[
+            s for s in target.replace('@', 'external/').replace(':', '/').split(
+                '/') if s != ''
+        ])
 
 
 def build_binary_with_debug_info(target):
     targets = [target, target + ".dwp"]
-    subprocess.check_call(["bazel", "build", "-c", "dbg"] + BAZEL_OPTIONS + targets)
+    subprocess.check_call(["bazel", "build", "-c", "dbg"] + BAZEL_OPTIONS +
+                          targets)
 
     bazel_bin = bazel_info("bazel-bin", ["-c", "dbg"])
     return binary_path(bazel_bin, target)
@@ -46,7 +49,8 @@ def build_binary_with_debug_info(target):
 
 def get_launch_json(workspace):
     try:
-        return json.loads(pathlib.Path(workspace, ".vscode", "launch.json").read_text())
+        return json.loads(
+            pathlib.Path(workspace, ".vscode", "launch.json").read_text())
     except:
         return {"version": "0.2.0"}
 
@@ -89,7 +93,8 @@ def lldb_config(target, binary, workspace, execroot, arguments):
     }
 
 
-def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type):
+def add_to_launch_json(target, binary, workspace, execroot, arguments,
+                       debugger_type):
     launch = get_launch_json(workspace)
     new_config = {}
     if debugger_type == "lldb":
@@ -111,7 +116,8 @@ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Build and generate launch config for VSCode')
+    parser = argparse.ArgumentParser(
+        description='Build and generate launch config for VSCode')
     parser.add_argument('--debugger', default="gdb")
     parser.add_argument('--args', default='')
     parser.add_argument('target')
@@ -120,5 +126,5 @@ if __name__ == "__main__":
     workspace = get_workspace()
     execution_root = get_execution_root(workspace)
     debug_binary = build_binary_with_debug_info(args.target)
-    add_to_launch_json(args.target, debug_binary, workspace, execution_root, args.args,
-                       args.debugger)
+    add_to_launch_json(args.target, debug_binary, workspace, execution_root,
+                       args.args, args.debugger)

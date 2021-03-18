@@ -11,7 +11,8 @@ class Comment(object):
     def __init__(self, comment, file_level_annotations=None):
         self.raw = comment
         self.file_level_annotations = file_level_annotations
-        self.annotations = annotations.extract_annotations(self.raw, file_level_annotations)
+        self.annotations = annotations.extract_annotations(
+            self.raw, file_level_annotations)
 
     def get_comment_with_transforms(self, annotation_xforms):
         """Return transformed comment with annotation transformers.
@@ -22,8 +23,9 @@ class Comment(object):
     Returns:
       transformed Comment object.
     """
-        return Comment(annotations.xform_annotation(self.raw, annotation_xforms),
-                       self.file_level_annotations)
+        return Comment(
+            annotations.xform_annotation(self.raw, annotation_xforms),
+            self.file_level_annotations)
 
 
 class SourceCodeInfo(object):
@@ -33,7 +35,9 @@ class SourceCodeInfo(object):
         self.name = name
         self.proto = source_code_info
         # Map from path to SourceCodeInfo.Location
-        self._locations = {str(location.path): location for location in self.proto.location}
+        self._locations = {
+            str(location.path): location for location in self.proto.location
+        }
         self._file_level_comments = None
         self._file_level_annotations = None
 
@@ -46,9 +50,11 @@ class SourceCodeInfo(object):
         # We find the earliest detached comment by first finding the maximum start
         # line for any location and then scanning for any earlier locations with
         # detached comments.
-        earliest_detached_comment = max(location.span[0] for location in self.proto.location) + 1
+        earliest_detached_comment = max(
+            location.span[0] for location in self.proto.location) + 1
         for location in self.proto.location:
-            if location.leading_detached_comments and location.span[0] < earliest_detached_comment:
+            if location.leading_detached_comments and location.span[
+                    0] < earliest_detached_comment:
                 comments = location.leading_detached_comments
                 earliest_detached_comment = location.span[0]
         self._file_level_comments = comments
@@ -61,7 +67,8 @@ class SourceCodeInfo(object):
             return self._file_level_annotations
         self._file_level_annotations = dict(
             sum([
-                list(annotations.extract_annotations(c).items()) for c in self.file_level_comments
+                list(annotations.extract_annotations(c).items())
+                for c in self.file_level_comments
             ], []))
         return self._file_level_annotations
 
@@ -91,7 +98,8 @@ class SourceCodeInfo(object):
     """
         location = self.location_path_lookup(path)
         if location is not None:
-            return Comment(location.leading_comments, self.file_level_annotations)
+            return Comment(location.leading_comments,
+                           self.file_level_annotations)
         return Comment('')
 
     def leading_detached_comments_path_lookup(self, path):
@@ -268,7 +276,8 @@ class TypeContext(object):
     @property
     def leading_detached_comments(self):
         """Leading detached comments for type context."""
-        return self.source_code_info.leading_detached_comments_path_lookup(self.path)
+        return self.source_code_info.leading_detached_comments_path_lookup(
+            self.path)
 
     @property
     def trailing_comment(self):
