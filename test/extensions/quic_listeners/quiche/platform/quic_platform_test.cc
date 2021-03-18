@@ -383,17 +383,20 @@ TEST_F(QuicPlatformTest, QuicDLog) {
 
 #undef VALUE_BY_COMPILE_MODE
 
-TEST_F(QuicPlatformTest, QuicCHECK) {
-  CHECK(1 == 1);
-  CHECK(1 == 1) << " 1 == 1 is forever true.";
+TEST_F(QuicPlatformTest, QuicheCheck) {
+  QUICHE_CHECK(1 == 1);
+  QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
-  EXPECT_DEBUG_DEATH({ DCHECK(false) << " Supposed to fail in debug mode."; },
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
                      "CHECK failed:.* Supposed to fail in debug mode.");
-  EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "CHECK failed");
 
-  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
+  EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
                "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ QUICHE_CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
+                     "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
 }
 
 // Test the behaviors of the cross products of

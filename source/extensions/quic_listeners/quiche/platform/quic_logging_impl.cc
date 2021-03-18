@@ -7,13 +7,44 @@
 #include "extensions/quic_listeners/quiche/platform/quic_logging_impl.h"
 
 #include <atomic>
+#include <cstdlib>
 
 #include "common/common/utility.h"
 
 namespace quic {
 
 namespace {
-std::atomic<int> g_verbosity_threshold;
+
+// Helper class that allows getting and setting QUICHE log verbosity threshold.
+class QuicLogVerbosityManager {
+public:
+  // Gets QUICHE log verbosity threshold.
+  static int GetThreshold() { return Get()->verbosity_threshold_.load(std::memory_order_relaxed); }
+
+  // Sets QUICHE log verbosity threshold.
+  static void SetThreshold(int new_verbosity) {
+    Get()->verbosity_threshold_.store(new_verbosity, std::memory_order_relaxed);
+  }
+
+private:
+  // Returns singleton.
+  static QuicLogVerbosityManager* Get() {
+    static QuicLogVerbosityManager manager = QuicLogVerbosityManager();
+    return &manager;
+  }
+
+  explicit QuicLogVerbosityManager() {
+    int verbosity = 0;
+    const char* verbosity_str = std::getenv("ENVOY_QUICHE_VERBOSITY");
+    if (verbosity_str != nullptr) {
+      verbosity = atoi(verbosity_str);
+    }
+    verbosity_threshold_.store(verbosity, std::memory_order_relaxed);
+  }
+
+  std::atomic<int> verbosity_threshold_;
+};
+
 std::atomic<bool> g_dfatal_exit_disabled;
 
 // Pointer to the global log sink, usually it is nullptr.
@@ -23,7 +54,15 @@ std::atomic<QuicLogSink*> g_quic_log_sink;
 absl::Mutex g_quic_log_sink_mutex;
 } // namespace
 
-QuicLogEmitter::QuicLogEmitter(QuicLogLevel level) : level_(level), saved_errno_(errno) {}
+int GetVerbosityLogThreshold() { return QuicLogVerbosityManager::GetThreshold(); }
+
+void SetVerbosityLogThreshold(int new_verbosity) {
+  QuicLogVerbosityManager::SetThreshold(new_verbosity);
+}
+
+QuicLogEmitter::QuicLogEmitter(QuicLogLevel level, const char* filename, int line,
+                               const char* funcname)
+    : level_(level), filename_(filename), line_(line), funcname_(funcname), saved_errno_(errno) {}
 
 QuicLogEmitter::~QuicLogEmitter() {
   if (is_perror_) {
@@ -36,7 +75,7 @@ QuicLogEmitter::~QuicLogEmitter() {
     // the output.
     content.back() = '\0';
   }
-  GetLogger().log(level_, "{}", content.c_str());
+  GetLogger().log(::spdlog::source_loc(filename_, line_, funcname_), level_, "{}", content.c_str());
 
   // Normally there is no log sink and we can avoid acquiring the lock.
   if (g_quic_log_sink.load(std::memory_order_relaxed) != nullptr) {
@@ -59,12 +98,6 @@ QuicLogEmitter::~QuicLogEmitter() {
     }
 #endif
   }
-}
-
-int GetVerbosityLogThreshold() { return g_verbosity_threshold.load(std::memory_order_relaxed); }
-
-void SetVerbosityLogThreshold(int new_verbosity) {
-  g_verbosity_threshold.store(new_verbosity, std::memory_order_relaxed);
 }
 
 bool IsDFatalExitDisabled() { return g_dfatal_exit_disabled.load(std::memory_order_relaxed); }
