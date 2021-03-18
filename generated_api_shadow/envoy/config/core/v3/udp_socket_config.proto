@@ -21,4 +21,11 @@ message UdpSocketConfig {
   // defaults to 1500 bytes.
   google.protobuf.UInt64Value max_rx_datagram_size = 1
       [(validate.rules).uint64 = {lt: 65536 gt: 0}];
+
+  // Configures whether Generic Receive Offload (GRO)
+  // <https://en.wikipedia.org/wiki/Large_receive_offload>_ is preferred when reading from the
+  // UDP socket. The default is context dependent and is documented where UdpSocketConfig is used.
+  // This option affects performance but not functionality. If GRO is not supported by the operating
+  // system, non-GRO receive will be used.
+  google.protobuf.BoolValue prefer_gro = 2;
 }
