@@ -60,9 +60,10 @@ void SetVerbosityLogThreshold(int new_verbosity) {
   QuicLogVerbosityManager::SetThreshold(new_verbosity);
 }
 
-QuicLogEmitter::QuicLogEmitter(QuicLogLevel level, const char* filename, int line,
-                               const char* funcname)
-    : level_(level), filename_(filename), line_(line), funcname_(funcname), saved_errno_(errno) {}
+QuicLogEmitter::QuicLogEmitter(QuicLogLevel level, const char* file_name, int line,
+                               const char* function_name)
+    : level_(level), file_name_(file_name), line_(line), function_name_(function_name),
+      saved_errno_(errno) {}
 
 QuicLogEmitter::~QuicLogEmitter() {
   if (is_perror_) {
@@ -75,7 +76,8 @@ QuicLogEmitter::~QuicLogEmitter() {
     // the output.
     content.back() = '\0';
   }
-  GetLogger().log(::spdlog::source_loc(filename_, line_, funcname_), level_, "{}", content.c_str());
+  GetLogger().log(::spdlog::source_loc(file_name_, line_, function_name_), level_, "{}",
+                  content.c_str());
 
   // Normally there is no log sink and we can avoid acquiring the lock.
   if (g_quic_log_sink.load(std::memory_order_relaxed) != nullptr) {

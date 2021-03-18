@@ -142,9 +142,10 @@ static const QuicLogLevel DFATAL = FATAL;
 
 class QuicLogEmitter {
 public:
-  // |filename| and |funcname| MUST be valid for the lifetime of the QuicLogEmitter. This is
+  // |file_name| and |function_name| MUST be valid for the lifetime of the QuicLogEmitter. This is
   // guaranteed when passing __FILE__ and __func__.
-  explicit QuicLogEmitter(QuicLogLevel level, const char* filename, int line, const char* funcname);
+  explicit QuicLogEmitter(QuicLogLevel level, const char* file_name, int line,
+                          const char* function_name);
 
   ~QuicLogEmitter();
 
@@ -157,9 +158,9 @@ public:
 
 private:
   const QuicLogLevel level_;
-  const char* filename_;
+  const char* file_name_;
   int line_;
-  const char* funcname_;
+  const char* function_name_;
   const int saved_errno_;
   bool is_perror_ = false;
   std::ostringstream stream_;
