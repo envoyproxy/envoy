@@ -3,4 +3,4 @@
 [style]
 based_on_style=Google
 indent_width=4
-column_limit=100
+column_limit=80
