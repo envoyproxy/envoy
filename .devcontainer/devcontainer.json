@@ -2,11 +2,8 @@
   "name": "Envoy Dev",
   "dockerFile": "Dockerfile",
   "runArgs": [
-    "--user=vscode",
-    "--cap-add=SYS_PTRACE",
-    "--cap-add=NET_RAW",
-    "--cap-add=NET_ADMIN",
-    "--security-opt=seccomp=unconfined",
+    "--user=root",
+    "--privileged",
     "--volume=${env:HOME}:${env:HOME}",
     "--volume=envoy-build:/build",
     "--network=host",
@@ -34,8 +31,8 @@
       "**/bazel-*/**": true
     }
   },
-  "remoteUser": "vscode",
-  "containerUser": "vscode",
+  "remoteUser": "root",
+  "containerUser": "root",
   "postCreateCommand": ".devcontainer/setup.sh",
   "extensions": [
     "github.vscode-pull-request-github",
