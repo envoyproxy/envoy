@@ -95,6 +95,15 @@ message Listener {
   message InternalListenerConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.listener.v3.Listener.InternalListenerConfig";
+
+    // The max contiguous chained internal listener to internal cluster is allowed. 0 means upstream
+    // connection cannot use internal connection. The goal is to avoid a bad config that containing
+    // loop of the internal listener and internal cluster. Such a loop will OOM the Envoy in a second.
+    // Per listener connection limit doesn't work well here because it takes 1 dispatcher cycle to reach
+    // the per listener connection limit but may take N cycles to remove the long chain of internal
+    // connections.
+    // [#not-implemented-hide:]
+    google.protobuf.UInt32Value hop_to_live = 1;
   }
 
   reserved 14, 23, 7;
