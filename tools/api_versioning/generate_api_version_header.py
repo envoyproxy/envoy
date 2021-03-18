@@ -21,7 +21,7 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
 
 
 def GenerateHeaderFile(input_path):
-  """Generates a c++ header file containing the api_version variable with the
+    """Generates a c++ header file containing the api_version variable with the
   correct value.
 
   Args:
@@ -30,26 +30,26 @@ def GenerateHeaderFile(input_path):
   Returns:
     the header file contents.
   """
-  lines = pathlib.Path(input_path).read_text().splitlines()
-  assert (len(lines) == 1)
+    lines = pathlib.Path(input_path).read_text().splitlines()
+    assert (len(lines) == 1)
 
-  # Mapping each field to int verifies it is a valid version
-  version = ApiVersion(*map(int, lines[0].split('.')))
-  oldest_version = ComputeOldestApiVersion(version)
+    # Mapping each field to int verifies it is a valid version
+    version = ApiVersion(*map(int, lines[0].split('.')))
+    oldest_version = ComputeOldestApiVersion(version)
 
-  header_file_contents = FILE_TEMPLATE.substitute({
-      'major': version.major,
-      'minor': version.minor,
-      'patch': version.patch,
-      'oldest_major': oldest_version.major,
-      'oldest_minor': oldest_version.minor,
-      'oldest_patch': oldest_version.patch
-  })
-  return header_file_contents
+    header_file_contents = FILE_TEMPLATE.substitute({
+        'major': version.major,
+        'minor': version.minor,
+        'patch': version.patch,
+        'oldest_major': oldest_version.major,
+        'oldest_minor': oldest_version.minor,
+        'oldest_patch': oldest_version.patch
+    })
+    return header_file_contents
 
 
 def ComputeOldestApiVersion(current_version: ApiVersion):
-  """Computest the oldest API version the client supports. According to the
+    """Computest the oldest API version the client supports. According to the
   specification (see: api/API_VERSIONING.md), Envoy supports up to 2 most
   recent minor versions. Therefore if the latest API version "X.Y.Z", Envoy's
   oldest API version is "X.Y-1.0". Note that the major number is always the
@@ -63,11 +63,11 @@ def ComputeOldestApiVersion(current_version: ApiVersion):
   Returns:
     the oldest supported API version.
   """
-  return ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
+    return ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
 
 
 if __name__ == '__main__':
-  input_path = sys.argv[1]
-  output = GenerateHeaderFile(input_path)
-  # Print output to stdout
-  print(output)
+    input_path = sys.argv[1]
+    output = GenerateHeaderFile(input_path)
+    # Print output to stdout
+    print(output)
