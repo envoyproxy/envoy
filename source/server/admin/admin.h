@@ -463,14 +463,14 @@ public:
    * Copy data into the buffer.
    * @param data supplies the data..
    */
-  virtual void add(absl::string_view data) PURE;
+  virtual void add(absl::string_view data);
 
   /**
    * Report Error, cannot call this after add()
    * @param code supplies the http code.
    * @param error_text supplies the error string.
    */
-  virtual void reportError(Http::Code code, absl::string_view error_text) PURE;
+  virtual void reportError(Http::Code code, absl::string_view error_text);
 };
 
 } // namespace Server
