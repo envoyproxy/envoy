@@ -138,9 +138,7 @@ auto testing_values = ::testing::Values("front-proxy_front-envoy.yaml", "envoypr
 #if defined(WIN32) && defined(SO_ORIGINAL_DST)
                                         "configs_original-dst-cluster_proxy_config.yaml"
 #endif
-#ifndef WIN32
                                         "grpc-bridge_server_envoy-proxy.yaml",
-#endif
                                         "front-proxy_service-envoy.yaml");
 
 INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest, testing_values);

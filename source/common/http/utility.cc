@@ -547,10 +547,14 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   if (local_reply_data.is_grpc_) {
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
-    response_headers->setGrpcStatus(
-        std::to_string(enumToInt(local_reply_data.grpc_status_
-                                     ? local_reply_data.grpc_status_.value()
-                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+
+    if (response_headers->getGrpcStatusValue().empty()) {
+      response_headers->setGrpcStatus(std::to_string(
+          enumToInt(local_reply_data.grpc_status_
+                        ? local_reply_data.grpc_status_.value()
+                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+    }
+
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
