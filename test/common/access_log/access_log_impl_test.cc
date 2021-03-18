@@ -993,7 +993,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x800000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x1000000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -1064,6 +1064,45 @@ typed_config:
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                           ProtoValidationException, "Proto constraint validation failed");
+}
+
+TEST_F(AccessLogImplTest, Stdout) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_, createAccessLog(_))
+      .WillOnce(Invoke(
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
+
+            return file_;
+          }));
+  EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
+}
+
+TEST_F(AccessLogImplTest, Stderror) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stderror.v3.StdErrorAccessLog
+  )EOF";
+
+  ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
+  EXPECT_CALL(log_manager_, createAccessLog(_))
+      .WillOnce(Invoke(
+          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
+            EXPECT_EQ(file_info.path_, "");
+            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
+            return file_;
+          }));
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
 TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {

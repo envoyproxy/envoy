@@ -168,14 +168,14 @@ developments and expect to be active in this space in the near future. API sheph
 take on API shepherd review load and participate in meetings. They should be active on Slack `#xds`
 and responsive to GitHub issues and PRs on which they are tagged.
 
-The API shepherds are distinct to the [UDPA working
-group](https://github.com/cncf/udpa/blob/main/README.md), which aims to evolve xDS directionally
+The API shepherds are distinct to the [xDS working
+group](https://github.com/cncf/xds/blob/main/README.md), which aims to evolve xDS directionally
 towards a universal dataplane API. API shepherds are responsible for the execution of the xDS
-day-to-day and guiding xDS implementation changes. Proposals from UDPA-WG will be aligned with the
-xDS API shepherds to ensure that xDS is heading towards the UDPA goal. xDS API shepherds operate
-under the [envoyproxy](https://github.com/envoyproxy) organization but are expected to keep in mind
-the needs of all xDS clients (currently Envoy and gRPC, but we are aware of other in-house
-implementations) and the goals of UDPA-WG.
+day-to-day and guiding xDS implementation changes. Proposals from xDS-WG will be aligned with the
+xDS API shepherds to ensure that xDS is heading towards the xDS goal of client and server neutral
+xDS. xDS API shepherds operate under the [envoyproxy](https://github.com/envoyproxy) organization
+but are expected to keep in mind the needs of all xDS clients (currently Envoy and gRPC, but we are
+aware of other in-house implementations) and the goals of xDS-WG.
 
 If you wish to become an API shepherd and satisfy the above criteria, please contact an existing
 API shepherd. We will factor in PR and review history to determine if the above API shepherd
