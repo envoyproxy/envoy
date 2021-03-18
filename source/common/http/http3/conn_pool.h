@@ -11,14 +11,19 @@ namespace Envoy {
 namespace Http {
 namespace Http3 {
 
-// TODO(#14829) the constructor of Http2::ActiveClient sets max requests per
-// connection based on HTTP/2 config. Sort out the HTTP/3 config story.
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data)
-      : MultiplexedActiveClientBase(
-            parent, parent.host()->cluster().stats().upstream_cx_http3_total_, data) {}
+      : MultiplexedActiveClientBase(parent,
+                                    parent.host()
+                                        ->cluster()
+                                        .http3Options()
+                                        .quic_protocol_options()
+                                        .max_concurrent_streams()
+                                        .value(),
+                                    parent.host()->cluster().stats().upstream_cx_http3_total_,
+                                    data) {}
 };
 
 ConnectionPool::InstancePtr
