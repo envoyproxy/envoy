@@ -132,7 +132,9 @@ TEST_F(ClusterInfoImplTest, Http3) {
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
-          http3_protocol_options: {}
+          http3_protocol_options:
+            quic_protocol_options:
+              max_concurrent_streams: 2
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
@@ -150,10 +152,15 @@ TEST_F(ClusterInfoImplTest, Http3) {
   auto explicit_h3 = makeCluster(yaml + explicit_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(
+      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
+      2);
 
   auto downstream_h3 = makeCluster(yaml + downstream_http3);
   EXPECT_EQ(Http::Protocol::Http3,
             downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
+  EXPECT_FALSE(
+      downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
 }
 
 TEST_F(ClusterInfoImplTest, Http3BadConfig) {

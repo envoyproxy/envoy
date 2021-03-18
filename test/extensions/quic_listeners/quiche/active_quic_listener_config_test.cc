@@ -29,7 +29,8 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();
 
   std::string yaml = R"EOF(
-    max_concurrent_streams: 10
+    quic_protocol_options:
+      max_concurrent_streams: 10
     idle_timeout: {
       seconds: 2
     }
@@ -63,7 +64,8 @@ TEST(ActiveQuicListenerConfigTest, QuicListenerFlagNotConfigured) {
   ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();
 
   std::string yaml = R"EOF(
-    max_concurrent_streams: 10
+    quic_protocol_options:
+      max_concurrent_streams: 10
     idle_timeout: {
       seconds: 2
     }

@@ -38,7 +38,7 @@ envoy_cc_library(
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/ssl:context_config_interface",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

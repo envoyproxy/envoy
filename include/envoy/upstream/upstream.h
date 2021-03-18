@@ -765,6 +765,12 @@ public:
   virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
 
   /**
+   * @return const envoy::config::core::v3::Http3ProtocolOptions& for HTTP/3 connections
+   * created on behalf of this cluster. @see envoy::config::core::v3::Http3ProtocolOptions.
+   */
+  virtual const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::HttpProtocolOptions for all of HTTP versions.
    */
   virtual const envoy::config::core::v3::HttpProtocolOptions&

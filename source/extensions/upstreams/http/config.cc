@@ -41,17 +41,13 @@ getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
   return options.explicit_http_config().http2_protocol_options();
 }
 
-absl::optional<envoy::config::core::v3::Http3ProtocolOptions>
+const envoy::config::core::v3::Http3ProtocolOptions&
 getHttp3Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
   if (options.has_use_downstream_protocol_config() &&
       options.use_downstream_protocol_config().has_http3_protocol_options()) {
     return options.use_downstream_protocol_config().http3_protocol_options();
   }
-  if (options.has_explicit_http_config() &&
-      options.explicit_http_config().has_http3_protocol_options()) {
-    return options.explicit_http_config().http3_protocol_options();
-  }
-  return {};
+  return options.explicit_http_config().http3_protocol_options();
 }
 
 } // namespace
@@ -89,14 +85,17 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
               ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                     options.upstream_http_protocol_options())
               : absl::nullopt) {
-  if (http3_options_.has_value()) {
-    use_http3_ = true;
-  }
-  if (options.has_explicit_http_config() &&
-      options.explicit_http_config().has_http2_protocol_options()) {
-    use_http2_ = true;
+  if (options.has_explicit_http_config()) {
+    if (options.explicit_http_config().has_http3_protocol_options()) {
+      use_http3_ = true;
+    } else if (options.explicit_http_config().has_http2_protocol_options()) {
+      use_http2_ = true;
+    }
   }
   if (options.has_use_downstream_protocol_config()) {
+    if (options.use_downstream_protocol_config().has_http3_protocol_options()) {
+      use_http3_ = true;
+    }
     if (options.use_downstream_protocol_config().has_http2_protocol_options()) {
       use_http2_ = true;
     }

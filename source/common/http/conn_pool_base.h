@@ -173,9 +173,10 @@ class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Http::ConnectionCallbacks,
                                     public Envoy::Http::ActiveClient {
 public:
-  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, Stats::Counter& cx_total);
-  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, Stats::Counter& cx_total,
-                              Upstream::Host::CreateConnectionData& data);
+  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
+                              Stats::Counter& cx_total);
+  MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t max_concurrent_streams,
+                              Stats::Counter& cx_total, Upstream::Host::CreateConnectionData& data);
   ~MultiplexedActiveClientBase() override = default;
 
   // ConnPoolImpl::ActiveClient
@@ -205,7 +206,8 @@ public:
 
 protected:
   MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
-                              Upstream::Host::CreateConnectionData& data, Stats::Counter& cx_total);
+                              Upstream::Host::CreateConnectionData& data,
+                              uint32_t max_concurrent_streams, Stats::Counter& cx_total);
 
 private:
   bool closed_with_active_rq_{};
