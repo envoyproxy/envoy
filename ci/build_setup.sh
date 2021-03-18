@@ -98,6 +98,7 @@ BAZEL_BUILD_OPTIONS=(
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
   "--noshow_progress"
+  "--noshow_loading_progress"
   "--repository_cache=${BUILD_DIR}/repository_cache"
   "--experimental_repository_cache_hardlinks"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
