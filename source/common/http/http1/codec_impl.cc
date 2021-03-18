@@ -119,14 +119,15 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream,
                                           bool bodiless_request) {
+  const Http::HeaderValues& header_values = Http::Headers::get();
   bool saw_content_length = false;
-  headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+  headers.iterate([this, &header_values](const HeaderEntry& header) -> HeaderMap::Iterate {
     absl::string_view key_to_use = header.key().getStringView();
     uint32_t key_size_to_use = header.key().size();
     // Translate :authority -> host so that upper layers do not need to deal with this.
     if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-      key_size_to_use = Headers::get().HostLegacy.get().size();
+      key_to_use = absl::string_view(header_values.HostLegacy.get());
+      key_size_to_use = header_values.HostLegacy.get().size();
     }
 
     // Skip all headers starting with ':' that make it here.
@@ -173,7 +174,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
         if (!bodiless_request ||
             !Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests")) {
-          encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
+          encodeFormattedHeader(header_values.ContentLength.get(), "0");
         }
       }
       chunk_encoding_ = false;
@@ -191,8 +192,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
       if (!is_response_to_connect_request_) {
-        encodeFormattedHeader(Headers::get().TransferEncoding.get(),
-                              Headers::get().TransferEncodingValues.Chunked);
+        encodeFormattedHeader(header_values.TransferEncoding.get(),
+                              header_values.TransferEncodingValues.Chunked);
       }
       // We do not apply chunk encoding for HTTP upgrades, including CONNECT style upgrades.
       // If there is a body in a response on the upgrade path, the chunks will be
@@ -390,10 +391,11 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
+  const Http::HeaderValues& header_values = Http::Headers::get();
 
-  if (method->value() == Headers::get().MethodValues.Head) {
+  if (method->value() == header_values.MethodValues.Head) {
     head_request_ = true;
-  } else if (method->value() == Headers::get().MethodValues.Connect) {
+  } else if (method->value() == header_values.MethodValues.Connect) {
     disableChunkEncoding();
     connection_.connection().enableHalfClose(true);
     connect_request_ = true;
@@ -672,11 +674,12 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
     protocol_ = Protocol::Http10;
   }
   RequestOrResponseHeaderMap& request_or_response_headers = requestOrResponseHeaders();
+  const Http::HeaderValues& header_values = Http::Headers::get();
   if (Utility::isUpgrade(request_or_response_headers) && upgradeAllowed()) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
     if (absl::EqualsIgnoreCase(request_or_response_headers.getUpgradeValue(),
-                               Http::Headers::get().UpgradeValues.H2c)) {
+                               header_values.UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       request_or_response_headers.removeUpgrade();
       if (request_or_response_headers.Connection()) {
@@ -689,13 +692,13 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
           request_or_response_headers.setConnection(new_value);
         }
       }
-      request_or_response_headers.remove(Headers::get().Http2Settings);
+      request_or_response_headers.remove(header_values.Http2Settings);
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }
   }
-  if (parser_->methodName() == Headers::get().MethodValues.Connect) {
+  if (parser_->methodName() == header_values.MethodValues.Connect) {
     if (request_or_response_headers.ContentLength()) {
       if (request_or_response_headers.getContentLengthValue() == "0") {
         request_or_response_headers.removeContentLength();
@@ -740,8 +743,8 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
   // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if (!absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked) ||
-        parser_->methodName() == Headers::get().MethodValues.Connect) {
+    if (!absl::EqualsIgnoreCase(encoding, header_values.TransferEncodingValues.Chunked) ||
+        parser_->methodName() == header_values.MethodValues.Connect) {
       error_code_ = Http::Code::NotImplemented;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
       return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
@@ -943,15 +946,16 @@ void ServerConnectionImpl::onEncodeComplete() {
 }
 
 Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_view method) {
-  HeaderString path(Headers::get().Path);
+  const Http::HeaderValues& header_values = Http::Headers::get();
+  HeaderString path(header_values.Path);
 
-  bool is_connect = (method == Headers::get().MethodValues.Connect);
+  bool is_connect = (method == header_values.MethodValues.Connect);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
   auto& active_request = active_request_.value();
   if (!is_connect && !active_request.request_url_.getStringView().empty() &&
       (active_request.request_url_.getStringView()[0] == '/' ||
-       (method == Headers::get().MethodValues.Options &&
+       (method == header_values.MethodValues.Options &&
         active_request.request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request.request_url_));
     return okStatus();
@@ -989,7 +993,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
       return codecProtocolError("http/1.1 protocol error: invalid scheme");
     }
     if (codec_settings_.validate_scheme_ &&
-        absolute_url.scheme() == Headers::get().SchemeValues.Https && !connection().ssl()) {
+        absolute_url.scheme() == header_values.SchemeValues.Https && !connection().ssl()) {
       error_code_ = Http::Code::Forbidden;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpsInPlaintext));
       return codecProtocolError("http/1.1 protocol error: https in the clear");
@@ -1027,10 +1031,11 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
+    const Http::HeaderValues& header_values = Http::Headers::get();
     active_request.response_encoder_.setIsResponseToHeadRequest(parser_->methodName() ==
-                                                                Headers::get().MethodValues.Head);
+                                                                header_values.MethodValues.Head);
     active_request.response_encoder_.setIsResponseToConnectRequest(
-        parser_->methodName() == Headers::get().MethodValues.Connect);
+        parser_->methodName() == header_values.MethodValues.Connect);
 
     RETURN_IF_ERROR(handlePath(*headers, parser_->methodName()));
     ASSERT(active_request.request_url_.empty());
