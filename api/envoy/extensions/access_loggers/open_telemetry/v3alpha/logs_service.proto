@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.open_telemetry.v3alpha;
+
+import "envoy/extensions/access_loggers/grpc/v3/als.proto";
+
+import "opentelemetry/proto/common/v1/common.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3alpha";
+option java_outer_classname = "LogsServiceProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OpenTelemetry (gRPC) Access Log]
+
+// Configuration for the built-in *envoy.access_loggers.open_telemetry*
+// :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
+// populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
+// OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/resource/v1/resource.proto>`_
+// attributes are filled with Envoy node info. In addition, the request start time is set in the
+// dedicated field.
+// [#extension: envoy.access_loggers.open_telemetry]
+// [#comment:TODO(itamarkam): allow configuration for resource attributes.]
+message OpenTelemetryAccessLogConfig {
+  // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
+  grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+
+  // OpenTelemetry `LogResource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto>`_
+  // fields, following `Envoy access logging formatting <https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage>`_.
+  //
+  // See 'body' in the LogResource proto for more details.
+  // Example: ``body { string_value: "%PROTOCOL%" }``.
+  opentelemetry.proto.common.v1.AnyValue body = 2;
+
+  // See 'attributes' in the LogResource proto for more details.
+  // Example: ``attributes { values { key: "user_agent" value { string_value: "%REQ(USER-AGENT)%" } } }``.
+  opentelemetry.proto.common.v1.KeyValueList attributes = 3;
+}

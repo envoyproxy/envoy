@@ -73,5 +73,6 @@ Further reading
 * File :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`.
 * gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
   sink.
+* OpenTelemetry (gRPC) :ref:`LogsService <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>`
 * Stdoutput :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stdoutput.v3.StdoutputAccessLog>`
 * Stderror :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stderror.v3.StderrorAccessLog>`
