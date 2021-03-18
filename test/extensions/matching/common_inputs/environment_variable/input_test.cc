@@ -1,11 +1,11 @@
-#include "extensions/matching/generic_inputs/environment_variable/input.h"
+#include "extensions/matching/common_inputs/environment_variable/input.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace GenericInputs {
+namespace CommonInputs {
 namespace EnvironmentVariable {
 
 TEST(InputTest, BasicUsage) {
@@ -20,7 +20,7 @@ TEST(InputTest, BasicUsage) {
   EXPECT_EQ(input.get().value(), "foo");
 }
 } // namespace EnvironmentVariable
-} // namespace GenericInputs
+} // namespace CommonInputs
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

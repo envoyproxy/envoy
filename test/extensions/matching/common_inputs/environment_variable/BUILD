@@ -14,9 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.matching.generic_inputs.environment_variable",
+    extension_name = "envoy.matching.common_inputs.environment_variable",
     deps = [
-        "//source/extensions/matching/generic_inputs/environment_variable:config",
+        "//source/extensions/matching/common_inputs/environment_variable:config",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
@@ -24,8 +24,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "input_test",
     srcs = ["input_test.cc"],
-    extension_name = "envoy.matching.generic_inputs.environment_variable",
+    extension_name = "envoy.matching.common_inputs.environment_variable",
     deps = [
-        "//source/extensions/matching/generic_inputs/environment_variable:input_lib",
+        "//source/extensions/matching/common_inputs/environment_variable:input_lib",
     ],
 )

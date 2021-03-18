@@ -155,19 +155,19 @@ private:
     return absl::nullopt;
   }
 
-  // Wrapper around a GenericDataInput that allows it to be used as a DataInput<DataType>.
-  class GenericDataInputWrapper : public DataInput<DataType> {
+  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
+  class CommonProtocolInputWrapper : public DataInput<DataType> {
   public:
-    explicit GenericDataInputWrapper(GenericDataInputPtr&& generic_data_input)
-        : generic_data_input_(std::move(generic_data_input)) {}
+    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+        : common_protocol_input_(std::move(common_protocol_input)) {}
 
     DataInputGetResult get(const DataType&) override {
       return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                generic_data_input_->get()};
+                                common_protocol_input_->get()};
     }
 
   private:
-    const GenericDataInputPtr generic_data_input_;
+    const CommonProtocolInputPtr common_protocol_input_;
   };
 
   DataInputPtr<DataType>
@@ -179,12 +179,14 @@ private:
       return factory->createDataInput(*message, factory_context_);
     }
 
-    // If the provided config doesn't match a typed input, assume that this is a generic input.
-    auto& generic_factory = Config::Utility::getAndCheckFactory<GenericDataInputFactory>(config);
+    // If the provided config doesn't match a typed input, assume that this is one of the common
+    // inputs.
+    auto& common_input_factory =
+        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), factory_context_.messageValidationVisitor(), generic_factory);
-    return std::make_unique<GenericDataInputWrapper>(
-        generic_factory.createGenericDataInput(*message, factory_context_));
+        config.typed_config(), factory_context_.messageValidationVisitor(), common_input_factory);
+    return std::make_unique<CommonProtocolInputWrapper>(
+        common_input_factory.createCommonProtocolInput(*message, factory_context_));
   }
 
   InputMatcherPtr createInputMatcher(

@@ -1,6 +1,6 @@
 #include "common/config/utility.h"
 
-#include "extensions/matching/generic_inputs/environment_variable/config.h"
+#include "extensions/matching/common_inputs/environment_variable/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace GenericInputs {
+namespace CommonInputs {
 namespace EnvironmentVariable {
 
 TEST(ConfigTest, TestConfig) {
@@ -19,7 +19,7 @@ TEST(ConfigTest, TestConfig) {
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.generic_inputs.environment_variable.v3.Config
+        "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.environment_variable.v3.Config
         name: foo
 )EOF";
 
@@ -31,14 +31,14 @@ TEST(ConfigTest, TestConfig) {
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
   {
-    auto input = factory.createGenericDataInput(*message, context);
+    auto input = factory.createCommonProtocolInput(*message, context);
     EXPECT_NE(nullptr, input);
     EXPECT_EQ(input->get(), absl::nullopt);
   }
 
   TestEnvironment::setEnvVar("foo", "bar", 1);
   {
-    auto input = factory.createGenericDataInput(*message, context);
+    auto input = factory.createCommonProtocolInput(*message, context);
     EXPECT_NE(nullptr, input);
     EXPECT_EQ(input->get(), absl::make_optional("bar"));
   }
@@ -47,7 +47,7 @@ TEST(ConfigTest, TestConfig) {
 }
 
 } // namespace EnvironmentVariable
-} // namespace GenericInputs
+} // namespace CommonInputs
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

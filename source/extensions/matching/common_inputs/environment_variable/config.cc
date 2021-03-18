@@ -1,4 +1,4 @@
-#include "extensions/matching/generic_inputs/environment_variable/config.h"
+#include "extensions/matching/common_inputs/environment_variable/config.h"
 
 #include <memory>
 
@@ -7,14 +7,14 @@
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace GenericInputs {
+namespace CommonInputs {
 namespace EnvironmentVariable {
 
-Envoy::Matcher::GenericDataInputPtr
-Config::createGenericDataInput(const Protobuf::Message& config,
-                               Server::Configuration::FactoryContext& factory_context) {
+Envoy::Matcher::CommonProtocolInputPtr
+Config::createCommonProtocolInput(const Protobuf::Message& config,
+                                  Server::Configuration::FactoryContext& factory_context) {
   const auto& environment_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::matching::generic_inputs::environment_variable::v3::Config&>(
+      const envoy::extensions::matching::common_inputs::environment_variable::v3::Config&>(
       config, factory_context.messageValidationVisitor());
 
   // We read the env variable at construction time to avoid repeat lookups.
@@ -30,10 +30,10 @@ Config::createGenericDataInput(const Protobuf::Message& config,
 /**
  * Static registration for the environment data input. @see RegisterFactory.
  */
-REGISTER_FACTORY(Config, Envoy::Matcher::GenericDataInputFactory);
+REGISTER_FACTORY(Config, Envoy::Matcher::CommonProtocolInputFactory);
 
 } // namespace EnvironmentVariable
-} // namespace GenericInputs
+} // namespace CommonInputs
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

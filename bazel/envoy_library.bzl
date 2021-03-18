@@ -82,7 +82,7 @@ EXTENSION_CATEGORIES = [
     "envoy.health_checkers",
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
-    "envoy.matching.generic_inputs",
+    "envoy.matching.common_inputs",
     "envoy.matching.input_matchers",
     "envoy.rate_limit_descriptors",
     "envoy.request_id",

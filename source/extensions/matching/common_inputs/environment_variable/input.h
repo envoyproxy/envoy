@@ -5,10 +5,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace GenericInputs {
+namespace CommonInputs {
 namespace EnvironmentVariable {
 
-class Input : public Envoy::Matcher::GenericDataInput {
+class Input : public Matcher::CommonProtocolInput {
 public:
   explicit Input(absl::optional<std::string>&& value) : storage_(std::move(value)) {}
 
@@ -18,7 +18,7 @@ private:
   const absl::optional<std::string> storage_;
 };
 } // namespace EnvironmentVariable
-} // namespace GenericInputs
+} // namespace CommonInputs
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

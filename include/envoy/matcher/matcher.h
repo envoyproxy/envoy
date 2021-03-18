@@ -237,23 +237,30 @@ public:
   }
 };
 
-class GenericDataInput {
+/**
+ * Interface for types providing a way to use a string for matching without depending on protocol
+ * data. As a result, these can be used for all protocols.
+ */
+class CommonProtocolInput {
 public:
-  virtual ~GenericDataInput() = default;
+  virtual ~CommonProtocolInput() = default;
   virtual absl::optional<absl::string_view> get() PURE;
 };
-using GenericDataInputPtr = std::unique_ptr<GenericDataInput>;
+using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 
-class GenericDataInputFactory : public Config::TypedFactory {
+/**
+ * Factory for CommonProtocolInput.
+ */
+class CommonProtocolInputFactory : public Config::TypedFactory {
 public:
   /**
-   * Creates a GenericDataInput from the provided config.
+   * Creates a CommonProtocolInput from the provided config.
    */
-  virtual GenericDataInputPtr
-  createGenericDataInput(const Protobuf::Message& config,
-                         Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual CommonProtocolInputPtr
+  createCommonProtocolInput(const Protobuf::Message& config,
+                            Server::Configuration::FactoryContext& factory_context) PURE;
 
-  std::string category() const override { return "envoy.matching.generic_inputs"; }
+  std::string category() const override { return "envoy.matching.common_inputs"; }
 };
 
 } // namespace Matcher
