@@ -8,6 +8,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -121,6 +122,8 @@ private:
   std::vector<std::string> verify_subject_alt_name_list_;
   bool verify_trusted_ca_{false};
 };
+
+DECLARE_FACTORY(DefaultCertValidatorFactory);
 
 } // namespace Tls
 } // namespace TransportSockets
