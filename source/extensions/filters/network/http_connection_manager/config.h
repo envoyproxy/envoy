@@ -192,7 +192,7 @@ public:
       filter_path = filter_path_transformer_->transform(forwarding_path.value());
     }
     if (forwarding_path.has_value()) {
-      request_headers.setForwaringPath(forwarding_path.value());
+      request_headers.setForwardingPath(forwarding_path.value());
     }
     if (filter_path.has_value()) {
       request_headers.setFilterPath(filter_path.value());

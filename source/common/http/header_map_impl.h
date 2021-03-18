@@ -462,7 +462,7 @@ public:
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
 
-  void setForwaringPath(absl::string_view path) override { forwarding_path_ = path; }
+  void setForwardingPath(absl::string_view path) override { forwarding_path_ = path; }
   absl::string_view getForwardingPath() override { return forwarding_path_; }
   void setFilterPath(absl::string_view path) override { filter_path_ = path; }
   absl::string_view getFilterPath() override { return filter_path_; }
