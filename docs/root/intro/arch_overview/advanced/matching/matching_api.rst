@@ -3,11 +3,11 @@
 Matching API
 ============
 
-Envoy makes use of a matching API to allow the various subsystems to express actions that should
-be performed based on incoming data.
+Envoy makes use of a :ref:`matching API <envoy_v3_api_msg_config.common.matcher.v3.Matcher>`
+to allow the various subsystems to express actions that should be performed based on incoming data.
 
 The matching API is designed as a tree structure to allow for sublinear matching algorithms for
-performance better than the linear list matching as seen in Envoy's HTTP routing. It makes heavy
+better performance than the linear list matching as seen in Envoy's HTTP routing. It makes heavy
 use of extension points to make it easy to extend to different inputs based on protocol or
 environment data as well as custom sublinear matchers and direct matchers.
 
@@ -63,7 +63,7 @@ it has to manage stopping the iteration on its own.
 When it comes to actions such as
 :ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>`,
 this means that if the skip condition is based on anything but the request headers, the filter might
-get partially applied, which might result in surprising beahvior. An example of this would be to
+get partially applied, which might result in surprising behavior. An example of this would be to
 have a matching tree that attempts to skip the gRPC-Web filter based on response headers: clients
 assume that if they send a gRPC-Web request to Envoy, the filter will transform that into a gRPC
 request before proxying it upstream, then back into a gRPC-Web response on the encoding path. By
