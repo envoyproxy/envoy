@@ -16,11 +16,11 @@ public:
 
   Http::Code handlerCpuProfiler(absl::string_view path_and_query,
                                 Http::ResponseHeaderMap& response_headers,
-                                Buffer::Chunker& response, AdminStream&);
+                                Server::Chunker& response, AdminStream&);
 
   Http::Code handlerHeapProfiler(absl::string_view path_and_query,
                                  Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Chunker& response, AdminStream&);
+                                 Server::Chunker& response, AdminStream&);
 
 private:
   const std::string profile_path_;

@@ -305,7 +305,7 @@ private:
    * URL handlers.
    */
   Http::Code handlerAdminHome(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                              Http::ResponseHeaderMap& response_headers, Server::Chunker& response,
                               AdminStream&);
 
   Http::Code handlerHelp(absl::string_view path_and_query,
@@ -453,6 +453,24 @@ private:
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
+};
+
+class Chunker {
+public:
+  virtual ~Chunker() = default;
+
+  /**
+   * Copy data into the buffer.
+   * @param data supplies the data..
+   */
+  virtual void add(absl::string_view data) PURE;
+
+  /**
+   * Report Error, cannot call this after add()
+   * @param code supplies the http code.
+   * @param error_text supplies the error string.
+   */
+  virtual void reportError(Http::Code code, absl::string_view error_text) PURE;
 };
 
 } // namespace Server

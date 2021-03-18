@@ -24,27 +24,27 @@ public:
 
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
-                                  Buffer::Chunker& response, AdminStream&);
+                                  Server::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
                                        Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Chunker& response, AdminStream&);
+                                       Server::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
                                             Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Chunker& response, AdminStream&);
+                                            Server::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
                                               Http::ResponseHeaderMap& response_headers,
-                                              Buffer::Chunker& response, AdminStream&);
+                                              Server::Chunker& response, AdminStream&);
   Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
                                              Http::ResponseHeaderMap& response_headers,
-                                             Buffer::Chunker& response, AdminStream&);
+                                             Server::Chunker& response, AdminStream&);
   Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                          Http::ResponseHeaderMap& response_headers, Server::Chunker& response,
                           AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Chunker& response, AdminStream&);
+                                    Server::Chunker& response, AdminStream&);
   Http::Code handlerContention(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                               Http::ResponseHeaderMap& response_headers, Server::Chunker& response,
                                AdminStream&);
 
 private:

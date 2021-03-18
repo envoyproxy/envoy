@@ -85,10 +85,10 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::Ch
   return Http::Code::OK;
 }
 
-Http::Code AdminHandler::badRequest(Buffer::Chunker& response, absl::string_view error) {
+Http::Code AdminHandler::badRequest(Server::Chunker& response, absl::string_view error) {
   absl::string_view error_string = absl::StrCat("handler bad request: ", error);
-  ENVOY_LOG(debug, errorString);
-  response.reportError(Http::Code::BadRequest, errorString)
+  ENVOY_LOG(debug, error_string);
+  response.reportError(Http::Code::BadRequest, error_string);
   return Http::Code::BadRequest;
 }
 

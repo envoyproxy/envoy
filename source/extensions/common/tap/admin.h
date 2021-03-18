@@ -79,7 +79,7 @@ private:
 
   Http::Code handler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                      Buffer::Instance& response, Server::AdminStream& admin_stream);
-  Http::Code badRequest(Buffer::Chunker& response, absl::string_view error);
+  Http::Code badRequest(Server::Chunker& response, absl::string_view error);
 
   Server::Admin& admin_;
   Event::Dispatcher& main_thread_dispatcher_;

@@ -45,7 +45,7 @@ ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(
 
 Http::Code ClustersHandler::handlerClusters(absl::string_view url,
                                             Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Chunker& response, AdminStream&) {
+                                            Server::Chunker& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto format_value = Utility::formatParam(query_params);
 
@@ -106,7 +106,7 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsJson(Buffer::Chunker& response) {
+void ClustersHandler::writeClustersAsJson(Server::Chunker& response) {
   envoy::admin::v3::Clusters clusters;
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -195,7 +195,7 @@ void ClustersHandler::writeClustersAsJson(Buffer::Chunker& response) {
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsText(Buffer::Chunker& response) {
+void ClustersHandler::writeClustersAsText(Server::Chunker& response) {
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
   for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {

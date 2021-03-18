@@ -21,7 +21,7 @@ InitDumpHandler::InitDumpHandler(Server::Instance& server) : HandlerContextBase(
 
 Http::Code InitDumpHandler::handlerInitDump(absl::string_view url,
                                             Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Chunker& response, AdminStream&) const {
+                                            Server::Chunker& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto mask = maskParam(query_params);
 

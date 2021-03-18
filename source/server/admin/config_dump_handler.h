@@ -22,7 +22,7 @@ public:
   ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server);
 
   Http::Code handlerConfigDump(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Chunker& response,
+                               Http::ResponseHeaderMap& response_headers, Server::Chunker& response,
                                AdminStream&) const;
 
 private:

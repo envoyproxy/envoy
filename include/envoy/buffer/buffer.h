@@ -479,24 +479,6 @@ private:
 
 using InstancePtr = std::unique_ptr<Instance>;
 
-class Chunker {
-public:
-  virtual ~Chunker() = default;
-
-  /**
-   * Copy data into the buffer.
-   * @param data supplies the data..
-   */
-  virtual void add(absl::string_view data) PURE;
-
-  /**
-   * Report Error, cannot call this after add()
-   * @param code supplies the http code.
-   * @param error_text supplies the error string.
-   */
-  virtual void reportError(Http::Code code, absl::string_view error_text) PURE;
-};
-
 /**
  * A factory for creating buffers which call callbacks when reaching high and low watermarks.
  */

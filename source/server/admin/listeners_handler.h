@@ -19,18 +19,18 @@ public:
 
   Http::Code handlerDrainListeners(absl::string_view path_and_query,
                                    Http::ResponseHeaderMap& response_headers,
-                                   Buffer::Chunker& response, AdminStream&);
+                                   Server::Chunker& response, AdminStream&);
 
   Http::Code handlerListenerInfo(absl::string_view path_and_query,
                                  Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Chunker& response, AdminStream&);
+                                 Server::Chunker& response, AdminStream&);
 
 private:
   /**
    * Helper methods for the /listeners url handler.
    */
-  void writeListenersAsJson(Buffer::Chunker& response);
-  void writeListenersAsText(Buffer::Chunker& response);
+  void writeListenersAsJson(Server::Chunker& response);
+  void writeListenersAsText(Server::Chunker& response);
 };
 
 } // namespace Server

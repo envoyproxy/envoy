@@ -313,7 +313,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
 }
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Chunker& response, AdminStream&) {
+                                       Server::Chunker& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
 
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
@@ -422,6 +422,25 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(absl::nullopt, *listener_);
   }
+}
+
+void Chunker::add(absl::string_view data) {
+  const char* src = static_cast<const char*>(data);
+  bool new_slice_needed = slices_.empty();
+  while (size != 0) {
+    if (new_slice_needed) {
+      slices_.emplace_back(Slice(size, account_));
+    }
+    uint64_t copy_size = slices_.back().append(src, size);
+    src += copy_size;
+    size -= copy_size;
+    length_ += copy_size;
+    new_slice_needed = true;
+  }
+}
+
+void Chunker::reportError(Http::Code code, absl::string_view error_text) {
+
 }
 
 } // namespace Server
