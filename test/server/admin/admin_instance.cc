@@ -2,7 +2,7 @@
 
 #include "common/access_log/access_log_impl.h"
 
-#include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -13,8 +13,9 @@ AdminInstanceTest::AdminInstanceTest()
       admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
       admin_filter_(admin_.createCallbackFunction()) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      "/dev/null", {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   admin_.startHttpListener(access_logs, address_out_path_,
                            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
