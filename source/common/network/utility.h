@@ -51,6 +51,12 @@ public:
                              Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
 
   /**
+   * Called whenever datagrams are dropped due to overflow or truncation.
+   * @param dropped supplies the number of dropped datagrams.
+   */
+  virtual void onDatagramsDropped(uint32_t dropped) PURE;
+
+  /**
    * The expected max size of the datagram to be read. If it's smaller than
    * the size of datagrams received, they will be dropped.
    */
@@ -141,7 +147,7 @@ public:
 
   /**
    * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
-   * not include a port number. Throws EnvoyException if unable to parse the address.
+   * not include a port number.
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?

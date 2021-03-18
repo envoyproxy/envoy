@@ -87,6 +87,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "safe_memcpy_test",
+    srcs = ["safe_memcpy_test.cc"],
+    deps = ["//source/common/common:safe_memcpy_lib"],
+)
+
+envoy_cc_test(
     name = "phantom_test",
     srcs = ["phantom_test.cc"],
     deps = ["//source/common/common:phantom"],

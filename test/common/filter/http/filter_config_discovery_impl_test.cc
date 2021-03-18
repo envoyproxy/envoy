@@ -78,11 +78,23 @@ public:
 
   FilterConfigProviderPtr createProvider(std::string name, bool warm) {
     EXPECT_CALL(init_manager_, add(_));
-    envoy::config::core::v3::ConfigSource config_source;
-    TestUtility::loadFromYaml("ads: {}", config_source);
+    envoy::config::core::v3::ExtensionConfigSource config_source;
+    TestUtility::loadFromYaml(R"EOF(
+config_source: { ads: {} }
+type_urls:
+- envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                              config_source);
+    if (!warm) {
+      config_source.set_apply_default_config_without_warming(true);
+      TestUtility::loadFromYaml(R"EOF(
+"@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                                *config_source.mutable_default_config());
+    }
+
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, {"envoy.extensions.filters.http.router.v3.Router"}, factory_context_,
-        "xds.", !warm);
+        config_source, name, factory_context_, "xds.");
   }
 
   void setup(bool warm = true) {
@@ -238,7 +250,7 @@ TEST_F(FilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
   InSequence s;
   setup(false);
   EXPECT_EQ("foo", provider_->name());
-  EXPECT_EQ(absl::nullopt, provider_->config());
+  EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
