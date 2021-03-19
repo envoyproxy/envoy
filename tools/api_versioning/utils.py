@@ -9,7 +9,7 @@ import sys
 ApiVersion = namedtuple('ApiVersion', ['major', 'minor', 'patch'])
 
 
-def GetApiVersion(input_path):
+def get_api_version(input_path):
     """Returns the API version from a given API version input file.
 
   Args:
@@ -27,7 +27,7 @@ def GetApiVersion(input_path):
     return version
 
 
-def ComputeOldestApiVersion(current_version: ApiVersion):
+def compute_oldest_api_version(current_version: ApiVersion):
     """Computest the oldest API version the client supports. According to the
   specification (see: api/API_VERSIONING.md), Envoy supports up to 2 most
   recent minor versions. Therefore if the latest API version "X.Y.Z", Envoy's

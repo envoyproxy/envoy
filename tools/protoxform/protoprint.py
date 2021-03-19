@@ -604,7 +604,7 @@ class ProtoFormatVisitor(visitor.Visitor):
   """
 
     def __init__(self, api_version_file_path, frozen_proto):
-        current_api_version = api_version_utils.GetApiVersion(api_version_file_path)
+        current_api_version = api_version_utils.get_api_version(api_version_file_path)
         self._deprecated_annotation_version_value = '{}.{}'.format(current_api_version.major,
                                                                    current_api_version.minor)
         self._needs_deprecation_annotation_import = False
