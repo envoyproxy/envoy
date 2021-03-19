@@ -40,6 +40,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/odcds_api.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/retry_host_predicate.h"
 #include "test/mocks/upstream/retry_priority.h"

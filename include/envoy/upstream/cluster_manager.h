@@ -72,6 +72,21 @@ public:
 
 using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHandle>;
 
+using ClusterDiscoveryCallback = std::function<void(bool)>;
+using ClusterDiscoveryCallbackWeakPtr = std::weak_ptr<ClusterDiscoveryCallback>;
+using ClusterDiscoveryCallbackSharedPtr = std::shared_ptr<ClusterDiscoveryCallback>;
+
+/**
+ * ClusterDiscoveryCallbackHandle is a RAII wrapper for a ClusterDiscoveryCallback. Deleting the
+ * ClusterDiscoveryCallbackHandle will remove the callbacks from ClusterManager.
+ */
+class ClusterDiscoveryCallbackHandle {
+public:
+  virtual ~ClusterDiscoveryCallbackHandle() = default;
+};
+
+using ClusterDiscoveryCallbackHandlePtr = std::unique_ptr<ClusterDiscoveryCallbackHandle>;
+
 class ClusterManagerFactory;
 
 // These are per-cluster per-thread, so not "global" stats.
@@ -118,6 +133,10 @@ struct ClusterConnectivityState {
   // Note this tracks the sum of multiple 32 bit stream capacities so must remain 64 bit.
   int64_t connecting_stream_capacity_{};
 };
+
+class OdCdsApi;
+using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
+using OdCdsApiWeakPtr = std::weak_ptr<OdCdsApi>;
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -309,6 +328,32 @@ public:
   virtual const ClusterRequestResponseSizeStatNames&
   clusterRequestResponseSizeStatNames() const PURE;
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
+
+  /**
+   * Request an on-demand discovery of a cluster with a passed name. Passed ODCDS may be used to
+   * perform the discovery process in the main thread if there is no discovery going on for this
+   * cluster. The passed callback will be invoked when the cluster is added and warmed up. It is
+   * expected that the callback will be destroyed when it is invoked. To cancel the discovery,
+   * destroy the returned handle and the callback.
+   *
+   * This function is thread-safe.
+   *
+   * @param weak_odcds is a weak pointer to the ODCDS that will be used for discovery.
+   * @param name is the name of the cluster to be discovered.
+   * @param callback will be called when the discovery is finished.
+   * @return the discovery process handle
+   */
+  virtual ClusterDiscoveryCallbackHandlePtr
+  requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds, const std::string& name,
+                                  ClusterDiscoveryCallbackWeakPtr callback) PURE;
+
+  /**
+   * Notifies the threads that were waiting for discovery of a cluster with a passed name. Usually
+   * used to unblock the requests in case of discovery failure.
+   *
+   * @param name is the cluster's name.
+   */
+  virtual void notifyOnDemandCluster(const std::string& name, bool cluster_exists) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -338,6 +383,21 @@ public:
 };
 
 using CdsApiPtr = std::unique_ptr<CdsApi>;
+
+/**
+ * Abstract interface for a On-Demand CDS API provider.
+ */
+class OdCdsApi {
+public:
+  virtual ~OdCdsApi() = default;
+
+  /**
+   * File an on-demand request for a cluster.
+   */
+  virtual void updateOnDemand(const std::string& cluster_name) PURE;
+};
+
+using OdCdsApiPtr = std::unique_ptr<OdCdsApi>;
 
 /**
  * Factory for objects needed during cluster manager operation.

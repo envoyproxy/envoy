@@ -285,6 +285,11 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
+  ClusterDiscoveryCallbackHandlePtr
+  requestOnDemandClusterDiscovery(OdCdsApiWeakPtr weak_odcds, const std::string& name,
+                                  ClusterDiscoveryCallbackWeakPtr callback) override;
+  void notifyOnDemandCluster(const std::string& name, bool cluster_exists) override;
+
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
@@ -336,6 +341,49 @@ protected:
                                             ThreadLocalClusterUpdateParams&& params);
 
 private:
+  struct ThreadLocalClusterManagerImpl;
+
+  class ClusterDiscoveryManager {
+  public:
+    ClusterDiscoveryManager(ThreadLocalClusterManagerImpl& parent);
+
+    void ensureCallbacksAreInstalled();
+    void processClusterName(const std::string& name, bool cluster_exists);
+
+    struct Pair {
+      ClusterDiscoveryCallbackHandlePtr handle_ptr_;
+      bool discovery_in_progress_;
+    };
+
+    Pair addCallback(const std::string& name, ClusterDiscoveryCallbackWeakPtr weak_callback);
+
+    void erase(const std::string& name, ClusterDiscoveryCallbackWeakPtr cb);
+
+  private:
+    bool eraseFromDeque(const std::string& name, ClusterDiscoveryCallbackWeakPtr cb);
+    void maybePostResetCallbacks();
+
+    ThreadLocalClusterManagerImpl& parent_;
+    absl::flat_hash_map<std::string, std::deque<ClusterDiscoveryCallbackWeakPtr>> pending_clusters_;
+    ClusterUpdateCallbacksHandlePtr callbacks_handle_;
+    std::unique_ptr<ClusterUpdateCallbacks> callbacks_;
+    bool callbacks_handle_cleanup_posted_ = false;
+  };
+
+  class ClusterDiscoveryCallbackHandleImpl : public ClusterDiscoveryCallbackHandle {
+  public:
+    ClusterDiscoveryCallbackHandleImpl(ClusterDiscoveryManager& parent,
+                                       ClusterDiscoveryCallbackWeakPtr cb, std::string name)
+        : parent_(parent), cb_(std::move(cb)), name_(std::move(name)) {}
+
+    ~ClusterDiscoveryCallbackHandleImpl() override { parent_.erase(name_, cb_); }
+
+  private:
+    ClusterDiscoveryManager& parent_;
+    ClusterDiscoveryCallbackWeakPtr cb_;
+    std::string name_;
+  };
+
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
    * central dynamic cluster (if applicable). It maintains load balancer state and any created
@@ -465,6 +513,7 @@ private:
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
     bool destroying_{};
+    ClusterDiscoveryManager cdm_;
   };
 
   struct ClusterData : public ClusterManagerCluster {
@@ -578,6 +627,7 @@ private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
+  absl::flat_hash_map<std::string, OdCdsApiSharedPtr> pending_cluster_creations_;
   Random::RandomGenerator& random_;
 
 protected:
