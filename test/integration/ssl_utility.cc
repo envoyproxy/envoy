@@ -76,12 +76,8 @@ void initializeUpstreamTlsContextConfig(
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api) {
-  ClientSslTransportOptions options_with_san = options;
-  if (options.san_.empty()) {
-    options_with_san.setSan("spiffe://lyft.com/backend-team");
-  }
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  initializeUpstreamTlsContextConfig(options_with_san, tls_context);
+  initializeUpstreamTlsContextConfig(options, tls_context);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
