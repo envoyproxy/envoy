@@ -130,6 +130,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
 
 // Add a filter that overrides the cached route/cluster selection with a DelegatingRoute
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
+  EXCLUDE_UPSTREAM_HTTP3;
+
   config_helper_.addFilter(R"EOF(
   name: set-route-filter
   )EOF");
