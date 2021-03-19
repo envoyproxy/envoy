@@ -1,3 +1,4 @@
+import importlib
 import os
 
 from tools.type_whisperer.api_type_db_pb2 import TypeDb
@@ -17,3 +18,8 @@ def load_type_db(type_db_path):
     _typedb = TypeDb()
     with open(type_db_path, 'r') as f:
         text_format.Merge(f.read(), _typedb)
+
+
+def load_protos(packages):
+    for package in packages:
+        importlib.import_module(f"{package}_pb2")

@@ -7,21 +7,16 @@
 import copy
 import functools
 
-from tools.api_proto_plugin import plugin
-from tools.api_proto_plugin import visitor
-from tools.protoxform import migrate
-from tools.protoxform import utils
+from tools.api_proto_plugin import plugin, visitor
+from tools.protoxform import migrate, utils
 
-# Note: we have to include those proto definitions to ensure we don't lose these
-# during FileDescriptorProto printing.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
-from envoy_api_canonical.envoy.annotations import deprecation_pb2 as _
-from envoy_api_canonical.envoy.annotations import resource_pb2
-from udpa.annotations import migrate_pb2
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
 from udpa.annotations import status_pb2
+
+PROTO_PACKAGES = ("google.api.annotations", "validate.validate",
+                  "envoy_api_canonical.envoy.annotations.deprecation",
+                  "envoy_api_canonical.envoy.annotations.resource", "udpa.annotations.migrate",
+                  "udpa.annotations.security", "udpa.annotations.status",
+                  "udpa.annotations.sensitive")
 
 
 class ProtoXformError(Exception):
@@ -79,6 +74,8 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 
 def main():
+    utils.load_protos(PROTO_PACKAGES)
+
     plugin.plugin([
         plugin.direct_output_descriptor('.active_or_frozen.proto',
                                         functools.partial(ProtoFormatVisitor, True),
