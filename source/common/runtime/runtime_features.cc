@@ -68,6 +68,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
+    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",

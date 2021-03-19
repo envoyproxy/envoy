@@ -245,6 +245,7 @@ message ResponseFlagFilter {
         in: "NFCF"
         in: "DT"
         in: "UPE"
+        in: "NC"
       }
     }
   }];

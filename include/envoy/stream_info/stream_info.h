@@ -84,8 +84,10 @@ enum ResponseFlag {
   DurationTimeout = 0x400000,
   // Upstream response had an HTTP protocol error
   UpstreamProtocolError = 0x800000,
+  // No cluster found for a given request.
+  NoClusterFound = 0x1000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UpstreamProtocolError
+  LastFlag = NoClusterFound,
 };
 
 /**

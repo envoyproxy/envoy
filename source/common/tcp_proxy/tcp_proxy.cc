@@ -398,7 +398,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   } else {
     ENVOY_CONN_LOG(debug, "Cluster not found {}", read_callbacks_->connection(), cluster_name);
     config_->stats().downstream_cx_no_route_.inc();
-    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
     onInitFailure(UpstreamFailureReason::NoRoute);
     return Network::FilterStatus::StopIteration;
   }

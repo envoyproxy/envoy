@@ -24,7 +24,7 @@ public:
   void TearDown() override;
 
   virtual Network::ClientConnectionPtr
-  makeSslClientConnection(const ClientSslTransportOptions& options);
+  makeSslClientConnection(const ClientSslTransportOptions& options, bool use_expired);
   void checkVerifyErrorCouter(uint64_t value);
 
   static std::string ipClientVersionTestParamsToString(
@@ -39,6 +39,7 @@ public:
   }
 
 protected:
+  bool allow_expired_cert_{};
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
   std::unique_ptr<ContextManager> context_manager_;
   const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{

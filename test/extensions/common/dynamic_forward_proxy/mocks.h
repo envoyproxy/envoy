@@ -34,12 +34,13 @@ public:
   struct MockLoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandle* handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override {
     MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
-    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}};
+    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}, result.host_info_};
   }
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override {
     Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_();
