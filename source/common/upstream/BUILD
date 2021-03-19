@@ -45,6 +45,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "odcds_api_lib",
+    srcs = ["odcds_api_impl.cc"],
+    hdrs = ["odcds_api_impl.h"],
+    deps = [
+        ":cds_api_helper_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
@@ -52,6 +71,7 @@ envoy_cc_library(
         ":cds_api_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
+        ":odcds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
         "//include/envoy/api:api_interface",

@@ -85,6 +85,7 @@ envoy_cc_mock(
         ":host_set_mocks",
         ":load_balancer_context_mock",
         ":load_balancer_mocks",
+        ":odcds_api_mocks",
         ":priority_set_mocks",
         ":retry_host_predicate_mocks",
         ":retry_priority_factory_mocks",
@@ -274,6 +275,15 @@ envoy_cc_mock(
     name = "cds_api_mocks",
     srcs = ["cds_api.cc"],
     hdrs = ["cds_api.h"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "odcds_api_mocks",
+    srcs = ["odcds_api.cc"],
+    hdrs = ["odcds_api.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
     ],

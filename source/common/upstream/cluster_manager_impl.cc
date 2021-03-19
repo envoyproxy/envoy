@@ -957,6 +957,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
+  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
   tls_.runOnAllThreads(
       [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
        load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
@@ -1027,6 +1028,185 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
+namespace {
+
+using ClusterAddedCb = std::function<void(ThreadLocalCluster&)>;
+
+class ClusterCallbacks : public ClusterUpdateCallbacks {
+public:
+  ClusterCallbacks(ClusterAddedCb cb) : cb_(std::move(cb)) {}
+
+  void onClusterAddOrUpdate(ThreadLocalCluster& cluster) override { cb_(cluster); };
+
+  void onClusterRemoval(const std::string&) override {}
+
+private:
+  ClusterAddedCb cb_;
+};
+
+} // namespace
+
+ClusterManagerImpl::ClusterDiscoveryManager::ClusterDiscoveryManager(
+    ThreadLocalClusterManagerImpl& parent)
+    : parent_(parent) {}
+
+void ClusterManagerImpl::ClusterDiscoveryManager::ensureCallbacksAreInstalled() {
+  if (callbacks_handle_) {
+    return;
+  }
+  auto cb = ClusterAddedCb([this](ThreadLocalCluster& cluster) {
+    processClusterName(cluster.info()->name(), ClusterDiscoveryStatus::Available);
+  });
+  callbacks_ = std::make_unique<ClusterCallbacks>(cb);
+  callbacks_handle_ = parent_.parent_.addThreadLocalClusterUpdateCallbacks(*callbacks_);
+}
+
+void ClusterManagerImpl::ClusterDiscoveryManager::processClusterName(
+    const std::string& name, ClusterDiscoveryStatus cluster_status) {
+  auto map_node_handle = pending_clusters_.extract(name);
+  if (map_node_handle.empty()) {
+    return;
+  }
+  for (const auto& weak_callback : map_node_handle.mapped()) {
+    auto callback = weak_callback.lock();
+    if (callback != nullptr) {
+      (*callback)(cluster_status);
+    }
+  }
+  maybePostResetCallbacks();
+}
+
+ClusterManagerImpl::ClusterDiscoveryManager::Pair
+ClusterManagerImpl::ClusterDiscoveryManager::addCallback(
+    const std::string& name, ClusterDiscoveryCallbackWeakPtr weak_callback) {
+  auto& callbacks_deque = pending_clusters_[name];
+  callbacks_deque.emplace_back(weak_callback);
+  auto handle =
+      std::make_unique<ClusterDiscoveryCallbackHandleImpl>(*this, std::move(weak_callback), name);
+  auto discovery_in_progress = (callbacks_deque.size() > 1);
+  return {std::move(handle), discovery_in_progress};
+}
+
+void ClusterManagerImpl::ClusterDiscoveryManager::erase(const std::string& name,
+                                                        ClusterDiscoveryCallbackWeakPtr cb) {
+  const bool drop_deque = eraseFromDeque(name, cb);
+  if (drop_deque) {
+    pending_clusters_.erase(name);
+  }
+  maybePostResetCallbacks();
+}
+
+bool ClusterManagerImpl::ClusterDiscoveryManager::eraseFromDeque(
+    const std::string& name, ClusterDiscoveryCallbackWeakPtr cb) {
+  auto it = pending_clusters_.find(name);
+  if (it == pending_clusters_.end()) {
+    return false;
+  }
+  auto& deque = it->second;
+  // Could use std::erase_if, but it's only in C++20.
+  auto it2 = std::remove_if(deque.begin(), deque.end(),
+                            [cb](ClusterDiscoveryCallbackWeakPtr const& weak_ptr) {
+                              if (cb.owner_before(weak_ptr)) {
+                                return false;
+                              }
+                              if (weak_ptr.owner_before(cb)) {
+                                return false;
+                              }
+                              return true;
+                            });
+  deque.erase(it2, deque.end());
+  return deque.empty();
+}
+
+void ClusterManagerImpl::ClusterDiscoveryManager::maybePostResetCallbacks() {
+  if (!callbacks_handle_cleanup_posted_ && pending_clusters_.empty()) {
+    parent_.thread_local_dispatcher_.post([this] {
+      // Something might got added in the meantime, so check the
+      // map again.
+      if (pending_clusters_.empty()) {
+        callbacks_handle_.reset();
+        callbacks_.reset();
+      }
+      callbacks_handle_cleanup_posted_ = false;
+    });
+    callbacks_handle_cleanup_posted_ = true;
+  }
+}
+
+ClusterDiscoveryCallbackHandlePtr
+ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds,
+                                                    const std::string& name,
+                                                    ClusterDiscoveryCallbackWeakPtr weak_callback) {
+  ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
+
+  cluster_manager.cdm_.ensureCallbacksAreInstalled();
+
+  auto [handle, discovery_in_progress] = cluster_manager.cdm_.addCallback(name, weak_callback);
+  if (discovery_in_progress) {
+    // We have already started a discovery process for a cluster with
+    // this name, so nothing more left to do here.
+    return std::move(handle);
+  }
+  dispatcher_.post([this, odcds = std::move(odcds), weak_callback, name,
+                    &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
+    // Check for the cluster here too. It might have been added
+    // between the time when this callback was posted and when it is
+    // being executed.
+    if (getThreadLocalCluster(name) != nullptr) {
+      if (weak_callback.expired()) {
+        // Not only the cluster was added, but it was also already
+        // handled, so don't bother with posting the callback back to
+        // the worker thread.
+        return;
+      }
+      thread_local_dispatcher.post([weak_callback] {
+        if (auto callback = weak_callback.lock(); callback != nullptr) {
+          // If this gets called here, it means that we requested a
+          // discovery of a cluster without checking if that cluster
+          // is already known by cluster manager.
+          (*callback)(ClusterDiscoveryStatus::Available);
+        }
+      });
+      return;
+    }
+
+    auto it = pending_cluster_creations_.find(name);
+    if (it != pending_cluster_creations_.end()) {
+      // We already began the discovery process for this cluster,
+      // nothing to do.
+      return;
+    }
+    odcds->updateOnDemand(name);
+    auto timer_cb = Event::TimerCb([this, name] { notifyExpiredDiscovery(name); });
+    auto timer = dispatcher_.createTimer(timer_cb);
+    timer->enableTimer(std::chrono::milliseconds(5000));
+    // Keep odcds alive for the duration of the discovery process.
+    pending_cluster_creations_.insert(
+        {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
+  });
+
+  return std::move(handle);
+}
+
+void ClusterManagerImpl::notifyExpiredDiscovery(const std::string& name) {
+  auto map_node_handle = pending_cluster_creations_.extract(name);
+  if (map_node_handle.empty()) {
+    return;
+  }
+  // Defer destroying the timer, so it's not destroyed during its
+  // callback. TimerPtr is a unique_ptr, which is not copyable, but
+  // std::function is copyable, we turn a move-only unique_ptr into a
+  // copyable shared_ptr and pass that to the std::function.
+  dispatcher_.post([timer = std::shared_ptr<Event::Timer>(
+                        std::move(map_node_handle.mapped().expiration_timer_))] {});
+  tls_.runOnAllThreads([name](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    if (!cluster_manager.has_value()) {
+      return;
+    }
+    cluster_manager->cdm_.processClusterName(name, ClusterDiscoveryStatus::Missing);
+  });
+}
+
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
@@ -1061,7 +1241,7 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
     const absl::optional<LocalClusterParams>& local_cluster_params)
-    : parent_(parent), thread_local_dispatcher_(dispatcher) {
+    : parent_(parent), thread_local_dispatcher_(dispatcher), cdm_(*this) {
   // If local cluster is defined then we need to initialize it first.
   if (local_cluster_params.has_value()) {
     const auto& local_cluster_name = local_cluster_params->info_->name();
