@@ -1,6 +1,19 @@
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 
 licenses(["notice"])  # Apache 2
+
+py_binary(
+    name = "e2e_test",
+    srcs = ["e2e_test.py"],
+    data = [
+        ":envoy_engine.so",
+    ],
+    main = "e2e_test.py",
+    deps = [
+        "//library/python/gevent_util",
+    ],
+)
 
 pybind_library(
     name = "envoy_engine_lib",

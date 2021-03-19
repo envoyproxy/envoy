@@ -20,15 +20,17 @@ void* c_on_headers(envoy_headers headers, bool end_stream, void* context) {
       }
       builder.set(pair.first, pair.second);
     }
-    stream_callbacks->on_headers.value()(builder.build(), end_stream);
+    auto on_headers = stream_callbacks->on_headers.value();
+    on_headers(builder.build(), end_stream);
   }
   return context;
 }
 
 void* c_on_data(envoy_data data, bool end_stream, void* context) {
   auto stream_callbacks = static_cast<StreamCallbacks*>(context);
-  if (stream_callbacks->on_error.has_value()) {
-    stream_callbacks->on_data.value()(data, end_stream);
+  if (stream_callbacks->on_data.has_value()) {
+    auto on_data = stream_callbacks->on_data.value();
+    on_data(data, end_stream);
   }
   return context;
 }
@@ -41,7 +43,8 @@ void* c_on_trailers(envoy_headers metadata, void* context) {
     for (const auto& pair : raw_headers) {
       builder.set(pair.first, pair.second);
     }
-    stream_callbacks->on_trailers.value()(builder.build());
+    auto on_trailers = stream_callbacks->on_trailers.value();
+    on_trailers(builder.build());
   }
   return context;
 }
@@ -55,7 +58,8 @@ void* c_on_error(envoy_error raw_error, void* context) {
     // when doing so won't cause merge conflicts with other PRs.
     error->message = "";
     error->attempt_count = absl::optional<int>(raw_error.attempt_count);
-    stream_callbacks->on_error.value()(error);
+    auto on_error = stream_callbacks->on_error.value();
+    on_error(error);
   }
   return context;
 }
@@ -63,7 +67,8 @@ void* c_on_error(envoy_error raw_error, void* context) {
 void* c_on_complete(void* context) {
   auto stream_callbacks = static_cast<StreamCallbacks*>(context);
   if (stream_callbacks->on_complete.has_value()) {
-    stream_callbacks->on_complete.value();
+    auto on_complete = stream_callbacks->on_complete.value();
+    on_complete();
   }
   return context;
 }
@@ -71,7 +76,8 @@ void* c_on_complete(void* context) {
 void* c_on_cancel(void* context) {
   auto stream_callbacks = static_cast<StreamCallbacks*>(context);
   if (stream_callbacks->on_cancel.has_value()) {
-    stream_callbacks->on_cancel.value();
+    auto on_cancel = stream_callbacks->on_cancel.value();
+    on_cancel();
   }
   return context;
 }

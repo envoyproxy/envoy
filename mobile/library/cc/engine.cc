@@ -27,7 +27,7 @@ Engine::Engine(envoy_engine_t engine, const std::string& configuration, LogLevel
   envoy_engine_callbacks envoy_callbacks{
       .on_engine_running = &c_on_engine_running,
       .on_exit = &c_on_exit,
-      .context = &this->callbacks_,
+      .context = this->callbacks_.get(),
   };
 
   run_engine(this->engine_, envoy_callbacks, configuration.c_str(),
