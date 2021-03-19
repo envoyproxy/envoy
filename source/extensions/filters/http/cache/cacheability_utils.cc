@@ -51,7 +51,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest.
   return headers.Path() && headers.Host() &&
-         !headers.getInline(CacheCustomHeaders::get().authorization.handle()) &&
+          !headers.getInline(CacheCustomHeaders::Authorization()) &&
          (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
@@ -60,7 +60,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
                                             const VaryHeader& vary_allow_list) {
   absl::string_view cache_control =
-      headers.getInlineValue(CacheCustomHeaders::get().response_cache_control.handle());
+      headers.getInlineValue(CacheCustomHeaders::ResponseCacheControl());
   ResponseCacheControl response_cache_control(cache_control);
 
   // Only cache responses with enough data to calculate freshness lifetime as per:
@@ -71,7 +71,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   //    Both "Expires" and "Date" headers.
   const bool has_validation_data =
       response_cache_control.must_validate_ || response_cache_control.max_age_.has_value() ||
-      (headers.Date() && headers.getInline(CacheCustomHeaders::get().expires.handle()));
+          (headers.Date() && headers.getInline(CacheCustomHeaders::Expires()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&

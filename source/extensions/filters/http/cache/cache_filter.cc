@@ -366,7 +366,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   // freshly served response from the origin, unless the 304 response has an Age header, which
   // means it was served by an upstream cache.
   // Remove any existing Age header in the cached response.
-  lookup_result_->headers_->removeInline(CacheCustomHeaders::get().age.handle());
+  lookup_result_->headers_->removeInline(CacheCustomHeaders::Age());
 
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
@@ -405,9 +405,9 @@ bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& respons
   // If the 304 response contains a strong validator (etag) that does not match the cached response,
   // the cached response should not be updated.
   const Http::HeaderEntry* response_etag =
-      response_headers.getInline(CacheCustomHeaders::get().etag.handle());
+      response_headers.getInline(CacheCustomHeaders::Etag());
   const Http::HeaderEntry* cached_etag =
-      lookup_result_->headers_->getInline(CacheCustomHeaders::get().etag.handle());
+          lookup_result_->headers_->getInline(CacheCustomHeaders::Etag());
   return !response_etag || (cached_etag && cached_etag->value().getStringView() ==
                                                response_etag->value().getStringView());
 }
@@ -420,24 +420,24 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
          "CacheFilter is not validating a cache lookup result");
 
   const Http::HeaderEntry* etag_header =
-      lookup_result_->headers_->getInline(CacheCustomHeaders::get().etag.handle());
+      lookup_result_->headers_->getInline(CacheCustomHeaders::Etag());
   const Http::HeaderEntry* last_modified_header =
-      lookup_result_->headers_->getInline(CacheCustomHeaders::get().last_modified.handle());
+      lookup_result_->headers_->getInline(CacheCustomHeaders::LastModified());
 
   if (etag_header) {
     absl::string_view etag = etag_header->value().getStringView();
-    request_headers.setInline(CacheCustomHeaders::get().if_none_match.handle(), etag);
+    request_headers.setInline(CacheCustomHeaders::IfNoneMatch(), etag);
   }
   if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers.setInline(CacheCustomHeaders::get().if_modified_since.handle(), last_modified);
+    request_headers.setInline(CacheCustomHeaders::IfModifiedSince(), last_modified);
   } else {
     // Either Last-Modified is missing or invalid, fallback to Date.
     // A correct behaviour according to:
     // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
     absl::string_view date = lookup_result_->headers_->getDateValue();
-    request_headers.setInline(CacheCustomHeaders::get().if_modified_since.handle(), date);
+    request_headers.setInline(CacheCustomHeaders::IfModifiedSince(), date);
   }
 }
 
