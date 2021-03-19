@@ -101,7 +101,7 @@ matcher_list:
   TestUtility::validate(matcher);
   MatchTreeFactory<TestData> factory(factory_context_);
 
-  auto generic_factory = TestGenericDataInputFactory("generic", "foo");
+  auto common_input_factory = TestCommonProtocolInputFactory("generic", "foo");
   auto match_tree = factory.create(matcher);
 
   const auto result = match_tree->match(TestData());
