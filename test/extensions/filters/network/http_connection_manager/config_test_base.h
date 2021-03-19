@@ -50,7 +50,8 @@ public:
   }
 };
 
-class PassThroughFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<test::http_connection_manager::TestHttpFilterConfig> {
+class PassThroughFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
+                                     test::http_connection_manager::FilterDependencyTestFilter> {
 public:
   PassThroughFilterFactory(std::string name) : FactoryBase(name) {}
 

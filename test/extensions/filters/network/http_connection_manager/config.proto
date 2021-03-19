@@ -9,5 +9,5 @@ message CustomRequestIDExtension {
 message UnknownRequestIDExtension {
 }
 
-message TestHttpFilterConfig {
+message FilterDependencyTestFilter {
 }
