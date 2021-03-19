@@ -10,20 +10,15 @@ import pathlib
 import sys
 
 from tools.api_proto_plugin import type_context as api_type_context
+from tools.protoxform import utils
 
-from google.protobuf import descriptor_pb2
-from google.protobuf import text_format
+from google.protobuf import descriptor_pb2, text_format
+from envoy.annotations import deprecation_pb2
 
-# Note: we have to include those proto definitions for text_format sanity.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
-from envoy.annotations import deprecation_pb2 as deprecation_pb2
-from envoy.annotations import resource_pb2 as _
-from udpa.annotations import migrate_pb2 as _
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
-from udpa.annotations import status_pb2 as _
-from udpa.annotations import versioning_pb2 as _
+PROTO_PACKAGES = ("google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
+                  "envoy.annotations.resource", "udpa.annotations.migrate",
+                  "udpa.annotations.security", "udpa.annotations.status",
+                  "udpa.annotations.sensitive", "udpa.annotations.versioning")
 
 
 # Set reserved_range in target_proto to reflect previous_reserved_range skipping
@@ -232,6 +227,9 @@ def merge_active_shadow_file(active_file_proto, shadow_file_proto):
 
 if __name__ == '__main__':
     active_src, shadow_src, dst = sys.argv[1:]
+
+    utils.load_protos(PROTO_PACKAGES)
+
     active_proto = descriptor_pb2.FileDescriptorProto()
     text_format.Merge(pathlib.Path(active_src).read_text(), active_proto)
     shadow_proto = descriptor_pb2.FileDescriptorProto()
