@@ -4,7 +4,10 @@ licenses(["notice"])  # Apache 2
 
 py_binary(
     name = "merge_active_shadow",
-    srcs = ["merge_active_shadow.py"],
+    srcs = [
+        "merge_active_shadow.py",
+        "utils.py",
+    ],
     deps = [
         "//tools/api_proto_plugin",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
@@ -18,10 +21,7 @@ py_binary(
 
 py_test(
     name = "merge_active_shadow_test",
-    srcs = [
-        "merge_active_shadow_test.py",
-        "utils.py",
-    ],
+    srcs = ["merge_active_shadow_test.py"],
     deps = [
         ":merge_active_shadow",
         "//tools/api_proto_plugin",
