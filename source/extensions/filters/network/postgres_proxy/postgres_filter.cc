@@ -231,11 +231,11 @@ Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool fron
   // that it cannot process data in the buffer.
   while (0 < data.length()) {
     switch (decoder_->onData(data, frontend)) {
-    case Decoder::NeedMoreData:
+    case Decoder::Result::NeedMoreData:
       return Network::FilterStatus::Continue;
-    case Decoder::ReadyForNext:
+    case Decoder::Result::ReadyForNext:
       continue;
-    case Decoder::Stopped:
+    case Decoder::Result::Stopped:
       return Network::FilterStatus::StopIteration;
     }
   }

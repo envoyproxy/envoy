@@ -182,7 +182,7 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
   // The minimum size of the message sufficient for parsing is 5 bytes.
   if (data.length() < 5) {
     // not enough data in the buffer.
-    return Decoder::NeedMoreData;
+    return Decoder::Result::NeedMoreData;
   }
 
   if (!startup_) {
@@ -198,7 +198,7 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
     ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
               message_len_ + (startup_ ? 0 : 1));
     // Not enough data in the buffer.
-    return Decoder::NeedMoreData;
+    return Decoder::Result::NeedMoreData;
   }
 
   if (startup_) {
@@ -226,7 +226,7 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
         startup_ = false;
       }
       data.drain(data.length());
-      return encrypted_ ? Decoder::ReadyForNext : Decoder::Stopped;
+      return encrypted_ ? Decoder::Result::ReadyForNext : Decoder::Result::Stopped;
     } else {
       ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
     }
@@ -235,52 +235,106 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
   data.drain(startup_ ? 4 : 5); // Length plus optional 1st byte.
 
   ENVOY_LOG(trace, "postgres_proxy: msg parsed");
-  return Decoder::ReadyForNext;
+  return Decoder::Result::ReadyForNext;
 }
 
 Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
-  // If encrypted, just drain the traffic.
-  if (encrypted_) {
-    ENVOY_LOG(trace, "postgres_proxy: ignoring {} bytes of encrypted data", data.length());
-    data.drain(data.length());
-    return Decoder::ReadyForNext;
+switch(state_) {
+case State::InitState:
+    return onDataInit(data, frontend);
+case State::OutOfSyncState:
+    return onDataIgnore(data, frontend);
+default:
+    return onDataInSync(data, frontend);
+    
+}
+}
+
+Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool frontend) {
+    ASSERT(state_ == State::InitState);
+
+  // The minimum size of the message sufficient for parsing is 5 bytes.
+  if (data.length() < 4) {
+    // not enough data in the buffer.
+    return Decoder::Result::NeedMoreData;
+  }
+  //std::reference_wrapper<MessageProcessor> msg = msg_processor.unknown_;
+
+  // Validate the message before processing. 
+  const MsgBodyReader& f = std::get<1>(first_);
+  // TODO: skip msgParser and call f() directly.
+    const auto msgParser = f();
+  // Run the validation. 
+  message_len_ = data.peekBEInt<uint32_t>(0);
+    Message::ValidationResult validationResult = msgParser->validate(data, 4, message_len_ - 4);
+  
+  if (validationResult == Message::ValidationNeedMoreData) {
+    return Decoder::Result::NeedMoreData;
   }
 
-  if (!frontend && startup_) {
+  if (validationResult == Message::ValidationFailed) {
+    // Message does not conform to the expected format. Move to out-of-sync state.
     data.drain(data.length());
-    return Decoder::ReadyForNext;
+    state_ = State::OutOfSyncState;
+    return Decoder::Result::ReadyForNext;
   }
+  //enum ValidationResult { ValidationFailed, ValidationOK, ValidationNeedMoreData };
+/*
+  message_len_ = data.peekBEInt<uint32_t>(0);
+  if (data.length() < (message_len_ + (0))) {
+    ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
+              message_len_);
+    // Not enough data in the buffer.
+    return Decoder::NeedMoreData;
+  }
+*/
+    Decoder::Result result = Decoder::Result::ReadyForNext;
+    uint32_t code = data.peekBEInt<uint32_t>(4);
+    data.drain(4);
+    // Startup message with 1234 in the most significant 16 bits
+    // indicate request to encrypt.
+    if (code >= 0x04d20000) {
+      encrypted_ = true;
+      // Handler for SSLRequest (Int32(80877103) = 0x04d2162f)
+      // See details in https://www.postgresql.org/docs/current/protocol-message-formats.html.
+      if (code == 0x04d2162f) {
+        // Notify the filter that `SSLRequest` message was decoded.
+        // If the filter returns true, it means to pass the message upstream
+        // to the server. If it returns false it means, that filter will try
+        // to terminate SSL session and SSLRequest should not be passed to the
+        // server.
+        encrypted_ = callbacks_->onSSLRequest();
+      }
 
-  ENVOY_LOG(trace, "postgres_proxy: decoding {} bytes", data.length());
-
-  const Decoder::Result result = parseHeader(data);
-  if (result != Decoder::ReadyForNext || encrypted_) {
+      // Count it as recognized frontend message.
+      callbacks_->incMessagesFrontend();
+      if (encrypted_) {
+        ENVOY_LOG(trace, "postgres_proxy: detected encrypted traffic.");
+        incSessionsEncrypted();
+        state_ = State::EncryptedState;
+        startup_ = false;
+      } else {
+        result = Decoder::Result::Stopped; 
+        // Stay in InitState. After switch to SSL, another init packet will be sent.
+      }
+      //data.drain(data.length());
+    } else {
+      ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
+      state_ = State::InSyncState;
+  }
+    frontend = true;
+  processMessageBody(data, message_len_ - 4, first_);
+  data.drain(message_len_);
     return result;
-  }
+}
 
-  MsgGroup& msg_processor = std::ref(frontend ? FE_messages_ : BE_messages_);
-  frontend ? callbacks_->incMessagesFrontend() : callbacks_->incMessagesBackend();
-
-  // Set processing to the handler of unknown messages.
-  // If message is found, the processing will be updated.
-  std::reference_wrapper<MessageProcessor> msg = msg_processor.unknown_;
-
-  if (startup_) {
-    msg = std::ref(first_);
-    startup_ = false;
-  } else {
-    auto it = msg_processor.messages_.find(command_);
-    if (it != msg_processor.messages_.end()) {
-      msg = std::ref((*it).second);
-    }
-  }
-
+void DecoderImpl::processMessageBody(Buffer::Instance& data, uint32_t length, MessageProcessor& msg) {
   // message_len_ specifies total message length including 4 bytes long
   // "length" field. The length of message body is total length minus size
   // of "length" field (4 bytes).
-  uint32_t bytes_to_read = message_len_ - 4;
+  uint32_t bytes_to_read = length/*message_len_ - 4*/;
 
-  std::vector<MsgAction>& actions = std::get<2>(msg.get());
+  std::vector<MsgAction>& actions = std::get<2>(msg);
   if (!actions.empty()) {
     // Linearize the message for processing.
     message_.assign(std::string(static_cast<char*>(data.linearize(bytes_to_read)), bytes_to_read));
@@ -294,16 +348,87 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     message_.erase();
   }
 
-  ENVOY_LOG(debug, "({}) command = {} ({})", msg_processor.direction_, command_,
-            std::get<0>(msg.get()));
-  ENVOY_LOG(debug, "({}) length = {}", msg_processor.direction_, message_len_);
-  ENVOY_LOG(debug, "({}) message = {}", msg_processor.direction_,
+  ENVOY_LOG(debug, "({}) command = {} ({})", /*msg_processor.direction_*/"to-do", command_,
+            std::get<0>(msg));
+  ENVOY_LOG(debug, "({}) length = {}", /*msg_processor.direction_*/"to-do", message_len_);
+  ENVOY_LOG(debug, "({}) message = {}", /*msg_processor.direction_*/"to-do",
             genDebugMessage(msg, data, bytes_to_read));
 
-  data.drain(bytes_to_read);
+  data.drain(length);
   ENVOY_LOG(trace, "postgres_proxy: {} bytes remaining in buffer", data.length());
 
-  return Decoder::ReadyForNext;
+    length = 0;
+  //return Decoder::ReadyForNext;
+}
+
+Decoder::Result DecoderImpl::onDataInSync(Buffer::Instance& data, bool frontend) {
+  ENVOY_LOG(trace, "postgres_proxy: decoding {} bytes", data.length());
+
+  ENVOY_LOG(trace, "postgres_proxy: parsing message, len {}", data.length());
+
+  // The minimum size of the message sufficient for parsing is 5 bytes.
+  if (data.length() < 5) {
+    // not enough data in the buffer.
+    return Decoder::Result::NeedMoreData;
+  }
+
+    data.copyOut(0, 1, &command_);
+    ENVOY_LOG(trace, "postgres_proxy: command is {}", command_);
+
+  // The 1 byte message type and message length should be in the buffer
+  // Check if the entire message has been read.
+#if 0
+  std::string message;
+  if (data.length() < (message_len_ + (1))) {
+    ENVOY_LOG(trace, "postgres_proxy: cannot parse message. Need {} bytes in buffer",
+              message_len_ + 1);
+    // Not enough data in the buffer.
+    return Decoder::NeedMoreData;
+  }
+#endif
+
+  MsgGroup& msg_processor = std::ref(frontend ? FE_messages_ : BE_messages_);
+  frontend ? callbacks_->incMessagesFrontend() : callbacks_->incMessagesBackend();
+
+  // Set processing to the handler of unknown messages.
+  // If message is found, the processing will be updated.
+  std::reference_wrapper<MessageProcessor> msg = msg_processor.unknown_;
+
+    auto it = msg_processor.messages_.find(command_);
+    if (it != msg_processor.messages_.end()) {
+      msg = std::ref((*it).second);
+    }
+
+  // Validate the message before processing. 
+  const MsgBodyReader& f = std::get<1>(msg.get());
+  message_len_ = data.peekBEInt<uint32_t>(1);
+  // TODO: skip msgParser and call f() directly.
+    const auto msgParser = f();
+  // Run the validation. 
+    Message::ValidationResult validationResult = msgParser->validate(data, 5, message_len_ - 4);
+  
+  if (validationResult == Message::ValidationNeedMoreData) {
+    return Decoder::Result::NeedMoreData;
+  }
+
+  if (validationResult == Message::ValidationFailed) {
+    // Message does not conform to the expected format. Move to out-of-sync state.
+    data.drain(data.length());
+    state_ = State::OutOfSyncState;
+    return Decoder::Result::ReadyForNext;
+  }
+
+  // Drain message code and length fields.
+  data.drain(5);
+
+  processMessageBody(data, message_len_-4, msg);
+
+  return Decoder::Result::ReadyForNext;
+}
+
+Decoder::Result DecoderImpl::onDataIgnore(Buffer::Instance& data, bool) {
+    data.drain(data.length());
+  return Decoder::Result::ReadyForNext;
 }
 
 // Method is called when C (CommandComplete) message has been
@@ -320,6 +445,8 @@ void DecoderImpl::decodeBackendStatements() {
     position = message_.find('\0');
   }
   const std::string statement = message_.substr(0, position);
+ 
+  printf("STATEMENT: %s\n", statement.c_str());
 
   auto it = BE_statements_.find(statement);
   if (it != BE_statements_.end()) {

@@ -40,7 +40,7 @@ public:
   // length field. "data" buffer may contain more bytes than "length".
   virtual bool read(const Buffer::Instance& data, const uint64_t length) PURE;
 
-  virtual ValidationResult validate(const Buffer::Instance& data, const uint64_t) PURE;
+  virtual ValidationResult validate(const Buffer::Instance& data, const uint64_t,  const uint64_t) PURE;
 
   // toString method provides displayable representation of
   // the Postgres message.
@@ -338,8 +338,8 @@ public:
     uint64_t left = length;
     return Sequence<Types...>::read(data, pos, left);
   }
-  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t length) override {
-    uint64_t pos = 0;
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t start_pos, const uint64_t length) override {
+    uint64_t pos = start_pos;
     uint64_t left = length;
     validation_result_ = Sequence<Types...>::validate(data, pos, left);
     return validation_result_;

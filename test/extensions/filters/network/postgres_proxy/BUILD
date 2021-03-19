@@ -19,6 +19,7 @@ envoy_extension_cc_test_library(
     extension_name = "envoy.filters.network.postgres_proxy",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/network/postgres_proxy:filter",
     ],
 )
 

@@ -54,7 +54,7 @@ public:
 
   // The following values are returned by the decoder, when filter
   // passes bytes of data via onData method:
-  enum Result {
+  enum class Result {
     ReadyForNext, // Decoder processed previous message and is ready for the next message.
     NeedMoreData, // Decoder needs more data to reconstruct the message.
     Stopped // Received and processed message disrupts the current flow. Decoder stopped accepting
@@ -90,7 +90,23 @@ public:
 
   bool encrypted() const { return encrypted_; }
 
+    enum class State {
+InitState,
+InSyncState,
+OutOfSyncState,
+EncryptedState };
+  State state() const {return state_;}
+  void state(State state) {state_ = state;}
 protected:
+  State state_{State::InitState};
+
+    // using 
+  using onDataFunc = std::function<Result(Buffer::Instance&, bool)>;
+  
+  Result onDataInit(Buffer::Instance& data, bool frontend);
+  Result onDataInSync(Buffer::Instance& data, bool frontend);
+  Result onDataIgnore(Buffer::Instance& data, bool frontend);
+
   // MsgAction defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
   using MsgAction = std::function<void(DecoderImpl*)>;
@@ -108,6 +124,7 @@ protected:
   // is processed.
   using MessageProcessor = std::tuple<std::string, MsgBodyReader, std::vector<MsgAction>>;
 
+    void processMessageBody(Buffer::Instance& data, uint32_t length, MessageProcessor& msg);
   // Frontend and Backend messages.
   using MsgGroup = struct {
     // String describing direction (Frontend or Backend).

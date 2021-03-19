@@ -646,12 +646,12 @@ TEST(PostgresMessage, SingleFieldInt32) {
   Buffer::OwnedImpl data;
   // Validation of empty message should complain that there
   // is not enough data in the buffer.
-  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 4, 4), Message::ValidationNeedMoreData);
 
   data.writeBEInt<uint32_t>(12);
 
   // Simulate that message is longer than In32.
-  ASSERT_THAT(msg->validate(data, 5), Message::ValidationFailed);
+  ASSERT_THAT(msg->validate(data, 5, ), Message::ValidationFailed);
 
   ASSERT_THAT(msg->validate(data, 4), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, 4));
