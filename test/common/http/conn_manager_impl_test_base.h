@@ -207,6 +207,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
   const LocalReply::LocalReplyPtr local_reply_;
+  bool strip_trailing_host_dot_ = false;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   NiceMock<MockResponseEncoder> response_encoder_;
