@@ -457,6 +457,9 @@ void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_head
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }
+  if (config.shouldStripTrailingHostDot()) {
+    HeaderUtility::stripTrailingHostDot(request_headers);
+  }
 }
 
 } // namespace Http

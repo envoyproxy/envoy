@@ -183,6 +183,11 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
+   * @brief Remove the trailing host dot from host/authority header.
+   */
+  static void stripTrailingHostDot(RequestHeaderMap& headers);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
    * If port is not passed, port part from host/authority header is removed.
    */

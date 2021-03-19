@@ -801,6 +801,89 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Filters observe host header w/o trailing dot in host when trailing dot removal is configured
+TEST_F(HttpConnectionManagerImplTest, FilterShouldUseHostWithoutTrailingDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+
+  auto* filter = new MockStreamFilter();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(updated_host, header_map.getHostValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clean up.
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// The router observes host header w/o trailing dot, not the original host, when
+// remove_trailing_hot_dot is configured
+TEST_F(HttpConnectionManagerImplTest, RouteShouldUseHostWithoutTrailingDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot
+  strip_trailing_host_dot_ = true;
+  strip_port_type_ = Http::StripPortType::MatchingHost;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  const std::string fake_cluster_name = "fake_cluster";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  std::shared_ptr<Router::MockRoute> route = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster_name));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap& header_map,
+                           const StreamInfo::StreamInfo&, uint64_t) {
+        EXPECT_EQ(updated_host, header_map.getHostValue());
+        return route;
+      }));
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks&) -> void {}));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DateHeaderNotPresent) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);

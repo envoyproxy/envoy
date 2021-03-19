@@ -451,6 +451,12 @@ public:
   virtual bool shouldMergeSlashes() const PURE;
 
   /**
+   * @return if the HttpConnectionManager should remove trailing host dot from host/authority
+   * header.
+   */
+  virtual bool shouldStripTrailingHostDot() const PURE;
+
+  /**
    * @return port strip type from host/authority header.
    */
   virtual StripPortType stripPortType() const PURE;
