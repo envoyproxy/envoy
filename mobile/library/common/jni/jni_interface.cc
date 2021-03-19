@@ -623,7 +623,8 @@ static envoy_data jvm_get_string(const void* context) {
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(const_cast<void*>(context));
   jclass jcls_JvmStringAccessorContext = env->GetObjectClass(j_context);
-  jmethodID jmid_getString = env->GetMethodID(jcls_JvmStringAccessorContext, "getString", "()[B");
+  jmethodID jmid_getString =
+      env->GetMethodID(jcls_JvmStringAccessorContext, "getEnvoyString", "()[B");
   jbyteArray j_data = static_cast<jbyteArray>(env->CallObjectMethod(j_context, jmid_getString));
   envoy_data native_data = array_to_native_data(env, j_data);
 
