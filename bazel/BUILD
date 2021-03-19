@@ -296,7 +296,7 @@ config_setting(
     name = "disable_http3",
     flag_values = {
         ":http3": "False",
-        },
+    },
 )
 
 config_setting(
