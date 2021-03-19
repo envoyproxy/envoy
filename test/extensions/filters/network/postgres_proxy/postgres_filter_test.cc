@@ -84,7 +84,7 @@ TEST_P(PostgresFilterTest, ReadData) {
   EXPECT_CALL(*decoderPtr, onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(data.length());
-        return Decoder::ReadyForNext;
+        return Decoder::Result::ReadyForNext;
       })));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
@@ -93,11 +93,11 @@ TEST_P(PostgresFilterTest, ReadData) {
   EXPECT_CALL(*decoderPtr, onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
-        return Decoder::ReadyForNext;
+        return Decoder::Result::ReadyForNext;
       })))
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(156);
-        return Decoder::ReadyForNext;
+        return Decoder::Result::ReadyForNext;
       })));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
@@ -108,15 +108,15 @@ TEST_P(PostgresFilterTest, ReadData) {
   EXPECT_CALL(*decoderPtr, onData)
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
-        return Decoder::ReadyForNext;
+        return Decoder::Result::ReadyForNext;
       })))
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
-        return Decoder::ReadyForNext;
+        return Decoder::Result::ReadyForNext;
       })))
       .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(0);
-        return Decoder::NeedMoreData;
+        return Decoder::Result::NeedMoreData;
       })));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 56);
@@ -135,7 +135,7 @@ INSTANTIATE_TEST_SUITE_P(ProcessDataTests, PostgresFilterTest,
 // It expects that certain statistics are updated.
 TEST_F(PostgresFilterTest, BackendMsgsStats) {
   // pretend that startup message has been received.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InSyncState);
 
   // unknown message
   createPostgresMsg(data_, "=", "blah blah blah");
@@ -230,7 +230,7 @@ TEST_F(PostgresFilterTest, BackendMsgsStats) {
 // verifies that statistic counters are increased.
 TEST_F(PostgresFilterTest, ErrorMsgsStats) {
   // Pretend that startup message has been received.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InSyncState);
 
   createPostgresMsg(data_, "E", "SERRORVERRORC22012");
   filter_->onWrite(data_, false);
@@ -257,7 +257,7 @@ TEST_F(PostgresFilterTest, ErrorMsgsStats) {
 // that corresponding stats counters are updated.
 TEST_F(PostgresFilterTest, NoticeMsgsStats) {
   // Pretend that startup message has been received.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InSyncState);
 
   createPostgresMsg(data_, "N", "SblalalaC2345");
   filter_->onWrite(data_, false);
@@ -304,7 +304,7 @@ TEST_F(PostgresFilterTest, EncryptedSessionStats) {
 // Postgres metadata.
 TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
   // Pretend that startup message has been received.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InSyncState);
   setMetadata();
 
   createPostgresMsg(data_, "Q", "BLAH blah blah");
@@ -322,7 +322,7 @@ TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
 // and it happens only when parse_sql flag is true.
 TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   // Pretend that startup message has been received.
-  static_cast<DecoderImpl*>(filter_->getDecoder())->setStartup(false);
+  static_cast<DecoderImpl*>(filter_->getDecoder())->state(DecoderImpl::State::InSyncState);
   setMetadata();
 
   // Disable creating parsing SQL and creating metadata.

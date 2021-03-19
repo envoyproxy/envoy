@@ -85,24 +85,19 @@ public:
 
   std::string getMessage() { return message_; }
 
-  void setStartup(bool startup) { startup_ = startup; }
   void initialize();
 
   bool encrypted() const { return encrypted_; }
 
-    enum class State {
-InitState,
-InSyncState,
-OutOfSyncState,
-EncryptedState };
-  State state() const {return state_;}
-  void state(State state) {state_ = state;}
+  enum class State { InitState, InSyncState, OutOfSyncState, EncryptedState };
+  State state() const { return state_; }
+  void state(State state) { state_ = state; }
+
 protected:
   State state_{State::InitState};
 
-    // using 
   using onDataFunc = std::function<Result(Buffer::Instance&, bool)>;
-  
+
   Result onDataInit(Buffer::Instance& data, bool frontend);
   Result onDataInSync(Buffer::Instance& data, bool frontend);
   Result onDataIgnore(Buffer::Instance& data, bool frontend);
@@ -124,7 +119,7 @@ protected:
   // is processed.
   using MessageProcessor = std::tuple<std::string, MsgBodyReader, std::vector<MsgAction>>;
 
-    void processMessageBody(Buffer::Instance& data, uint32_t length, MessageProcessor& msg);
+  void processMessageBody(Buffer::Instance& data, uint32_t length, MessageProcessor& msg);
   // Frontend and Backend messages.
   using MsgGroup = struct {
     // String describing direction (Frontend or Backend).

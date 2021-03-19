@@ -33,7 +33,6 @@ public:
   PostgresProxyDecoderTestBase() {
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
     decoder_->initialize();
-    decoder_->setStartup(false);
     decoder_->state(DecoderImpl::State::InSyncState);
   }
 
@@ -61,8 +60,9 @@ class PostgresProxyFrontendEncrDecoderTest : public PostgresProxyDecoderTestBase
 class PostgresProxyBackendDecoderTest : public PostgresProxyDecoderTestBase,
                                         public ::testing::TestWithParam<std::string> {};
 
-class PostgresProxyBackendStatementTest : public PostgresProxyDecoderTestBase,
-                                        public ::testing::TestWithParam<std::pair<std::string, bool>> {};
+class PostgresProxyBackendStatementTest
+    : public PostgresProxyDecoderTestBase,
+      public ::testing::TestWithParam<std::pair<std::string, bool>> {};
 
 class PostgresProxyErrorTest
     : public PostgresProxyDecoderTestBase,
@@ -79,8 +79,7 @@ class PostgresProxyNoticeTest
 // startup message the server should start using message format
 // with command as 1st byte.
 TEST_F(PostgresProxyDecoderTest, StartupMessage) {
-    decoder_->state(DecoderImpl::State::InitState);
-  decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   buf_[0] = '\0';
   // Startup message has the following structure:
@@ -130,8 +129,7 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
 // Test verifies that when Startup message does not carry
 // "database" attribute, it is derived from "user".
 TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
-    decoder_->state(DecoderImpl::State::InitState);
-  decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   buf_[0] = '\0';
   // Startup message has the following structure:
@@ -163,26 +161,25 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 }
 
-// Test that decoder does not crash when it receives 
+// Test that decoder does not crash when it receives
 // random data in InitState.
 TEST_F(PostgresProxyDecoderTest, DISABLED_StartupMessageRandomData) {
-  decoder_->setStartup(true);
 
-     srand (time(NULL));
+  srand(time(NULL));
   for (auto i = 0; i < 10000; i++) {
-  // Generate random length. 
-  uint32_t len = rand() % 2048;
-  // Now fill the buffer with random data.
-  for (uint32_t j = 0; j < len; j++) {
-    data_.writeBEInt<uint32_t>(rand() % 1024);
-    uint8_t data = static_cast<uint8_t>(rand() % 256);
-    data_.writeBEInt<uint8_t>(data);
-  }
-  // Feed the buffer to the decoder. It should not crash.
-  //ASSERT_THAT(decoder_->onData(data_, true), DecoderImpl::State::InSyncState);
-  
-  // Reset the buffer for the nect iteration.
-  data_.drain(data_.length());
+    // Generate random length.
+    uint32_t len = rand() % 2048;
+    // Now fill the buffer with random data.
+    for (uint32_t j = 0; j < len; j++) {
+      data_.writeBEInt<uint32_t>(rand() % 1024);
+      uint8_t data = static_cast<uint8_t>(rand() % 256);
+      data_.writeBEInt<uint8_t>(data);
+    }
+    // Feed the buffer to the decoder. It should not crash.
+    // ASSERT_THAT(decoder_->onData(data_, true), DecoderImpl::State::InSyncState);
+
+    // Reset the buffer for the nect iteration.
+    data_.drain(data_.length());
   }
 }
 
@@ -562,11 +559,10 @@ INSTANTIATE_TEST_SUITE_P(
 // that protocol uses encryption.
 TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // Set decoder to wait for initial message.
-    decoder_->state(DecoderImpl::State::InitState);
-  //decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   // Initial state is no-encryption.
-  //ASSERT_FALSE(decoder_->encrypted());
+  // ASSERT_FALSE(decoder_->encrypted());
 
   // Indicate that decoder should continue with processing the message.
   ON_CALL(callbacks_, onSSLRequest).WillByDefault(testing::Return(true));
@@ -580,7 +576,7 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   data_.writeBEInt<uint32_t>(GetParam());
   ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::EncryptedState);
-  //ASSERT_TRUE(decoder_->encrypted());
+  // ASSERT_TRUE(decoder_->encrypted());
   // Decoder should drain data.
   ASSERT_THAT(data_.length(), 0);
 
@@ -604,8 +600,7 @@ INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEn
 // Test onSSLRequest callback.
 TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
   // Set decoder to wait for initial message.
-    decoder_->state(DecoderImpl::State::InitState);
-  //decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   // Indicate that decoder should not continue with processing the message
   // because filter will try to terminate SSL session.
@@ -660,8 +655,6 @@ TEST_F(PostgresProxyDecoderTest, Linearize) {
   decoder_->state(DecoderImpl::State::InSyncState);
   testing::NiceMock<FakeBuffer> fake_buf;
   uint8_t body[] = "test\0";
-
-  //decoder_->setStartup(false);
 
   // Simulate that decoder reads message which needs processing.
   // Query 'Q' message's body is just string.

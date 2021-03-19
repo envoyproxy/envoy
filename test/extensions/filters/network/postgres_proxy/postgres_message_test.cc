@@ -646,14 +646,14 @@ TEST(PostgresMessage, SingleFieldInt32) {
   Buffer::OwnedImpl data;
   // Validation of empty message should complain that there
   // is not enough data in the buffer.
-  ASSERT_THAT(msg->validate(data, 4, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 0, 4), Message::ValidationNeedMoreData);
 
   data.writeBEInt<uint32_t>(12);
 
   // Simulate that message is longer than In32.
-  ASSERT_THAT(msg->validate(data, 5, ), Message::ValidationFailed);
+  ASSERT_THAT(msg->validate(data, 0, 5), Message::ValidationFailed);
 
-  ASSERT_THAT(msg->validate(data, 4), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, 4), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, 4));
   auto out = msg->toString();
   ASSERT_THAT(out, "[12]");
@@ -666,10 +666,10 @@ TEST(PostgresMessage, SingleFieldInt16) {
 
   // Validation of empty message should complain that there
   // is not enough data in the buffer.
-  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 0, 2), Message::ValidationNeedMoreData);
 
   data.writeBEInt<uint16_t>(12);
-  ASSERT_THAT(msg->validate(data, 2), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, 2), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, 2));
   auto out = msg->toString();
   ASSERT_THAT(out, "[12]");
@@ -681,7 +681,7 @@ TEST(PostgresMessage, SingleByteN) {
   Buffer::OwnedImpl data;
   // Validation of empty message should complain that there
   // is not enough data in the buffer.
-  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 0, 4), Message::ValidationNeedMoreData);
 
   data.writeBEInt<uint8_t>(0);
   data.writeBEInt<uint8_t>(1);
@@ -689,7 +689,7 @@ TEST(PostgresMessage, SingleByteN) {
   data.writeBEInt<uint8_t>(3);
   data.writeBEInt<uint8_t>(4);
   const uint64_t length = 5 * 1;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("0") != std::string::npos); // NOLINT
@@ -706,12 +706,12 @@ TEST(PostgresMessage, MultipleValues1) {
 
   // Validation of empty message should complain that there
   // is not enough data in the buffer.
-  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 0, 4), Message::ValidationNeedMoreData);
 
   data.writeBEInt<uint32_t>(12);
   data.writeBEInt<uint16_t>(13);
   const uint64_t length = 4 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("12") != std::string::npos);
@@ -726,7 +726,7 @@ TEST(PostgresMessage, MultipleValues2) {
   data.writeBEInt<uint32_t>(14);
   data.writeBEInt<uint16_t>(15);
   const uint64_t length = 2 + 4 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -743,7 +743,7 @@ TEST(PostgresMessage, MultipleValues3) {
   data.writeBEInt<uint32_t>(14);
   data.writeBEInt<uint16_t>(15);
   const uint64_t length = 4 + 2 + 4 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("12") != std::string::npos);
@@ -762,7 +762,7 @@ TEST(PostgresMessage, MultipleValues4) {
   data.writeBEInt<uint32_t>(16);
   data.writeBEInt<uint16_t>(17);
   const uint64_t length = 2 + 4 + 2 + 4 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -783,7 +783,7 @@ TEST(PostgresMessage, MultipleValues5) {
   data.writeBEInt<uint32_t>(16);
   data.writeBEInt<uint16_t>(17);
   const uint64_t length = 4 + 2 + 4 + 2 + 4 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("12") != std::string::npos);
@@ -808,7 +808,7 @@ TEST(PostgresMessage, MultipleValues6) {
   data.writeBEInt<uint32_t>(16);
   data.writeBEInt<uint16_t>(17);
   const uint64_t length = 5 + 4 + 2 + 4 + 2 + 4 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test") != std::string::npos);
@@ -833,7 +833,7 @@ TEST(PostgresMessage, MultipleValues7) {
   data.writeBEInt<uint32_t>(14);
   data.writeBEInt<uint32_t>(15);
   const uint64_t length = 5 + 2 + 3 * 4;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test") != std::string::npos);
@@ -852,7 +852,7 @@ TEST(PostgresMessage, ArraySet1) {
   data.writeBEInt<uint16_t>(14);
   data.writeBEInt<uint16_t>(15);
   const uint64_t length = 2 + 3 * 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -877,7 +877,7 @@ TEST(PostgresMessage, ArraySet2) {
   // 16-bits value.
   data.writeBEInt<uint16_t>(115);
   const uint64_t length = 2 + 4 + 5 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("114") != std::string::npos);
@@ -907,7 +907,7 @@ TEST(PostgresMessage, ArraySet3) {
   // 16-bits value.
   data.writeBEInt<uint16_t>(115);
   const uint64_t length = 2 + 3 * 2 + 2 + 4 + 5 + 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -933,7 +933,7 @@ TEST(PostgresMessage, ArraySet4) {
   data.writeBEInt<uint16_t>(113);
   data.writeBEInt<uint16_t>(114);
   const uint64_t length = 2 + 4 + 5 + 2 + 2 * 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("111") != std::string::npos);
@@ -965,7 +965,7 @@ TEST(PostgresMessage, ArraySet5) {
   data.writeBEInt<uint16_t>(113);
   data.writeBEInt<uint16_t>(114);
   const uint64_t length = 2 + 3 * 2 + 2 + 4 + 5 + 2 + 2 * 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -1003,7 +1003,7 @@ TEST(PostgresMessage, ArraySet6) {
   data.writeBEInt<uint16_t>(114);
 
   const uint64_t length = 5 + 2 + 3 * 2 + 2 + 4 + 5 + 2 + 2 * 2;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test") != std::string::npos);
@@ -1024,7 +1024,7 @@ TEST(PostgresMessage, Repeated1) {
   data.writeBEInt<int8_t>(0);
 
   const uint64_t length = 3 * 6;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test1") != std::string::npos);
@@ -1046,7 +1046,7 @@ TEST(PostgresMessage, Repeated2) {
   data.writeBEInt<int8_t>(0);
 
   const uint64_t length = 4 + 3 * 6;
-  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_THAT(msg->validate(data, 0, length), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("115") != std::string::npos);
@@ -1063,8 +1063,27 @@ TEST(PostgresMessage, NotEnoughData) {
   data.writeBEInt<uint8_t>(1);
   data.writeBEInt<uint8_t>(2);
 
-  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
-  ASSERT_THAT(msg->validate(data, 2), Message::ValidationFailed);
+  ASSERT_THAT(msg->validate(data, 0, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 0, 2), Message::ValidationFailed);
+}
+
+// Test check validating a properly formatted message
+// which starts at some offset in data buffer.
+TEST(PostgresMessage, ValidateFromOffset) {
+  std::unique_ptr<Message> msg = createMsgBodyReader<Int32, String>();
+  Buffer::OwnedImpl data;
+
+  // Write some data which should be skipped by validator.
+  data.add("skip");
+  data.writeBEInt<int8_t>(0);
+
+  // Write valid data according to message syntax.
+  data.writeBEInt<uint32_t>(110);
+  data.add("test123");
+  data.writeBEInt<int8_t>(0);
+
+  // Skip first 5 bytes in the buffer.
+  ASSERT_THAT(msg->validate(data, 5, 4 + 8), Message::ValidationOK);
 }
 
 } // namespace PostgresProxy
