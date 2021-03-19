@@ -386,7 +386,8 @@ class ActiveQuicListenerEmptyFlagConfigTest : public ActiveQuicListenerTest {
 protected:
   std::string yamlForQuicConfig() override {
     return R"EOF(
-    max_concurrent_streams: 10
+    quic_protocol_options:
+      max_concurrent_streams: 10
   )EOF";
   }
 };

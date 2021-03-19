@@ -26,6 +26,7 @@
 
 #include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
@@ -111,7 +112,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       // the hood. Therefore, to ignore cert expiration, we need to set the callback
       // for X509_verify_cert to ignore that error.
       if (config_->allowExpiredCertificate()) {
-        X509_STORE_set_verify_cb(store, DefaultCertValidator::ignoreCertificateExpirationCallback);
+        X509_STORE_set_verify_cb(store, CertValidatorUtil::ignoreCertificateExpirationCallback);
       }
     }
   }
@@ -224,17 +225,6 @@ int DefaultCertValidator::doVerifyCertChain(
 
   return allow_untrusted_certificate_ ? 1
                                       : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
-}
-
-int DefaultCertValidator::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx) {
-  if (!ok) {
-    int err = X509_STORE_CTX_get_error(store_ctx);
-    if (err == X509_V_ERR_CERT_HAS_EXPIRED || err == X509_V_ERR_CERT_NOT_YET_VALID) {
-      return 1;
-    }
-  }
-
-  return ok;
 }
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
