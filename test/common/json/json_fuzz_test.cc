@@ -25,8 +25,15 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     MessageUtil::loadFromJson(json_string, message);
     // We should be able to serialize, parse again and get the same result.
     ProtobufWkt::Struct message2;
-    MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessageOrDie(message), message2);
-    FUZZ_ASSERT(TestUtility::protoEqual(message, message2));
+    // This can sometimes fail on too deep recursion in case protobuf parsing is configured to have
+    // less recursion depth than json parsing in the proto library.
+    // This is the only version of MessageUtil::getJsonStringFromMessage function safe to use on
+    // untrusted inputs.
+    std::string deserialized = MessageUtil::getJsonStringFromMessageOrError(message);
+    if (!absl::StartsWith(deserialized, "Failed to convert")) {
+      MessageUtil::loadFromJson(deserialized, message2);
+      FUZZ_ASSERT(TestUtility::protoEqual(message, message2));
+    }
 
     // MessageUtil::getYamlStringFromMessage automatically convert types, so we have to do another
     // round-trip.
