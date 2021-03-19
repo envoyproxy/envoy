@@ -51,7 +51,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest.
   return headers.Path() && headers.Host() &&
-          !headers.getInline(CacheCustomHeaders::Authorization()) &&
+         !headers.getInline(CacheCustomHeaders::Authorization()) &&
          (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
@@ -71,7 +71,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   //    Both "Expires" and "Date" headers.
   const bool has_validation_data =
       response_cache_control.must_validate_ || response_cache_control.max_age_.has_value() ||
-          (headers.Date() && headers.getInline(CacheCustomHeaders::Expires()));
+      (headers.Date() && headers.getInline(CacheCustomHeaders::Expires()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&

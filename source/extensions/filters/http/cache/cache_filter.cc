@@ -404,10 +404,9 @@ bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& respons
   // and assuming a single cached response per key:
   // If the 304 response contains a strong validator (etag) that does not match the cached response,
   // the cached response should not be updated.
-  const Http::HeaderEntry* response_etag =
-      response_headers.getInline(CacheCustomHeaders::Etag());
+  const Http::HeaderEntry* response_etag = response_headers.getInline(CacheCustomHeaders::Etag());
   const Http::HeaderEntry* cached_etag =
-          lookup_result_->headers_->getInline(CacheCustomHeaders::Etag());
+      lookup_result_->headers_->getInline(CacheCustomHeaders::Etag());
   return !response_etag || (cached_etag && cached_etag->value().getStringView() ==
                                                response_etag->value().getStringView());
 }
