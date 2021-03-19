@@ -53,7 +53,7 @@ envoy_headers raw_header_map_as_envoy_headers(const RawHeaderMap& headers) {
   return raw_headers;
 }
 
-RawHeaderMap envoy_headers_as_raw_headers(envoy_headers raw_headers) {
+RawHeaderMap envoy_headers_as_raw_header_map(envoy_headers raw_headers) {
   RawHeaderMap headers;
   for (auto i = 0; i < raw_headers.length; i++) {
     auto key = envoy_data_as_string(raw_headers.entries[i].key);
@@ -64,7 +64,10 @@ RawHeaderMap envoy_headers_as_raw_headers(envoy_headers raw_headers) {
     }
     headers[key].push_back(value);
   }
-  release_envoy_headers(raw_headers);
+  // free instead of release_envoy_headers
+  // because we already free each envoy_data piecewise
+  // during calls to envoy_data_as_string
+  free(raw_headers.entries);
   return headers;
 }
 
