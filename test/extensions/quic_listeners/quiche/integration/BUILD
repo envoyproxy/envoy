@@ -32,9 +32,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_http_integration_test",
-    size = "medium",
+    size = "large",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
+    shard_count = 6,
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     # TODO(envoyproxy/windows-dev): Diagnose timeout, why opt build test under Windows GCP RBE

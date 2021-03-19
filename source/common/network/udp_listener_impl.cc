@@ -29,8 +29,11 @@ namespace Envoy {
 namespace Network {
 
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                                 UdpListenerCallbacks& cb, TimeSource& time_source)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
+                                 UdpListenerCallbacks& cb, TimeSource& time_source,
+                                 const envoy::config::core::v3::UdpSocketConfig& config)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),
+      // Default prefer_gro to false for downstream server traffic.
+      config_(config, false) {
   socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -71,7 +74,7 @@ void UdpListenerImpl::handleReadCallback() {
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
-      packets_dropped_);
+      config_.prefer_gro_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level

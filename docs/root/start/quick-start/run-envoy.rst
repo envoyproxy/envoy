@@ -219,12 +219,12 @@ The Envoy admin interface should now be available on http://localhost:9902.
 .. note::
 
    When merging ``yaml`` lists (e.g. :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
-   or :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`) the merged configurations
+   or :ref:`clusters <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`) the merged configurations
    are appended.
 
    You cannot therefore use an override file to change the configurations of previously specified
    :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` or
-   :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+   :ref:`clusters <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`
 
 Validating your Envoy configuration
 -----------------------------------
