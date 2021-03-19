@@ -20,6 +20,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -182,7 +183,8 @@ message Bootstrap {
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
   // Deprecated in favor of *watchdogs* which has finer granularity.
-  Watchdog hidden_envoy_deprecated_watchdog = 8 [deprecated = true];
+  Watchdog hidden_envoy_deprecated_watchdog = 8
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
@@ -194,7 +196,8 @@ message Bootstrap {
   // .. attention::
   //  This field has been deprecated in favor of :ref:`HttpConnectionManager.Tracing.provider
   //  <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.Tracing.provider>`.
-  trace.v4alpha.Tracing hidden_envoy_deprecated_tracing = 9 [deprecated = true];
+  trace.v4alpha.Tracing hidden_envoy_deprecated_tracing = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
