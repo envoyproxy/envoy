@@ -882,12 +882,21 @@ message HttpFilter {
   oneof config_type {
     // Filter specific configuration which depends on the filter being instantiated. See the supported
     // filters for further documentation.
+    //
+    // To support configuring a :ref:`match tree <arch_overview_matching_api>`, use an
+    // :ref:`ExtensionWithMatcher <envoy_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
+    // with the desired HTTP filter.
     // [#extension-category: envoy.filters.http]
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery service.
     // In case of a failure and without the default configuration, the HTTP listener responds with code 500.
     // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
+    //
+    // To support configuring a :ref:`match tree <arch_overview_matching_api>`, use an
+    // :ref:`ExtensionWithMatcher <envoy_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
+    // with the desired HTTP filter. This works for both the default filter configuration as well
+    // as for filters provided via the API.
     config.core.v3.ExtensionConfigSource config_discovery = 5;
   }
 
