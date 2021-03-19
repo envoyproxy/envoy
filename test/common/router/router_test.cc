@@ -5432,10 +5432,6 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
     FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
-
-  // Legacy logic uses upstream crypto
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
   {
     Http::TestRequestHeaderMapImpl headers;
     FilterUtility::setUpstreamScheme(headers, true, true);
