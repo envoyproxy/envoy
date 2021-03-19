@@ -15,9 +15,12 @@ class ResponseFlagUtils {
 public:
   static const std::string toShortString(const StreamInfo& stream_info);
   static absl::optional<ResponseFlag> toResponseFlag(const std::string& response_flag);
+  static const std::vector<std::pair<std::string, ResponseFlag>> ALL_RESPONSE_STRING_FLAGS;
 
 private:
   ResponseFlagUtils();
+  static absl::flat_hash_map<std::string, ResponseFlag> getFlagMap();
+
   static void appendString(std::string& result, const std::string& append);
 
   const static std::string NONE;
