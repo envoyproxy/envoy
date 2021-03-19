@@ -45,7 +45,7 @@ namespace Server {
 namespace {
 
 using TimerType = Event::ScaledTimerType;
-
+// TODO add fakeReactiveResourceMonitor
 class FakeResourceMonitor : public ResourceMonitor {
 public:
   FakeResourceMonitor(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), response_(0.0) {}
@@ -93,6 +93,21 @@ private:
   absl::optional<std::reference_wrapper<ResourceMonitor::Callbacks>> callbacks_;
 };
 
+class FakeReactiveResourceMonitor : public ReactiveResourceMonitor {
+public:
+  FakeResourceMonitor(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), response_(0.0) {}
+
+  void setPressure(double pressure) { response_ = pressure; }
+
+  void setError() { response_ = EnvoyException("fake_error"); }
+
+  // TBD
+private:
+  Event::Dispatcher& dispatcher_;
+  absl::variant<double, EnvoyException> response_;
+};
+
+// TODO add fake factory for reactive resources
 template <class ConfigType>
 class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
@@ -323,6 +338,10 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   EXPECT_EQ(42, pressure_gauge2.value());
 
   manager->stop();
+}
+
+TEST_F(OverloadManagerImplTest, ImmediateUpdateForReactiveResource) {
+  // TBD
 }
 
 TEST_F(OverloadManagerImplTest, ScaledTrigger) {

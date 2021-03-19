@@ -34,9 +34,22 @@ public:
 
   // Overload action to reduce some subset of configured timeouts.
   const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
+
+  std::set<std::string> reactive_action_names_{StopAcceptingConnections, RejectIncomingConnections};
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
+
+class OverloadReactiveResourceNameValues {
+public:
+  // Overload action to stop accepting new HTTP requests.
+  const std::string GlobalDownstreamMaxConnections =
+      "envoy.resource_monitors.global_downstream_max_connections";
+
+  std::set<std::string> reactive_resource_names_{GlobalDownstreamMaxConnections};
+};
+
+using OverloadReactiveResourceNames = ConstSingleton<OverloadReactiveResourceNameValues>;
 
 /**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client

@@ -124,6 +124,8 @@ public:
   // about overload state changes.
   void stop();
 
+  void updateReactiveResource(std::string name, uint64_t increment);
+
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
@@ -154,6 +156,26 @@ private:
     Stats::Counter& skipped_updates_counter_;
   };
 
+  class ReactiveResource : public ResourceMonitor::Callbacks {
+  public:
+    ReactiveResource(const std::string& name, ReactiveResourceMonitorPtr monitor,
+                     OverloadManagerImpl& manager, Stats::Scope& stats_scope);
+
+    // ResourceMonitor::Callbacks
+    void onSuccess(const ResourceUsage& usage) override;
+    void onFailure(const EnvoyException& error) override;
+
+    void update(uint64_t increment);
+
+  private:
+    const std::string name_;
+    ReactiveResourceMonitorPtr monitor_;
+    OverloadManagerImpl& manager_;
+    Stats::Gauge& pressure_gauge_;
+    Stats::Counter& failed_updates_counter_;
+    Stats::Counter& skipped_updates_counter_;
+  };
+
   struct ActionCallback {
     ActionCallback(Event::Dispatcher& dispatcher, OverloadActionCb callback)
         : dispatcher_(dispatcher), callback_(callback) {}
@@ -163,6 +185,7 @@ private:
 
   void updateResourcePressure(const std::string& resource, double pressure,
                               FlushEpochId flush_epoch);
+  void updateReactiveResourcePressure(const std::string& resource, double pressure);
   // Flushes any enqueued action state updates to all worker threads.
   void flushResourceUpdates();
 
@@ -173,6 +196,8 @@ private:
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   absl::node_hash_map<std::string, Resource> resources_;
+  absl::node_hash_map<std::string, ReactiveResource> reactive_resources_;
+
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
@@ -191,6 +216,7 @@ private:
       std::unordered_multimap<NamedOverloadActionSymbolTable::Symbol, ActionCallback,
                               absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
+  ActionToCallbackMap reactive_action_to_callbacks_;
 };
 
 } // namespace Server

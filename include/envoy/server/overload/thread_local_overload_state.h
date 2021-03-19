@@ -46,6 +46,9 @@ class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
+  // On-demand recalculation of resource pressure and update of overload action state.
+  virtual void updateReactiveResource(const std::string& reactive_resource_name,
+                                      uint64_t increment) PURE;
 };
 
 } // namespace Server

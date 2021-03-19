@@ -258,6 +258,7 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
+      void updateReactiveResource(const std::string&, uint64_t) override{};
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };

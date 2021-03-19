@@ -5,6 +5,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -50,7 +52,43 @@ public:
   virtual void updateResourceUsage(Callbacks& callbacks) PURE;
 };
 
+class ReactiveResourceMonitor : public ResourceMonitor {
+public:
+  ReactiveResourceMonitor(uint64_t max, uint64_t current) : max_(max), current_(current){};
+  virtual ~ReactiveResourceMonitor() = default;
+  using ResourceMonitor::updateResourceUsage;
+  virtual void updateResourceUsage(uint64_t curr_value, Callbacks& callbacks) PURE;
+  uint64_t currentResourceUsage() const { return current_.load(); }
+  uint64_t maxResourceUsage() const { return max_; };
+
+protected:
+  uint64_t max_;
+  std::atomic<uint64_t> current_;
+};
+
 using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
+
+using ReactiveResourceMonitorPtr = std::unique_ptr<ReactiveResourceMonitor>;
+
+// Example of reactive resource monitor. To be removed.
+class ActiveConnectionsResourceMonitor : public ReactiveResourceMonitor {
+public:
+  ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
+      : ReactiveResourceMonitor(max_active_conns, 0){};
+
+  void updateResourceUsage(uint64_t increment, Callbacks& callbacks) {
+    // Calling code will need to reset its current value after this.
+    current_ += increment;
+    // Invoke callback actions.
+
+    Server::ResourceUsage usage;
+    usage.resource_pressure_ = currentResourceUsage() / maxResourceUsage();
+
+    callbacks.onSuccess(usage);
+  }
+
+  void updateResourceUsage(Callbacks&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+};
 
 } // namespace Server
 } // namespace Envoy
