@@ -28,6 +28,7 @@ public:
 
     envoy::extensions::filters::network::rbac::v3::RBAC config;
     config.set_stat_prefix("tcp.");
+    config.set_shadow_rules_stat_prefix("prefix_");
 
     if (with_policy) {
       envoy::config::rbac::v3::Policy policy;
@@ -45,7 +46,6 @@ public:
       shadow_policy_rules->add_rules()->set_destination_port(456);
       shadow_policy.add_principals()->set_any(true);
       config.mutable_shadow_rules()->set_action(action);
-      config.set_shadow_rules_stat_prefix("prefix_");
       (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
     }
 
@@ -125,6 +125,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithOneTimeEnforcement) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithContinuousEnforcement) {
@@ -142,6 +146,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithContinuousEnforcement
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(2U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {
@@ -157,6 +165,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
@@ -172,6 +184,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
@@ -187,6 +203,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
@@ -206,6 +226,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldLog) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   checkAccessLogMetadata(true);
 }
@@ -221,6 +245,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldNotLog) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("tcp.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("tcp.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   checkAccessLogMetadata(false);
 }

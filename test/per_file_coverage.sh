@@ -9,6 +9,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
 "source/common/event:93.4" # Emulated edge events guards don't report LCOV
+"source/common/filesystem/posix:96.2"
 "source/common/filter:96.5"
 "source/common/filter/http:96.5"
 "source/common/http/http3:50.0"
@@ -43,7 +44,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/common/redis:96.3"
 "source/extensions/filters/network/dubbo_proxy:96.1"
 "source/extensions/filters/network/dubbo_proxy/router:95.1"
-"source/extensions/filters/network/mongo_proxy:94.1"
+"source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/sni_cluster:90.3"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:90.9"
 "source/extensions/health_checkers:95.9"
