@@ -4688,8 +4688,8 @@ private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
 };
 
-// Verifies that we propagate the upstream connection filter state to the upstream request filter
-// state.
+// Verifies that we propagate the upstream connection filter state to the upstream and downstream
+// request filter state.
 TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
