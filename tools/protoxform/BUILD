@@ -7,6 +7,7 @@ py_binary(
     srcs = ["merge_active_shadow.py"],
     deps = [
         "//tools/api_proto_plugin",
+        "//tools/type_whisperer:api_type_db_proto_py_proto",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_googleapis//google/api:annotations_py_proto",
