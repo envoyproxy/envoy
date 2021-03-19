@@ -26,6 +26,10 @@ Minor Behavior Changes
   logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
   Setting the hostname manually allows overriding the internal hostname used for such features while
   still allowing the original DNS resolution name to be used.
+* grpc_json_transcoder: filter now adheres to encoder and decoder buffer limits. Requests and responses
+  that require buffering over the limits will be directly rejected. The behavior can be reverted by
+  disabling runtime feature `envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits`.
+  To reduce or increase the buffer limits the filter adheres to, reference the :ref:`flow control documentation <faq_flow_control>`.
 * hds: support custom health check port via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 * healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
   :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
@@ -56,6 +60,9 @@ Minor Behavior Changes
 * router: extended custom date formatting to DOWNSTREAM_PEER_CERT_V_START and DOWNSTREAM_PEER_CERT_V_END when using :ref:`custom request/response header formats <config_http_conn_man_headers_custom_request_headers>`.
 * router: made the path rewrite available without finalizing headers, so the filter could calculate the current value of the final url.
 * tracing: added `upstream_cluster.name` tag that resolves to resolve to :ref:`alt_stat_name <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` if provided (and otherwise the cluster name).
+* udp: configuration has been added for :ref:`GRO <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>`
+  which used to be force enabled if the OS supports it. The default is now disabled for server
+  sockets and enabled for client sockets (see the new features section for links).
 * upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
   atomically inline. This change has been made to support load balancer pre-computation of data
   structures based on host weight, but may have performance implications if host weight changes
@@ -111,6 +118,8 @@ Removed Config or Runtime
 
 New Features
 ------------
+
+* access log: added a new :ref:`OpenTelemetry access logger <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>` extension, allowing a flexible log structure with native Envoy access log formatting.
 * access log: added the new response flag `NC` for upstream cluster not found. The error flag is set when the http or tcp route is found for the request but the cluster is not available.
 * access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
 * access log: added support for cross platform writing to :ref:`standard output <envoy_v3_api_msg_extensions.access_loggers.stdoutput.v3.StdoutputAccessLog>` and :ref:`standard error <envoy_v3_api_msg_extensions.access_loggers.stderror.v3.StderrorAccessLog>`.
@@ -158,6 +167,10 @@ New Features
   :ref:`upstream_socket_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_socket_config>`
   UDP proxy configuration to allow configuration of upstream max UDP datagram size. The defaults for
   both remain 1500 bytes.
+* udp: added configuration for :ref:`GRO
+  <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>`. The default is disabled for
+  :ref:`downstream sockets <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.downstream_socket_config>`
+  and enabled for :ref:`upstream sockets <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_socket_config>`.
 
 Deprecated
 ----------
