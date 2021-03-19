@@ -75,7 +75,11 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<CompositeAction>();
 
   FactoryCallbacksWrapper wrapper(*this);
-  composite_action.createFilters(wrapper);
+  const auto status = composite_action.createFilters(wrapper);
+  if (!status.ok()) {
+    ENVOY_LOG(error, "failed to create delegated filter {}", status);
+    return;
+  }
 
   if (wrapper.filter_to_inject_) {
     if (absl::holds_alternative<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_)) {

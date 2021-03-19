@@ -139,6 +139,105 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   filter_.onDestroy();
 }
 
+// Adding multiple stream filters should cause delegation to be skipped.
+TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+    cb.addStreamFilter(stream_filter);
+  };
+
+  CompositeAction action(factory_callback);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
+// Adding multiple decoder filters should cause delegation to be skipped.
+TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
+  auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamDecoderFilter(decoder_filter);
+    cb.addStreamDecoderFilter(decoder_filter);
+  };
+
+  CompositeAction action(factory_callback);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
+// Adding multiple encoder filters should cause delegation to be skipped.
+TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
+  auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(encode_filter);
+    cb.addStreamEncoderFilter(encode_filter);
+  };
+
+  CompositeAction action(factory_callback);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
+// Adding a stream filter with a match tree should not cause delegation.
+TEST_F(FilterTest, StreamFilterDelegationStreamFilterWithMatchTree) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter, nullptr);
+  };
+
+  CompositeAction action(factory_callback);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
+// Adding a decoder filter with a match tree should not cause delegation.
+TEST_F(FilterTest, StreamFilterDelegationDecodeFilterWithMatchTree) {
+  auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamDecoderFilter(decoder_filter, nullptr);
+  };
+
+  CompositeAction action(factory_callback);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
+// Adding a encoder filter with a match tree should not cause delegation.
+TEST_F(FilterTest, StreamFilterDelegationEncodeFilterWithMatchTree) {
+  auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(encode_filter, nullptr);
+  };
+
+  CompositeAction action(factory_callback);
+  filter_.onMatchCallback(action);
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
 } // namespace
 } // namespace Composite
 } // namespace HttpFilters

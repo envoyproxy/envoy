@@ -6,6 +6,7 @@
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/composite/action.h"
+#include "extensions/filters/http/composite/factory_wrapper.h"
 
 #include "absl/types/variant.h"
 
@@ -14,7 +15,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-class Filter : public Http::StreamFilter {
+struct FactoryCallbacksWrapper;
+
+class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter() : decoded_headers_(false), encoded_headers_(false) {}
 
@@ -53,6 +56,8 @@ public:
   void onMatchCallback(const Matcher::Action& action) override;
 
 private:
+  friend FactoryCallbacksWrapper;
+
   // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
   // serve to surface an easier to understand error, as attempting to insert a filter at a later
   // time will result in various FM assertions firing.
@@ -95,56 +100,6 @@ private:
   private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
     Http::StreamDecoderFilterSharedPtr decoder_filter_;
-  };
-
-  // A FilterChainFactoryCallbacks that delegates filter creation to the filter callbacks.
-  struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
-    explicit FactoryCallbacksWrapper(Filter& filter) : filter_(filter) {}
-
-    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-      ASSERT(!filter_.decoded_headers_);
-      ASSERT(!filter_to_inject_);
-
-      filter_to_inject_ = filter;
-    }
-    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
-                                Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
-    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-      ASSERT(!filter_.encoded_headers_);
-      ASSERT(!filter_to_inject_);
-
-      filter_to_inject_ = filter;
-    }
-
-    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr,
-                                Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
-
-    void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-      ASSERT(!filter_.decoded_headers_);
-      ASSERT(!filter_to_inject_);
-
-      filter_to_inject_ = filter;
-    }
-
-    void addStreamFilter(Http::StreamFilterSharedPtr,
-                         Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
-
-    void addAccessLogHandler(AccessLog::InstanceSharedPtr) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
-
-    Filter& filter_;
-
-    using FilterAlternative =
-        absl::variant<Http::StreamDecoderFilterSharedPtr, Http::StreamEncoderFilterSharedPtr,
-                      Http::StreamFilterSharedPtr>;
-    absl::optional<FilterAlternative> filter_to_inject_;
   };
 
   Http::StreamFilterSharedPtr delegated_filter_;

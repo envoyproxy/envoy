@@ -23,8 +23,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "filter_lib",
-    srcs = ["filter.cc"],
-    hdrs = ["filter.h"],
+    srcs = [
+        "factory_wrapper.cc",
+        "filter.cc",
+    ],
+    hdrs = [
+        "factory_wrapper.h",
+        "filter.h",
+    ],
     deps = [
         ":action_lib",
         "//include/envoy/http:filter_interface",
