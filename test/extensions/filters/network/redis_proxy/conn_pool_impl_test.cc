@@ -533,13 +533,13 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
   update_callbacks_->onClusterRemoval("fake_cluster");
 }
 
-// ConnPool created when no cluster exists at creation time . Dynamic cluster
-// creation and removal work correctly . Username and password are updated with
-// dynamic cluster .
+// ConnPool created when no cluster exists at creation time. Dynamic cluster
+// creation and removal work correctly. Username and password are updated with
+// dynamic cluster.
 TEST_F(RedisConnPoolImplTest, AuthInfoUpdate) {
   InSequence s;
 
-  // Initialize username and password .
+  // Initialize username and password.
   auth_username_ = "testusername";
   auth_password_ = "testpassword";
 
