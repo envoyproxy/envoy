@@ -63,6 +63,7 @@ public:
   };
 
 private:
+  bool allow_expired_certificate_{false};
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
   std::string ca_file_name_;
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;

@@ -20,6 +20,13 @@ Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoType
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+KillRequestFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const KillSettings>(proto_config);
+}
+
 /**
  * Static registration for the KillRequest filter. @see RegisterFactory.
  */

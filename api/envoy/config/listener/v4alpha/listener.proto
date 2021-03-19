@@ -5,7 +5,6 @@ package envoy.config.listener.v4alpha;
 import "envoy/config/accesslog/v4alpha/accesslog.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
-import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/socket_option.proto";
 import "envoy/config/listener/v4alpha/api_listener.proto";
 import "envoy/config/listener/v4alpha/listener_components.proto";
@@ -98,7 +97,7 @@ message Listener {
         "envoy.config.listener.v3.Listener.InternalListenerConfig";
   }
 
-  reserved 14, 7;
+  reserved 14, 23, 7;
 
   reserved "deprecated_v1";
 
@@ -220,10 +219,8 @@ message Listener {
 
   // If the protocol in the listener socket address in :ref:`protocol
   // <envoy_api_field_config.core.v4alpha.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_api_enum_value_config.core.v4alpha.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
-  // listener to create, i.e. :ref:`udp_listener_name
-  // <envoy_api_field_config.listener.v4alpha.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
-  // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
+  // <envoy_api_enum_value_config.core.v4alpha.SocketAddress.Protocol.UDP>`, this field specifies UDP
+  // listener specific configuration.
   UdpListenerConfig udp_listener_config = 18;
 
   // Used to represent an API listener, which is used in non-proxy clients. The type of API
@@ -264,16 +261,6 @@ message Listener {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
   repeated accesslog.v4alpha.AccessLog access_log = 22;
-
-  // If the protocol in the listener socket address in :ref:`protocol
-  // <envoy_api_field_config.core.v4alpha.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_api_enum_value_config.core.v4alpha.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
-  // writer to create, i.e. :ref:`name <envoy_api_field_config.core.v4alpha.TypedExtensionConfig.name>`
-  //    = "udp_default_writer" for creating a udp writer with writing in passthrough mode,
-  //    = "udp_gso_batch_writer" for creating a udp writer with writing in batch mode.
-  // If not present, treat it as "udp_default_writer".
-  // [#not-implemented-hide:]
-  core.v4alpha.TypedExtensionConfig udp_writer_config = 23;
 
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.

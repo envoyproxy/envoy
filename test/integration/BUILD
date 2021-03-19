@@ -86,17 +86,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "api_version_integration_test",
-    srcs = ["api_version_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
 py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
@@ -460,6 +449,7 @@ envoy_cc_test_library(
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_data_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:logging_lib",
@@ -863,6 +853,7 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/access_loggers/stdoutput:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",

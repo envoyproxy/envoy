@@ -304,7 +304,6 @@ message HttpConnectionManager {
   // A list of individual HTTP filters that make up the filter chain for
   // requests made to the connection manager. :ref:`Order matters <arch_overview_http_filters_ordering>`
   // as the filters are processed sequentially as request events happen.
-  // [#extension-category: envoy.filters.http]
   repeated HttpFilter http_filters = 5;
 
   // Whether the connection manager manipulates the :ref:`config_http_conn_man_headers_user-agent`
@@ -892,6 +891,7 @@ message HttpFilter {
   oneof config_type {
     // Filter specific configuration which depends on the filter being instantiated. See the supported
     // filters for further documentation.
+    // [#extension-category: envoy.filters.http]
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery service.
