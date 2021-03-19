@@ -164,8 +164,33 @@ public:
 
 void testMerge() {
   Api::ApiPtr api = Api::createApiForTest();
-
-  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  const std::string overlay = R"EOF(
+        {
+          admin: {
+            "access_log": [
+              {
+                "name": "envoy.access_loggers.file",
+                "typed_config": { 
+                  "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+                  "path": "/dev/null"
+                }
+              }
+            ],
+            "address": {
+              "socket_address": {
+                "address": "1.2.3.4",
+                "port_value": 5678
+              }
+            }
+          },
+          static_resources: { 
+            clusters: [
+              {
+                name: 'foo'
+              }
+            ]
+          }
+        })EOF";
   OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
