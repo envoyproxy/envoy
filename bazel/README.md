@@ -619,6 +619,10 @@ bazel test //test/integration:protocol_integration_test --test_output=streamed \
   --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
+Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
+environment where `n` is the desired verbosity level (e.g.
+`--test_env="ENVOY_QUICHE_VERBOSITY=2"`.
+
 ## Disabling optional features
 
 The following optional features can be disabled on the Bazel build command-line:

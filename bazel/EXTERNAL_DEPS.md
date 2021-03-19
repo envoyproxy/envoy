@@ -109,6 +109,9 @@ dependencies:
 
 * `nghttp2`: set `ENVOY_NGHTTP2_TRACE` in the environment and run at `-l trace`.
 
+* `QUICHE`: set `ENVOY_QUICHE_VERBOSITY=n` in the environment to display
+  verbose logs up to level `n`.
+
 # Distdir - prefetching dependencies
 
 Usually Bazel downloads all dependencies during build time. But there is a

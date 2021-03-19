@@ -35,3 +35,8 @@ When the aggregated buffered bytes goes above high watermark, its registered net
 As to Http::StreamEncoder::encodeHeaders()/encodeTrailers(), the accounting is done differently between Google QUIC and IETF QUIC:
  * In Google QUIC, encodeHeaders()/encodeTrailers() check the buffer size increase on header stream before and after writing headers/trailers. In QuicSession::OnCanWrite(), may drain header stream send buffer, so there we also check send buffer size decrease on header stream.
  * In IETF QUIC, encodeHeaders()/encodeTrailers() check the buffer size increase on the corresponding data stream which is similar to encodeData(). The buffered headers/trailers are only drained via QuicStream::OnCanWrite() so there is no need to check QuicSession::OnCanWrite.
+
+### Debugging
+
+QUICHE verbose logs (such as `QUICHE_VLOG(2)` for example) can be enabled by setting the `ENVOY_QUICHE_VERBOSITY` environment variable. For example, pass `--test_env="ENVOY_QUICHE_VERBOSITY=2"` to `bazel test`.
+
