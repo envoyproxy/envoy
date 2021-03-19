@@ -57,6 +57,18 @@ cc_library(
 )
 
 cc_library(
+    name = "wamr_lib",
+    srcs = glob([
+        "src/wamr/*.h",
+        "src/wamr/*.cc",
+    ]),
+    deps = [
+        ":common_lib",
+        "@com_github_wamr//:wamr_lib",
+    ],
+)
+
+cc_library(
     name = "wavm_lib",
     srcs = glob([
         "src/wavm/*.cc",

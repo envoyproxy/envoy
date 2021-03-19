@@ -19,6 +19,9 @@ std::vector<std::string> sandboxRuntimes() {
 #if defined(ENVOY_WASM_WAVM)
   runtimes.push_back("wavm");
 #endif
+#if defined(ENVOY_WASM_WAMR)
+  runtimes.push_back("wamr");
+#endif
 #if defined(ENVOY_WASM_WASMTIME)
   runtimes.push_back("wasmtime");
 #endif
