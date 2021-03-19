@@ -64,6 +64,25 @@ public:
   // Network::UdpConnectionHandler
   Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
 
+  // Network::IntelListenerManager
+  Network::InternalListenerOptRef
+  findByAddress(const Network::Address::InstanceConstSharedPtr& listen_address) override;
+
+  /**
+   * Wrapper for an active listener owned by this handler.
+   */
+  class ActiveListenerImplBase : public virtual Network::ConnectionHandler::ActiveListener {
+  public:
+    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig* config);
+
+    // Network::ConnectionHandler::ActiveListener.
+    uint64_t listenerTag() override { return config_->listenerTag(); }
+
+    ListenerStats stats_;
+    PerHandlerListenerStats per_worker_stats_;
+    Network::ListenerConfig* config_{};
+  };
+
 private:
   struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
