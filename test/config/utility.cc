@@ -1112,6 +1112,7 @@ void ConfigHelper::initializeTls(
     validation_context->add_verify_certificate_hash(
         options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
   }
+  validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.

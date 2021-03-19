@@ -272,3 +272,8 @@ generate_x509_cert spiffe_san ca
 
 generate_rsa_key non_spiffe_san
 generate_x509_cert non_spiffe_san ca
+
+cp -f spiffe_san_cert.cfg expired_spiffe_san_cert.cfg
+generate_rsa_key expired_spiffe_san
+generate_x509_cert expired_spiffe_san ca -365
+rm -f expired_spiffe_san_cert.cfg

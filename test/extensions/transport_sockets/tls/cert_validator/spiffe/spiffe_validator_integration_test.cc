@@ -12,9 +12,12 @@ namespace Envoy {
 namespace Ssl {
 
 void SslSPIFFECertValidatorIntegrationTest::initialize() {
-  config_helper_.addSslConfig(
-      ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true).setCustomValidatorConfig(
-          custom_validator_config_));
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setRsaCertOcspStaple(false)
+                                  .setCustomValidatorConfig(custom_validator_config_)
+                                  .setAllowExpiredCertificate(allow_expired_cert_));
   HttpIntegrationTest::initialize();
 
   context_manager_ =
@@ -29,9 +32,10 @@ void SslSPIFFECertValidatorIntegrationTest::TearDown() {
 }
 
 Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClientConnection(
-    const ClientSslTransportOptions& options) {
+    const ClientSslTransportOptions& options, bool use_expired = false) {
   ClientSslTransportOptions modified_options{options};
   modified_options.setTlsVersion(tls_version_);
+  modified_options.use_expired_spiffe_cert_ = use_expired;
 
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr =
@@ -76,6 +80,60 @@ typed_config:
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkVerifyErrorCouter(0);
+}
+
+// Client certificate has expired but the config allows expired certificates, so this case should
+// be accepted.
+TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorExpiredButAccepcepted) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  )EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  allow_expired_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    const bool use_expired_certificate = true;
+    return makeSslClientConnection({}, use_expired_certificate);
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkVerifyErrorCouter(0);
+}
+
+// Client certificate has expired and the config does NOT allow expired certificates, so this case
+// should be rejected.
+TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorExpiredAndRejected) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  )EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  // Explicitly specify "false" just in case and for clarity.
+  allow_expired_cert_ = false;
+  initialize();
+  auto conn = makeSslClientConnection({});
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
+    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    EXPECT_FALSE(codec->connected());
+  } else {
+    auto codec = makeHttpConnection(std::move(conn));
+    ASSERT_TRUE(codec->waitForDisconnect());
+    codec->close();
+  }
+  checkVerifyErrorCouter(1);
 }
 
 // clientcert.pem's san is "spiffe://lyft.com/frontend-team" so it should be rejected.

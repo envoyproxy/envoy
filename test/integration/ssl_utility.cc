@@ -40,6 +40,14 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
       private_key:
         filename: "{{ test_rundir }}/test/config/integration/certs/client_ecdsakey.pem"
 )EOF";
+  } else if (options.use_expired_spiffe_cert_) {
+    yaml_plain += R"EOF(
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_spiffe_san_key.pem"
+)EOF";
   } else {
     yaml_plain += R"EOF(
     tls_certificates:

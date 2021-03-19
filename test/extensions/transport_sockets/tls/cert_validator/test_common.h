@@ -30,8 +30,10 @@ private:
 class TestCertificateValidationContextConfig
     : public Envoy::Ssl::CertificateValidationContextConfig {
 public:
-  TestCertificateValidationContextConfig(envoy::config::core::v3::TypedExtensionConfig config)
-      : api_(Api::createApiForTest()), custom_validator_config_(config){};
+  TestCertificateValidationContextConfig(envoy::config::core::v3::TypedExtensionConfig config,
+                                         bool allow_expired_certificate = false)
+      : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
+        custom_validator_config_(config){};
   TestCertificateValidationContextConfig()
       : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt){};
 
@@ -56,7 +58,7 @@ public:
   const std::vector<std::string>& verifyCertificateSpkiList() const override {
     CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
   }
-  bool allowExpiredCertificate() const override { return false; }
+  bool allowExpiredCertificate() const override { return allow_expired_certificate_; }
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
       TrustChainVerification
       trustChainVerification() const override {
@@ -73,6 +75,7 @@ public:
   Api::Api& api() const override { return *api_; }
 
 private:
+  bool allow_expired_certificate_{false};
   Api::ApiPtr api_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
 };

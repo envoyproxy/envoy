@@ -33,6 +33,11 @@ public:
   using HttpConnectionManager =
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
   struct ServerSslOptions {
+    ServerSslOptions& setAllowExpiredCertificate(bool allow) {
+      allow_expired_certificate_ = allow;
+      return *this;
+    }
+
     ServerSslOptions& setRsaCert(bool rsa_cert) {
       rsa_cert_ = rsa_cert;
       return *this;
@@ -74,6 +79,7 @@ public:
       return *this;
     }
 
+    bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
