@@ -452,8 +452,12 @@ class FormatChecker:
         if file_path.endswith(DOCS_SUFFIX):
             return False
 
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
-            or self.is_in_subdir(file_path, 'tools/testdata')
+        return (
+            (file_path.endswith('.h')
+             and not file_path.startswith("./test/")
+             and not file_path in EXCEPTION_ALLOWLIST)
+            or file_path in EXCEPTION_DENYLIST
+            or self.is_in_subdir(file_path, 'tools/testdata'))
 
     def allow_listed_for_build_urls(self, file_path):
         return file_path in BUILD_URLS_ALLOWLIST
