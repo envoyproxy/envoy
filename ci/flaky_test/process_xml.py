@@ -8,7 +8,7 @@ import sys
 import ssl
 
 well_known_timeouts = [60, 300, 900, 3600]
-section_delimiter = "---------------------------------------------------------------------------------------------------\n"
+section_delimiter = f"{'-' * 99}\n"
 
 
 # Returns a boolean indicating if a test passed.
@@ -45,8 +45,9 @@ def print_test_suite_error(testsuite, testcase, log_path, duration, time, error_
     ret += "- Error:        {} ({})\n".format(error_msg.capitalize(), errno_string)
 
     if duration == time and duration in well_known_timeouts:
-        ret += "- Note:         This error is likely a timeout (test duration == {}, a well known timeout value).\n".format(
-            duration)
+        ret += (
+            "- Note:         This error is likely a timeout "
+            "(test duration == {duration}, a well known timeout value).\n")
 
     # If there's a call stack, print it. Otherwise, attempt to print the most recent,
     # relevant lines.
@@ -189,9 +190,9 @@ def get_git_info(CI_TARGET):
     ret += "Commmit:        {}/commit/{}".format(os.environ['REPO_URI'], output)
 
     build_id = os.environ['BUILD_URI'].split('/')[-1]
-    ret += "CI results:     https://dev.azure.com/cncf/envoy/_build/results?buildId=" + build_id + "\n"
-
-    ret += "\n"
+    ret += (
+        "CI results:     "
+        f"https://dev.azure.com/cncf/envoy/_build/results?buildId={build_id}\n\n")
 
     remotes = subprocess.check_output(['git', 'remote'], encoding='utf-8').splitlines()
 
