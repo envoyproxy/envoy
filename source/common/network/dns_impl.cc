@@ -1,7 +1,5 @@
 #include "common/network/dns_impl.h"
 
-#include <netdb.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
