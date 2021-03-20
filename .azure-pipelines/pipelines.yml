@@ -28,7 +28,7 @@ stages:
             displayName: "Run format pre-checks"
 
       - job: format
-        dependsOn: [] # "format_pre"]
+        dependsOn: ["format_pre"]
         pool:
           vmImage: "ubuntu-18.04"
         steps:
