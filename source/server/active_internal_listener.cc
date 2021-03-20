@@ -264,10 +264,12 @@ ActiveInternalConnection::~ActiveInternalConnection() {
 }
 
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& parent,
+                                               Event::Dispatcher& dispatcher,
                                                Network::ListenerPtr&& listener,
                                                Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config), parent_(parent),
-      listener_(std::move(listener)), listener_filters_timeout_(config.listenerFiltersTimeout()),
+      dispatcher_(dispatcher), listener_(std::move(listener)),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {}
 
 ActiveInternalListener::~ActiveInternalListener() {

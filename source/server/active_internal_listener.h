@@ -39,8 +39,8 @@ class ActiveInternalListener : public ConnectionHandlerImpl::ActiveListenerImplB
                                public Network::InternalListenerCallbacks,
                                Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ActiveInternalListener(Network::ConnectionHandler& conn_handler, Network::ListenerPtr&& listener,
-                         Network::ListenerConfig& config);
+  ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
+                         Network::ListenerPtr&& listener, Network::ListenerConfig& config);
   ~ActiveInternalListener() override;
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
@@ -58,13 +58,12 @@ public:
 
   // Network::InternalListenerCallbacks
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
-  Event::Dispatcher& dispatcher() override {
-    // TODO(lambdai): FIX-ME
-    Event::Dispatcher* dispatcher = nullptr;
-    return *dispatcher;
-  }
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void decNumConnections() { config_->openConnections().dec(); }
+  void decNumConnections() {
+    // FIX-ME: redesign openConnections.
+    // config_->openConnections().dec();
+  }
   /**
    * Remove and destroy an active connection.
    * @param connection supplies the connection to remove.
@@ -96,6 +95,7 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config);
 
   Network::ConnectionHandler& parent_;
+  Event::Dispatcher& dispatcher_;
   Network::ListenerPtr listener_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
