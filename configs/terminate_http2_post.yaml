@@ -3,10 +3,9 @@
 # or used to test POST directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
 admin:
   access_log:
-  - name: envoy.access_loggers.file
+  - name: envoy.access_loggers.stdoutput
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: /tmp/admin_access.log
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
   address:
     socket_address:
       protocol: TCP

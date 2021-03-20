@@ -491,7 +491,7 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   if (initial_config.admin().address()) {
-    if (initial_config.admin().accessLogs().size() == 0) {
+    if (initial_config.admin().accessLogs().empty()) {
       throw EnvoyException("An admin access logger is required for a listening server.");
     }
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
