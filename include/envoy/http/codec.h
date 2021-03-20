@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
@@ -436,7 +437,7 @@ struct Http1Settings {
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
-  HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+  absl::variant<HeaderKeyFormat, StatefulHeaderKeyFormatterFactoryPtr> header_key_format_;
 
   // Behaviour on invalid HTTP messaging:
   // - if true, the HTTP/1.1 connection is left open (where possible)

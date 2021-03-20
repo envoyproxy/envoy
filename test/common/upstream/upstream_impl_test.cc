@@ -358,7 +358,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
-            cluster.info()->http1Settings().header_key_format_);
+            absl::get<Http::Http1Settings::HeaderKeyFormat>(
+                cluster.info()->http1Settings().header_key_format_));
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());

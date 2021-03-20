@@ -10,6 +10,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/http/header_formatter.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -659,6 +660,13 @@ public:
     headers.dumpState(os);
     return os;
   }
+
+  /**
+   * Return the optional formatter attached to this header map. Filters can use the non-const
+   * version to remember additional header keys during operation if they wish.
+   */
+  virtual HeaderKeyFormatterOptConstRef formatter() const PURE;
+  virtual StatefulHeaderKeyFormatterOptRef formatter() PURE;
 };
 
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
