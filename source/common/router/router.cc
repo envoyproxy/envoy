@@ -156,6 +156,13 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     } else {
       timeout.global_timeout_ = route.timeout();
     }
+  } else {
+    // If we are using new timeouts and MaxStreamDuration is not set, use the route's timeout value.
+    // This is the route's MaxStreamDuration is specified without inner MaxStreamDuration i.e. only
+    // grpc_timeout_header_max is set.
+    if (!route.maxStreamDuration()) {
+      timeout.global_timeout_ = route.timeout();
+    }
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
