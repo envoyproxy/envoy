@@ -92,12 +92,9 @@ void ValidationInstance::initialize(const Options& options,
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   Configuration::InitialImpl initial_config(bootstrap, options, *this);
-
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
-
-
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
