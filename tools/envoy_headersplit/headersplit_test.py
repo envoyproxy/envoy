@@ -71,8 +71,8 @@ class HeadersplitTest(unittest.TestCase):
 
     def test_class_implementations_error(self):
         # LibClang will fail in parse this source file (it's modified from the original
-        # test/server/mocks.cc from Envoy repository) if we don't add flag PARSE_SKIP_FUNCTION_BODIES
-        # to ignore function bodies.
+        # test/server/mocks.cc from Envoy repository) if we don't add flag
+        # PARSE_SKIP_FUNCTION_BODIES to ignore function bodies.
         impl_translation_unit = TranslationUnit.from_source(
             "tools/envoy_headersplit/code_corpus/fail_mocks.cc")
         impls_cursors = headersplit.class_implementations(impl_translation_unit.cursor)

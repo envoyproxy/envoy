@@ -25,7 +25,8 @@ def to_classname(filename: str) -> str:
     e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
 
     Args:
-        filename: string, mock class header file name (might be the whole path instead of the base name)
+        filename: string, mock class header file name
+           (might be the whole path instead of the base name)
 
     Returns:
         corresponding class name
@@ -41,7 +42,8 @@ def to_bazelname(filename: str, mockname: str) -> str:
     e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
 
     Args:
-        filename: string, mock class header file name (might be the whole path instead of the base name)
+        filename: string, mock class header file name
+             (might be the whole path instead of the base name)
         mockname: string, mock directory name
 
     Returns:
@@ -86,11 +88,13 @@ def replace_includes(mockname):
                 for classname in classnames:
                     if classname in content:
                         # replace mocks.h with mock class header used by this test library
-                        # limitation: if some class names in classnames are substrings of others, this part
-                        # will bring over-inclusion e.g. if we have MockCluster and MockClusterFactory, and
-                        # the source code only used MockClusterFactory, then the result code will also include
-                        # MockCluster since it also shows in the file.
-                        # TODO: use clang to analysis class usage instead by simple find and replace
+                        # limitation: if some class names in classnames are substrings of others,
+                        # this part will bring over-inclusion e.g. if we have MockCluster and
+                        # MockClusterFactory, and the source code only used MockClusterFactory,
+                        # then the result code will also include MockCluster since it also shows in
+                        # the file.
+                        # TODO: use clang to analysis class usage instead by simple find and
+                        # replace
                         replace_includes += '#include "test/mocks/{}/{}.h"\n'.format(
                             mockname, to_filename(classname))
                         bazel_targets += '"{}",'.format(

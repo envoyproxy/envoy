@@ -62,7 +62,10 @@ def get_directives(translation_unit: Type[TranslationUnit]) -> str:
     """
     cursor = translation_unit.cursor
     for descendant in cursor.walk_preorder():
-        if descendant.location.file is not None and descendant.location.file.name == cursor.displayname:
+        has_descendant_file = (
+            descendant.location.file is not None
+            and descendant.location.file.name == cursor.displayname)
+        if has_descendant_file:
             filename = descendant.location.file.name
             contents = read_file_contents(filename)
             return contents[:descendant.extent.start.offset]
@@ -84,7 +87,8 @@ def cursors_in_same_file(cursor: Cursor) -> List[Cursor]:
         # We don't want Cursors from files other than the input file,
         # otherwise we get definitions for every file included
         # when clang parsed the input file (i.e. if we don't limit descendant location,
-        # it will check definitions from included headers and get class definitions like std::string)
+        # it will check definitions from included headers and get class definitions like
+        # std::string)
         if descendant.location.file is None:
             continue
         if descendant.location.file.name != cursor.displayname:

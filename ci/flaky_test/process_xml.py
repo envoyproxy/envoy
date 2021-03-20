@@ -47,7 +47,7 @@ def print_test_suite_error(testsuite, testcase, log_path, duration, time, error_
     if duration == time and duration in well_known_timeouts:
         ret += (
             "- Note:         This error is likely a timeout "
-            "(test duration == {duration}, a well known timeout value).\n")
+            f"(test duration == {duration}, a well known timeout value).\n")
 
     # If there's a call stack, print it. Otherwise, attempt to print the most recent,
     # relevant lines.
