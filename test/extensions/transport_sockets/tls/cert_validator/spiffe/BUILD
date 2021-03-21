@@ -23,7 +23,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
-        "//test/extensions/transport_sockets/tls/cert_validator:util",
+        "//test/extensions/transport_sockets/tls/cert_validator:test_common",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",

@@ -13,13 +13,15 @@ namespace Http {
 
 namespace Http2 {
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
-    : MultiplexedActiveClientBase(parent,
-                                  parent.host()->cluster().stats().upstream_cx_http2_total_) {}
+    : MultiplexedActiveClientBase(
+          parent, parent.host()->cluster().http2Options().max_concurrent_streams().value(),
+          parent.host()->cluster().stats().upstream_cx_http2_total_) {}
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
-    : MultiplexedActiveClientBase(parent, data,
-                                  parent.host()->cluster().stats().upstream_cx_http2_total_) {}
+    : MultiplexedActiveClientBase(
+          parent, data, parent.host()->cluster().http2Options().max_concurrent_streams().value(),
+          parent.host()->cluster().stats().upstream_cx_http2_total_) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
