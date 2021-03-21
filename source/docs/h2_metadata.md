@@ -18,7 +18,7 @@ supported in HTTP/2. Metadata sent in any other protocol should result in protoc
 errors or be ignored.
 
 To simplify the implementation, we don't allow metadata frames to carry end of
-stream flag. Because metadata frames must be associated with an existing frame, users must
+stream flag. Because metadata frames must be associated with an existing stream, users must
 ensure metadata frames to be received before the end of stream is received by the
 peer.
 
