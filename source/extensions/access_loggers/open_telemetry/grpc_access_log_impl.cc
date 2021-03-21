@@ -1,6 +1,7 @@
 #include "extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 
@@ -47,7 +48,6 @@ opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& 
 } // namespace
 
 // See comment about the structure of repeated fields in the header file.
-// TODO(itamarkam): allow user configurable attributes.
 void GrpcAccessLoggerImpl::initMessageRoot(const std::string& log_name,
                                            const LocalInfo::LocalInfo& local_info) {
   auto* resource_logs = message_.add_resource_logs();
