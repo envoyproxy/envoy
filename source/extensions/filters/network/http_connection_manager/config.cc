@@ -465,7 +465,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   const auto& filters = config.http_filters();
   DependencyManager dependency_manager;
   for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_, dependency_manager);
+    processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_,
+                  dependency_manager);
   }
   // TODO(auni53): Validate encode dependencies too.
   auto status = dependency_manager.validDecodeDependencies();
@@ -485,8 +486,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       DependencyManager upgrade_dependency_manager;
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        processFilter(upgrade_config.filters(j), j, name, "http upgrade", j == upgrade_config.filters().size() - 1,
-                      *factories, upgrade_dependency_manager);
+        processFilter(upgrade_config.filters(j), j, name, "http upgrade",
+                      j == upgrade_config.filters().size() - 1, *factories,
+                      upgrade_dependency_manager);
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));

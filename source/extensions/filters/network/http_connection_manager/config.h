@@ -16,7 +16,6 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
-#include "extensions/filters/network/http_connection_manager/dependency_manager.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_config.h"
@@ -31,6 +30,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/network/common/factory_base.h"
+#include "extensions/filters/network/http_connection_manager/dependency_manager.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {

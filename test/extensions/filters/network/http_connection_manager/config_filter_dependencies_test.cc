@@ -13,9 +13,9 @@
 
 using envoy::extensions::filters::common::dependency::v3::Dependency;
 using envoy::extensions::filters::common::dependency::v3::FilterDependencies;
-using testing::Eq;
 using Envoy::Server::Configuration::FilterDependenciesPtr;
 using Envoy::Server::Configuration::NamedHttpFilterConfigFactory;
+using testing::Eq;
 
 namespace Envoy {
 namespace Extensions {
@@ -133,7 +133,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
                                   route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_,
                                   filter_config_provider_manager_),
-      EnvoyException, "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+      EnvoyException,
+      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 // ChefFilter requires a potato, but no preceding filter provides it.
@@ -154,7 +155,8 @@ TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
                                   route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_,
                                   filter_config_provider_manager_),
-      EnvoyException, "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+      EnvoyException,
+      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
 } // namespace
