@@ -11,9 +11,9 @@ EXCLUDE_LIST = ['generated', 'venv']
 def collect_files():
     """Collect all Python files in the tools directory.
 
-  Returns: A collection of python files in the tools directory excluding
-    any directories in the EXCLUDE_LIST constant.
-  """
+    Returns: A collection of python files in the tools directory excluding
+       any directories in the EXCLUDE_LIST constant.
+    """
     # TODO: Add ability to collect a specific file or files.
     matches = []
     path_parts = os.getcwd().split('/')
@@ -32,8 +32,8 @@ def validate_format(fix=False):
     """Check the format of python files in the tools directory.
 
     Arguments:
-      fix: a flag to indicate if fixes should be applied.
-  """
+          fix: a flag to indicate if fixes should be applied.
+    """
     fixes_required = False
     failed_update_files = set()
     successful_update_files = set()

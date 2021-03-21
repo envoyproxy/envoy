@@ -42,6 +42,7 @@ fi
 
 SCRIPT_DIR="$(dirname "$0")"
 SRC_DIR="$(dirname "$SCRIPT_DIR")"
+ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
 API_DIR="${SRC_DIR}"/api
 CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
@@ -53,6 +54,8 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
+
+export ENVOY_SRCDIR
 
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt

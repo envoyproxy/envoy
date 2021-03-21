@@ -6,42 +6,42 @@ from tools.api_proto_plugin import type_context
 def traverse_service(type_context, service_proto, visitor):
     """Traverse a service definition.
 
-  Args:
-    type_context: type_context.TypeContext for service type.
-    service_proto: ServiceDescriptorProto for service.
-    visitor: visitor.Visitor defining the business logic of the plugin.
+    Args:
+        type_context: type_context.TypeContext for service type.
+        service_proto: ServiceDescriptorProto for service.
+        visitor: visitor.Visitor defining the business logic of the plugin.
 
-  Returns:
-    Plugin specific output.
-  """
+    Returns:
+        Plugin specific output.
+    """
     return visitor.visit_service(service_proto, type_context)
 
 
 def traverse_enum(type_context, enum_proto, visitor):
     """Traverse an enum definition.
 
-  Args:
-    type_context: type_context.TypeContext for enum type.
-    enum_proto: EnumDescriptorProto for enum.
-    visitor: visitor.Visitor defining the business logic of the plugin.
+    Args:
+        type_context: type_context.TypeContext for enum type.
+        enum_proto: EnumDescriptorProto for enum.
+        visitor: visitor.Visitor defining the business logic of the plugin.
 
-  Returns:
-    Plugin specific output.
-  """
+    Returns:
+        Plugin specific output.
+    """
     return visitor.visit_enum(enum_proto, type_context)
 
 
 def traverse_message(type_context, msg_proto, visitor):
     """Traverse a message definition.
 
-  Args:
-    type_context: type_context.TypeContext for message type.
-    msg_proto: DescriptorProto for message.
-    visitor: visitor.Visitor defining the business logic of the plugin.
+    Args:
+        type_context: type_context.TypeContext for message type.
+        msg_proto: DescriptorProto for message.
+        visitor: visitor.Visitor defining the business logic of the plugin.
 
-  Returns:
-    Plugin specific output.
-  """
+    Returns:
+        Plugin specific output.
+    """
     # We need to do some extra work to recover the map type annotation from the
     # synthesized messages.
     type_context.map_typenames = {
@@ -67,13 +67,13 @@ def traverse_message(type_context, msg_proto, visitor):
 def traverse_file(file_proto, visitor):
     """Traverse a proto file definition.
 
-  Args:
-    file_proto: FileDescriptorProto for file.
-    visitor: visitor.Visitor defining the business logic of the plugin.
+    Args:
+        file_proto: FileDescriptorProto for file.
+        visitor: visitor.Visitor defining the business logic of the plugin.
 
-  Returns:
-    Plugin specific output.
-  """
+    Returns:
+        Plugin specific output.
+    """
     source_code_info = type_context.SourceCodeInfo(file_proto.name, file_proto.source_code_info)
     package_type_context = type_context.TypeContext(source_code_info, file_proto.package)
     services = [
