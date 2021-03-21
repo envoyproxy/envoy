@@ -15,14 +15,16 @@ static_resources:
         address: 127.0.0.1
         port_value: 1234
     udp_listener_config:
-      max_downstream_rx_datagram_size: 9000
+      downstream_socket_config:
+        max_rx_datagram_size: 9000
     listener_filters:
     - name: envoy.filters.udp_listener.udp_proxy
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
         stat_prefix: service
         cluster: service_udp
-        max_upstream_rx_datagram_size: 9000
+        upstream_socket_config:
+          max_rx_datagram_size: 9000
   clusters:
   - name: service_udp
     connect_timeout: 0.25s
