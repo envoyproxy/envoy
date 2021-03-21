@@ -14,12 +14,12 @@ import tempfile
 def path_and_filename(label):
     """Retrieve actual path and filename from bazel label
 
-  Args:
-    label: bazel label to specify target proto.
+    Args:
+        label: bazel label to specify target proto.
 
-  Returns:
-    actual path and filename
-  """
+    Returns:
+        actual path and filename
+    """
     if label.startswith('/'):
         label = label.replace('//', '/', 1)
     elif label.startswith('@'):
@@ -34,14 +34,14 @@ def path_and_filename(label):
 def golden_proto_file(path, filename, version):
     """Retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
 
-  Args:
-    path: target proto path
-    filename: target proto filename
-    version: api version to specify target golden proto filename
+    Args:
+        path: target proto path
+        filename: target proto filename
+        version: api version to specify target golden proto filename
 
-  Returns:
-    actual golden proto absolute path
-  """
+    Returns:
+        actual golden proto absolute path
+    """
     base = "./"
     base += path + "/" + filename + "." + version + ".gold"
     return os.path.abspath(base)
@@ -50,10 +50,10 @@ def golden_proto_file(path, filename, version):
 def proto_print(src, dst):
     """Pretty-print FileDescriptorProto to a destination file.
 
-  Args:
-    src: source path for FileDescriptorProto.
-    dst: destination path for formatted proto.
-  """
+    Args:
+        src: source path for FileDescriptorProto.
+        dst: destination path for formatted proto.
+    """
     print('proto_print %s -> %s' % (src, dst))
     subprocess.check_call([
         'bazel-bin/tools/protoxform/protoprint', src, dst,
@@ -64,16 +64,16 @@ def proto_print(src, dst):
 def result_proto_file(cmd, path, tmp, filename, version):
     """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
-  Args:
-    cmd: fix or freeze?
-    path: target proto path
-    tmp: temporary directory.
-    filename: target proto filename
-    version: api version to specify target result proto filename
+    Args:
+        cmd: fix or freeze?
+        path: target proto path
+        tmp: temporary directory.
+        filename: target proto filename
+        version: api version to specify target result proto filename
 
-  Returns:
-    actual result proto absolute path
-  """
+    Returns:
+        actual result proto absolute path
+    """
     base = "./bazel-bin"
     base += os.path.join(path, "%s_protos" % cmd)
     base += os.path.join(base, path)
@@ -86,13 +86,13 @@ def result_proto_file(cmd, path, tmp, filename, version):
 def diff(result_file, golden_file):
     """Execute diff command with unified form
 
-  Args:
-    result_file: result proto file
-    golden_file: golden proto file
+    Args:
+        result_file: result proto file
+        golden_file: golden proto file
 
-  Returns:
-    output and status code
-  """
+    Returns:
+        output and status code
+    """
     command = 'diff -u '
     command += result_file + ' '
     command += golden_file
@@ -103,15 +103,15 @@ def diff(result_file, golden_file):
 def run(cmd, path, filename, version):
     """Run main execution for protoxform test
 
-  Args:
-    cmd: fix or freeze?
-    path: target proto path
-    filename: target proto filename
-    version: api version to specify target result proto filename
+    Args:
+        cmd: fix or freeze?
+        path: target proto path
+        filename: target proto filename
+        version: api version to specify target result proto filename
 
-  Returns:
-    result message extracted from diff command
-  """
+    Returns:
+        result message extracted from diff command
+    """
     message = ""
     with tempfile.TemporaryDirectory() as tmp:
         golden_path = golden_proto_file(path, filename, version)

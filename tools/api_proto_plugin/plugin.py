@@ -38,16 +38,16 @@ def direct_output_descriptor(output_suffix, visitor, want_params=False):
 def plugin(output_descriptors):
     """Protoc plugin entry point.
 
-  This defines protoc plugin and manages the stdin -> stdout flow. An
-  api_proto_plugin is defined by the provided visitor.
+    This defines protoc plugin and manages the stdin -> stdout flow. An
+    api_proto_plugin is defined by the provided visitor.
 
-  See
-  http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
-  for further details on protoc plugin basics.
+    See
+        http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
+          for further details on protoc plugin basics.
 
-  Args:
-    output_descriptors: a list of OutputDescriptors.
-  """
+    Args:
+        output_descriptors: a list of OutputDescriptors.
+    """
     request = plugin_pb2.CodeGeneratorRequest()
     request.ParseFromString(sys.stdin.buffer.read())
     response = plugin_pb2.CodeGeneratorResponse()

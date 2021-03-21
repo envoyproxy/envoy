@@ -25,15 +25,15 @@ import argparse
 def validate_fragment(type_name, fragment):
     """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
 
-  Throws Protobuf errors on parsing exceptions, successful validations produce
-  no result.
+    Throws Protobuf errors on parsing exceptions, successful validations produce
+    no result.
 
-  Args:
-    type_name: a string providing the type name, e.g.
-      envoy.config.bootstrap.v3.Bootstrap.
-    fragment: a dictionary representing the parsed JSON/YAML configuration
-      fragment.
-  """
+    Args:
+        type_name: a string providing the type name, e.g.
+          envoy.config.bootstrap.v3.Bootstrap.
+        fragment: a dictionary representing the parsed JSON/YAML configuration
+          fragment.
+    """
     json_fragment = json.dumps(fragment)
 
     r = runfiles.Create()

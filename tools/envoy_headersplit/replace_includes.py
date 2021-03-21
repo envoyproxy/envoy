@@ -20,16 +20,16 @@ import argparse
 
 def to_classname(filename: str) -> str:
     """
-  maps divided mock class file name to class names
-  inverse function of headersplit.to_filename
-  e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
+    maps divided mock class file name to class names
+    inverse function of headersplit.to_filename
+    e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
 
-  Args:
-      filename: string, mock class header file name (might be the whole path instead of the base name)
+    Args:
+        filename: string, mock class header file name (might be the whole path instead of the base name)
 
-  Returns:
-      corresponding class name
-  """
+    Returns:
+        corresponding class name
+    """
     classname_tokens = filename.split('/')[-1].replace('.h', '').split('_')
     classname = "Mock" + ''.join(map(lambda x: x[:1].upper() + x[1:], classname_tokens))
     return classname
@@ -37,16 +37,16 @@ def to_classname(filename: str) -> str:
 
 def to_bazelname(filename: str, mockname: str) -> str:
     """
-  maps divided mock class file name to bazel target name
-  e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
+    maps divided mock class file name to bazel target name
+    e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
 
-  Args:
-      filename: string, mock class header file name (might be the whole path instead of the base name)
-      mockname: string, mock directory name
+    Args:
+        filename: string, mock class header file name (might be the whole path instead of the base name)
+        mockname: string, mock directory name
 
-  Returns:
-      corresponding bazel target name
-  """
+    Returns:
+        corresponding bazel target name
+    """
     bazelname = "//test/mocks/{}:".format(mockname)
     bazelname += filename.split('/')[-1].replace('.h', '') + '_mocks'.format(mockname)
     return bazelname
@@ -54,14 +54,14 @@ def to_bazelname(filename: str, mockname: str) -> str:
 
 def get_filenames(mockname: str) -> List[str]:
     """
-  scans all headers in test/mocks/{mockname}, return corresponding file names
+    scans all headers in test/mocks/{mockname}, return corresponding file names
 
-  Args:
-    mockname: string, mock directory name
+    Args:
+        mockname: string, mock directory name
 
-  Returns:
-    List of file name for the headers in test/mock/{mocksname}
-  """
+    Returns:
+        List of file name for the headers in test/mock/{mocksname}
+    """
     dir = Path("test/mocks/{}/".format(mockname))
     filenames = list(map(str, dir.glob('*.h')))
     return filenames

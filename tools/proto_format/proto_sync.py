@@ -73,18 +73,18 @@ class RequiresReformatError(ProtoSyncError):
 def get_directory_from_package(package):
     """Get directory path from package name or full qualified message name
 
-  Args:
-    package: the full qualified name of package or message.
-  """
+    Args:
+        package: the full qualified name of package or message.
+    """
     return '/'.join(s for s in package.split('.') if s and s[0].islower())
 
 
 def get_destination_path(src):
     """Obtain destination path from a proto file path by reading its package statement.
 
-  Args:
-    src: source path
-  """
+    Args:
+        src: source path
+    """
     src_path = pathlib.Path(src)
     contents = src_path.read_text(encoding='utf8')
     matches = re.findall(PACKAGE_REGEX, contents)
@@ -98,12 +98,12 @@ def get_destination_path(src):
 def get_abs_rel_destination_path(dst_root, src):
     """Obtain absolute path from a proto file path combined with destination root.
 
-  Creates the parent directory if necessary.
+    Creates the parent directory if necessary.
 
-  Args:
-    dst_root: destination root path.
-    src: source path.
-  """
+    Args:
+        dst_root: destination root path.
+        src: source path.
+    """
     rel_dst_path = get_destination_path(src)
     dst = dst_root.joinpath(rel_dst_path)
     dst.parent.mkdir(0o755, parents=True, exist_ok=True)
@@ -113,10 +113,10 @@ def get_abs_rel_destination_path(dst_root, src):
 def proto_print(src, dst):
     """Pretty-print FileDescriptorProto to a destination file.
 
-  Args:
-    src: source path for FileDescriptorProto.
-    dst: destination path for formatted proto.
-  """
+    Args:
+        src: source path for FileDescriptorProto.
+        dst: destination path for formatted proto.
+    """
     print('proto_print %s' % dst)
     subprocess.check_output([
         'bazel-bin/tools/protoxform/protoprint', src,
@@ -128,11 +128,11 @@ def proto_print(src, dst):
 def merge_active_shadow(active_src, shadow_src, dst):
     """Merge active/shadow FileDescriptorProto to a destination file.
 
-  Args:
-    active_src: source path for active FileDescriptorProto.
-    shadow_src: source path for active FileDescriptorProto.
-    dst: destination path for FileDescriptorProto.
-  """
+    Args:
+        active_src: source path for active FileDescriptorProto.
+        shadow_src: source path for active FileDescriptorProto.
+        dst: destination path for FileDescriptorProto.
+    """
     print('merge_active_shadow %s' % dst)
     subprocess.check_output([
         'bazel-bin/tools/protoxform/merge_active_shadow',
@@ -145,14 +145,14 @@ def merge_active_shadow(active_src, shadow_src, dst):
 def sync_proto_file(dst_srcs):
     """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
 
-  In the case where we are generating an Envoy internal shadow, it may be
-  necessary to combine the current active proto, subject to hand editing, with
-  shadow artifacts from the previous verion; this is done via
-  merge_active_shadow().
+    In the case where we are generating an Envoy internal shadow, it may be
+    necessary to combine the current active proto, subject to hand editing, with
+    shadow artifacts from the previous verion; this is done via
+    merge_active_shadow().
 
-  Args:
-    dst_srcs: destination/sources path tuple.
-  """
+    Args:
+        dst_srcs: destination/sources path tuple.
+    """
     dst, srcs = dst_srcs
     assert (len(srcs) > 0)
     # If we only have one candidate source for a destination, just pretty-print.
@@ -184,12 +184,12 @@ def sync_proto_file(dst_srcs):
 def get_import_deps(proto_path):
     """Obtain the Bazel dependencies for the import paths from a .proto file.
 
-  Args:
-    proto_path: path to .proto.
+    Args:
+        proto_path: path to .proto.
 
-  Returns:
-    A list of Bazel targets reflecting the imports in the .proto at proto_path.
-  """
+    Returns:
+        A list of Bazel targets reflecting the imports in the .proto at proto_path.
+    """
     imports = []
     with open(proto_path, 'r', encoding='utf8') as f:
         for line in f:
@@ -227,14 +227,14 @@ def get_import_deps(proto_path):
 def get_previous_message_type_deps(proto_path):
     """Obtain the Bazel dependencies for the previous version of messages in a .proto file.
 
-  We need to link in earlier proto descriptors to support Envoy reflection upgrades.
+    We need to link in earlier proto descriptors to support Envoy reflection upgrades.
 
-  Args:
-    proto_path: path to .proto.
+    Args:
+        proto_path: path to .proto.
 
-  Returns:
-    A list of Bazel targets reflecting the previous message types in the .proto at proto_path.
-  """
+    Returns:
+        A list of Bazel targets reflecting the previous message types in the .proto at proto_path.
+    """
     contents = pathlib.Path(proto_path).read_text(encoding='utf8')
     matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
     deps = []
@@ -247,12 +247,12 @@ def get_previous_message_type_deps(proto_path):
 def has_services(proto_path):
     """Does a .proto file have any service definitions?
 
-  Args:
-    proto_path: path to .proto.
+    Args:
+        proto_path: path to .proto.
 
-  Returns:
-    True iff there are service definitions in the .proto at proto_path.
-  """
+    Returns:
+        True iff there are service definitions in the .proto at proto_path.
+    """
     with open(proto_path, 'r', encoding='utf8') as f:
         for line in f:
             if re.match(SERVICE_REGEX, line):
@@ -268,13 +268,13 @@ def build_order_key(key):
 def build_file_contents(root, files):
     """Compute the canonical BUILD contents for an api/ proto directory.
 
-  Args:
-    root: base path to directory.
-    files: a list of files in the directory.
+    Args:
+        root: base path to directory.
+        files: a list of files in the directory.
 
-  Returns:
-    A string containing the canonical BUILD file content for root.
-  """
+    Returns:
+        A string containing the canonical BUILD file content for root.
+    """
     import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
     history_deps = set(
         sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
@@ -297,9 +297,9 @@ def build_file_contents(root, files):
 def sync_build_files(cmd, dst_root):
     """Diff or in-place update api/ BUILD files.
 
-  Args:
-    cmd: 'check' or 'fix'.
-  """
+    Args:
+        cmd: 'check' or 'fix'.
+    """
     for root, dirs, files in os.walk(str(dst_root)):
         is_proto_dir = any(f.endswith('.proto') for f in files)
         if not is_proto_dir:
@@ -312,12 +312,12 @@ def sync_build_files(cmd, dst_root):
 
 def generate_current_api_dir(api_dir, dst_dir):
     """Helper function to generate original API repository to be compared with diff.
-  This copies the original API repository and deletes file we don't want to compare.
+    This copies the original API repository and deletes file we don't want to compare.
 
-  Args:
-    api_dir: the original api directory
-    dst_dir: the api directory to be compared in temporary directory
-  """
+    Args:
+        api_dir: the original api directory
+        dst_dir: the api directory to be compared in temporary directory
+    """
     dst = dst_dir.joinpath("envoy")
     shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
 
@@ -335,12 +335,12 @@ def git_status(path):
 def git_modified_files(path, suffix):
     """Obtain a list of modified files since the last commit merged by GitHub.
 
-  Args:
-    path: path to examine.
-    suffix: path suffix to filter with.
-  Return:
-    A list of strings providing the paths of modified files in the repo.
-  """
+    Args:
+        path: path to examine.
+        suffix: path suffix to filter with.
+    Return:
+        A list of strings providing the paths of modified files in the repo.
+    """
     try:
         modified_files = subprocess.check_output(
             ['tools/git/modified_since_last_github_commit.sh', 'api', 'proto']).decode().split()

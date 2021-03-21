@@ -16,12 +16,12 @@ class Comment(object):
     def get_comment_with_transforms(self, annotation_xforms):
         """Return transformed comment with annotation transformers.
 
-    Args:
-      annotation_xforms: a dict of transformers for annotations in leading comment.
+        Args:
+            annotation_xforms: a dict of transformers for annotations in leading comment.
 
-    Returns:
-      transformed Comment object.
-    """
+        Returns:
+            transformed Comment object.
+        """
         return Comment(annotations.xform_annotation(self.raw, annotation_xforms),
                        self.file_level_annotations)
 
@@ -68,13 +68,13 @@ class SourceCodeInfo(object):
     def location_path_lookup(self, path):
         """Lookup SourceCodeInfo.Location by path in SourceCodeInfo.
 
-    Args:
-      path: a list of path indexes as per
-        https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+        Args:
+            path: a list of path indexes as per
+              https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
 
-    Returns:
-      SourceCodeInfo.Location object if found, otherwise None.
-    """
+        Returns:
+            SourceCodeInfo.Location object if found, otherwise None.
+        """
         return self._locations.get(str(path), None)
 
     # TODO(htuch): consider integrating comment lookup with overall
@@ -82,13 +82,13 @@ class SourceCodeInfo(object):
     def leading_comment_path_lookup(self, path):
         """Lookup leading comment by path in SourceCodeInfo.
 
-    Args:
-      path: a list of path indexes as per
-        https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+        Args:
+            path: a list of path indexes as per
+               https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
 
-    Returns:
-      Comment object.
-    """
+        Returns:
+            Comment object.
+        """
         location = self.location_path_lookup(path)
         if location is not None:
             return Comment(location.leading_comments, self.file_level_annotations)
@@ -97,13 +97,13 @@ class SourceCodeInfo(object):
     def leading_detached_comments_path_lookup(self, path):
         """Lookup leading detached comments by path in SourceCodeInfo.
 
-    Args:
-      path: a list of path indexes as per
-        https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+        Args:
+            path: a list of path indexes as per
+               https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
 
-    Returns:
-      List of detached comment strings.
-    """
+        Returns:
+            List of detached comment strings.
+        """
         location = self.location_path_lookup(path)
         if location is not None and location.leading_detached_comments != self.file_level_comments:
             return location.leading_detached_comments
@@ -112,13 +112,13 @@ class SourceCodeInfo(object):
     def trailing_comment_path_lookup(self, path):
         """Lookup trailing comment by path in SourceCodeInfo.
 
-    Args:
-      path: a list of path indexes as per
-        https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+        Args:
+            path: a list of path indexes as per
+               https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
 
-    Returns:
-      Raw detached comment string
-    """
+        Returns:
+            Raw detached comment string
+        """
         location = self.location_path_lookup(path)
         if location is not None:
             return location.trailing_comments
@@ -128,9 +128,9 @@ class SourceCodeInfo(object):
 class TypeContext(object):
     """Contextual information for a message/field.
 
-  Provides information around namespaces and enclosing types for fields and
-  nested messages/enums.
-  """
+    Provides information around namespaces and enclosing types for fields and
+    nested messages/enums.
+    """
 
     def __init__(self, source_code_info, name):
         # SourceCodeInfo as per
@@ -173,49 +173,49 @@ class TypeContext(object):
     def extend_message(self, index, name, deprecated):
         """Extend type context with a message.
 
-    Args:
-      index: message index in file.
-      name: message name.
-      deprecated: is the message depreacted?
-    """
+        Args:
+            index: message index in file.
+            name: message name.
+            deprecated: is the message depreacted?
+        """
         return self._extend([4, index], 'message', name, deprecated)
 
     def extend_nested_message(self, index, name, deprecated):
         """Extend type context with a nested message.
 
-    Args:
-      index: nested message index in message.
-      name: message name.
-      deprecated: is the message depreacted?
-    """
+        Args:
+            index: nested message index in message.
+            name: message name.
+            deprecated: is the message depreacted?
+        """
         return self._extend([3, index], 'message', name, deprecated)
 
     def extend_field(self, index, name):
         """Extend type context with a field.
 
-    Args:
-      index: field index in message.
-      name: field name.
-    """
+        Args:
+            index: field index in message.
+            name: field name.
+        """
         return self._extend([2, index], 'field', name)
 
     def extend_enum(self, index, name, deprecated):
         """Extend type context with an enum.
 
-    Args:
-      index: enum index in file.
-      name: enum name.
-      deprecated: is the message depreacted?
-    """
+        Args:
+            index: enum index in file.
+            name: enum name.
+            deprecated: is the message depreacted?
+        """
         return self._extend([5, index], 'enum', name, deprecated)
 
     def extend_service(self, index, name):
         """Extend type context with a service.
 
-    Args:
-      index: service index in file.
-      name: service name.
-    """
+        Args:
+            index: service index in file.
+            name: service name.
+        """
         return self._extend([6, index], 'service', name)
 
     def extend_nested_enum(self, index, name, deprecated):
@@ -231,28 +231,28 @@ class TypeContext(object):
     def extend_enum_value(self, index, name):
         """Extend type context with an enum enum.
 
-    Args:
-      index: enum value index in enum.
-      name: value name.
-    """
+        Args:
+            index: enum value index in enum.
+            name: value name.
+        """
         return self._extend([2, index], 'enum_value', name)
 
     def extend_oneof(self, index, name):
         """Extend type context with an oneof declaration.
 
-    Args:
-      index: oneof index in oneof_decl.
-      name: oneof name.
-    """
+        Args:
+            index: oneof index in oneof_decl.
+            name: oneof name.
+        """
         return self._extend([8, index], 'oneof', name)
 
     def extend_method(self, index, name):
         """Extend type context with a service method declaration.
 
-    Args:
-      index: method index in service.
-      name: method name.
-    """
+        Args:
+            index: method index in service.
+            name: method name.
+        """
         return self._extend([2, index], 'method', name)
 
     @property

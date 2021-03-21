@@ -26,8 +26,8 @@ class ProtoXformError(Exception):
 class ProtoFormatVisitor(visitor.Visitor):
     """Visitor to generate a proto representation from a FileDescriptor proto.
 
-  See visitor.Visitor for visitor method docs comments.
-  """
+    See visitor.Visitor for visitor method docs comments.
+    """
 
     def __init__(self, active_or_frozen, params):
         if params['type_db_path']:
