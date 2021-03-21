@@ -269,7 +269,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If the path normalization options has been set.
   if (config.has_path_normalization_options()) {
-    ASSERT(false);
     normalize_path_ = false;
     merge_slashes_ = false;
     forwarding_path_transformer_ = std::make_unique<Http::PathTransformer>(

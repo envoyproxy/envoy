@@ -121,7 +121,7 @@ PathTransformer::PathTransformer(
 }
 
 absl::optional<std::string> PathTransformer::transform(absl::string_view original) const {
-  absl::optional<std::string> path_string;
+  absl::optional<std::string> path_string = std::string(original);
   absl::string_view path_string_view = original;
   for (Transformation const& transformation : transformations_) {
     path_string = transformation(path_string_view);
