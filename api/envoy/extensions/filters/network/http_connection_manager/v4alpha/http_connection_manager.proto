@@ -486,7 +486,7 @@ message HttpConnectionManager {
 
   // Via header value to append to request and response headers. If this is
   // empty, no via header will be appended.
-  string via = 22;
+  string via = 22 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Whether the connection manager will generate the :ref:`x-request-id
   // <config_http_conn_man_headers_x-request-id>` header if it does not exist. This defaults to
