@@ -37,13 +37,10 @@ public:
    * the character intervals to be removed from the name after all the tag extractions are
    * complete. This approach simplifies the tag searching process because without mutations,
    * the tag extraction will be order independent, apart from the order of the tag array.
-   * @param context identifies the name from which to extract tags.
-   * @param tags list of tags updated with the tag name and value if found in the name.
-   * @param remove_characters set of intervals of character-indices to be removed from name.
+   * @param context identifies the name from which to extract tags, and output tags.
    * @return bool indicates whether a tag was found in the name.
    */
-  virtual bool extractTag(TagExtractionContext& context, TagVector& tags,
-                          IntervalSet<size_t>& remove_characters) const PURE;
+  virtual bool extractTag(TagExtractionContext& context) const PURE;
 
   /**
    * Finds a prefix string associated with the matching criteria owned by the

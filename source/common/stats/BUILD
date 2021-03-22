@@ -198,6 +198,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/common:regex_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -243,6 +244,7 @@ envoy_cc_library(
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
+        ":tag_extractor_lib",
         ":tag_producer_lib",
         ":tag_utility_lib",
         "//include/envoy/thread_local:thread_local_interface",

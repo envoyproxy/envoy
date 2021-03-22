@@ -88,17 +88,15 @@ void TagProducerImpl::forEachExtractorMatching(
   }
 }
 
-std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVector& tags) const {
+std::string TagProducerImpl::produceTags(TagExtractionContext& extraction_context) const {
   // TODO(jmarantz): Skip the creation of string-based tags, creating a StatNameTagVector instead.
+  TagVector& tags = extraction_context.tags();
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
-  IntervalSetImpl<size_t> remove_characters;
-  TagExtractionContext tag_extraction_context(metric_name);
-  std::vector<absl::string_view> tokens;
-  forEachExtractorMatching(metric_name, [&remove_characters, &tags, &tag_extraction_context](
-                                            const TagExtractorPtr& tag_extractor) {
-    tag_extractor->extractTag(tag_extraction_context, tags, remove_characters);
+  forEachExtractorMatching(extraction_context.name(),
+                           [&extraction_context](const TagExtractorPtr& tag_extractor) {
+    tag_extractor->extractTag(extraction_context);
   });
-  return StringUtil::removeCharacters(metric_name, remove_characters);
+  return extraction_context.tagExtractedName();
 }
 
 void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsConfig& config) {

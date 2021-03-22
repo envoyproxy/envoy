@@ -71,6 +71,7 @@ envoy_cc_benchmark_binary(
         "//source/common/common:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:recent_lookups_lib",
+        "//source/common/stats:tag_extractor_lib",
     ],
 )
 

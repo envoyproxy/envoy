@@ -20,12 +20,10 @@ TEST(TagExtractorTest, TwoSubexpressions) {
   TagExtractorStdRegexImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
   EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
-  TagVector tags;
-  IntervalSetImpl<size_t> remove_characters;
-  TagExtractionContext tag_extraction_context(name);
-  ASSERT_TRUE(tag_extractor.extractTag(tag_extraction_context, tags, remove_characters));
-  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
-  EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
+  TagExtractionContext extraction_context(name);
+  ASSERT_TRUE(tag_extractor.extractTag(extraction_context));
+  EXPECT_EQ("cluster.upstream_cx_total", extraction_context.tagExtractedName());
+  TagVector& tags = extraction_context.tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("test_cluster", tags.at(0).value_);
   EXPECT_EQ("cluster_name", tags.at(0).name_);
@@ -35,12 +33,10 @@ TEST(TagExtractorTest, RE2Variants) {
   TagExtractorRe2Impl tag_extractor("cluster_name", "^cluster\\.(([^\\.]+)\\.).*");
   EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
-  TagVector tags;
-  IntervalSetImpl<size_t> remove_characters;
-  TagExtractionContext tag_extraction_context(name);
-  ASSERT_TRUE(tag_extractor.extractTag(tag_extraction_context, tags, remove_characters));
-  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
-  EXPECT_EQ("cluster.upstream_cx_total", tag_extracted_name);
+  TagExtractionContext extraction_context(name);
+  ASSERT_TRUE(tag_extractor.extractTag(extraction_context));
+  EXPECT_EQ("cluster.upstream_cx_total", extraction_context.tagExtractedName());
+  TagVector& tags = extraction_context.tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("test_cluster", tags.at(0).value_);
   EXPECT_EQ("cluster_name", tags.at(0).name_);
@@ -49,12 +45,10 @@ TEST(TagExtractorTest, RE2Variants) {
 TEST(TagExtractorTest, SingleSubexpression) {
   TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
   std::string name = "listener.80.downstream_cx_total";
-  TagVector tags;
-  IntervalSetImpl<size_t> remove_characters;
-  TagExtractionContext tag_extraction_context(name);
-  ASSERT_TRUE(tag_extractor.extractTag(tag_extraction_context, tags, remove_characters));
-  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
-  EXPECT_EQ("listener.downstream_cx_total", tag_extracted_name);
+  TagExtractionContext extraction_context(name);
+  ASSERT_TRUE(tag_extractor.extractTag(extraction_context));
+  EXPECT_EQ("listener.downstream_cx_total", extraction_context.tagExtractedName());
+  TagVector& tags = extraction_context.tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("80.", tags.at(0).value_);
   EXPECT_EQ("listner_port", tags.at(0).name_);
@@ -92,8 +86,9 @@ public:
                  const TagVector& expected_tags) {
 
     // Test forward iteration through the regexes
-    TagVector tags;
-    const std::string tag_extracted_name = tag_extractors_.produceTags(stat_name, tags);
+    TagExtractionContext extraction_context(stat_name);
+    const std::string tag_extracted_name = tag_extractors_.produceTags(extraction_context);
+    TagVector& tags = extraction_context.tags();
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
       return lhs.name_ == rhs.name_ && lhs.value_ == rhs.value_;
@@ -142,12 +137,12 @@ public:
                                                extractors.push_front(tag_extractor.get());
                                              });
 
-    IntervalSetImpl<size_t> remove_characters;
     TagExtractionContext tag_extraction_context(metric_name);
     for (const TagExtractor* tag_extractor : extractors) {
-      tag_extractor->extractTag(tag_extraction_context, tags, remove_characters);
+      tag_extractor->extractTag(tag_extraction_context);
     }
-    return StringUtil::removeCharacters(metric_name, remove_characters);
+    tags = tag_extraction_context.tags();
+    return tag_extraction_context.tagExtractedName();
   }
 
   SymbolTableImpl symbol_table_;
@@ -407,20 +402,20 @@ class TagExtractorTokensTest : public testing::Test {
 protected:
   bool extract(absl::string_view tag_name, absl::string_view pattern, absl::string_view stat_name) {
     TagExtractorTokensImpl tokens(tag_name, pattern);
-    IntervalSetImpl<size_t> remove_characters;
-    tags_.clear();
     TagExtractionContext tag_extraction_context(stat_name);
-    bool extracted = tokens.extractTag(tag_extraction_context, tags_, remove_characters);
+    bool extracted = tokens.extractTag(tag_extraction_context);
     if (extracted) {
-      tag_extracted_name_ = StringUtil::removeCharacters(stat_name, remove_characters);
+      tag_extracted_name_ = tag_extraction_context.tagExtractedName();
+      tags_ = tag_extraction_context.tags();
     } else {
       tag_extracted_name_.clear();
+      tags_.clear();
     }
     return extracted;
   }
 
-  std::vector<Tag> tags_;
   std::string tag_extracted_name_;
+  TagVector tags_;
 };
 
 TEST_F(TagExtractorTokensTest, Prefix) {

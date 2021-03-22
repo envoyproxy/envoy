@@ -14,6 +14,7 @@
 #include "common/common/lock_guard.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/tag_extractor_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/tag_utility.h"
 
@@ -354,17 +355,20 @@ public:
                     const absl::optional<StatNameTagVector>& stat_name_tags)
       : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
     if (!stat_name_tags) {
-      TagVector tags;
-      tag_extracted_name_ =
-          pool_.add(tls.tagProducer().produceTags(tls.symbolTable().toString(name), tags));
-      StatName empty;
-      for (const auto& tag : tags) {
-        StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
-        if (tag_name.empty()) {
-          tag_name = pool_.add(tag.name_);
+      std::string tag_extracted_name;
+      {
+        TagExtractionContext extraction_context(tls.symbolTable().toString(name));
+        tag_extracted_name = tls.tagProducer().produceTags(extraction_context);
+        StatName empty;
+        for (const auto& tag : extraction_context.tags()) {
+          StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
+          if (tag_name.empty()) {
+            tag_name = pool_.add(tag.name_);
+          }
+          stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
         }
-        stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
       }
+      tag_extracted_name_ = pool_.add(tag_extracted_name);
     } else {
       tag_extracted_name_ = name;
     }

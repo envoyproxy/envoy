@@ -44,6 +44,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/well_known_names.h"
+#include "common/stats/tag_extractor_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
 #include "benchmark/benchmark.h"
@@ -98,8 +99,9 @@ void BM_ExtractTags(benchmark::State& state) {
 
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    TagVector tags;
-    tag_extractors.produceTags(str, tags);
+    TagExtractionContext extraction_context(str);
+    tag_extractors.produceTags(extraction_context);
+    TagVector& tags = extraction_context.tags();
     RELEASE_ASSERT(tags.size() == tags_size,
                    absl::StrCat("tags.size()=", tags.size(), " tags_size==", tags_size));
   }

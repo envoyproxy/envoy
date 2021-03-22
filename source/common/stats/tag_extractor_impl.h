@@ -10,6 +10,7 @@
 
 #include "envoy/stats/tag_extractor.h"
 
+#include "common/common/utility.h"
 #include "common/common/regex.h"
 
 #include "absl/strings/string_view.h"
@@ -21,14 +22,21 @@ namespace Stats {
 // Carries state across tag extractions.
 class TagExtractionContext {
 public:
-  explicit TagExtractionContext(absl::string_view name) : name_(name) {}
+  TagExtractionContext(absl::string_view name) : name_(name) {}
+
+  std::string& addTag(absl::string_view name);
+  void removeCharacters(uint32_t start, uint32_t end);
 
   absl::string_view name() { return name_; }
   const std::vector<absl::string_view>& tokens();
+  TagVector& tags() { return tags_; }
+  std::string tagExtractedName() const;
 
 private:
   absl::string_view name_;
   std::vector<absl::string_view> tokens_;
+  TagVector tags_;
+  IntervalSetImpl<size_t> remove_characters_;
 };
 
 // To check if a tag extractor is actually used you can run
@@ -118,8 +126,7 @@ public:
   TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                            absl::string_view substr = "");
 
-  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(TagExtractionContext& context) const override;
 
 private:
   const std::regex regex_;
@@ -130,8 +137,7 @@ public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                       absl::string_view substr = "");
 
-  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(TagExtractionContext& context) const override;
 
 private:
   const re2::RE2 regex_;
@@ -148,8 +154,7 @@ class TagExtractorTokensImpl : public TagExtractorImplBase {
 public:
   TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens);
 
-  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
+  bool extractTag(TagExtractionContext& context) const override;
 
 private:
   static uint32_t findMatchIndex(const std::vector<std::string>& tokens);

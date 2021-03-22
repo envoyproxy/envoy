@@ -25,6 +25,21 @@ const std::vector<absl::string_view>& TagExtractionContext::tokens() {
   return tokens_;
 }
 
+std::string& TagExtractionContext::addTag(absl::string_view name) {
+  tags_.emplace_back();
+  Tag& tag = tags_.back();
+  tag.name_ = name;
+  return tag.value_;
+}
+
+void TagExtractionContext::removeCharacters(uint32_t start, uint32_t end) {
+  remove_characters_.insert(start, end);
+}
+
+std::string TagExtractionContext::tagExtractedName() const {
+  return StringUtil::removeCharacters(name_, remove_characters_);
+}
+
 namespace {
 
 bool regexStartsWithDot(absl::string_view regex) {
@@ -88,15 +103,7 @@ TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(absl::string_view name, absl:
     : TagExtractorImplBase(name, regex, substr),
       regex_(Regex::Utility::parseStdRegex(std::string(regex))) {}
 
-std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
-  tags.emplace_back();
-  Tag& tag = tags.back();
-  tag.name_ = name_;
-  return tag.value_;
-}
-
-bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                                          IntervalSet<size_t>& remove_characters) const {
+bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context) const {
   PERF_OPERATION(perf);
 
   absl::string_view stat_name = context.name();
@@ -119,12 +126,12 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
     // from the string but also not necessary in the tag value ("." for example). If there is no
     // second submatch, then the value_subexpr is the same as the remove_subexpr.
     const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
-    addTag(tags) = value_subexpr.str();
+    context.addTag(name_) = value_subexpr.str();
 
     // Determines which characters to remove from stat_name to elide remove_subexpr.
     std::string::size_type start = remove_subexpr.first - stat_name.begin();
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
-    remove_characters.insert(start, end);
+    context.removeCharacters(start, end);
     PERF_RECORD(perf, "re-match", name_);
     PERF_TAG_INC(matched_);
     return true;
@@ -138,8 +145,7 @@ TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_vi
                                          absl::string_view substr)
     : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
 
-bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                                     IntervalSet<size_t>& remove_characters) const {
+bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context) const {
   PERF_OPERATION(perf);
 
   absl::string_view stat_name = context.name();
@@ -164,12 +170,12 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
     if (value_subexpr.empty()) {
       value_subexpr = remove_subexpr;
     }
-    addTag(tags) = std::string(value_subexpr);
+    context.addTag(name_) = std::string(value_subexpr);
 
     // Determines which characters to remove from stat_name to elide remove_subexpr.
     std::string::size_type start = remove_subexpr.data() - stat_name.data();
     std::string::size_type end = remove_subexpr.data() + remove_subexpr.size() - stat_name.data();
-    remove_characters.insert(start, end);
+    context.removeCharacters(start, end);
 
     PERF_RECORD(perf, "re2-match", name_);
     PERF_TAG_INC(matched_);
@@ -201,8 +207,7 @@ uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& 
   return 0;
 }
 
-bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                                        IntervalSet<size_t>& remove_characters) const {
+bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context) const {
   PERF_OPERATION(perf);
   const std::vector<absl::string_view>& input_tokens = context.tokens();
   uint32_t match_input_index = input_tokens.size(), start = 0;
@@ -236,8 +241,8 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   } else if (start > 0) {
     --start; // Remove the dot prior to the lat token, e.g. ".ef"
   }
-  addTag(tags) = tag_value;
-  remove_characters.insert(start, end);
+  context.addTag(name_) = tag_value;
+  context.removeCharacters(start, end);
 
   PERF_RECORD(perf, "tokens-match", name_);
   PERF_TAG_INC(matched_);
