@@ -4,12 +4,11 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api:74.5"
-"source/common/api/posix:73.0"
+"source/common/api/posix:77.0"
 "source/common/common:96.3"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
 "source/common/event:93.4" # Emulated edge events guards don't report LCOV
-"source/common/filesystem/posix:96.2"
 "source/common/filter:96.5"
 "source/common/filter/http:96.5"
 "source/common/http/http3:50.0"
@@ -37,7 +36,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/cache/simple_http_cache:95.2"
 "source/extensions/filters/http/grpc_json_transcoder:94.8"
 "source/extensions/filters/http/ip_tagging:91.2"
-"source/extensions/filters/http/kill_request:85.0" # Death tests don't report LCOV
+"source/extensions/filters/http/kill_request:95.0" # Death tests don't report LCOV
 "source/extensions/filters/listener:96.5"
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/network/common:96.1"
