@@ -7,11 +7,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-RpcInvocationImpl::Attachment::Attachment(MapPtr&& value) : attachment_(std::move(value)) {
+RpcInvocationImpl::Attachment::Attachment(MapPtr&& value, size_t offset)
+    : attachment_(std::move(value)), attachment_offset_(offset) {
   headers_ = Http::RequestHeaderMapImpl::create();
 
   ASSERT(attachment_);
-  ASSERT(attachment_->toMutableUntypedMap());
+  ASSERT(attachment_->toMutableUntypedMap()); 
 
   for (const auto& pair : *attachment_->toMutableUntypedMap()) {
     const auto key = pair.first->toString();

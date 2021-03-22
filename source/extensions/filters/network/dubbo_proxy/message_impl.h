@@ -63,7 +63,7 @@ public:
     using MapPtr = std::unique_ptr<Hessian2::UntypedMapObject>;
     using String = Hessian2::StringObject;
 
-    Attachment(MapPtr&& value);
+    Attachment(MapPtr&& value, size_t offset);
 
     const Map& attachment() const { return *attachment_; }
 
@@ -77,9 +77,16 @@ public:
     // Whether the attachment should be re-serialized.
     bool attachmentUpdated() const { return attachment_updated_; }
 
+    size_t attachmentOffset() const { return attachment_offset_; }
+
   private:
     bool attachment_updated_{false};
+
     MapPtr attachment_;
+
+    // The binary offset of attachment in the original message. Retaining this value can help
+    // subsequent re-serialization of the attachment without reserializing the parameters.
+    size_t attachment_offset_{};
 
     // To reuse the HeaderMatcher API and related tools provided by Envoy, we store the key/value
     // pair of the string type in the attachment in the Http::HeaderMap. This introduces additional
