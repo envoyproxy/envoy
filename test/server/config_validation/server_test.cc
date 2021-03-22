@@ -134,12 +134,12 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
 // as-is. (Note, /dev/stdout as an access log file is invalid on Windows, no equivalent /dev/
 // exists.)
 
-auto testing_values = ::testing::Values("front-proxy_front-envoy.yaml", "envoyproxy_io_proxy.yaml",
+auto testing_values =
+    ::testing::Values("front-proxy_front-envoy.yaml", "envoyproxy_io_proxy.yaml",
 #if defined(WIN32) && defined(SO_ORIGINAL_DST)
-                                        "configs_original-dst-cluster_proxy_config.yaml"
+                      "configs_original-dst-cluster_proxy_config.yaml",
 #endif
-                                        "grpc-bridge_server_envoy-proxy.yaml",
-                                        "front-proxy_service-envoy.yaml");
+                      "grpc-bridge_server_envoy-proxy.yaml", "front-proxy_service-envoy.yaml");
 
 INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest, testing_values);
 
