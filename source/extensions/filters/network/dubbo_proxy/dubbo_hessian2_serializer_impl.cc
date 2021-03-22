@@ -63,9 +63,9 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   });
 
   invo->setAttachmentLazyCallback([delayed_decoder]() -> RpcInvocationImpl::AttachmentPtr {
-    auto result = delayed_decoder->decode<Hessian2::Object>();
     size_t offset = delayed_decoder->offset();
 
+    auto result = delayed_decoder->decode<Hessian2::Object>();
     if (result != nullptr && result->type() == Hessian2::Object::Type::UntypedMap) {
       return std::make_unique<RpcInvocationImpl::Attachment>(
           RpcInvocationImpl::Attachment::MapPtr{
