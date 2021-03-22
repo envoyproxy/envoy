@@ -376,6 +376,14 @@ protected:
   bool enableHalfClose() { return upstream_config_.enable_half_close_; }
 
   const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
+  void setMaxRequestHeadersKb(uint32_t value) { upstream_config_.max_request_headers_kb_ = value; }
+  void setMaxRequestHeadersCount(uint32_t value) {
+    upstream_config_.max_request_headers_count_ = value;
+  }
+  void setHeadersWithUnderscoreAction(
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction value) {
+    upstream_config_.headers_with_underscores_action_ = value;
+  }
 
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");

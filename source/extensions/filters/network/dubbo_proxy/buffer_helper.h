@@ -4,6 +4,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/safe_memcpy.h"
 
 namespace Envoy {
 namespace Extensions {

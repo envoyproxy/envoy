@@ -66,39 +66,31 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
   case Network::Address::IpVersion::v4: {
     addr_length[1] = PROXY_PROTO_V2_ADDR_LEN_INET;
     out.add(addr_length, 2);
-
-    uint8_t addrs[8];
-    const auto net_src_addr =
+    const uint32_t net_src_addr =
         Network::Address::Ipv4Instance(src_addr, src_port).ip()->ipv4()->address();
-    const auto net_dst_addr =
+    const uint32_t net_dst_addr =
         Network::Address::Ipv4Instance(dst_addr, dst_port).ip()->ipv4()->address();
-    memcpy(addrs, &net_src_addr, 4);
-    memcpy(&addrs[4], &net_dst_addr, 4);
-    out.add(addrs, 8);
+    out.add(&net_src_addr, 4);
+    out.add(&net_dst_addr, 4);
     break;
   }
   case Network::Address::IpVersion::v6: {
     addr_length[1] = PROXY_PROTO_V2_ADDR_LEN_INET6;
     out.add(addr_length, 2);
-
-    uint8_t addrs[32];
-    const auto net_src_addr =
+    const absl::uint128 net_src_addr =
         Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
-    const auto net_dst_addr =
+    const absl::uint128 net_dst_addr =
         Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
-    memcpy(addrs, &net_src_addr, 16);
-    memcpy(&addrs[16], &net_dst_addr, 16);
-    out.add(addrs, 32);
+    out.add(&net_src_addr, 16);
+    out.add(&net_dst_addr, 16);
     break;
   }
   }
 
-  uint8_t ports[4];
-  const auto net_src_port = htons(static_cast<uint16_t>(src_port));
-  const auto net_dst_port = htons(static_cast<uint16_t>(dst_port));
-  memcpy(ports, &net_src_port, 2);
-  memcpy(&ports[2], &net_dst_port, 2);
-  out.add(ports, 4);
+  const uint16_t net_src_port = htons(static_cast<uint16_t>(src_port));
+  const uint16_t net_dst_port = htons(static_cast<uint16_t>(dst_port));
+  out.add(&net_src_port, 2);
+  out.add(&net_dst_port, 2);
 }
 
 void generateV2Header(const Network::Address::Ip& source_address,
