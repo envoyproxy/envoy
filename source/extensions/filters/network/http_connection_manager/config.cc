@@ -490,6 +490,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                       j == upgrade_config.filters().size() - 1, *factories,
                       upgrade_dependency_manager);
       }
+      // TODO(auni53): Validate encode dependencies too.
+      auto status = upgrade_dependency_manager.validDecodeDependencies();
+      if (!status.ok()) {
+        throw EnvoyException(std::string(status.message()));
+      }
+
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {

@@ -159,6 +159,26 @@ TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
       "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(ConfigTemplate);
+  auto upgrade_config = hcm_config.add_upgrade_configs();
+  upgrade_config->set_upgrade_type("websocket");
+
+  upgrade_config->add_filters()->set_name("test.chef");
+  upgrade_config->add_filters()->set_name("envoy.filters.http.router");
+
+  ChefFilterFactory cf;
+  Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
+}
+
 } // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters
