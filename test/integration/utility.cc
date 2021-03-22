@@ -93,7 +93,9 @@ public:
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     if (event == Network::ConnectionEvent::Connected) {
-      // Handshake finished, unblock the test to continue.
+      // Handshake finished, unblock the test to continue. This is needed because we call
+      // Dispatcher::run() with Block to wait for the handshake to finish before proceeding.
+      // TODO(danzh) find an alternative approach with behaviors more in parallel with SSL.
       connected_ = true;
       dispatcher_.exit();
     } else if (event == Network::ConnectionEvent::RemoteClose) {

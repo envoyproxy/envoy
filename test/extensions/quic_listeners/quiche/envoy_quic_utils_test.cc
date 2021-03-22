@@ -50,7 +50,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
-  // "value1" and "value2" should be coalesced into one header by QUICHE and splitted again while
+  // "value1" and "value2" should be coalesced into one header by QUICHE and split again while
   // converting to Envoy headers..
   headers_block.AppendValueOrAddHeader("key", "value1");
   headers_block.AppendValueOrAddHeader("key", "value2");
