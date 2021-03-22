@@ -71,14 +71,7 @@ public:
   // Server::Instance
   Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
-  Upstream::ClusterManager& clusterManager() override {
-    // if (config_.clusterManager() == nullptr) {
-    //   ENVOY_LOG_MISC(info, "hahah");
-    //   while (!::IsDebuggerPresent())
-    //     ::Sleep(100);
-    // }
-    return *config_.clusterManager();
-  }
+  Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {

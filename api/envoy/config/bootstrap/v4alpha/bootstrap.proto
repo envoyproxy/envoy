@@ -288,7 +288,8 @@ message Admin {
   reserved "access_log_path";
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
-  // Output the access log for the administration server.
+  // emitted by the administration server. This is only required if
+  // :ref:`address <envoy_api_field_config.bootstrap.v4alpha.Admin.address>` is set.
   repeated accesslog.v4alpha.AccessLog access_log = 5;
 
   // The cpu profiler output path for the administration server. If no profile
