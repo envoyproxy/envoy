@@ -197,9 +197,8 @@ public:
    * verification.
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
-  static Network::TransportSocketFactoryPtr createQuicUpstreamTransportSocketFactory(
-      Server::Configuration::TransportSocketFactoryContext& context,
-      const std::string& san_to_match);
+  static Network::TransportSocketFactoryPtr
+  createQuicUpstreamTransportSocketFactory(Api::Api& api, const std::string& san_to_match);
 };
 
 // A set of connection callbacks which tracks connection state.

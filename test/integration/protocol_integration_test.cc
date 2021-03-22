@@ -59,6 +59,7 @@ void setDoNotValidateRouteConfig(
     return;                                                                                        \
   }
 
+// TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {                                    \
     return;                                                                                        \
@@ -746,6 +747,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
 TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2 &&
       downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    // TODO(alyssawilk) investigate why this combination doesn't work.
     return;
   }
   EXCLUDE_UPSTREAM_HTTP3;
@@ -1144,6 +1146,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+  // TODO(danzh) pass headers_with_underscores_action config into QUIC stream.
   EXCLUDE_DOWNSTREAM_HTTP3
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
@@ -1306,6 +1309,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
+  // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   initialize();
@@ -1330,6 +1334,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (many cookie headers).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
+  // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Set header count limit to 2010.
@@ -1542,6 +1547,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Send one 95 kB URL with limit 96 kB headers.
@@ -1636,6 +1642,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
 // time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
+  // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
@@ -1643,6 +1650,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -1650,6 +1658,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  // TODO(danzh) investigate why it failed for H3.
   EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -1754,7 +1763,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAll) {
-  // Enable after setting QUICHE stream initial flow control window from http3 options.
+  // TODO(danzh) Enable after setting QUICHE stream initial flow control window from http3 options.
   EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: call-decodedata-once-filter
@@ -1961,6 +1970,7 @@ name: encode-headers-return-stop-all-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAllWatermark) {
+  // TODO(danzh) Re-enable after codec buffer can be set according to http3 options.
   EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter

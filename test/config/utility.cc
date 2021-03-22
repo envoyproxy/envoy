@@ -1062,6 +1062,7 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().listener_config().typed_config().type_url() ==
         "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
+      ASSERT(listener.filter_chains_size() > 0);
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);

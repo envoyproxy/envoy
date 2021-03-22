@@ -83,15 +83,21 @@ void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string
   ADD_FAILURE();
 }
 
-struct ConnectionCallbacks : public Network::ConnectionCallbacks {
-  ConnectionCallbacks(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+// A callback for a QUIC client connection to unblock the test after handshake succeeds. QUIC
+// network connection initiates handshake and raises Connected event when it's done. Tests should
+// proceed with sending requests afterwards.
+class TestConnectionCallbacks : public Network::ConnectionCallbacks {
+public:
+  TestConnectionCallbacks(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     if (event == Network::ConnectionEvent::Connected) {
+      // Handshake finished, unblock the test to continue.
       connected_ = true;
       dispatcher_.exit();
     } else if (event == Network::ConnectionEvent::RemoteClose) {
+      // If the peer closes the connection, no need to wait anymore.
       dispatcher_.exit();
     } else {
       if (!connected_) {
@@ -107,13 +113,16 @@ struct ConnectionCallbacks : public Network::ConnectionCallbacks {
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+private:
   Event::Dispatcher& dispatcher_;
   bool connected_{false};
 };
 
-Network::TransportSocketFactoryPtr IntegrationUtil::createQuicUpstreamTransportSocketFactory(
-    Server::Configuration::TransportSocketFactoryContext& context,
-    const std::string& san_to_match) {
+Network::TransportSocketFactoryPtr
+IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api,
+                                                          const std::string& san_to_match) {
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+  ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -171,7 +180,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
                 Filesystem::fileSystemForTest(), random_generator);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
-  ConnectionCallbacks connection_callbacks(*dispatcher);
+  TestConnectionCallbacks connection_callbacks(*dispatcher);
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster,
@@ -188,10 +197,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                          client);
   }
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
   Network::TransportSocketFactoryPtr transport_socket_factory =
-      createQuicUpstreamTransportSocketFactory(mock_factory_ctx, "spiffe://lyft.com/backend-team");
+      createQuicUpstreamTransportSocketFactory(api, "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
   Http::QuicClientConnectionFactory& connection_factory =
       Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
@@ -210,10 +217,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       *persistent_info, *dispatcher, addr, local_address);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
-  if (type == Http::CodecClient::Type::HTTP3) {
-    // Quic connection needs to finish handshake.
-    dispatcher->run(Event::Dispatcher::RunType::Block);
-  }
+  // Quic connection needs to finish handshake.
+  dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
 }
 

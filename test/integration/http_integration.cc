@@ -258,6 +258,9 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
                                                         host_description, downstream_protocol_);
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP3 && codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
+    // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
+    // INVALID_VERSION error to caller and let caller to use server advertised version list to
+    // create a new connection with mutually supported version and make client codec again.
     ENVOY_LOG(error, "Fail to connect to server with error: {}",
               codec->connection()->transportFailureReason());
   }
@@ -307,12 +310,13 @@ void HttpIntegrationTest::initialize() {
   if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
     return BaseIntegrationTest::initialize();
   }
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(*api_));
-
+  // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
+  // according to the config.
   quic_transport_socket_factory_ =
-      IntegrationUtil::createQuicUpstreamTransportSocketFactory(mock_factory_ctx, san_to_match_);
+      IntegrationUtil::createQuicUpstreamTransportSocketFactory(*api_, san_to_match_);
 
+  // Needed to config QUIC transport socket factory, and needs to be added before base class calls
+  // initialize().
   config_helper_.addQuicDownstreamTransportSocketConfig(set_reuse_port_);
 
   BaseIntegrationTest::initialize();
@@ -320,6 +324,7 @@ void HttpIntegrationTest::initialize() {
 
   Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
+  // Needs to outlive all QUIC connections.
   quic_connection_persistent_info_ =
       Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
           Http::QuicCodecNames::get().Quiche)

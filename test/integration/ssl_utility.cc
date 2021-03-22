@@ -65,8 +65,6 @@ void initializeUpstreamTlsContextConfig(
     common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http3);
   }
   if (!options.san_.empty()) {
-    // common_context->mutable_validation_context()
-    //     ->add_hidden_envoy_deprecated_verify_subject_alt_name(options.san_);
     common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
         options.san_);
   }

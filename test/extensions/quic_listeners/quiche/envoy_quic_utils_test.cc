@@ -50,9 +50,12 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
+  // "value1" and "value2" should be coalesced into one header by QUICHE and splitted again while
+  // converting to Envoy headers..
   headers_block.AppendValueOrAddHeader("key", "value1");
   headers_block.AppendValueOrAddHeader("key", "value2");
   auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
+  // Envoy header block is 1 header larger because QUICHE header block does coalescing.
   EXPECT_EQ(headers_block.size() + 1u, envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
   EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
