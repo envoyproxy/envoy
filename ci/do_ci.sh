@@ -165,7 +165,7 @@ function run_ci_verify () {
   export DOCKER_NO_PULL=1
   umask 027
   chmod -R o-rwx examples/
-  ci/verify_examples.sh "${@}" || exit
+  "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
 }
 
 CI_TARGET=$1
@@ -371,7 +371,7 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh "$@"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
@@ -398,7 +398,7 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "format_pre" ]]; then
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./ci/format_pre.sh
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
@@ -455,7 +455,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
 
   # Validate repository metadata.
-  ./ci/check_repository_locations.sh
+  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
