@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
+import "envoy/config/core/v3/udp_socket_config.proto";
+
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
@@ -68,4 +70,10 @@ message UdpProxyConfig {
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
   repeated HashPolicy hash_policies = 5 [(validate.rules).repeated = {max_items: 1}];
+
+
+  // UDP socket configuration for upstream sockets. The default for
+  // :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is true for upstream
+  // sockets as the assumption is datagrams will be received from a single source.
+  config.core.v3.UdpSocketConfig upstream_socket_config = 6;
 }

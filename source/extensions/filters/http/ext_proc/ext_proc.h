@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
@@ -28,7 +29,8 @@ namespace ExternalProcessing {
   COUNTER(spurious_msgs_received)                                                                  \
   COUNTER(streams_closed)                                                                          \
   COUNTER(streams_failed)                                                                          \
-  COUNTER(failure_mode_allowed)
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(message_timeouts)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -37,15 +39,15 @@ struct ExtProcFilterStats {
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& config,
-               const std::chrono::milliseconds grpc_timeout, Stats::Scope& scope,
+               const std::chrono::milliseconds message_timeout, Stats::Scope& scope,
                const std::string& stats_prefix)
-      : failure_mode_allow_(config.failure_mode_allow()), grpc_timeout_(grpc_timeout),
+      : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
-  const std::chrono::milliseconds& grpcTimeout() const { return grpc_timeout_; }
+  const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
@@ -62,7 +64,7 @@ private:
   }
 
   const bool failure_mode_allow_;
-  const std::chrono::milliseconds grpc_timeout_;
+  const std::chrono::milliseconds message_timeout_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
@@ -114,7 +116,10 @@ public:
 
 private:
   void openStream();
-  void cleanupState();
+  void startMessageTimer(Event::TimerPtr& timer);
+  void onMessageTimeout();
+  void cleanUpTimers();
+  void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
   bool
@@ -123,8 +128,6 @@ private:
   handleResponseHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
   bool handleRequestBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
   bool handleResponseBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
-  void
-  handleImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
   void sendBodyChunk(bool request_path, const Buffer::Instance& data, bool end_stream);
 
@@ -157,6 +160,12 @@ private:
   // The processing mode. May be locally overridden by any response,
   // So every instance of the filter has a copy.
   envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
+
+  // The timers that are used to manage per-message timeouts. Since the
+  // request and response paths run in parallel and can theoretically overlap,
+  // we need two timers.
+  Event::TimerPtr request_message_timer_;
+  Event::TimerPtr response_message_timer_;
 };
 
 } // namespace ExternalProcessing

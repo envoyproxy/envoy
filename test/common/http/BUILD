@@ -215,7 +215,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
-        "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
