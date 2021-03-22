@@ -311,7 +311,7 @@ void HttpIntegrationTest::initialize() {
   ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(*api_));
 
   quic_transport_socket_factory_ =
-      IntegrationUtil::createQuicClientTransportSocketFactory(mock_factory_ctx, san_to_match_);
+      IntegrationUtil::createQuicUpstreamTransportSocketFactory(mock_factory_ctx, san_to_match_);
 
   config_helper_.addQuicDownstreamTransportSocketConfig(set_reuse_port_);
 

@@ -111,7 +111,7 @@ struct ConnectionCallbacks : public Network::ConnectionCallbacks {
   bool connected_{false};
 };
 
-Network::TransportSocketFactoryPtr IntegrationUtil::createQuicClientTransportSocketFactory(
+Network::TransportSocketFactoryPtr IntegrationUtil::createQuicUpstreamTransportSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const std::string& san_to_match) {
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
@@ -126,6 +126,37 @@ Network::TransportSocketFactoryPtr IntegrationUtil::createQuicClientTransportSoc
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
   return config_factory.createTransportSocketFactory(quic_transport_socket_config, context);
+}
+
+BufferingStreamDecoderPtr
+sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& method,
+                              const std::string& url, const std::string& body,
+                              const std::string& host, const std::string& content_type,
+                              Http::CodecClientProd& client) {
+  BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
+    client.close();
+    dispatcher.exit();
+  }));
+  Http::RequestEncoder& encoder = client.newStream(*response);
+  encoder.getStream().addCallbacks(*response);
+
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setMethod(method);
+  headers.setPath(url);
+  headers.setHost(host);
+  headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
+  if (!content_type.empty()) {
+    headers.setContentType(content_type);
+  }
+  const auto status = encoder.encodeHeaders(headers, body.empty());
+  ASSERT(status.ok());
+  if (!body.empty()) {
+    Buffer::OwnedImpl body_buffer(body);
+    encoder.encodeData(body_buffer, true);
+  }
+
+  dispatcher.run(Event::Dispatcher::RunType::Block);
+  return response;
 }
 
 BufferingStreamDecoderPtr
@@ -147,64 +178,43 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       fmt::format("{}://127.0.0.1:80", (type == Http::CodecClient::Type::HTTP3 ? "udp" : "tcp")),
       time_system)};
 
+  if (type <= Http::CodecClient::Type::HTTP2) {
+    Http::CodecClientProd client(
+        type,
+        dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
+                                           Network::Test::createRawBufferSocket(), nullptr),
+        host_description, *dispatcher, random);
+    return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
+                                         client);
+  }
+
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
   Network::TransportSocketFactoryPtr transport_socket_factory =
-      createQuicClientTransportSocketFactory(mock_factory_ctx, "spiffe://lyft.com/backend-team");
+      createQuicUpstreamTransportSocketFactory(mock_factory_ctx, "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  Network::ClientConnectionPtr connection;
-  if (type == Http::CodecClient::Type::HTTP3) {
-    Http::QuicClientConnectionFactory& connection_factory =
-        Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche);
-    persistent_info = connection_factory.createNetworkConnectionInfo(
-        *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
+  Http::QuicClientConnectionFactory& connection_factory =
+      Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+          Http::QuicCodecNames::get().Quiche);
+  persistent_info = connection_factory.createNetworkConnectionInfo(
+      *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
 
-    Network::Address::InstanceConstSharedPtr local_address;
-    if (addr->ip()->version() == Network::Address::IpVersion::v4) {
-      local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
-    } else {
-      // Docker only works with loopback v6 address.
-      local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    }
-    connection = connection_factory.createQuicNetworkConnection(*persistent_info, *dispatcher, addr,
-                                                                local_address);
-    connection->addConnectionCallbacks(connection_callbacks);
+  Network::Address::InstanceConstSharedPtr local_address;
+  if (addr->ip()->version() == Network::Address::IpVersion::v4) {
+    local_address = Network::Utility::getLocalAddress(Network::Address::IpVersion::v4);
   } else {
-    connection =
-        dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                           Network::Test::createRawBufferSocket(), nullptr);
+    // Docker only works with loopback v6 address.
+    local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
+  Network::ClientConnectionPtr connection = connection_factory.createQuicNetworkConnection(
+      *persistent_info, *dispatcher, addr, local_address);
+  connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   if (type == Http::CodecClient::Type::HTTP3) {
     // Quic connection needs to finish handshake.
     dispatcher->run(Event::Dispatcher::RunType::Block);
   }
-
-  BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
-    client.close();
-    dispatcher->exit();
-  }));
-  Http::RequestEncoder& encoder = client.newStream(*response);
-  encoder.getStream().addCallbacks(*response);
-
-  Http::TestRequestHeaderMapImpl headers;
-  headers.setMethod(method);
-  headers.setPath(url);
-  headers.setHost(host);
-  headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
-  if (!content_type.empty()) {
-    headers.setContentType(content_type);
-  }
-  const auto status = encoder.encodeHeaders(headers, body.empty());
-  ASSERT(status.ok());
-  if (!body.empty()) {
-    Buffer::OwnedImpl body_buffer(body);
-    encoder.encodeData(body_buffer, true);
-  }
-
-  dispatcher->run(Event::Dispatcher::RunType::Block);
-  return response;
+  return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
 }
 
 BufferingStreamDecoderPtr
