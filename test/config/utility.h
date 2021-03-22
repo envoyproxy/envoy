@@ -79,6 +79,12 @@ public:
       return *this;
     }
 
+    ServerSslOptions&
+    setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
+      san_matchers_ = san_matchers;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -88,6 +94,7 @@ public:
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
+    std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
   };
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
