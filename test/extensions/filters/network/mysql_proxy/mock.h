@@ -68,9 +68,16 @@ public:
 };
 
 namespace ConnectionPool {
+
+class MockCancellable : public ConnectionPool::Cancellable {
+public:
+  ~MockCancellable() override = default;
+  MOCK_METHOD(void, cancel, ());
+};
+
 class MockClientData : public ClientData {
 public:
-  MockClientData(DecoderPtr&&);
+  MockClientData() = default;
   ~MockClientData() override = default;
   void resetClient(DecoderPtr&& decoder) override {
     decoder_ = std::move(decoder);

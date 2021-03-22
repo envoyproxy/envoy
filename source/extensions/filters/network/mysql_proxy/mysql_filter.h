@@ -118,6 +118,7 @@ public:
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   MySQLSession& getSession() { return decoder_->getSession(); }
+  friend class MySQLFilterTest;
 
 private:
   void onFailure(const ClientLoginResponse& err, uint8_t seq);

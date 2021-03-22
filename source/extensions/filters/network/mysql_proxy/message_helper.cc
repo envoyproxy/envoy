@@ -38,6 +38,14 @@ ClientLogin MessageHelper::encodeClientLogin(AuthMethod auth_method, const std::
   return client_login;
 }
 
+ClientLogin MessageHelper::encodeSslUpgrade() {
+  ClientLogin client_login{};
+  client_login.setClientCap(CLIENT_SSL);
+  client_login.setMaxPacket(0);
+  client_login.setCharset(DEFAULT_MYSQL_CHARSET);
+  return client_login;
+}
+
 ServerGreeting MessageHelper::encodeGreeting(const std::vector<uint8_t>& seed,
                                              const std::string& auth_plugin_name) {
   ServerGreeting greet{};

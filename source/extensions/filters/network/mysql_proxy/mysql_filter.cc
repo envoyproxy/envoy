@@ -115,7 +115,7 @@ void MySQLFilter::onClientFailure(ConnectionPool::MySQLPoolFailureReason reason)
               "mysql proxy upstream connection pool: connection failure due to error of parsing");
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ENVOY_LOG(error, "mysql proxy upstream connection pool: unknown error");
   }
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
@@ -126,11 +126,8 @@ void MySQLFilter::onResponse(MySQLCodec& codec, uint8_t seq) {
 }
 
 void MySQLFilter::onFailure() {
-  config_->stats_.login_failures_.inc();
+  ENVOY_LOG(error, "upstream client: proxy to server occur failure");
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  if (client_ != nullptr) {
-    client_->close();
-  }
 }
 
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
@@ -145,6 +142,7 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
   if (client_login.isSSLRequest()) {
     config_->stats_.upgraded_to_ssl_.inc();
     ENVOY_LOG(error, "client try to upgrade to ssl, which can not be handled");
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
   if (config_->username_ != client_login.getUsername()) {
@@ -214,17 +212,12 @@ void MySQLFilter::onFailure(const ClientLoginResponse& err, uint8_t seq) {
   read_callbacks_->connection().write(buffer, false);
 }
 
-void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-    config_->stats_.auth_switch_request_.inc();
-  } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-  }
+void MySQLFilter::onClientLoginResponse(ClientLoginResponse&) {
+  ENVOY_LOG(error, "mysql filter: onClientLoginResponse impossible callback is called");
 }
 
-void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-    config_->stats_.login_failures_.inc();
-  }
+void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse&) {
+  ENVOY_LOG(error, "mysql filter: onMoreClientLoginResponse impossible callback is called");
 }
 
 void MySQLFilter::onCommand(Command& command) {

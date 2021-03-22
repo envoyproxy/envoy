@@ -26,15 +26,6 @@ MockDecoder::MockDecoder(const MySQLSession& session) : session_(session) {
   });
 }
 
-namespace ConnectionPool {
-MockClientData::MockClientData(DecoderPtr&& decoder) : decoder_(std::move(decoder)) {
-  ON_CALL(*this, decoder()).WillByDefault([&]() -> Decoder& {
-    std::cout << "call decoder()" << std::endl;
-    return *decoder_;
-  });
-}
-
-} // namespace ConnectionPool
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

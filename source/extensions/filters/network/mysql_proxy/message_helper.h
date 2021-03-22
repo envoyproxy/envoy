@@ -17,13 +17,14 @@ public:
   static ClientLogin encodeClientLogin(AuthMethod auth_method, const std::string& username,
                                        const std::string& password, const std::string& db,
                                        const std::vector<uint8_t>& seed);
-
+  static ClientLogin encodeSslUpgrade();
   static ServerGreeting encodeGreeting(const std::vector<uint8_t>& seed) {
     return encodeGreeting(seed, "mysql_native_password");
   }
   static ServerGreeting encodeGreeting(const std::vector<uint8_t>& seed,
                                        const std::string& auth_plugin_name);
   static OkMessage encodeOk();
+
   static AuthSwitchMessage encodeAuthSwitch(const std::vector<uint8_t>& seed);
   static AuthSwitchMessage encodeAuthSwitch(const std::vector<uint8_t>& seed,
                                             const std::string& auth_plugin_name);

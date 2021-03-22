@@ -1,5 +1,6 @@
 
 
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -53,21 +54,22 @@ public:
     return DecoderPtr{upstream_decoders_.back()};
   }
 
-  void setup(size_t start_connections = 0, size_t totol_connections = 0) {
+  void setup(size_t start_connections = 0, size_t total_clients = 0,
+             size_t total_success_connection = 0) {
     EXPECT_CALL(context_.thread_local_, allocateSlot());
-    EXPECT_CALL(*this, create).Times(totol_connections);
+    EXPECT_CALL(*this, create).Times(total_success_connection);
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(Upstream::ResourcePriority::Default, nullptr));
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
-        .Times(totol_connections);
-    for (size_t i = 0; i < start_connections; i++) {
-      EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
-                  addUpstreamCallbacks(_))
-          .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
-            upstream_clients_.push_back(dynamic_cast<InstanceImpl::ThreadLocalActiveClient*>(&cb));
-            ;
-          }));
-    }
+        .Times(total_clients)
+        .WillRepeatedly(Invoke([&](Tcp::ConnectionPool::Callbacks& callbacks)
+                                   -> Tcp::ConnectionPool::Cancellable* {
+          upstream_clients_.push_back(
+              dynamic_cast<InstanceImpl::ThreadLocalActiveClient*>(&callbacks));
+          return context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(
+              callbacks);
+        }));
+
     context_.cluster_manager_.initializeThreadLocalClusters(
         std::vector<std::string>{config_.cluster});
     EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster);
@@ -177,15 +179,25 @@ TEST_F(ConnPoolTest, BasicFailPoolClient) {
   setup();
   Sequence seq;
   auto client_callbacks = std::make_unique<MockClientPoolCallbacks>();
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_));
-  EXPECT_CALL(*client_callbacks, onClientFailure(MySQLPoolFailureReason::RemoteConnectionFailure));
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+      .Times(3);
+  EXPECT_CALL(*client_callbacks, onClientFailure(MySQLPoolFailureReason::Overflow));
 
   auto* cancel = conn_pool_->newMySQLClient(*client_callbacks);
   EXPECT_NE(cancel, nullptr);
+  checkSize(1, 1, 0, 0);
   EXPECT_EQ(pendingRequests().size(), 1);
   EXPECT_EQ(pendingClients().size(), 1);
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      PoolFailureReason::RemoteConnectionFailure);
+      PoolFailureReason::Overflow);
+
+  checkSize(0, 0, 0, 0);
+  cancel = conn_pool_->newMySQLClient(*client_callbacks);
+  EXPECT_NE(cancel, nullptr);
+  checkSize(1, 1, 0, 0);
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
+      static_cast<PoolFailureReason>(-1));
+  checkSize(1, 1, 0, 0);
   teardown();
 }
 
@@ -221,6 +233,7 @@ TEST_F(ConnPoolTest, FailByNotHandledErrAtClientLoginResponse) {
   EXPECT_CALL(*client_data.decoder, getSession());
   EXPECT_CALL(*client_data.connection, write(_, false));
   auto greet = MessageHelper::encodeGreeting(MySQLTestUtils::getAuthPluginData20());
+  greet.setAuthPluginName("mysql_clear_password");
   client_data.callbacks->onServerGreeting(greet);
 
   auto switch_more = MessageHelper::encodeAuthMore(MySQLTestUtils::getAuthPluginData20());
@@ -272,7 +285,7 @@ TEST_F(ConnPoolTest, FailByNotSupportPluginErrAtClientLoginResponse) {
   client_data.callbacks->onServerGreeting(greet);
 
   auto auth_switch = MessageHelper::encodeAuthSwitch(MySQLTestUtils::getAuthPluginData20(),
-                                                     "msyql_unknown_password");
+                                                     "mysql_clear_password");
   client_data.callbacks->onClientLoginResponse(auth_switch);
   checkSize(0, 0, 0, 0);
   teardown();
@@ -474,7 +487,7 @@ TEST_F(ConnPoolTest, ImpossibleDeocderCallbackOnCommandResp) {
 }
 
 TEST_F(ConnPoolTest, GetClientFromStartClients) {
-  setup(1, 1);
+  setup(1, 1, 1);
   Sequence seq;
 
   auto client_callbacks = std::make_unique<MockClientPoolCallbacks>();
@@ -495,7 +508,7 @@ TEST_F(ConnPoolTest, GetClientFromStartClients) {
 }
 
 TEST_F(ConnPoolTest, CloseClient) {
-  setup(1, 1);
+  setup(1, 1, 1);
   Sequence seq;
 
   auto client_callbacks = std::make_unique<MockClientPoolCallbacks>();
@@ -518,7 +531,7 @@ TEST_F(ConnPoolTest, CloseClient) {
 }
 
 TEST_F(ConnPoolTest, CloseMoreThanMaxIdleClients) {
-  setup(1, 2);
+  setup(1, 2, 2);
   Sequence seq;
 
   auto client_callbacks1 = std::make_unique<MockClientPoolCallbacks>();
@@ -572,6 +585,71 @@ TEST_F(ConnPoolTest, CloseMoreThanMaxIdleClients) {
   checkSize(0, 0, 1, 1);
   client_callbacks2->data_->close();
   checkSize(0, 0, 1, 0);
+
+  teardown();
+}
+
+TEST_F(ConnPoolTest, RequestMoreThanMaxConnection) {
+  setup(2, 2, 2);
+  Sequence seq;
+
+  auto client_callbacks1 = std::make_unique<MockClientPoolCallbacks>();
+  EXPECT_CALL(*client_callbacks1, onClientReady_(_));
+
+  EXPECT_CALL(upstream_connections_[0], close(_))
+      .WillOnce(Invoke([&](Network::ConnectionCloseType type) {
+        EXPECT_EQ(Network::ConnectionCloseType::NoFlush, type);
+        upstream_clients_[0]->onEvent(Network::ConnectionEvent::LocalClose);
+      }));
+  EXPECT_CALL(upstream_connections_[1], close(_))
+      .WillOnce(Invoke([&](Network::ConnectionCloseType type) {
+        EXPECT_EQ(Network::ConnectionCloseType::NoFlush, type);
+        upstream_clients_[1]->onEvent(Network::ConnectionEvent::LocalClose);
+      }));
+  // get from start connection
+  auto canceler = conn_pool_->newMySQLClient(*client_callbacks1);
+  EXPECT_EQ(canceler, nullptr);
+  EXPECT_NE(upstream_clients_[0], nullptr);
+  EXPECT_EQ(upstream_clients_[0]->state_, InstanceImpl::ClientState::Busy);
+
+  auto client_callbacks2 = std::make_unique<MockClientPoolCallbacks>();
+  EXPECT_CALL(*client_callbacks2, onClientReady_(_));
+
+  // get from start connection
+  canceler = conn_pool_->newMySQLClient(*client_callbacks2);
+  EXPECT_EQ(canceler, nullptr);
+  EXPECT_NE(upstream_clients_[1], nullptr);
+  EXPECT_EQ(upstream_clients_[1]->state_, InstanceImpl::ClientState::Busy);
+
+  checkSize(0, 0, 0, 2);
+
+  auto client_callbacks3 = std::make_unique<MockClientPoolCallbacks>();
+  canceler = conn_pool_->newMySQLClient(*client_callbacks3);
+  EXPECT_NE(canceler, nullptr);
+
+  checkSize(1, 0, 0, 2);
+  teardown();
+}
+
+TEST_F(ConnPoolTest, ThreadLocalPoolDeconstruct) {
+  setup(0, 2, 1);
+  Sequence seq;
+  EXPECT_CALL(upstream_connections_[0], close(_))
+      .WillOnce(Invoke([&](Network::ConnectionCloseType type) {
+        EXPECT_EQ(Network::ConnectionCloseType::NoFlush, type);
+        upstream_clients_[0]->onEvent(Network::ConnectionEvent::LocalClose);
+      }));
+  auto client_callbacks1 = std::make_unique<MockClientPoolCallbacks>();
+  auto* canceler = conn_pool_->newMySQLClient(*client_callbacks1);
+  EXPECT_NE(canceler, nullptr);
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+      upstream_connections_[0]);
+
+  checkSize(1, 1, 0, 0);
+  auto client_callbacks2 = std::make_unique<MockClientPoolCallbacks>();
+  canceler = conn_pool_->newMySQLClient(*client_callbacks2);
+  EXPECT_NE(canceler, nullptr);
+  checkSize(2, 2, 0, 0);
 
   teardown();
 }

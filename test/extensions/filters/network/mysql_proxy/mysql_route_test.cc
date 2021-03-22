@@ -5,8 +5,6 @@
 #include "gtest/gtest.h"
 #include "mock.h"
 
-using testing::ReturnRef;
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -35,8 +33,7 @@ TEST(PrefixRoutesTest, BasicMatch) {
   std::vector<ConnectionPool::ClientPoolSharedPtr> pools;
   for (const auto& route : config.routes()) {
     pools.emplace_back(std::make_shared<ConnectionPool::MockPool>(route.cluster()));
-    auto route_ = std::make_shared<MockRoute>(pools.back().get());
-    EXPECT_CALL(*route_, upstream()).WillOnce(ReturnRef(*pools.back()));
+    auto route_ = std::make_shared<RouteImpl>(pools.back());
     routes.emplace(route.database(), route_);
   }
 

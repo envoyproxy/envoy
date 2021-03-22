@@ -53,6 +53,7 @@ TEST(AuthHelperTest, OldPassWordHash) {
     EXPECT_EQ(old_password_case.second,
               MySQLTestUtils::encodeUint32Hex(old_hash.data(), old_hash.size()));
   }
+  EXPECT_EQ(AuthHelper::oldHash("lmbnatik"), AuthHelper::oldHash("lm na  tik"));
 }
 
 TEST(AuthHelperTest, NativePassWordHash) {
@@ -118,6 +119,21 @@ TEST(AuthHelperTest, NativePassWordHash) {
     EXPECT_EQ(Hex::encode(reinterpret_cast<uint8_t*>(actual.data()), actual.size()),
               native_password_case.second);
   }
+}
+
+TEST(AuthHelperTest, AuthMethod) {
+  uint32_t cap = CLIENT_PROTOCOL_41;
+  EXPECT_EQ(AuthHelper::authMethod(cap & 0xffff, cap >> 16, "sha256_password"),
+            AuthMethod::Sha256Password);
+  EXPECT_EQ(AuthHelper::authMethod(cap & 0xffff, cap >> 16, "caching_sha2_password"),
+            AuthMethod::CacheSha2Password);
+  EXPECT_EQ(AuthHelper::authMethod(cap & 0xffff, cap >> 16, "mysql_clear_password"),
+            AuthMethod::ClearPassword);
+  EXPECT_EQ(AuthHelper::authMethod(cap & 0xffff, cap >> 16, "mysql_unknown_password"),
+            AuthMethod::Unknown);
+  EXPECT_EQ(AuthHelper::authMethod(0, 0, ""), AuthMethod::OldPassword);
+  cap = CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION | MYSQL_EXT_CL_PLUGIN_AUTH;
+  EXPECT_EQ(AuthHelper::authMethod(cap & 0xffff, cap >> 16, ""), AuthMethod::Unknown);
 }
 
 } // namespace MySQLProxy

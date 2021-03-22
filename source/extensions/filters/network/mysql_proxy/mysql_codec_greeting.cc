@@ -103,7 +103,6 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   setExtServerCap(ext_server_cap);
   uint8_t auth_plugin_data_len = 0;
   if (BufferHelper::readUint8(buffer, auth_plugin_data_len) != DecodeStatus::Success) {
-
     ENVOY_LOG(debug, "error when parsing length of auth plugin data of mysql greeting msg");
     return DecodeStatus::Failure;
   }
@@ -145,7 +144,6 @@ DecodeStatus ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   auto auth_plugin_len = auth_plugin_data1_.size() + auth_plugin_data2_.size();
   if (server_cap_ & CLIENT_PLUGIN_AUTH) {
     if (auth_plugin_len != auth_plugin_data_len) {
-
       ENVOY_LOG(debug, "error when final check failure of mysql greeting msg");
       return DecodeStatus::Failure;
     }

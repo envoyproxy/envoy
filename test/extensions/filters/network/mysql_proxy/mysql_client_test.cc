@@ -39,7 +39,7 @@ public:
 
   MySQLSession session_;
   MockDecoder* decoder_{new MockDecoder(session_)};
-  ConnectionPool::MockClientData* client_data_{new ConnectionPool::MockClientData(nullptr)};
+  ConnectionPool::MockClientData* client_data_{new ConnectionPool::MockClientData()};
   DecoderCallbacks* decoder_callbacks_;
   MockClientCallbacks client_callbacks_;
   std::unique_ptr<ClientImpl> client_;

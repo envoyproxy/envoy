@@ -26,7 +26,7 @@ TEST(MySQLAuthSwithRespTest, AuthSwithRespErrLengthResp) {
   switch_resp_encode.encode(buffer);
   Buffer::OwnedImpl decode_data(buffer.toString().data(), 0);
   ClientSwitchResponse switch_resp_decode{};
-  switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, 0);
+  switch_resp_decode.decode(decode_data, AUTH_SWITH_RESP_SEQ, -1);
   EXPECT_EQ(switch_resp_decode.getAuthPluginResp().size(), 0);
 }
 } // namespace MySQLProxy

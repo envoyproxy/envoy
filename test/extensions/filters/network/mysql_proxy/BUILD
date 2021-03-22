@@ -191,7 +191,7 @@ envoy_extension_cc_test(
 # )
 
 envoy_extension_cc_test(
-    name = "integration_test",
+    name = "integration_tests",
     srcs = [
         "integration_test.cc",
     ],

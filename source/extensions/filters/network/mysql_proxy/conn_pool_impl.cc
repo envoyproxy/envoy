@@ -66,7 +66,7 @@ InstanceImpl::ThreadLocalClientPool::ThreadLocalClientPool(std::shared_ptr<Insta
 
 Cancellable* InstanceImpl::ThreadLocalClientPool::newMySQLClient(ClientPoolCallBack& call_backs) {
   if (!active_clients_.empty()) {
-    ThreadLocalActiveClient& client = *active_clients_.front();
+    ThreadLocalActiveClient& client = *active_clients_.back();
     client.state_ = ClientState::Busy;
     client.moveBetweenLists(active_clients_, busy_clients_);
     call_backs.onClientReady(std::make_unique<ClientDataImpl>(client.client_wrapper_));
@@ -74,8 +74,7 @@ Cancellable* InstanceImpl::ThreadLocalClientPool::newMySQLClient(ClientPoolCallB
   }
   auto pending_request = std::make_unique<PendingRequest>(*this, call_backs);
   LinkedList::moveIntoList(std::move(pending_request), pending_requests_);
-  if (pending_requests_.size() + active_clients_.size() + pending_clients_.size() +
-          busy_clients_.size() >
+  if (active_clients_.size() + pending_clients_.size() + busy_clients_.size() >=
       config_.max_connections) {
     return pending_requests_.front().get();
   }
@@ -146,9 +145,9 @@ void InstanceImpl::ThreadLocalClientPool::processIdleClient(ThreadLocalActiveCli
     client.moveBetweenLists(pending_clients_, busy_clients_);
   }
   client.state_ = ClientState::Busy;
-  pending_requests_.front()->callbacks_.onClientReady(
+  pending_requests_.back()->callbacks_.onClientReady(
       std::make_unique<ClientDataImpl>(client.client_wrapper_));
-  pending_requests_.pop_front();
+  pending_requests_.pop_back();
 }
 
 InstanceImpl::PendingRequest::PendingRequest(ThreadLocalClientPool& pool,
@@ -259,7 +258,8 @@ void InstanceImpl::ThreadLocalActiveClient::onFailure(MySQLPoolFailureReason rea
     break;
   case MySQLPoolFailureReason::Overflow:
     if (!parent_.pending_requests_.empty()) {
-      parent_.pending_requests_.back()->callbacks_.onClientFailure(reason);
+      parent_.pending_requests_.front()->callbacks_.onClientFailure(reason);
+      parent_.pending_requests_.pop_front();
     }
     break;
   default:
