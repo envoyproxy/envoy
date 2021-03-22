@@ -34,9 +34,12 @@ ActiveQuicListener::ActiveQuicListener(
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : Server::ActiveUdpListenerBase(worker_index, concurrency, parent, *listen_socket,
-                                    dispatcher.createUdpListener(listen_socket, *this),
-                                    &listener_config),
+    : Server::ActiveUdpListenerBase(
+          worker_index, concurrency, parent, *listen_socket,
+          dispatcher.createUdpListener(
+              listen_socket, *this,
+              listener_config.udpListenerConfig()->config().downstream_socket_config()),
+          &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing) {
   if (Runtime::LoaderSingleton::getExisting()) {
@@ -74,7 +77,7 @@ ActiveQuicListener::ActiveQuicListener(
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
-      listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+      listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
   udp_packet_writer_ = udp_packet_writer.get();
 
@@ -217,7 +220,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           : 20000;
   quic_config_.set_max_time_before_crypto_handshake(
       quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  int32_t max_streams =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
 }

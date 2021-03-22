@@ -24,6 +24,16 @@ message TcpProtocolOptions {
       "envoy.config.core.v3.TcpProtocolOptions";
 }
 
+// QUIC protocol options which apply to both downstream and upstream connections.
+message QuicProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.QuicProtocolOptions";
+
+  // Maximum number of streams that the client can negotiate per connection. 100
+  // if not specified.
+  google.protobuf.UInt32Value max_concurrent_streams = 1;
+}
+
 message UpstreamHttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.UpstreamHttpProtocolOptions";
@@ -401,4 +411,6 @@ message GrpcProtocolOptions {
 message Http3ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http3ProtocolOptions";
+
+  QuicProtocolOptions quic_protocol_options = 1;
 }

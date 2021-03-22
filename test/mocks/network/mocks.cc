@@ -25,9 +25,15 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Network {
 
+MockUdpListenerConfig::MockUdpListenerConfig()
+    : udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
+  ON_CALL(*this, listenerWorkerRouter()).WillByDefault(ReturnRef(*udp_listener_worker_router_));
+  ON_CALL(*this, config()).WillByDefault(ReturnRef(config_));
+}
+MockUdpListenerConfig::~MockUdpListenerConfig() = default;
+
 MockListenerConfig::MockListenerConfig()
-    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()),
-      udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
+    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
   ON_CALL(socket_factory_, localAddress())
@@ -37,9 +43,6 @@ MockListenerConfig::MockListenerConfig()
       .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, udpListenerWorkerRouter()).WillByDefault(Invoke([this]() {
-    return UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_);
-  }));
 }
 MockListenerConfig::~MockListenerConfig() = default;
 

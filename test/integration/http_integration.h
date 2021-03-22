@@ -257,8 +257,6 @@ protected:
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
-  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
-  uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };

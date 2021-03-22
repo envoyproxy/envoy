@@ -561,6 +561,9 @@ public:
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
     return http_protocol_options_->http2_options_;
   }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const override {
+    return http_protocol_options_->http3_options_;
+  }
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
