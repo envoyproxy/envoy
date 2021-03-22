@@ -8,6 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# TODO(tbarrella): Use envoy_extension_cc_test once config.cc exists.
 envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
