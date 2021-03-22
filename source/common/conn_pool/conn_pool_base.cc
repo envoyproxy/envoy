@@ -9,14 +9,14 @@
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
-  ssize_t connectingCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
-    ssize_t ret = 0;
-    for (const auto& client : connecting_clients) {
-      ret += client->effectiveConcurrentStreamLimit();
-    }
-    return ret;
+ssize_t connectingCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
+  ssize_t ret = 0;
+  for (const auto& client : connecting_clients) {
+    ret += client->effectiveConcurrentStreamLimit();
   }
+  return ret;
 }
+} // namespace
 
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
@@ -224,7 +224,8 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
-  ASSERT(connecting_stream_capacity_ == connectingCapacity(connecting_clients_));  // O(n) debug check.
+  ASSERT(connecting_stream_capacity_ ==
+         connectingCapacity(connecting_clients_)); // O(n) debug check.
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
