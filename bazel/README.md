@@ -62,7 +62,8 @@ for how to update or override dependencies.
        ninja-build \
        curl \
        unzip \
-       virtualenv
+       virtualenv \
+       patch
     ```
 
     ### Fedora
@@ -135,7 +136,7 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    Another option to shorten the output root for Bazel is to set the `USERNAME` environment variable in your shell
     session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
     is set.
 
@@ -617,6 +618,10 @@ logging at `-l trace`. For example, in tests:
 bazel test //test/integration:protocol_integration_test --test_output=streamed \
   --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
+
+Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
+environment where `n` is the desired verbosity level (e.g.
+`--test_env="ENVOY_QUICHE_VERBOSITY=2"`.
 
 ## Disabling optional features
 

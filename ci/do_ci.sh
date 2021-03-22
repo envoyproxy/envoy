@@ -6,7 +6,7 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
+if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
         "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
@@ -397,12 +397,13 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
   exit 0
+elif [[ "$CI_TARGET" == "format_pre" ]]; then
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./ci/format_pre.sh
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
   echo "fix_format..."
-  ./tools/code_format/check_shellcheck_format.sh fix
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
@@ -414,7 +415,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
-  ./tools/code_format/check_shellcheck_format.sh check
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
@@ -449,16 +449,18 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   # Validate dependency relationships between core/extensions and external deps.
   ./tools/dependency/validate_test.py
   ./tools/dependency/validate.py
+
   # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
   # presubmits, but cve_scan only runs async.
-  python3.8 tools/dependency/cve_scan_test.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+
   # Validate repository metadata.
   ./ci/check_repository_locations.sh
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   echo "scanning for CVEs in dependencies..."
-  python3.8 tools/dependency/cve_scan_test.py
-  python3.8 tools/dependency/cve_scan.py
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc

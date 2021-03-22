@@ -24,6 +24,16 @@ message TcpProtocolOptions {
       "envoy.config.core.v3.TcpProtocolOptions";
 }
 
+// QUIC protocol options which apply to both downstream and upstream connections.
+message QuicProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.QuicProtocolOptions";
+
+  // Maximum number of streams that the client can negotiate per connection. 100
+  // if not specified.
+  google.protobuf.UInt32Value max_concurrent_streams = 1;
+}
+
 message UpstreamHttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.UpstreamHttpProtocolOptions";
@@ -240,6 +250,10 @@ message Http2ProtocolOptions {
   // For upstream connections, this also limits how many streams Envoy will initiate concurrently
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
   // additional connections (as allowed per circuit breaker limits).
+  //
+  // This acts as an upper bound: Envoy will lower the max concurrent streams allowed on a given
+  // connection based on upstream settings. Config dumps will reflect the configured upper bound,
+  // not the per-connection negotiated limits.
   google.protobuf.UInt32Value max_concurrent_streams = 2
       [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
 
@@ -407,4 +421,6 @@ message GrpcProtocolOptions {
 message Http3ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http3ProtocolOptions";
+
+  QuicProtocolOptions quic_protocol_options = 1;
 }

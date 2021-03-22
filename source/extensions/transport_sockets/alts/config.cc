@@ -123,10 +123,10 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
     tsi_handshaker* handshaker = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
     // in this use case. The validation will be performed by TsiSocket with the validator.
-    // Leaving the max frame size as 0 (unspecified) sets the default max frame size of 128 KiB.
+    // Set the max frame size to 16KB.
     tsi_result status = alts_tsi_handshaker_create(
         options.get(), target_name, handshaker_service.c_str(), is_upstream,
-        nullptr /* interested_parties */, &handshaker, 0 /* default max frame size */);
+        nullptr /* interested_parties */, &handshaker, 16384 /* default max frame size */);
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {

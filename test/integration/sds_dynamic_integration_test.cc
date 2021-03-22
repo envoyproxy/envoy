@@ -1,10 +1,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
 #include "common/config/api_version.h"
@@ -122,7 +122,7 @@ protected:
   }
 
   void sendSdsResponse(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
@@ -752,7 +752,7 @@ public:
 
   void sendSdsResponse2(const envoy::extensions::transport_sockets::tls::v3::Secret& secret,
                         FakeStream& sds_stream) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);

@@ -72,9 +72,10 @@ public:
     return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, backlog_size)};
   }
 
-  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb)};
+  Network::UdpListenerPtr
+  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+                    const envoy::config::core::v3::UdpSocketConfig& config) override {
+    return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -137,7 +138,8 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                bool bind_to_port, uint32_t backlog_size));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
+              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
+               const envoy::config::core::v3::UdpSocketConfig& config));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));

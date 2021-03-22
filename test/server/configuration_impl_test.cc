@@ -612,7 +612,7 @@ TEST(InitialImplTest, V2BootstrapRuntimeInjection) {
     admin_layer: {}
   - name: "enabled_deprecated_v2_api (auto-injected)"
     static_layer:
-      envoy.reloadable_features.enable_deprecated_v2_api: true
+      envoy.test_only.broken_in_production.enable_deprecated_v2_api: true
   )EOF";
   const auto expected_runtime =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);

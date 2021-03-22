@@ -213,7 +213,10 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      udp_listener_name: "quiche_quic_listener"
+      listener_config:
+        name: quic_listener_config
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
 )EOF",
                                                            Platform::null_device_path));
 }
@@ -732,7 +735,7 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
 }
 
 void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
+  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
@@ -1109,6 +1112,7 @@ void ConfigHelper::initializeTls(
     validation_context->add_verify_certificate_hash(
         options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
   }
+  validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
