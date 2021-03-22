@@ -74,3 +74,39 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
         version = "v0.0.0-20180726023541-3605ed457bf7",
     )
+    go_repository(
+        name = "com_github_sirupsen_logrus",
+        importpath = "github.com/sirupsen/logrus",
+        sum = "h1:SPIRibHv4MatM3XXNO2BJeFLZwZ2LvZgfQ5+UNI2im4=",
+        version = "v1.4.2",
+    )
+    go_repository(
+        name = "com_github_alecthomas_jsonschema",
+        importpath = "github.com/alecthomas/jsonschema",
+        sum = "h1:h+KAZEUnNceFhqyH46BgwH4lk8m6pdR/3x3h7IPn7VA=",
+        version = "v0.0.0-20200217214135-7152f22193c9",
+    )
+    go_repository(
+        name = "com_github_iancoleman_orderedmap",
+        importpath = "github.com/iancoleman/orderedmap",
+        sum = "h1:i462o439ZjprVSFSZLZxcsoAe592sZB1rci2Z8j4wdk=",
+        version = "v0.0.0-20190318233801-ac98e3ecb4b0",
+    )
+    go_repository(
+        name = "com_github_xeipuuv_gojsonschema",
+        importpath = "github.com/xeipuuv/gojsonschema",
+        sum = "h1:ngVtJC9TY/lg0AA/1k48FYhBrhRoFlEmWzsehpNAaZg=",
+        version = "v1.1.0",
+    )
+    go_repository(
+        name = "com_github_xeipuuv_gojsonreference",
+        importpath = "github.com/xeipuuv/gojsonreference",
+        sum = "h1:EzJWgHovont7NscjpAxXsDA8S8BMYve8Y5+7cuRE7R0=",
+        version = "v0.0.0-20180127040603-bd5ef7bd5415",
+    )
+    go_repository(
+        name = "com_github_xeipuuv_gojsonpointer",
+        importpath = "github.com/xeipuuv/gojsonpointer",
+        sum = "h1:6cLsL+2FW6dRAdl5iMtHgRogVCff0QpRi9653YmdcJA=",
+        version = "v0.0.0-20190809123943-df4f5c81cb3b",
+    )

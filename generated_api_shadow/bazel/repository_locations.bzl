@@ -62,6 +62,21 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-08-23",
         use_category = ["api"],
     ),
+    com_github_chrusty_protoc_gen_jsonschema = dict(
+        project_name = "Protoc gen jsonschema",
+        project_desc = "Protoc extension for generating JSONSchema",
+        project_url = "https://github.com/chrusty/protoc-gen-jsonschema",
+        version = "a172ca0beeca4cbe5057442ae083f2a0958694a5",
+        sha256 = "ac310458be6b362a6c2bd6fa54c33b3af0a4b5918f42ba993c198cb6de026ec0",
+        strip_prefix = "protoc-gen-jsonschema-" + "a172ca0beeca4cbe5057442ae083f2a0958694a5",
+        urls = ["https://github.com/chrusty/protoc-gen-jsonschema/archive/a172ca0beeca4cbe5057442ae083f2a0958694a5.tar.gz"],
+        release_date = "2021-02-23",
+        use_category = ["api"],
+        implied_untracked_deps = [
+            "com_github_sirupsen_logrus",
+        ],
+    ),
+
     com_google_googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
         project_name = "Google APIs",
