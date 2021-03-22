@@ -45,7 +45,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 
 The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specify
 the configuration to load dynamically, and the :ref:`cluster <start_quick_start_dynamic_static_resources>`
-to connect to for dynamic configuration updates.
+to connect for dynamic configuration updates.
 
 In this example, the configuration is provided by the ``xds_cluster`` configured below.
 
