@@ -801,6 +801,30 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Observe host header w/o trailing dot after decodeHeaders, not the original host, when
+// remove_trailing_hot_dot is configured
+TEST_F(HttpConnectionManagerImplTest, RemoveTrailingHostDot) {
+  setup(false, "");
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+  RequestHeaderMap* updated_headers = nullptr;
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+    updated_headers = headers.get();
+    decoder_->decodeHeaders(std::move(headers), true);
+    EXPECT_EQ(updated_host, updated_headers->getHostValue());
+    return Http::okStatus();
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 // Filters observe host header w/o trailing dot in host when trailing dot removal is configured
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseHostWithoutTrailingDot) {
   setup(false, "");
