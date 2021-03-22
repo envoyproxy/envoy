@@ -54,7 +54,7 @@ static_resources:
                                 percentage:
                                   numerator: 100
                                   denominator: HUNDRED
-                      "tiny fault": # inject 10ms latency into all requests
+                      "tiny fault": # inject 1s latency into all requests
                         action:
                           name: composite-action
                           typed_config:
@@ -62,7 +62,7 @@ static_resources:
                             typed_config:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
                               delay:
-                                fixed_delay: 10ms
+                                fixed_delay: 1s
                                 percentage:
                                   numerator: 100
                                   denominator: HUNDRED
