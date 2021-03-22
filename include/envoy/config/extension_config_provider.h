@@ -42,16 +42,16 @@ public:
    * Update the provider with a new configuration.
    * @param config is an extension factory callback to replace the existing configuration.
    * @param version_info is the version of the new extension configuration.
-   * @param cb the continuation callback for a completed configuration application.
+   * @param cb the continuation callback for a completed configuration application on all threads.
    */
   virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info,
-                              ConfigAppliedCb cb) PURE;
+                              ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
    * Removes the current configuration from the provider.
-   * @param cb the continuation callback for a completed configuration application.
+   * @param cb the continuation callback for a completed configuration application on all threads.
    */
-  virtual void onConfigRemoved(ConfigAppliedCb cb) PURE;
+  virtual void onConfigRemoved(ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
    * Applies the default configuration if one is set, otherwise does nothing.

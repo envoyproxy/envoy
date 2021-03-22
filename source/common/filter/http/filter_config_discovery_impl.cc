@@ -24,6 +24,24 @@ void validateTypeUrlHelper(const std::string& type_url,
                                      type_url, absl::StrJoin(require_type_urls, ", ")));
   }
 }
+
+// Updates each provider with update_cb, triggering done_cb once this has been applied to all
+// providers.
+void updateProviders(
+    const absl::flat_hash_set<DynamicFilterConfigProviderImpl*>& filter_config_providers,
+    std::function<void(DynamicFilterConfigProviderImpl*, std::function<void()>)> update_cb,
+    std::function<void()> done_cb) {
+
+  auto remaining_providers =
+      std::make_shared<std::atomic<uint64_t>>(filter_config_providers.size());
+  for (auto* provider : filter_config_providers) {
+    update_cb(provider, [remaining_providers, done_cb] {
+      if (--(*remaining_providers) == 0) {
+        done_cb();
+      }
+    });
+  }
+}
 } // namespace
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
@@ -78,18 +96,17 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
       });
 }
 
-void DynamicFilterConfigProviderImpl::onConfigRemoved(Config::ConfigAppliedCb cb) {
+void DynamicFilterConfigProviderImpl::onConfigRemoved(
+    Config::ConfigAppliedCb applied_on_all_threads) {
   tls_.runOnAllThreads(
-      [cb, config = default_configuration_](OptRef<ThreadLocalConfig> tls) {
-        tls->config_ = config;
-        if (cb) {
-          cb();
-        }
-      },
-      [this]() {
+      [config = default_configuration_](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
+      [this, applied_on_all_threads]() {
         // This happens after all workers have discarded the previous config so it can be safely
         // deleted on the main thread by an update with the new config.
         this->current_config_ = default_configuration_;
+        if (applied_on_all_threads) {
+          applied_on_all_threads();
+        }
       });
 }
 
@@ -160,15 +177,13 @@ void FilterConfigSubscription::onConfigUpdate(
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
-      (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
-  for (auto* provider : filter_config_providers_) {
-    provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
-      if (--(*pending_update) == 0) {
-        stats_.config_reload_.inc();
-      }
-    });
-  }
+  updateProviders(
+      filter_config_providers_,
+      [&factory_callback, &version_info](DynamicFilterConfigProviderImpl* provider,
+                                         std::function<void()> cb) {
+        provider->onConfigUpdate(factory_callback, version_info, cb);
+      },
+      [this]() { stats_.config_reload_.inc(); });
   last_config_hash_ = new_hash;
   last_config_ = factory_callback;
   last_type_url_ = type_url;
@@ -181,15 +196,12 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
-        (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
-    for (auto* provider : filter_config_providers_) {
-      provider->onConfigRemoved([this, pending_update]() {
-        if (--(*pending_update) == 0) {
-          stats_.config_reload_.inc();
-        }
-      });
-    }
+    updateProviders(
+        filter_config_providers_,
+        [](DynamicFilterConfigProviderImpl* provider, std::function<void()> cb) {
+          provider->onConfigRemoved(cb);
+        },
+        [this]() { stats_.config_reload_.inc(); });
 
     last_config_hash_ = 0;
     last_config_ = absl::nullopt;
