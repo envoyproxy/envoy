@@ -61,9 +61,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
-        ":active_tcp_listener",
-        ":active_udp_listener",
-        ":connection_handler_impl",
+        "//source/server:active_tcp_listener",
+        "//source/server:active_udp_listener",
+        "//source/server:connection_handler_impl",
     ],
 )
 
@@ -71,7 +71,6 @@ envoy_cc_library(
     name = "connection_handler_impl",
     srcs = ["connection_handler_impl.cc"],
     hdrs = [
-        "active_tcp_listener.h",
         "connection_handler_impl.h",
     ],
     deps = [
@@ -91,6 +90,15 @@ envoy_cc_library(
         "//source/common/event:deferred_task",
         "//source/common/network:connection_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/server:active_tcp_listener_header",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_tcp_listener_header",
+    hdrs = [
+        "active_tcp_listener.h",
+        "connection_handler_impl.h",
     ],
 )
 
@@ -120,7 +128,8 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/server:connection_handler_impl",
+        "//source/server:active_tcp_listener_header",
+        #"//source/server:connection_handler_impl",
     ],
 )
 
