@@ -5,11 +5,12 @@ namespace Thread {
 
 bool MainThread::isMainThread() {
   // If threading is off, only main thread is running.
-  if (MainThreadSingleton::getExisting() == nullptr) {
+  auto main_thread_singleton = MainThreadSingleton::getExisting();
+  if (main_thread_singleton == nullptr) {
     return true;
   }
   // When threading is on, compare thread id with main thread id.
-  return MainThreadSingleton::get().inMainThread() || MainThreadSingleton::get().inTestThread();
+  return main_thread_singleton->inMainThread() || main_thread_singleton->inTestThread();
 }
 
 void MainThread::clear() {

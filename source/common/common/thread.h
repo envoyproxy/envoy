@@ -178,14 +178,26 @@ struct MainThread {
   void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
   void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
   static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
+  /*
+   * Reigister the main thread id, should be called in main thread before threading is on. Currently
+   * called in ThreadLocal::InstanceImpl().
+   */
   static void initMainThread();
+  /*
+   * Reigister the test thread id, should be called in test thread before threading is on. Allow
+   * some main thread only code to be executed on test thread.
+   */
   static void initTestThread();
+  /*
+   * Delete the injectable main thread singleton, should be called in main thread after threading
+   * has been shut down. Currently called in ~ThreadLocal::InstanceImpl().
+   */
   static void clear();
   static bool isMainThread();
 
 private:
   std::thread::id main_thread_id_;
-  absl::optional<std::thread::id> test_thread_id_{};
+  absl::optional<std::thread::id> test_thread_id_;
 };
 
 // To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
