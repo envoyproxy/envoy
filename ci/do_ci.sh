@@ -347,7 +347,7 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
   export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
   echo "Validating API structure..."
-  ./tools/api/validate_structure.py
+  "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
   echo "Testing API and API Boosting..."
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
     @envoy_api_canonical//tools:tap2pcap_test @envoy_dev//clang_tools/api_booster/...
@@ -355,7 +355,7 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//envoy/...
   echo "Testing API boosting (golden C++ tests)..."
   # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" python3.8 ./tools/api_boost/api_boost_test.py
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" python3.8 "${ENVOY_SRCDIR}"/tools/api_boost/api_boost_test.py
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
@@ -364,7 +364,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
   [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
   # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
@@ -404,51 +404,51 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   setup_clang_toolchain
 
   echo "fix_format..."
-  ./tools/code_format/check_format.py fix
-  ./tools/code_format/format_python_tools.sh fix
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
+  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
+  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
   echo "check_format_test..."
-  ./tools/code_format/check_format_test_helper.sh --log=WARN
+  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
-  ./tools/code_format/check_format.py check
-  ./tools/code_format/format_python_tools.sh check
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
+  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
+  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
-  ./tools/check_repositories.sh
+  "${ENVOY_SRCDIR}"/tools/check_repositories.sh
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
-  ./tools/spelling/check_spelling.sh check
+  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   echo "fix_spell..."
-  ./tools/spelling/check_spelling.sh fix
+  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
-  ./tools/spelling/check_spelling_pedantic.py --mark check
+  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
-  ./tools/spelling/check_spelling_pedantic.py fix
+  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py fix
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   # Build docs.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" docs/build.sh
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  ./tools/dependency/validate_test.py
-  ./tools/dependency/validate.py
+  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
+  "${ENVOY_SRCDIR}"/tools/dependency/validate.py
 
   # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
   # presubmits, but cve_scan only runs async.
