@@ -34,11 +34,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
                                              quic::StreamType type)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
-          // This should be larger than 8k to fully utilize congestion control
-          // window. And no larger than the max stream flow control window for
-          // the stream to buffer all the data.
-          // Ideally this limit should also correlate to peer's receive window
-          // but not fully depends on that.
+          // Flow control receive window should be larger than 8k so that the send buffer can fully
+          // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
@@ -47,8 +44,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
                                              quic::StreamType type)
     : quic::QuicSpdyClientStream(pending, client_session, type),
       EnvoyQuicStream(
-          16 * 1024, *filterManagerConnection(), [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }) {}
+          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
@@ -246,6 +243,9 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicClientStream::OnClose() {
   quic::QuicSpdyClientStream::OnClose();
   if (isDoingWatermarkAccounting()) {
+    // This is called in the scope of a watermark buffer updater. Clear the
+    // buffer accounting afterwards so that the updator doesn't override the
+    // result.
     connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }

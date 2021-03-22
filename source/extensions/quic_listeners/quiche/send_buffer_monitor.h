@@ -43,9 +43,6 @@ protected:
   virtual void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) = 0;
 
   bool isDoingWatermarkAccounting() const { return is_doing_watermark_accounting_; }
-  void setIsDoingWatermarkAccounting(bool is_doing_watermark_accounting) {
-    is_doing_watermark_accounting_ = is_doing_watermark_accounting;
-  }
 
 private:
   bool is_doing_watermark_accounting_{false};

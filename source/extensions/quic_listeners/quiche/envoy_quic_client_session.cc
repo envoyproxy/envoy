@@ -51,6 +51,8 @@ void EnvoyQuicClientSession::OnCanWrite() {
   if (quic::VersionUsesHttp3(transport_version())) {
     quic::QuicSpdyClientSession::OnCanWrite();
   } else {
+    // This will cause header stream flushing. It is the only place to discount bytes buffered in
+    // header stream from connection watermark buffer during writing.
     SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
     quic::QuicSpdyClientSession::OnCanWrite();
   }
