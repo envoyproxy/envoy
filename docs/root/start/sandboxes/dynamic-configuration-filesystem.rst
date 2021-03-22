@@ -90,8 +90,8 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
-   :lines: 7-15
-   :lineno-start: 7
+   :lines: 6-14
+   :lineno-start: 6
    :emphasize-lines: 8
 
 You can do this using ``sed`` inside the container:
