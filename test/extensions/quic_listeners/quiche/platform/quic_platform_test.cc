@@ -74,13 +74,13 @@ namespace {
 class QuicPlatformTest : public testing::Test {
 protected:
   QuicPlatformTest()
-      : log_level_(GetLogger().level()), verbosity_log_threshold_(GetVerbosityLogThreshold()) {
-    SetVerbosityLogThreshold(0);
+      : log_level_(GetLogger().level()), verbosity_log_threshold_(getVerbosityLogThreshold()) {
+    setVerbosityLogThreshold(0);
     GetLogger().set_level(ERROR);
   }
 
   ~QuicPlatformTest() override {
-    SetVerbosityLogThreshold(verbosity_log_threshold_);
+    setVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }
 
@@ -312,12 +312,12 @@ TEST_F(QuicPlatformTest, QuicLog) {
   // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
   GetLogger().set_level(INFO);
 
-  ASSERT_EQ(0, GetVerbosityLogThreshold());
+  ASSERT_EQ(0, getVerbosityLogThreshold());
 
   QUIC_VLOG(1) << (i = 1);
   EXPECT_EQ(12, i);
 
-  SetVerbosityLogThreshold(1);
+  setVerbosityLogThreshold(1);
 
   EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
@@ -364,12 +364,12 @@ TEST_F(QuicPlatformTest, QuicDLog) {
   QUIC_DLOG_IF(INFO, true) << (i = 11);
   EXPECT_EQ(VALUE_BY_COMPILE_MODE(11, 0), i);
 
-  ASSERT_EQ(0, GetVerbosityLogThreshold());
+  ASSERT_EQ(0, getVerbosityLogThreshold());
 
   QUIC_DVLOG(1) << (i = 1);
   EXPECT_EQ(VALUE_BY_COMPILE_MODE(11, 0), i);
 
-  SetVerbosityLogThreshold(1);
+  setVerbosityLogThreshold(1);
 
   QUIC_DVLOG(1) << (i = 1);
   EXPECT_EQ(VALUE_BY_COMPILE_MODE(1, 0), i);
@@ -383,17 +383,20 @@ TEST_F(QuicPlatformTest, QuicDLog) {
 
 #undef VALUE_BY_COMPILE_MODE
 
-TEST_F(QuicPlatformTest, QuicCHECK) {
-  CHECK(1 == 1);
-  CHECK(1 == 1) << " 1 == 1 is forever true.";
+TEST_F(QuicPlatformTest, QuicheCheck) {
+  QUICHE_CHECK(1 == 1);
+  QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
-  EXPECT_DEBUG_DEATH({ DCHECK(false) << " Supposed to fail in debug mode."; },
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
                      "CHECK failed:.* Supposed to fail in debug mode.");
-  EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "CHECK failed");
 
-  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
+  EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
                "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ QUICHE_CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
+                     "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
 }
 
 // Test the behaviors of the cross products of

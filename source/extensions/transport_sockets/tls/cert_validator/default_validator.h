@@ -52,9 +52,7 @@ public:
   std::string getCaFileName() const override { return ca_file_path_; };
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
-  // utility functions
-  static int ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx);
-
+  // Utility functions.
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
                     const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers);

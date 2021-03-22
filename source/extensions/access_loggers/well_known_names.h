@@ -24,6 +24,8 @@ public:
   const std::string Stdoutput = "envoy.access_loggers.stdoutput";
   // TCP gRPC access log
   const std::string TcpGrpc = "envoy.access_loggers.tcp_grpc";
+  // OpenTelemetry gRPC access log
+  const std::string OpenTelemetry = "envoy.access_loggers.open_telemetry";
   // WASM access log
   const std::string Wasm = "envoy.access_loggers.wasm";
 };

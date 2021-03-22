@@ -176,21 +176,23 @@ uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
+                                                         uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value()) {
+          max_concurrent_streams) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
+                                                         uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total,
                                                          Upstream::Host::CreateConnectionData& data)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+          max_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();
@@ -198,10 +200,11 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& p
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
                                                          Upstream::Host::CreateConnectionData& data,
+                                                         uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+          max_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();
