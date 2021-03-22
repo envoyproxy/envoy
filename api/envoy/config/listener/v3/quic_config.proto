@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/protocol.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -24,9 +25,7 @@ message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
 
-  // Maximum number of streams that the client can negotiate per connection. 100
-  // if not specified.
-  google.protobuf.UInt32Value max_concurrent_streams = 1;
+  core.v3.QuicProtocolOptions quic_protocol_options = 1;
 
   // Maximum number of milliseconds that connection will be alive when there is
   // no network activity. 300000ms if not specified.

@@ -3,6 +3,7 @@ import unittest
 import merge_active_shadow
 
 from tools.api_proto_plugin import type_context as api_type_context
+from tools.protoxform import utils
 
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
@@ -585,4 +586,5 @@ reserved_range {
 # TODO(htuch): add some test for recursion.
 
 if __name__ == '__main__':
+    utils.load_protos(merge_active_shadow.PROTO_PACKAGES)
     unittest.main()
