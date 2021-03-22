@@ -48,7 +48,7 @@ create a new filter.
 If Envoy needs to parse a metadata sent on a request from downstream to upstream, a
 StreamDecodeFilter should be created. The interface to override is
 
-FilterMetadataStatus StreamDecoderFilter::decodeMetadata(MetadataMapPtr& metadata);
+FilterMetadataStatus StreamDecoderFilter::decodeMetadata(MetadataMap& metadata\_map);
 
 The metadata passed in is a map of the metadata associated with the request stream. After metadata
 have been parsed, the filter can choose to remove metadata from the map, or keep
@@ -81,7 +81,7 @@ map to the upstream. StreamDecoderFilterCallbacks::addDecodedMetadata() can be c
 StreamDecoderFilter::decodeHeaders(), StreamDecoderFilter::decodeData() and
 StreamDecoderFilter::decodeTrailers(). Do not call
 StreamDecoderFilterCallbacks::addDecodedMetadata() in
-StreamDecoderFilter::decodeMetadata(MetadataMap metadata\_map). New metadata can
+StreamDecoderFilter::decodeMetadata(MetadataMap& metadata\_map). New metadata can
 be added directly to metadata\_map.
 
 If users need to add new metadata for a response to downstream, a
