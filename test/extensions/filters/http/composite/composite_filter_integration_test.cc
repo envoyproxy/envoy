@@ -38,8 +38,10 @@ public:
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.CompositeAction
                   typed_config:
-                    "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-                    code: 403
+                    name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                      code: 403
     )EOF");
     HttpIntegrationTest::initialize();
   }

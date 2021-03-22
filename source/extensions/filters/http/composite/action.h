@@ -31,10 +31,12 @@ public:
         const envoy::extensions::filters::http::composite::v3::CompositeAction&>(
         config, factory_context.messageValidationVisitor());
 
-    auto& factory = Config::Utility::getAndCheckFactoryByType<
-        Server::Configuration::NamedHttpFilterConfigFactory>(composite_action.typed_config());
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+            composite_action.typed_config());
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        composite_action.typed_config(), factory_context.messageValidationVisitor(), factory);
+        composite_action.typed_config().typed_config(), factory_context.messageValidationVisitor(),
+        factory);
     auto callback = factory.createFilterFactoryFromProto(*message, stat_prefix, factory_context);
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
       return std::make_unique<CompositeAction>(cb);

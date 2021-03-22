@@ -3,11 +3,11 @@
 Composite Filter
 ================
 
-The composite filter allows delegating filter actions to a filter specified by a :ref:`match result <arch_.
-The purpose of this is to allow different filters or filter configurations to be selected based
-on the incoming request/response, allowing for more dynamic configuration that could become
-prohibitive when making use of per route configurations (e.g. because the cardinality would cause
-a route table explosion).
+The composite filter allows delegating filter actions to a filter specified by a
+:ref:`match result <arch_overview_matching_api>`. The purpose of this is to allow different filters
+or filter configurations to be selected based on the incoming request/response, allowing for more
+dynamic configuration that could become prohibitive when making use of per route configurations
+(e.g. because the cardinality would cause a route table explosion).
 
 
 Sample Envoy configuration

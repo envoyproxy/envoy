@@ -48,24 +48,28 @@ static_resources:
                           typed_config:
                             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.CompositeAction
                             typed_config:
-                              "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-                              delay:
-                                fixed_delay: 10s
-                                percentage:
-                                  numerator: 100
-                                  denominator: HUNDRED
+                              name: http-fault
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                                delay:
+                                  fixed_delay: 10s
+                                  percentage:
+                                    numerator: 100
+                                    denominator: HUNDRED
                       "tiny fault": # inject 1s latency into all requests
                         action:
                           name: composite-action
                           typed_config:
                             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.CompositeAction
                             typed_config:
-                              "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-                              delay:
-                                fixed_delay: 1s
-                                percentage:
-                                  numerator: 100
-                                  denominator: HUNDRED
+                              name: http-fault
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                                delay:
+                                  fixed_delay: 1s
+                                  percentage:
+                                    numerator: 100
+                                    denominator: HUNDRED
           - name: envoy.filters.http.router
 
   clusters:
