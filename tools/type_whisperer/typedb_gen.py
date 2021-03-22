@@ -79,12 +79,12 @@ def upgraded_type_with_description(type_name, type_desc):
 def load_types(path):
     """Load a tools.type_whisperer.Types proto from the filesystem.
 
-  Args:
-    path: filesystem path for a file in text proto format.
+    Args:
+        path: filesystem path for a file in text proto format.
 
-  Returns:
-    tools.type_whisperer.Types proto loaded from path.
-  """
+    Returns:
+        tools.type_whisperer.Types proto loaded from path.
+    """
     types = Types()
     with open(path, 'r') as f:
         text_format.Merge(f.read(), types)
@@ -94,19 +94,19 @@ def load_types(path):
 def next_version_upgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
     """Does a given type require upgrade between major version?
 
-  Performs depth-first search through type dependency graph for any upgraded
-  types that will force type_name to be upgraded.
+    Performs depth-first search through type dependency graph for any upgraded
+    types that will force type_name to be upgraded.
 
-  Args:
-    type_name: fully qualified type name.
-    type_map: map from type name to tools.type_whisperer.TypeDescription.
-    next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes
-      across invocations.
-    visited: a set of visited nodes in the current search, used to detect loops.
+    Args:
+        type_name: fully qualified type name.
+        type_map: map from type name to tools.type_whisperer.TypeDescription.
+           next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes
+           across invocations.
+        visited: a set of visited nodes in the current search, used to detect loops.
 
-  Returns:
-    A boolean indicating whether the type requires upgrade.
-  """
+    Returns:
+        A boolean indicating whether the type requires upgrade.
+    """
     if not visited:
         visited = set([])
     # Ignore non-API types.

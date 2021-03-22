@@ -1141,6 +1141,10 @@ void ConfigHelper::initializeTls(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
   }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
+  }
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

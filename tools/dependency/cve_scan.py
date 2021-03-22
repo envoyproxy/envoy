@@ -62,7 +62,7 @@ Cve = namedtuple(
 
 
 class Cpe(namedtuple('CPE', ['part', 'vendor', 'product', 'version'])):
-    '''Model a subset of CPE fields that are used in CPE matching.'''
+    """Model a subset of CPE fields that are used in CPE matching."""
 
     @classmethod
     def from_string(cls, cpe_str):
@@ -75,18 +75,18 @@ class Cpe(namedtuple('CPE', ['part', 'vendor', 'product', 'version'])):
         return f'cpe:2.3:{self.part}:{self.vendor}:{self.product}:{self.version}'
 
     def vendor_normalized(self):
-        '''Return a normalized CPE where only part and vendor are significant.'''
+        """Return a normalized CPE where only part and vendor are significant."""
         return Cpe(self.part, self.vendor, '*', '*')
 
 
 def parse_cve_json(cve_json, cves, cpe_revmap):
-    '''Parse CVE JSON dictionary.
+    """Parse CVE JSON dictionary.
 
-  Args:
-    cve_json: a NIST CVE JSON dictionary.
-    cves: dictionary mapping CVE ID string to Cve object (output).
-    cpe_revmap: a reverse map from vendor normalized CPE to CVE ID string.
-  '''
+    Args:
+        cve_json: a NIST CVE JSON dictionary.
+        cves: dictionary mapping CVE ID string to Cve object (output).
+        cpe_revmap: a reverse map from vendor normalized CPE to CVE ID string.
+    """
 
     # This provides an over-approximation of possible CPEs affected by CVE nodes
     # metadata; it traverses the entire AND-OR tree and just gathers every CPE
@@ -123,14 +123,14 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
 
 
 def download_cve_data(urls):
-    '''Download NIST CVE JSON databases from given URLs and parse.
+    """Download NIST CVE JSON databases from given URLs and parse.
 
-  Args:
-    urls: a list of URLs.
-  Returns:
-    cves: dictionary mapping CVE ID string to Cve object (output).
-    cpe_revmap: a reverse map from vendor normalized CPE to CVE ID string.
-  '''
+    Args:
+        urls: a list of URLs.
+    Returns:
+        cves: dictionary mapping CVE ID string to Cve object (output).
+        cpe_revmap: a reverse map from vendor normalized CPE to CVE ID string.
+    """
     cves = {}
     cpe_revmap = defaultdict(set)
     for url in urls:
@@ -144,7 +144,7 @@ def download_cve_data(urls):
 def format_cve_details(cve, deps):
     formatted_deps = ', '.join(sorted(deps))
     wrapped_description = '\n  '.join(textwrap.wrap(cve.description))
-    return f'''
+    return f"""
   CVE ID: {cve.id}
   CVSS v3 score: {cve.score}
   Severity: {cve.severity}
@@ -153,7 +153,7 @@ def format_cve_details(cve, deps):
   Dependencies: {formatted_deps}
   Description: {wrapped_description}
   Affected CPEs:
-  ''' + '\n  '.join(f'- {cpe}' for cpe in cve.cpes)
+  """ + '\n  '.join(f'- {cpe}' for cpe in cve.cpes)
 
 
 FUZZY_DATE_RE = re.compile('(\d{4}).?(\d{2}).?(\d{2})')
@@ -161,15 +161,15 @@ FUZZY_SEMVER_RE = re.compile('(\d+)[:\.\-_](\d+)[:\.\-_](\d+)')
 
 
 def regex_groups_match(regex, lhs, rhs):
-    '''Do two strings match modulo a regular expression?
+    """Do two strings match modulo a regular expression?
 
-  Args:
-    regex: regular expression
-    lhs: LHS string
-    rhs: RHS string
-  Returns:
-    A boolean indicating match.
-  '''
+    Args:
+        regex: regular expression
+        lhs: LHS string
+        rhs: RHS string
+    Returns:
+        A boolean indicating match.
+    """
     lhs_match = regex.search(lhs)
     if lhs_match:
         rhs_match = regex.search(rhs)
@@ -179,22 +179,22 @@ def regex_groups_match(regex, lhs, rhs):
 
 
 def cpe_match(cpe, dep_metadata):
-    '''Heuristically match dependency metadata against CPE.
+    """Heuristically match dependency metadata against CPE.
 
-  We have a number of rules below that should are easy to compute without having
-  to look at the dependency metadata. In the future, with additional access to
-  repository information we could do the following:
-  - For dependencies at a non-release version, walk back through git history to
-    the last known release version and attempt a match with this.
-  - For dependencies at a non-release version, use the commit date to look for a
-    version match where version is YYYY-MM-DD.
+    We have a number of rules below that should are easy to compute without having
+    to look at the dependency metadata. In the future, with additional access to
+    repository information we could do the following:
+    - For dependencies at a non-release version, walk back through git history to
+      the last known release version and attempt a match with this.
+    - For dependencies at a non-release version, use the commit date to look for a
+      version match where version is YYYY-MM-DD.
 
-  Args:
-    cpe: Cpe object to match against.
-    dep_metadata: dependency metadata dictionary.
-  Returns:
-    A boolean indicating a match.
-  '''
+    Args:
+        cpe: Cpe object to match against.
+        dep_metadata: dependency metadata dictionary.
+    Returns:
+        A boolean indicating a match.
+    """
     dep_cpe = Cpe.from_string(dep_metadata['cpe'])
     dep_version = dep_metadata['version']
     # The 'part' and 'vendor' must be an exact match.
@@ -227,17 +227,17 @@ def cpe_match(cpe, dep_metadata):
 
 
 def cve_match(cve, dep_metadata):
-    '''Heuristically match dependency metadata against CVE.
+    """Heuristically match dependency metadata against CVE.
 
-  In general, we allow false positives but want to keep the noise low, to avoid
-  the toil around having to populate IGNORES_CVES.
+    In general, we allow false positives but want to keep the noise low, to avoid
+    the toil around having to populate IGNORES_CVES.
 
-  Args:
-    cve: Cve object to match against.
-    dep_metadata: dependency metadata dictionary.
-  Returns:
-    A boolean indicating a match.
-  '''
+    Args:
+        cve: Cve object to match against.
+        dep_metadata: dependency metadata dictionary.
+    Returns:
+        A boolean indicating a match.
+    """
     wildcard_version_match = False
     # Consider each CPE attached to the CVE for a match against the dependency CPE.
     for cpe in cve.cpes:
@@ -258,18 +258,18 @@ def cve_match(cve, dep_metadata):
 
 
 def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
-    '''Scan for CVEs in a parsed NIST CVE database.
+    """Scan for CVEs in a parsed NIST CVE database.
 
-  Args:
-    cves: CVE dictionary as provided by download_cve_data().
-    cve_revmap: CPE-CVE reverse map as provided by download_cve_data().
-    cve_allowlist: an allowlist of CVE IDs to ignore.
-    repository_locations: a dictionary of dependency metadata in the format
-      described in api/bazel/external_deps.bzl.
-  Returns:
-    possible_cves: a dictionary mapping CVE IDs to Cve objects.
-    cve_deps: a dictionary mapping CVE IDs to dependency names.
-  '''
+    Args:
+        cves: CVE dictionary as provided by download_cve_data().
+        cve_revmap: CPE-CVE reverse map as provided by download_cve_data().
+        cve_allowlist: an allowlist of CVE IDs to ignore.
+        repository_locations: a dictionary of dependency metadata in the format
+           described in api/bazel/external_deps.bzl.
+    Returns:
+        possible_cves: a dictionary mapping CVE IDs to Cve objects.
+        cve_deps: a dictionary mapping CVE IDs to dependency names.
+    """
     possible_cves = {}
     cve_deps = defaultdict(list)
     for dep, metadata in repository_locations.items():
