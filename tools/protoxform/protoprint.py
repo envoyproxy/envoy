@@ -18,29 +18,20 @@ import re
 import subprocess
 import sys
 
-from tools.api_proto_plugin import annotations
-from tools.api_proto_plugin import plugin
-from tools.api_proto_plugin import traverse
-from tools.api_proto_plugin import visitor
+from tools.api_proto_plugin import annotations, traverse, visitor
 import tools.api_versioning.utils as api_version_utils
-from tools.protoxform import options as protoxform_options
-from tools.protoxform import utils
-from tools.type_whisperer import type_whisperer
-from tools.type_whisperer.types_pb2 import Types
+from tools.protoxform import options as protoxform_options, utils
+from tools.type_whisperer import type_whisperer, types_pb2
 
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
-# Note: we have to include those proto definitions to make format_options work,
-# this also serves as allowlist of extended options.
-from google.api import annotations_pb2 as _
-from validate import validate_pb2 as _
-from envoy.annotations import deprecation_pb2
-from envoy.annotations import resource_pb2
-from udpa.annotations import migrate_pb2
-from udpa.annotations import security_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
-from udpa.annotations import status_pb2
+from udpa.annotations import deprecation_pb2, migrate_pb2, status_pb2
+
+PROTO_PACKAGES = ("google.api.annotations", "validate.validate",
+                  "envoy.annotations.resource", "udpa.annotations.migrate",
+                  "udpa.annotations.security", "udpa.annotations.status",
+                  "udpa.annotations.versioning", "udpa.annotations.sensitive")
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -52,12 +43,12 @@ class ProtoPrintError(Exception):
 def extract_clang_proto_style(clang_format_text):
     """Extract a key:value dictionary for proto formatting.
 
-  Args:
-    clang_format_text: text from a .clang-format file.
+    Args:
+        clang_format_text: text from a .clang-format file.
 
-  Returns:
-    key:value dictionary suitable for passing to clang-format --style.
-  """
+    Returns:
+        key:value dictionary suitable for passing to clang-format --style.
+    """
     lang = None
     format_dict = {}
     for line in clang_format_text.split('\n'):
@@ -82,12 +73,12 @@ CLANG_FORMAT_STYLE = extract_clang_proto_style(pathlib.Path('.clang-format').rea
 def clang_format(contents):
     """Run proto-style oriented clang-format over given string.
 
-  Args:
-    contents: a string with proto contents.
+    Args:
+        contents: a string with proto contents.
 
-  Returns:
-    clang-formatted string
-  """
+    Returns:
+        clang-formatted string
+    """
     return subprocess.run(
         ['clang-format',
          '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
@@ -98,14 +89,14 @@ def clang_format(contents):
 def format_block(block):
     """Append \n to a .proto section (e.g.
 
-  comment, message definition, etc.) if non-empty.
+    comment, message definition, etc.) if non-empty.
 
-  Args:
-    block: a string representing the section.
+    Args:
+        block: a string representing the section.
 
-  Returns:
-    A string with appropriate whitespace.
-  """
+    Returns:
+        A string with appropriate whitespace.
+    """
     if block.strip():
         return block + '\n'
     return ''
@@ -114,15 +105,15 @@ def format_block(block):
 def format_comments(comments):
     """Format a list of comment blocks from SourceCodeInfo.
 
-  Prefixes // to each line, separates blocks by spaces.
+    Prefixes // to each line, separates blocks by spaces.
 
-  Args:
-    comments: a list of blocks, each block is a list of strings representing
-      lines in each block.
+    Args:
+        comments: a list of blocks, each block is a list of strings representing
+           lines in each block.
 
-  Returns:
-    A string reprenting the formatted comment blocks.
-  """
+    Returns:
+        A string reprenting the formatted comment blocks.
+    """
 
     # TODO(htuch): not sure why this is needed, but clang-format does some weird
     # stuff with // comment indents when we have these trailing \
@@ -139,12 +130,12 @@ def format_comments(comments):
 def create_next_free_field_xform(msg_proto):
     """Return the next free field number annotation transformer of a message.
 
-  Args:
-    msg_proto: DescriptorProto for message.
+    Args:
+        msg_proto: DescriptorProto for message.
 
-  Returns:
-    the next free field number annotation transformer.
-  """
+    Returns:
+        the next free field number annotation transformer.
+    """
     next_free = max(
         sum([
             [f.number + 1 for f in msg_proto.field],
@@ -157,14 +148,14 @@ def create_next_free_field_xform(msg_proto):
 def format_type_context_comments(type_context, annotation_xforms=None):
     """Format the leading/trailing comments in a given TypeContext.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    annotation_xforms: a dict of transformers for annotations in leading
-      comment.
+    Args:
+        type_context: contextual information for message/enum/field.
+        annotation_xforms: a dict of transformers for annotations in leading
+           comment.
 
-  Returns:
-    Tuple of formatted leading and trailing comment blocks.
-  """
+    Returns:
+        Tuple of formatted leading and trailing comment blocks.
+    """
     leading_comment = type_context.leading_comment
     if annotation_xforms:
         leading_comment = leading_comment.get_comment_with_transforms(annotation_xforms)
@@ -177,20 +168,20 @@ def format_header_from_file(source_code_info, file_proto, empty_file, import_dep
                             frozen_proto):
     """Format proto header.
 
-  Args:
-    source_code_info: SourceCodeInfo object.
-    file_proto: FileDescriptorProto for file.
-    empty_file: are there no message/enum/service defs in file?
-    import_deprecation_proto: should the "envoy/annotation/deprecation.proto" be imported?
-    frozen_proto: is the proto file frozen?
+    Args:
+        source_code_info: SourceCodeInfo object.
+        file_proto: FileDescriptorProto for file.
+        empty_file: are there no message/enum/service defs in file?
+        import_deprecation_proto: should the "envoy/annotation/deprecation.proto" be imported?
+        frozen_proto: is the proto file frozen?
 
-  Returns:
-    Formatted proto header as a string.
-  """
+    Returns:
+        Formatted proto header as a string.
+    """
     # Load the type database.
     typedb = utils.get_type_db()
     # Figure out type dependencies in this .proto.
-    types = Types()
+    types = types_pb2.Types()
     text_format.Merge(traverse.traverse_file(file_proto, type_whisperer.TypeWhispererVisitor()),
                       types)
     type_dependencies = sum([list(t.type_dependencies) for t in types.types.values()], [])
@@ -314,17 +305,17 @@ def format_header_from_file(source_code_info, file_proto, empty_file, import_dep
 def normalize_field_type_name(type_context, field_fqn):
     """Normalize a fully qualified field type name, e.g.
 
-  .envoy.foo.bar is normalized to foo.bar.
+    .envoy.foo.bar is normalized to foo.bar.
 
-  Considers type context to minimize type prefix.
+    Considers type context to minimize type prefix.
 
-  Args:
-    field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
-    type_context: contextual information for message/enum/field.
+    Args:
+        field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
+        type_context: contextual information for message/enum/field.
 
-  Returns:
-    Normalized type name as a string.
-  """
+    Returns:
+        Normalized type name as a string.
+    """
     if field_fqn.startswith('.'):
         # Let's say we have type context namespace a.b.c.d.e and the type we're
         # trying to normalize is a.b.d.e. We take (from the end) on package fragment
@@ -400,13 +391,13 @@ def type_name_from_fqn(fqn):
 def format_field_type(type_context, field):
     """Format a FieldDescriptorProto type description.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    field: FieldDescriptor proto.
+    Args:
+        type_context: contextual information for message/enum/field.
+        field: FieldDescriptor proto.
 
-  Returns:
-    Formatted proto field type as string.
-  """
+    Returns:
+        Formatted proto field type as string.
+    """
     label = 'repeated ' if field.label == field.LABEL_REPEATED else ''
     type_name = label + normalize_field_type_name(type_context, field.type_name)
 
@@ -445,13 +436,13 @@ def format_field_type(type_context, field):
 def format_service_method(type_context, method):
     """Format a service MethodDescriptorProto.
 
-  Args:
-    type_context: contextual information for method.
-    method: MethodDescriptorProto proto.
+    Args:
+        type_context: contextual information for method.
+        method: MethodDescriptorProto proto.
 
-  Returns:
-    Formatted service method as string.
-  """
+    Returns:
+        Formatted service method as string.
+    """
 
     def format_streaming(s):
         return 'stream ' if s else ''
@@ -467,13 +458,13 @@ def format_service_method(type_context, method):
 def format_field(type_context, field):
     """Format FieldDescriptorProto as a proto field.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    field: FieldDescriptor proto.
+    Args:
+        type_context: contextual information for message/enum/field.
+        field: FieldDescriptor proto.
 
-  Returns:
-    Formatted proto field as a string.
-  """
+    Returns:
+        Formatted proto field as a string.
+    """
     if protoxform_options.has_hide_option(field.options):
         return ''
     leading_comment, trailing_comment = format_type_context_comments(type_context)
@@ -486,13 +477,13 @@ def format_field(type_context, field):
 def format_enum_value(type_context, value):
     """Format a EnumValueDescriptorProto as a proto enum value.
 
-  Args:
-    type_context: contextual information for message/enum/field.
-    value: EnumValueDescriptorProto.
+    Args:
+        type_context: contextual information for message/enum/field.
+        value: EnumValueDescriptorProto.
 
-  Returns:
-    Formatted proto enum value as a string.
-  """
+    Returns:
+        Formatted proto enum value as a string.
+    """
     if protoxform_options.has_hide_option(value.options):
         return ''
     leading_comment, trailing_comment = format_type_context_comments(type_context)
@@ -504,13 +495,13 @@ def format_enum_value(type_context, value):
 def text_format_value(field, value):
     """Format the value as protobuf text format
 
-  Args:
-    field: a FieldDescriptor that describes the field
-    value: the value stored in the field
+    Args:
+        field: a FieldDescriptor that describes the field
+        value: the value stored in the field
 
-  Returns:
-    value in protobuf text format
-  """
+    Returns:
+        value in protobuf text format
+    """
     out = io.StringIO()
     text_format.PrintFieldValue(field, value, out)
     return out.getvalue()
@@ -519,14 +510,15 @@ def text_format_value(field, value):
 def format_options(options):
     """Format *Options (e.g.
 
-  MessageOptions, FieldOptions) message.
+    MessageOptions, FieldOptions) message.
 
-  Args:
-    options: A *Options (e.g. MessageOptions, FieldOptions) message.
+    Args:
+        options: A *Options (e.g. MessageOptions, FieldOptions) message.
 
-  Returns:
-    Formatted options as a string.
-  """
+    Returns:
+        Formatted options as a string.
+    """
+
     formatted_options = []
     for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
         option_name = '({})'.format(option_descriptor.full_name
@@ -552,12 +544,12 @@ def format_options(options):
 def format_reserved(enum_or_msg_proto):
     """Format reserved values/names in a [Enum]DescriptorProto.
 
-  Args:
-    enum_or_msg_proto: [Enum]DescriptorProto message.
+    Args:
+        enum_or_msg_proto: [Enum]DescriptorProto message.
 
-  Returns:
-    Formatted enum_or_msg_proto as a string.
-  """
+    Returns:
+        Formatted enum_or_msg_proto as a string.
+    """
     rrs = copy.deepcopy(enum_or_msg_proto.reserved_range)
     # Fixups for singletons that don't seem to always have [inclusive, exclusive)
     # format when parsed by protoc.
@@ -600,8 +592,8 @@ def validate_deprecation_version(version: str):
 class ProtoFormatVisitor(visitor.Visitor):
     """Visitor to generate a proto representation from a FileDescriptor proto.
 
-  See visitor.Visitor for visitor method docs comments.
-  """
+    See visitor.Visitor for visitor method docs comments.
+    """
 
     def __init__(self, api_version_file_path, frozen_proto):
         current_api_version = api_version_utils.get_api_version(api_version_file_path)
@@ -724,6 +716,9 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 if __name__ == '__main__':
     proto_desc_path = sys.argv[1]
+
+    utils.load_protos(PROTO_PACKAGES)
+
     file_proto = descriptor_pb2.FileDescriptorProto()
     input_text = pathlib.Path(proto_desc_path).read_text()
     if not input_text:
