@@ -35,7 +35,7 @@ message MySQLProxy {
   }
 
   message ConnectionPoolSettings {
-    // Max connections exists in the connection pool, default is 10. FIXME(qinggniq)
+    // Max connections exists in the connection pool, default is 10.
     google.protobuf.UInt32Value max_connections = 1;
 
     // Max spare connections in the connection pool, addition spare connection will be closed, default is 0.
