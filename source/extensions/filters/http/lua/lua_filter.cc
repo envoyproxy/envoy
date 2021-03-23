@@ -172,9 +172,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
       {
           [](lua_State* state) {
             lua_newtable(state);
-            {
-              LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
-            }
+            { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.
@@ -670,7 +668,8 @@ int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   absl::uint128 resolution_as_int_from_state = 0;
   if (unit_parameter.empty()) {
     lua_pushnumber(state, milliseconds_since_epoch);
-  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) && resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
     lua_pushnumber(state, milliseconds_since_epoch);
   } else {
     luaL_error(state, "timestamp format must be MILLISECOND.");
