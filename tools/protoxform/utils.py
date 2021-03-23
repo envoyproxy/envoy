@@ -1,5 +1,4 @@
 import importlib
-import os
 
 from tools.type_whisperer.api_type_db_pb2 import TypeDb
 

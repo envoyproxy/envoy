@@ -8,8 +8,6 @@ import json
 import functools
 import os
 import pathlib
-import re
-import string
 import sys
 
 from google.protobuf import json_format

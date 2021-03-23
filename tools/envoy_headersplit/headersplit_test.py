@@ -2,15 +2,10 @@
 """Tests for headersplit."""
 
 import headersplit
-import io
-import os
-import subprocess
-import sys
 import unittest
 
 # libclang imports
-import clang.cindex
-from clang.cindex import TranslationUnit, Index, CursorKind
+from clang.cindex import TranslationUnit, Index
 
 
 class HeadersplitTest(unittest.TestCase):

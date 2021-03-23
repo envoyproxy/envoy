@@ -11,7 +11,6 @@
 # In each case this script will add file and line information to any backtrace log
 # lines found and echo back all non-Backtrace lines untouched.
 
-import collections
 import re
 import subprocess
 import sys

@@ -1,7 +1,5 @@
 """Envoy API annotations."""
 
-from collections import namedtuple
-
 import re
 
 # Key-value annotation regex.

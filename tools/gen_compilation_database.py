@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import glob
 import json
-import logging
 import os
 import shlex
 import subprocess

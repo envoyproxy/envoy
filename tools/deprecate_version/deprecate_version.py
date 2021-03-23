@@ -24,10 +24,8 @@ from __future__ import print_function
 
 import datetime
 from datetime import date
-from collections import defaultdict
 import os
 import re
-import subprocess
 import sys
 
 import github

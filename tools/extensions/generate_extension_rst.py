@@ -7,7 +7,6 @@ import json
 import os
 import pathlib
 import subprocess
-import sys
 
 
 def format_item(extension, metadata):

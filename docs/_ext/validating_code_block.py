@@ -1,9 +1,5 @@
-from typing import List
-from docutils import nodes
-from docutils.parsers.rst import Directive
 from docutils.parsers.rst import directives
-from sphinx.application import Sphinx
-from sphinx.util.docutils import SphinxDirective
+
 from sphinx.directives.code import CodeBlock
 from sphinx.errors import ExtensionError
 

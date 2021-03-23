@@ -4,7 +4,6 @@
 
 import imp
 import json
-import os.path
 import re
 import subprocess
 import sys
