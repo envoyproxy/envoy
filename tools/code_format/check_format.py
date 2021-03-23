@@ -115,8 +115,12 @@ MEMCPY_WHITELIST = ("./source/common/common/mem_block_builder.h",
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
-RAW_TRY_ALLOWLIST = ("./source/common/common/regex.cc", "./source/common/common/thread.h",
-                     "./source/common/network/utility.cc")
+RAW_TRY_ALLOWLIST = (
+    "./source/common/common/regex.cc",
+    "./source/common/common/thread.h",
+    "./source/common/network/utility.cc",
+    "./source/common/network/dns_impl.cc",
+)
 
 # Header files that can throw exceptions. These should be limited; the only
 # valid situation identified so far is template functions used for config

@@ -1295,6 +1295,7 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
+  // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
   TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
   catch (EnvoyException& ex) {
     return unspecifiedValue();

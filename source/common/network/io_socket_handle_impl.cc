@@ -277,6 +277,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 
 Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
                                                             socklen_t ss_len, os_fd_t fd) {
+  // TODO(chaoqin-li1123): remove this exception catching since the process is dying anyway.
   TRY_NEEDS_AUDIT {
     // Set v6only to false so that mapped-v6 address can be normalize to v4
     // address. Though dual stack may be disabled, it's still okay to assume the
