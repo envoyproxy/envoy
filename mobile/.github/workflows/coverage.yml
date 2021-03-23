@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:11efa5680d987fff33fde4af3cc5ece105015d04
+      image: envoyproxy/envoy-build-ubuntu:e33c93e6d79804bf95ff80426d10bdcc9096c785
       env:
         BAZEL_BUILD_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
         CC: /opt/llvm/bin/clang
