@@ -48,15 +48,12 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     ASSERT(data.size() > index);
     uint32_t remaining = data.size() - index;
     num_bytes = std::min(remaining, num_bytes); // restrict number up to the size of data
-    index += num_bytes;
 
     absl::string_view segment = data.substr(index, num_bytes);
+    index += num_bytes;
     if (is_symbolic) {
       absl::string_view::size_type pos = segment.find_first_not_of('.');
       segment.remove_prefix((pos == absl::string_view::npos) ? segment.size() : pos);
-      if (segment.empty()) {
-        continue;
-      }
       absl::StrAppend(&unit_test_encoding, segment);
       stat_names.push_back(symbolic_pool.add(segment));
     } else {
@@ -77,15 +74,6 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   }
   StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
   std::string decoded_str = symbol_table.toString(decoded);
-  uint32_t max_messages = 10;
-  for (uint32_t i = 0; i < std::min(name.size(), decoded_str.size()); ++i) {
-    if (name[i] != decoded_str[i]) {
-      ENVOY_LOG_MISC(error, "{}: {} != {}", i, name[i], decoded_str[i]);
-      if (--max_messages == 0) {
-        break;
-      }
-    }
-  }
   FUZZ_ASSERT(name == decoded_str);
   FUZZ_ASSERT(stat_name == decoded);
 }
