@@ -177,7 +177,7 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   absl::flat_hash_set<std::string> effective_resources;
   for (const auto& resource : resources) {
     if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
-      auto xdstp_resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
+      auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
       if (options.add_xdstp_node_context_params_) {
         const auto context = XdsContextParams::encodeResource(
             local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
