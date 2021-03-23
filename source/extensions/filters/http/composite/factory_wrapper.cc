@@ -1,4 +1,5 @@
 #include "extensions/filters/http/composite/factory_wrapper.h"
+#include "extensions/filters/http/composite/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +19,6 @@ void FactoryCallbacksWrapper::addStreamDecoderFilter(
     Http::StreamDecoderFilterSharedPtr, Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) {
   errors_.push_back(absl::InvalidArgumentError(
       "cannot delegate to decoder filter that instantiates a match tree"));
-  return;
 }
 void FactoryCallbacksWrapper::addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) {
   ASSERT(!filter_.encoded_headers_);

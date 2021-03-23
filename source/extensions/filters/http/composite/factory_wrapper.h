@@ -2,7 +2,6 @@
 
 #include "envoy/http/filter.h"
 
-#include "extensions/filters/http/composite/filter.h"
 
 namespace Envoy {
 namespace Extensions {
