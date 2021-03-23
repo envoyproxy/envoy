@@ -138,6 +138,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
 
   // Upstreams: cluster_0, cluster_override
   setUpstreamCount(2);
+
+  // Tests with ORIGINAL_DST cluster because the first use case of the setRoute / DelegatingRoute
+  // route mutability functionality will be for Lyft's internal filter that re-routes requests to an
+  // ORIGINAL_DST cluster on a per-request basis.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     std::string cluster_yaml = R"EOF(
             name: cluster_override
@@ -160,8 +164,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   auto host_foo = config_helper_.createVirtualHost("cluster_0 vhost", "/some/path", "cluster_0");
   config_helper_.addVirtualHost(host_foo);
 
-  initialize();
-
   std::string ip;
   if (GetParam().version == Network::Address::IpVersion::v4) {
     ip = "127.0.0.1";
@@ -179,13 +181,15 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
       {"x-envoy-original-dst-host", ip_port_pair},
   };
 
+  initialize();
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // Even though headers specify cluster_0, set_route_filter modifies cached route to
-  // cluster_override
+  // Even though headers specify cluster_0, set_route_filter modifies cached route cluster of
+  // current request to cluster_override
   test_server_->waitForCounterGe("cluster.cluster_override.upstream_cx_total", 1,
                                  std::chrono::milliseconds(30000));
   test_server_->waitForCounterGe("cluster.cluster_override.upstream_rq_200", 1,

@@ -19,9 +19,8 @@ public:
   constexpr static char name[] = "set-route-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> route_override =
-        std::make_shared<Router::ExampleDerivedDelegatingRoute>(decoder_callbacks_->route(),
-                                                                "cluster_override");
+    auto route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+        decoder_callbacks_->route(), "cluster_override");
 
     decoder_callbacks_->setRoute(route_override);
     return Http::FilterHeadersStatus::Continue;
