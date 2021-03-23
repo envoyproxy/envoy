@@ -140,6 +140,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "new_conn_pool_lib",
+    srcs = [
+        "new_conn_pool_impl.cc",
+    ],
+    hdrs = [
+        "new_conn_pool_impl.h",
+    ],
+    deps = [
+        ":client_interface",
+        ":codec_lib",
+        ":conn_pool_interface",
+        ":decoder_lib",
+        ":message_helper_lib",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:linked_object",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/conn_pool:conn_pool_base_lib",
+        "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_pool_lib",
     srcs = [
         "conn_pool_impl.cc",
