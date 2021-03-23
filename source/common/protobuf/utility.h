@@ -154,7 +154,7 @@ public:
 
   template <class ProtoType>
   static std::string debugString(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    return accumulateToString(
+    return accumulateToString<ProtoType>(
         source, [](const Protobuf::Message& message) { return message.DebugString(); });
   }
 

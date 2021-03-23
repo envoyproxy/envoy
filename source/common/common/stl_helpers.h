@@ -19,11 +19,11 @@ template <class Container, class T> bool containsReference(const Container& c, c
 }
 
 /**
- * Accumulates a vector of into a string of the format [string_func(element_0),
+ * Accumulates a container of into a string of the format [string_func(element_0),
  * string_func(element_1), ...]
  */
-template <class T>
-std::string accumulateToString(const std::vector<T>& source,
+template <class T, class ContainerT>
+std::string accumulateToString(const ContainerT& source,
                                std::function<std::string(const T&)> string_func) {
   if (source.empty()) {
     return "[]";
