@@ -147,8 +147,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           Utility::configSourceInitialFetchTimeout(config), false, options);
     }
     default:
-      // TODO(htuch): Add support for non-aggregated delta gRPC, but there will always be options,
-      // e.g. v2 REST, that don't make sense for xdstp:// ResourceLocators.
       throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
                                        api_config_source.DebugString()));
     }

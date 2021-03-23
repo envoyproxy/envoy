@@ -13,7 +13,7 @@ namespace Config {
 namespace {
 // Returns the namespace part (if there's any) in the resource name.
 std::string namespaceFromName(const std::string& resource_name) {
-  // We simple remove the last / component. E.g. www.foo.com/bar becomes www.foo.com.
+  // We simply remove the last / component. E.g. www.foo.com/bar becomes www.foo.com.
   const auto pos = resource_name.find_last_of('/');
   // We are not interested in the "/" character in the namespace
   return pos == std::string::npos ? "" : resource_name.substr(0, pos);

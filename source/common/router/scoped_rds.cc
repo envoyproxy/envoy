@@ -110,17 +110,15 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       scope_key_builder_(scope_key_builder), rds_config_source_(std::move(rds_config_source)),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
-  std::unique_ptr<xds::core::v3::ResourceLocator> srds_resources_locator;
-  if (!scoped_rds.srds_resources_locator().empty()) {
-    srds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
-        Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator()));
-  }
-  if (srds_resources_locator == nullptr) {
+  if (scoped_rds.srds_resources_locator().empty()) {
     subscription_ =
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
             *this, resource_decoder_, {});
   } else {
+    std::unique_ptr<xds::core::v3::ResourceLocator> srds_resources_locator =
+        std::make_unique<xds::core::v3::ResourceLocator>(
+            Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator()));
     subscription_ =
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
             *srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
