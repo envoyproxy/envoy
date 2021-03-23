@@ -131,8 +131,12 @@
 
 namespace quic {
 
-using QuicLogLevel = spdlog::level::level_enum;
-
+// QuicLogLevel and this enum exist to bridge the gap between QUICHE logging and Envoy's spdlog.
+// QUICHE logs are used in forms such as QUICHE_LOG(ERROR) which is why the enum values have
+// non-standard casing, as they are used in pre-processor token concatenation by macros in this
+// file. We cannot use an enum class like quic::LogLevel::DEBUG here because some of Envoy's build
+// environments specify -DDEBUG=1 which would cause the enum value to be replaced by the
+// pre-processor. This format of token avoids that issue.
 enum {
   LogLevelTRACE = spdlog::level::trace,
   LogLevelDEBUG = spdlog::level::debug,
@@ -147,6 +151,8 @@ enum {
   LogLevelDFATAL = LogLevelFATAL,
 #endif // NDEBUG
 };
+
+using QuicLogLevel = spdlog::level::level_enum;
 
 class QuicLogEmitter {
 public:
