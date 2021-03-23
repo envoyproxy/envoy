@@ -1,4 +1,5 @@
 #include "extensions/filters/http/composite/factory_wrapper.h"
+
 #include "extensions/filters/http/composite/filter.h"
 
 namespace Envoy {

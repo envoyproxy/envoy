@@ -2,7 +2,6 @@
 
 #include "envoy/http/filter.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
