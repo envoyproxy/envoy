@@ -97,7 +97,7 @@ envoy_cc_library(
 envoy_cc_library(
     # Currently both `active_tcp_listener` and `connection_handler_impl` need below headers
     # while addressing https://github.com/envoyproxy/envoy/issues/15126
-    # TODO(lambdai): Remove the defintion of ActiveTcpListener from dependency of ConnectionHandlerImpl
+    # TODO(lambdai): Remove the definition of ActiveTcpListener from dependency of ConnectionHandlerImpl
     # and delete this target.
     name = "active_tcp_listener_header",
     hdrs = [
