@@ -31,7 +31,7 @@ protected:
   };
 
   ListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
