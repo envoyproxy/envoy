@@ -13,8 +13,8 @@ if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || 
 fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
-SRCDIR="${SRCDIR:-$PWD}"
-ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}" 
+export SRCDIR="${SRCDIR:-$PWD}"
+export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}" 
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
 if [[ -z "$NO_BUILD_SETUP" ]]; then
