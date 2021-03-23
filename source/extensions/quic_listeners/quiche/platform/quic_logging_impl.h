@@ -201,7 +201,7 @@ inline spdlog::logger& GetLogger() {
            GetLogger().level();                                                                    \
   }
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(TRACE)
-QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(DEBUG)
+QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(QDEBUG)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(INFO)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(WARNING)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(ERROR)
