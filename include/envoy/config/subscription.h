@@ -128,7 +128,8 @@ public:
  */
 struct SubscriptionOptions {
   /**
-   * For legacy VHDS, should an xDS resource name be treated as <namespace>/<resource name>?
+   * For legacy VHDS, should an xDS resource name be treated as <namespace>/<resource name>? This is
+   * incompatible with the use of xdstp:// naming.
    */
   bool use_namespace_matching_{};
 

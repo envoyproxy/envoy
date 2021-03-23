@@ -116,12 +116,11 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
             *this, resource_decoder_, {});
   } else {
-    std::unique_ptr<xds::core::v3::ResourceLocator> srds_resources_locator =
-        std::make_unique<xds::core::v3::ResourceLocator>(
-            Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator()));
+    const auto srds_resources_locator =
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator());
     subscription_ =
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
-            *srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
+            srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
             *this, resource_decoder_);
   }
 
