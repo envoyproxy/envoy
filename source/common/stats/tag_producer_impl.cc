@@ -72,7 +72,6 @@ void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
 
 void TagProducerImpl::forEachExtractorMatching(
     absl::string_view stat_name, std::function<void(const TagExtractorPtr&)> f) const {
-  IntervalSetImpl<size_t> remove_characters;
   for (const TagExtractorPtr& tag_extractor : tag_extractors_without_prefix_) {
     f(tag_extractor);
   }
@@ -94,8 +93,8 @@ std::string TagProducerImpl::produceTags(TagExtractionContext& extraction_contex
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   forEachExtractorMatching(extraction_context.name(),
                            [&extraction_context](const TagExtractorPtr& tag_extractor) {
-    tag_extractor->extractTag(extraction_context);
-  });
+                             tag_extractor->extractTag(extraction_context);
+                           });
   return extraction_context.tagExtractedName();
 }
 

@@ -351,26 +351,23 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
 // When tag extraction is not done, this class is just a passthrough for the provided name/tags.
 class StatNameTagHelper {
 public:
-  StatNameTagHelper(ThreadLocalStoreImpl& tls, StatName name,
+  StatNameTagHelper(ThreadLocalStoreImpl& tls, StatName stat_name,
                     const absl::optional<StatNameTagVector>& stat_name_tags)
       : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
     if (!stat_name_tags) {
-      std::string tag_extracted_name;
-      {
-        TagExtractionContext extraction_context(tls.symbolTable().toString(name));
-        tag_extracted_name = tls.tagProducer().produceTags(extraction_context);
-        StatName empty;
-        for (const auto& tag : extraction_context.tags()) {
-          StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
-          if (tag_name.empty()) {
-            tag_name = pool_.add(tag.name_);
-          }
-          stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
+      std::string name = tls.symbolTable().toString(stat_name);
+      TagExtractionContext extraction_context(name);
+      tag_extracted_name_ = pool_.add(tls.tagProducer().produceTags(extraction_context));
+      StatName empty;
+      for (const auto& tag : extraction_context.tags()) {
+        StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
+        if (tag_name.empty()) {
+          tag_name = pool_.add(tag.name_);
         }
+        stat_name_tags_.emplace_back(tag_name, pool_.add(tag.value_));
       }
-      tag_extracted_name_ = pool_.add(tag_extracted_name);
     } else {
-      tag_extracted_name_ = name;
+      tag_extracted_name_ = stat_name;
     }
   }
 
