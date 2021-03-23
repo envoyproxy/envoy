@@ -80,7 +80,7 @@ EXTENSION_CATEGORIES = [
     "envoy.grpc_credentials",
     "envoy.guarddog_actions",
     "envoy.health_checkers",
-    "envoy.http.header_formatters",
+    "envoy.http.stateful_header_formatters",
     "envoy.internal_redirect_predicates",
     "envoy.io_socket",
     "envoy.matching.input_matchers",

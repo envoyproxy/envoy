@@ -19,7 +19,7 @@ To configure this for upstream request headers, specify the formatting in
 the cluster's
 :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
 
-Currently Envoy supports two different types of header key formatters:
+Currently Envoy supports two mutually exclusive types of header key formatters:
 
 Stateless formatters
 --------------------

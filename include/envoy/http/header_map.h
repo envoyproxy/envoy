@@ -663,10 +663,10 @@ public:
 
   /**
    * Return the optional formatter attached to this header map. Filters can use the non-const
-   * version to remember additional header keys during operation if they wish.
+   * version to remember additional header keys during operation if they wish. fixfix
    */
   virtual HeaderKeyFormatterOptConstRef formatter() const PURE;
-  virtual StatefulHeaderKeyFormatterOptRef formatter() PURE;
+  virtual StatefulHeaderKeyFormatterOptRef statefulFormatter() PURE;
 };
 
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;

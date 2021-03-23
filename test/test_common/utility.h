@@ -1013,10 +1013,10 @@ public:
     header_map_->verifyByteSizeInternalForTest();
     return rc;
   }
-  HeaderKeyFormatterOptConstRef formatter() const override {
-    return const_cast<const Impl*>(header_map_.get())->formatter();
+  HeaderKeyFormatterOptConstRef formatter() const override { return header_map_->formatter(); }
+  StatefulHeaderKeyFormatterOptRef statefulFormatter() override {
+    return header_map_->statefulFormatter();
   }
-  StatefulHeaderKeyFormatterOptRef formatter() override { return header_map_->formatter(); }
 
   std::unique_ptr<Impl> header_map_{Impl::create()};
 };

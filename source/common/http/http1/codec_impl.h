@@ -281,7 +281,7 @@ protected:
 
   Network::Connection& connection_;
   CodecStats& stats_;
-  const Http1Settings& codec_settings_;
+  const Http1Settings codec_settings_;
   http_parser parser_;
   Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};

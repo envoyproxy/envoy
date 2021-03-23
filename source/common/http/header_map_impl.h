@@ -104,7 +104,9 @@ public:
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(static_cast<const HeaderKeyFormatter*>(formatter_.get()));
   }
-  StatefulHeaderKeyFormatterOptRef formatter() { return makeOptRefFromPtr(formatter_.get()); }
+  StatefulHeaderKeyFormatterOptRef statefulFormatter() {
+    return makeOptRefFromPtr(formatter_.get());
+  }
 
 protected:
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
@@ -405,7 +407,9 @@ public:
     HeaderMapImpl::dumpState(os, indent_level);
   }
   HeaderKeyFormatterOptConstRef formatter() const override { return HeaderMapImpl::formatter(); }
-  StatefulHeaderKeyFormatterOptRef formatter() override { return HeaderMapImpl::formatter(); }
+  StatefulHeaderKeyFormatterOptRef statefulFormatter() override {
+    return HeaderMapImpl::statefulFormatter();
+  }
 
   // Generic custom header functions for each fully typed interface. To avoid accidental issues,
   // the Handle type is different for each interface, which is why these functions live here vs.

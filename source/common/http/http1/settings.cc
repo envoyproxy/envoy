@@ -26,7 +26,8 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
     auto header_formatter_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         config.header_key_format().stateful_formatter().typed_config(), validation_visitor,
         factory);
-    ret.header_key_format_ = factory.createFromProto(*header_formatter_config);
+    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::StatefulFormatter;
+    ret.stateful_header_key_formatter_ = factory.createFromProto(*header_formatter_config);
   }
 
   return ret;

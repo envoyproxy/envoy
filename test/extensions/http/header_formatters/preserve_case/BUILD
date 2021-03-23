@@ -12,11 +12,22 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "adaptive_concurrency_integration_test",
+    name = "preserve_case_formatter_test",
+    srcs = [
+        "preserve_case_formatter_test.cc",
+    ],
+    extension_name = "envoy.http.stateful_header_formatters.preserve_case",
+    deps = [
+        "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "preserve_case_formatter_integration_test",
     srcs = [
         "preserve_case_formatter_integration_test.cc",
     ],
-    extension_name = "envoy.http.header_formatters.preserve_case",
+    extension_name = "envoy.http.stateful_header_formatters.preserve_case",
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",

@@ -66,9 +66,7 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
 }
 
 HeaderKeyFormatterConstPtr encodeOnlyFormatterFromSettings(const Http::Http1Settings& settings) {
-  if (absl::holds_alternative<Http1Settings::HeaderKeyFormat>(settings.header_key_format_) &&
-      absl::get<Http1Settings::HeaderKeyFormat>(settings.header_key_format_) ==
-          Http1Settings::HeaderKeyFormat::ProperCase) {
+  if (settings.header_key_format_ == Http1Settings::HeaderKeyFormat::ProperCase) {
     return std::make_unique<ProperCaseHeaderKeyFormatter>();
   }
 
@@ -76,8 +74,8 @@ HeaderKeyFormatterConstPtr encodeOnlyFormatterFromSettings(const Http::Http1Sett
 }
 
 StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Settings& settings) {
-  if (absl::holds_alternative<StatefulHeaderKeyFormatterFactoryPtr>(settings.header_key_format_)) {
-    return absl::get<StatefulHeaderKeyFormatterFactoryPtr>(settings.header_key_format_)->create();
+  if (settings.header_key_format_ == Http1Settings::HeaderKeyFormat::StatefulFormatter) {
+    return settings.stateful_header_key_formatter_->create();
   }
   return nullptr;
 }
@@ -532,7 +530,7 @@ Status ConnectionImpl::completeLastHeader() {
 
     // If there is a stateful formatter installed, remember the original header key before
     // converting to lower case.
-    auto formatter = headers_or_trailers.formatter();
+    auto formatter = headers_or_trailers.statefulFormatter();
     if (formatter.has_value()) {
       formatter->rememberOriginalHeaderKey(current_header_field_.getStringView());
     }

@@ -1,6 +1,7 @@
+#include "extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.validate.h"
-#include "envoy/http/header_formatter.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
@@ -9,24 +10,25 @@ namespace Http {
 namespace HeaderFormatters {
 namespace PreserveCase {
 
-class PreserveCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatter {
-public:
-  // Envoy::Http::StatefulHeaderKeyFormatter
-  std::string format(absl::string_view key) const override {
-    const auto remembered_key = original_header_keys_.find(key);
-    if (remembered_key != original_header_keys_.end()) {
-      return *remembered_key;
-    } else {
-      return std::string(key);
-    }
+std::string PreserveCaseHeaderFormatter::format(absl::string_view key) const {
+  const auto remembered_key = original_header_keys_.find(key);
+  // TODO(mattklein123): We can avoid string copies here if the formatter interface allowed us
+  // to return something like GetAllOfHeaderAsStringResult with both a string_view and an
+  // optional backing string. We can do this in a follow up if there is interest.
+  if (remembered_key != original_header_keys_.end()) {
+    return *remembered_key;
+  } else {
+    return std::string(key);
   }
-  void rememberOriginalHeaderKey(absl::string_view key) override {
-    original_header_keys_.emplace(key);
-  }
+}
 
-private:
-  StringUtil::CaseUnorderedSet original_header_keys_;
-};
+void PreserveCaseHeaderFormatter::rememberOriginalHeaderKey(absl::string_view key) {
+  // Note: This implementation will only remember the first instance of a particular header key.
+  // So for example "Foo" followed by "foo" will both be serialized as "Foo" on the way out. We
+  // could do better here but it's unlikely it's worth it and we can see if anyone complains about
+  // the implementation.
+  original_header_keys_.emplace(key);
+}
 
 class PreserveCaseFormatterFactory : public Envoy::Http::StatefulHeaderKeyFormatterFactory {
 public:
@@ -41,9 +43,9 @@ class PreserveCaseFormatterFactoryConfig
 public:
   // Envoy::Http::StatefulHeaderKeyFormatterFactoryConfig
   std::string name() const override { return "preserve_case"; }
-  Envoy::Http::StatefulHeaderKeyFormatterFactoryPtr
+  Envoy::Http::StatefulHeaderKeyFormatterFactorySharedPtr
   createFromProto(const Protobuf::Message&) override {
-    return std::make_unique<PreserveCaseFormatterFactory>();
+    return std::make_shared<PreserveCaseFormatterFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::http::header_formatters::preserve_case::v3::

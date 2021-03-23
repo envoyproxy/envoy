@@ -11,7 +11,8 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "preserve_case_formatter",
     srcs = ["preserve_case_formatter.cc"],
-    category = "envoy.http.header_formatters",
+    hdrs = ["preserve_case_formatter.h"],
+    category = "envoy.http.stateful_header_formatters",
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         "//include/envoy/registry",

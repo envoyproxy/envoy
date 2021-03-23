@@ -434,10 +434,15 @@ struct Http1Settings {
     // Performs proper casing of header keys: the first and all alpha characters following a
     // non-alphanumeric character is capitalized.
     ProperCase,
+    // fixfix
+    StatefulFormatter,
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
-  absl::variant<HeaderKeyFormat, StatefulHeaderKeyFormatterFactoryPtr> header_key_format_;
+  HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+
+  // fixfix
+  StatefulHeaderKeyFormatterFactorySharedPtr stateful_header_key_formatter_;
 
   // Behaviour on invalid HTTP messaging:
   // - if true, the HTTP/1.1 connection is left open (where possible)

@@ -51,17 +51,18 @@ public:
   virtual StatefulHeaderKeyFormatterPtr create() PURE;
 };
 
-using StatefulHeaderKeyFormatterFactoryPtr = std::unique_ptr<StatefulHeaderKeyFormatterFactory>;
+using StatefulHeaderKeyFormatterFactorySharedPtr =
+    std::shared_ptr<StatefulHeaderKeyFormatterFactory>;
 
 /**
  * Extension configuration for stateful header key formatters.
  */
 class StatefulHeaderKeyFormatterFactoryConfig : public Config::TypedFactory {
 public:
-  virtual StatefulHeaderKeyFormatterFactoryPtr
+  virtual StatefulHeaderKeyFormatterFactorySharedPtr
   createFromProto(const Protobuf::Message& config) PURE;
 
-  std::string category() const override { return "envoy.http.header_formatters"; }
+  std::string category() const override { return "envoy.http.stateful_header_formatters"; }
 };
 
 } // namespace Http
