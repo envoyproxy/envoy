@@ -14,10 +14,10 @@ template <class ContainerT, class UpdateCbT>
 void applyToAllWithCompletionCallback(const ContainerT& container, UpdateCbT update_cb,
                                       std::function<void()> done_cb) {
 
-  auto remaining_elements = container.size();
+  auto remaining_elements = std::make_shared<uint64_t>(container.size());
   for (auto element : container) {
-    update_cb(element, [&remaining_elements, done_cb] {
-      if ((--remaining_elements) == 0) {
+    update_cb(element, [remaining_elements, done_cb] {
+      if (--(*remaining_elements) == 0) {
         done_cb();
       }
     });
