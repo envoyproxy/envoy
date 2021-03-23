@@ -4,10 +4,7 @@ package envoy.extensions.access_loggers.stderror.v3;
 
 import "envoy/config/core/v3/substitution_format_string.proto";
 
-import "google/protobuf/struct.proto";
-
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stderror.v3";

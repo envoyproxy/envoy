@@ -6,7 +6,6 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/protocol.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
