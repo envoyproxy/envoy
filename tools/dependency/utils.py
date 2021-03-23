@@ -1,6 +1,5 @@
 # Utilities for reasoning about dependencies.
 
-import os
 from collections import namedtuple
 
 from exports import (api_repository_locations, envoy_repository_locations,
