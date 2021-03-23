@@ -5,7 +5,6 @@
 #include <list>
 #include <memory>
 
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
