@@ -34,4 +34,20 @@ TEST(OptRefTest, Const) {
   EXPECT_EQ(5, optref->size());
 }
 
+class Foo {};
+class Bar : public Foo {};
+
+TEST(OptRefTest, Conversion) {
+  Foo foo;
+  Bar bar;
+  OptRef<Foo> foo_ref(foo);
+  OptRef<Bar> bar_ref(bar);
+
+  // Copy construct conversion.
+  OptRef<Foo> converted_ref(bar);
+
+  // Assignment conversion.
+  foo_ref = bar_ref;
+}
+
 } // namespace Envoy

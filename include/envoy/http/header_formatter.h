@@ -37,6 +37,7 @@ public:
 
 using StatefulHeaderKeyFormatterPtr = std::unique_ptr<StatefulHeaderKeyFormatter>;
 using StatefulHeaderKeyFormatterOptRef = OptRef<StatefulHeaderKeyFormatter>;
+using StatefulHeaderKeyFormatterOptConstRef = OptRef<const StatefulHeaderKeyFormatter>;
 
 /**
  * Interface for creating stateful header key formatters.

@@ -127,7 +127,7 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream,
                                           bool bodiless_request) {
-  HeaderKeyFormatterOptConstRef formatter = headers.formatter();
+  HeaderKeyFormatterOptConstRef formatter(headers.formatter());
   if (!formatter.has_value()) {
     formatter = connection_.formatter();
   }
@@ -530,7 +530,7 @@ Status ConnectionImpl::completeLastHeader() {
 
     // If there is a stateful formatter installed, remember the original header key before
     // converting to lower case.
-    auto formatter = headers_or_trailers.statefulFormatter();
+    auto formatter = headers_or_trailers.formatter();
     if (formatter.has_value()) {
       formatter->rememberOriginalHeaderKey(current_header_field_.getStringView());
     }

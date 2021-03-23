@@ -101,12 +101,10 @@ public:
   size_t size() const { return headers_.size(); }
   bool empty() const { return headers_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const;
-  HeaderKeyFormatterOptConstRef formatter() const {
-    return makeOptRefFromPtr(static_cast<const HeaderKeyFormatter*>(formatter_.get()));
+  StatefulHeaderKeyFormatterOptConstRef formatter() const {
+    return StatefulHeaderKeyFormatterOptConstRef(makeOptRefFromPtr(formatter_.get()));
   }
-  StatefulHeaderKeyFormatterOptRef statefulFormatter() {
-    return makeOptRefFromPtr(formatter_.get());
-  }
+  StatefulHeaderKeyFormatterOptRef formatter() { return makeOptRefFromPtr(formatter_.get()); }
 
 protected:
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
@@ -406,10 +404,10 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     HeaderMapImpl::dumpState(os, indent_level);
   }
-  HeaderKeyFormatterOptConstRef formatter() const override { return HeaderMapImpl::formatter(); }
-  StatefulHeaderKeyFormatterOptRef statefulFormatter() override {
-    return HeaderMapImpl::statefulFormatter();
+  StatefulHeaderKeyFormatterOptConstRef formatter() const override {
+    return HeaderMapImpl::formatter();
   }
+  StatefulHeaderKeyFormatterOptRef formatter() override { return HeaderMapImpl::formatter(); }
 
   // Generic custom header functions for each fully typed interface. To avoid accidental issues,
   // the Handle type is different for each interface, which is why these functions live here vs.

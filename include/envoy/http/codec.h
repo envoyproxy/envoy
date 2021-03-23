@@ -434,14 +434,14 @@ struct Http1Settings {
     // Performs proper casing of header keys: the first and all alpha characters following a
     // non-alphanumeric character is capitalized.
     ProperCase,
-    // fixfix
+    // A stateful formatter extension has been configured.
     StatefulFormatter,
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
 
-  // fixfix
+  // Non-null IFF header_key_format_ is configured to StatefulFormatter.
   StatefulHeaderKeyFormatterFactorySharedPtr stateful_header_key_formatter_;
 
   // Behaviour on invalid HTTP messaging:
