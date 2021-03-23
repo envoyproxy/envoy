@@ -397,6 +397,8 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
   EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
                      "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
+                     "CHECK failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
 }
 
 // Test the behaviors of the cross products of
