@@ -238,6 +238,30 @@ TEST_F(FilterTest, StreamFilterDelegationEncodeFilterWithMatchTree) {
   filter_.onDestroy();
 }
 
+// Adding a encoder filter with a match tree twice should not cause delegation.
+TEST_F(FilterTest, StreamFilterDelegationMultipleEncodeFilterWithMatchTree) {
+  auto encode_filter = std::make_shared<Http::MockStreamEncoderFilter>();
+
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamEncoderFilter(encode_filter, nullptr);
+    cb.addStreamEncoderFilter(encode_filter, nullptr);
+  };
+
+  CompositeAction action(factory_callback);
+
+  // Verify that the log output looks right.
+  EXPECT_LOG_CONTAINS(
+      "error",
+      "failed to create delegated filter [INVALID_ARGUMENT: cannot delegate to encoder "
+      "filter that instantiates a match tree, INVALID_ARGUMENT: cannot delegate to "
+      "encoder filter that instantiates a match tree]",
+      filter_.onMatchCallback(action));
+
+  doAllDecodingCallbacks();
+  doAllEncodingCallbacks();
+  filter_.onDestroy();
+}
+
 } // namespace
 } // namespace Composite
 } // namespace HttpFilters

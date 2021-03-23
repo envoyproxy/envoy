@@ -2,6 +2,8 @@
 
 #include "envoy/http/filter.h"
 
+#include "common/common/stl_helpers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -75,9 +77,12 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<CompositeAction>();
 
   FactoryCallbacksWrapper wrapper(*this);
-  const auto status = composite_action.createFilters(wrapper);
-  if (!status.ok()) {
-    ENVOY_LOG(error, "failed to create delegated filter {}", status);
+  composite_action.createFilters(wrapper);
+
+  if (!wrapper.errors_.empty()) {
+    ENVOY_LOG(error, "failed to create delegated filter {}",
+              accumulateToString<absl::Status>(
+                  wrapper.errors_, [](const auto& status) { return status.ToString(); }));
     return;
   }
 

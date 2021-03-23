@@ -14,8 +14,7 @@ class CompositeAction
 public:
   explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
 
-  ABSL_MUST_USE_RESULT
-  absl::Status createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
+  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 
 private:
   Http::FilterFactoryCb cb_;
