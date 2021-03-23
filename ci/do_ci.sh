@@ -12,8 +12,10 @@ if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || 
   build_setup_args="-nofetch"
 fi
 
-SRCDIR="${PWD}"
+SRCDIR="${SRCDIR:-$PWD}"
+ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}" 
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
+
 if [[ -z "$NO_BUILD_SETUP" ]]; then
     # shellcheck source=ci/setup_cache.sh
     . "$(dirname "$0")"/setup_cache.sh
