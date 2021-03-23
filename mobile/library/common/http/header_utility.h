@@ -10,13 +10,6 @@ namespace Http {
 namespace Utility {
 
 /**
- * Copy envoy_data into an std::string.
- * @param s the envoy_data to copy.
- * @return std::string the string constructed from s.
- */
-std::string convertToString(envoy_data s);
-
-/**
  * Transform envoy_headers to RequestHeaderMap.
  * This function copies the content.
  * @param headers, the envoy_headers to transform.
