@@ -508,15 +508,15 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
 
-    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
-    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
-              "Filter did not return StopAll or StopIteration after sending a local reply.");
-
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     (*entry)->decode_headers_called_ = true;
+
+    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+    ENVOY_BUG(!continue_iteration || !state_.local_complete_,
+              "Filter did not return StopAll or StopIteration after sending a local reply.");
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
