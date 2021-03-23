@@ -215,7 +215,6 @@ envoy_cc_test(
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
-        "//source/common/router:delegating_route_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
@@ -227,6 +226,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:delegating_route_utility_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",

@@ -4,7 +4,6 @@
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
-#include "common/router/delegating_route_impl.h"
 
 #include "extensions/access_loggers/common/file_access_log_impl.h"
 
@@ -17,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/delegating_route_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -213,34 +213,6 @@ public:
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
-
-  // For testing purposes only. Example derived class of DelegatingRouteEntry.
-  class ExampleDerivedDelegatingRouteEntry : public Router::DelegatingRouteEntry {
-  public:
-    ExampleDerivedDelegatingRouteEntry(Router::RouteConstSharedPtr base_route,
-                                       const std::string& cluster_name_override)
-        : DelegatingRouteEntry(base_route), custom_cluster_name_(cluster_name_override) {}
-
-    const std::string& clusterName() const override { return custom_cluster_name_; }
-
-  private:
-    const std::string custom_cluster_name_;
-  };
-
-  // For testing purposes only. Example derived class of DelegatingRoute.
-  class ExampleDerivedDelegatingRoute : public Router::DelegatingRoute {
-  public:
-    ExampleDerivedDelegatingRoute(Router::RouteConstSharedPtr base_route,
-                                  const std::string& cluster_name_override)
-        : DelegatingRoute(base_route),
-          custom_route_entry_(std::make_unique<const ExampleDerivedDelegatingRouteEntry>(
-              base_route, cluster_name_override)) {}
-
-    const Router::RouteEntry* routeEntry() const override { return custom_route_entry_.get(); }
-
-  private:
-    const std::unique_ptr<const ExampleDerivedDelegatingRouteEntry> custom_route_entry_;
-  };
 };
 
 } // namespace Http

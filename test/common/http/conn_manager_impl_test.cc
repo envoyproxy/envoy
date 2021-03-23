@@ -719,6 +719,9 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// The router observes the cached route as a DelegatingRoute (with upstream cluster foo), not the
+// original route returned by route config (upstream cluster default), when the setRoute filter
+// callback is applied.
 TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverride) {
   setup(false, "");
   setupFilterChain(2, 0);
@@ -748,7 +751,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
 
   // RouteConstSharedPtr of DelegatingRoute for foo
   // Initialization separate from declaration to be in scope for both decoder_filters_
-  std::shared_ptr<const ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
 
   // Route config mock
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
@@ -770,7 +773,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverrid
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
         // StreamFilterCallbacks to manually override the cached route for the current request.
-        foo_route_override = std::make_shared<ExampleDerivedDelegatingRoute>(
+        foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
             decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
         decoder_filters_[0]->callbacks_->setRoute(foo_route_override);
 
