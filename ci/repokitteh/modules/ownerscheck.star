@@ -200,6 +200,8 @@ def _comment(config, results, assignees, sender, force=False):
 
 
 def _assign_from_team(team_name, assignees, exclude_users):
+  if '/' not in team_name:
+    return None
   assigned = None
   # Find owners via github.team_get_by_name, github.team_list_members
   team_slug = team_name.split('/')[1]
