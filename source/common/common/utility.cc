@@ -577,7 +577,7 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
 }
 
 bool Primes::isPrime(uint32_t x) {
-  if (x < 4) {
+  if (x && x < 4) {
     return true; // eliminates special-casing 2.
   } else if ((x & 1) == 0) {
     return false; // eliminates even numbers >2.

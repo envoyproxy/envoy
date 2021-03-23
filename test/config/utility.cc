@@ -947,6 +947,17 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   }
 }
 
+void ConfigHelper::setListenerSendBufLimits(uint32_t limit) {
+  RELEASE_ASSERT(!finalized_, "");
+  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* options = listener->add_socket_options();
+  options->set_description("SO_SNDBUF");
+  options->set_level(SOL_SOCKET);
+  options->set_int_value(limit);
+  options->set_name(SO_SNDBUF);
+}
+
 void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
   addConfigModifier(
       [timeout](
@@ -1161,6 +1172,10 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
+  }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
   }
 }
 

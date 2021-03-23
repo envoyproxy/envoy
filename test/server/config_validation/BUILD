@@ -50,6 +50,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/config_validation:server_lib",

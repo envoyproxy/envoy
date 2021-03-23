@@ -6,13 +6,9 @@ remove the over-included header files in generated class codes and resolve depen
 corresponding Bazel files manually.
 """
 import argparse
-import os
-import subprocess
-import sys
 from typing import Type, List, Tuple, Dict
 
 # libclang imports
-import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
 

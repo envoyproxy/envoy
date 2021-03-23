@@ -2,6 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 licenses(["notice"])  # Apache 2
 
@@ -284,6 +285,18 @@ config_setting(
 config_setting(
     name = "disable_deprecated_features",
     values = {"define": "deprecated_features=disabled"},
+)
+
+bool_flag(
+    name = "http3",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "disable_http3",
+    flag_values = {
+        ":http3": "False",
+    },
 )
 
 config_setting(
