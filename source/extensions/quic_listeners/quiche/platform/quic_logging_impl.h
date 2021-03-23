@@ -39,14 +39,18 @@
 #define QUICHE_LOG_IF_IMPL(severity, condition)                                                    \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       QUICHE_IS_LOG_LEVEL_ENABLED(severity) && (condition),                                        \
-      quic::QuicLogEmitter(quic::severity, __FILE__, __LINE__, __func__).stream())
+      quic::QuicLogEmitter(static_cast<quic::QuicLogLevel>(quic::LogLevel##severity), __FILE__,    \
+                           __LINE__, __func__)                                                     \
+          .stream())
 
 #define QUICHE_LOG_IMPL(severity) QUICHE_LOG_IF_IMPL(severity, true)
 
 #define QUICHE_VLOG_IF_IMPL(verbosity, condition)                                                  \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       quic::isVerboseLogEnabled(verbosity) && (condition),                                         \
-      quic::QuicLogEmitter(quic::INFO, __FILE__, __LINE__, __func__).stream())
+      quic::QuicLogEmitter(static_cast<quic::QuicLogLevel>(quic::LogLevelINFO), __FILE__,          \
+                           __LINE__, __func__)                                                     \
+          .stream())
 
 #define QUICHE_VLOG_IMPL(verbosity) QUICHE_VLOG_IF_IMPL(verbosity, true)
 
@@ -62,7 +66,10 @@
 #define QUICHE_PLOG_IMPL(severity)                                                                 \
   QUICHE_LOG_IMPL_INTERNAL(                                                                        \
       QUICHE_IS_LOG_LEVEL_ENABLED(severity),                                                       \
-      quic::QuicLogEmitter(quic::severity, __FILE__, __LINE__, __func__).SetPerror().stream())
+      quic::QuicLogEmitter(static_cast<quic::QuicLogLevel>(quic::LogLevel##severity), __FILE__,    \
+                           __LINE__, __func__)                                                     \
+          .SetPerror()                                                                             \
+          .stream())
 
 #define QUICHE_LOG_INFO_IS_ON_IMPL() QUICHE_IS_LOG_LEVEL_ENABLED(INFO)
 #define QUICHE_LOG_WARNING_IS_ON_IMPL() QUICHE_IS_LOG_LEVEL_ENABLED(WARNING)
@@ -126,19 +133,20 @@ namespace quic {
 
 using QuicLogLevel = spdlog::level::level_enum;
 
-static const QuicLogLevel TRACE = spdlog::level::trace;
-static const QuicLogLevel DEBUG = spdlog::level::debug;
-static const QuicLogLevel INFO = spdlog::level::info;
-static const QuicLogLevel WARNING = spdlog::level::warn;
-static const QuicLogLevel ERROR = spdlog::level::err;
-static const QuicLogLevel FATAL = spdlog::level::critical;
-
+enum {
+  LogLevelTRACE = spdlog::level::trace,
+  LogLevelDEBUG = spdlog::level::debug,
+  LogLevelINFO = spdlog::level::info,
+  LogLevelWARNING = spdlog::level::warn,
+  LogLevelERROR = spdlog::level::err,
+  LogLevelFATAL = spdlog::level::critical,
 // DFATAL is FATAL in debug mode, ERROR in release mode.
 #ifdef NDEBUG
-static const QuicLogLevel DFATAL = ERROR;
-#else
-static const QuicLogLevel DFATAL = FATAL;
-#endif
+  LogLevelDFATAL = LogLevelERROR,
+#else  // NDEBUG
+  LogLevelDFATAL = LogLevelFATAL,
+#endif // NDEBUG
+};
 
 class QuicLogEmitter {
 public:
@@ -182,7 +190,10 @@ inline spdlog::logger& GetLogger() {
 // This allows us to use QUICHE_CHECK(condition) from constexpr functions.
 #define QUICHE_IS_LOG_LEVEL_ENABLED(severity) quic::isLogLevelEnabled##severity()
 #define QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(severity)                                                 \
-  inline bool isLogLevelEnabled##severity() { return quic::severity >= GetLogger().level(); }
+  inline bool isLogLevelEnabled##severity() {                                                      \
+    return static_cast<spdlog::level::level_enum>(quic::LogLevel##severity) >=                     \
+           GetLogger().level();                                                                    \
+  }
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(TRACE)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(DEBUG)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(INFO)
