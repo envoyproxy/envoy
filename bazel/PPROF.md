@@ -190,11 +190,20 @@ $ perf record -g -F 99 -p `pgrep envoy`
 [ perf record: Captured and wrote 0.694 MB perf.data (1532 samples) ]
 ```
 
-The program will store the collected sampling data in the file `perf.data` whose
-format is also understood by recent enough versions of `pprof`:
+The program will store the collected sampling data in the file `perf.data`. After installing
+[perf_to_profile](https://github.com/google/perf_data_converter) this format
+is also understood by recent enough versions of `pprof`:
 ```
-$ pprof -http=localhost:9999 perf.data
+$ pprof -http=localhost:9999 /path/to/envoy perf.data
 ```
+
+Note that in order to handle symbolization you need to pass an Envoy binary with debug symbols retained
+in version matching the profiled Envoy. You can get it from [envoyproxy/envoy-debug](https://hub.docker.com/r/envoyproxy/envoy-debug).
+
+Alternatively, you can use [allegro/envoy-perf-pprof](https://github.com/allegro/envoy-perf-pprof) which
+wraps the pprof setup mentioned above (installing perf_to_profile, pprof and getting
+the proper Envoy debug version) in a Dockerfile.
+
 ## Memory analysis
 
 Unfortunately `perf` doesn't support heap profiling analogous to `gperftools`, but still
