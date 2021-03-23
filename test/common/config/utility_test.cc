@@ -10,8 +10,8 @@
 #include "common/config/api_version.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
-#include "common/stats/tag_extractor_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/tag_extractor_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"
