@@ -42,6 +42,14 @@ TEST(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
+TEST(UtilityTest, TestGetSubjectAlternateNamesWithEmail) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/spiffe_san_cert.pem"));
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_EMAIL);
+  EXPECT_EQ(1, subject_alt_names.size());
+  EXPECT_EQ("envoy@example.com", subject_alt_names.front());
+}
+
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
