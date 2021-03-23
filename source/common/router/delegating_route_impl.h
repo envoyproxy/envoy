@@ -15,7 +15,7 @@ namespace Router {
  */
 class DelegatingRoute : public Router::Route {
 public:
-  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(route) {
+  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
     ASSERT(base_route_ != nullptr);
   }
 
@@ -26,7 +26,7 @@ public:
   const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 private:
-  Router::RouteConstSharedPtr base_route_;
+  const Router::RouteConstSharedPtr base_route_;
 };
 
 /**
@@ -38,7 +38,7 @@ private:
  */
 class DelegatingRouteEntry : public Router::RouteEntry {
 public:
-  explicit DelegatingRouteEntry(Router::RouteConstSharedPtr route) : base_route_(route) {
+  explicit DelegatingRouteEntry(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
     ASSERT(base_route_ != nullptr);
   }
 
@@ -91,7 +91,7 @@ public:
   const std::string& routeName() const override;
 
 private:
-  Router::RouteConstSharedPtr base_route_;
+  const Router::RouteConstSharedPtr base_route_;
 };
 
 } // namespace Router

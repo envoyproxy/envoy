@@ -243,7 +243,7 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCal
 }
 
 void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
-  parent_.filter_manager_callbacks_.setRoute(route);
+  parent_.filter_manager_callbacks_.setRoute(std::move(route));
 }
 
 void ActiveStreamFilterBase::clearRouteCache() {

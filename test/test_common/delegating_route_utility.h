@@ -12,7 +12,7 @@ class ExampleDerivedDelegatingRouteEntry : public Router::DelegatingRouteEntry {
 public:
   ExampleDerivedDelegatingRouteEntry(Router::RouteConstSharedPtr base_route,
                                      const std::string& cluster_name_override)
-      : DelegatingRouteEntry(base_route), custom_cluster_name_(cluster_name_override) {}
+      : DelegatingRouteEntry(std::move(base_route)), custom_cluster_name_(cluster_name_override) {}
 
   const std::string& clusterName() const override { return custom_cluster_name_; }
 
@@ -26,7 +26,7 @@ class ExampleDerivedDelegatingRoute : public Router::DelegatingRoute {
 public:
   ExampleDerivedDelegatingRoute(Router::RouteConstSharedPtr base_route,
                                 const std::string& cluster_name_override)
-      : DelegatingRoute(base_route),
+      : DelegatingRoute(std::move(base_route)),
         custom_route_entry_(std::make_unique<const ExampleDerivedDelegatingRouteEntry>(
             base_route, cluster_name_override)) {}
 
