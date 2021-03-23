@@ -64,7 +64,7 @@ can be used to modify this behavior, and they fall into two categories:
     Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
     See :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` for more details.
 
-  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
+  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria.
     See the configuration example below for more details.
 
 * :ref:`Priority Predicates<envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`: These predicates can
@@ -169,15 +169,14 @@ For a redirect to be handled successfully it must pass the following checks:
    either 302 (by default), or a set of 3xx codes (301, 302, 303, 307, 308).
 2. Have a *location* header with a valid, fully qualified URL.
 3. The request must have been fully processed by Envoy.
-4. The request must not have a body.
-5. :ref:`allow_cross_scheme_redirect
+4. :ref:`allow_cross_scheme_redirect
    <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true (default to false),
    or the scheme of the downstream request and the *location* header are the same.
-6. The number of previously handled internal redirect within a given downstream request does not
+5. The number of previously handled internal redirect within a given downstream request does not
    exceed :ref:`max internal redirects
    <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
    of the route that the request or redirected request is hitting.
-7. All :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` accept
+6. All :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` accept
    the target route.
 
 Any failure will result in redirect being passed downstream instead.
@@ -201,7 +200,7 @@ Specifically, the *allow listed routes* predicate defines edges of individual no
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 
-A third predicate :ref:`safe_cross_scheme                                      
+A third predicate :ref:`safe_cross_scheme
 <envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
 can be used to prevent HTTP -> HTTPS redirect.
 
