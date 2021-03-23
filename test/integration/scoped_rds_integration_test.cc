@@ -30,7 +30,7 @@ protected:
   };
 
   ScopedRdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
