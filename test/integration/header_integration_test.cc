@@ -1193,9 +1193,7 @@ TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
       R"EOF(
       operations:
               )EOF");
-  EXPECT_DEATH(
-      initializeFilter(HeaderMode::Append, false),
-      "Details: Lds update failed.");
+  EXPECT_DEATH(initializeFilter(HeaderMode::Append, false), "Details: Lds update failed.");
 }
 
 // Validates behavior when normalize path is on.
