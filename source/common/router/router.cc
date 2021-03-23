@@ -687,7 +687,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // a backoff timer.
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty();
+  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty() ||
+                   (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
@@ -1475,7 +1476,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
   // destruction of this filter before the stream is marked as complete, and onDestroy will reset
   // the stream.
   //
-  // Normally when a stream is complete we signal this by resetting the upstream but this cam not
+  // Normally when a stream is complete we signal this by resetting the upstream but this cannot
   // be done in this case because if recreateStream fails, the "failure" path continues to call
   // code in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy
   // performing a spurious stream reset in the case recreateStream() succeeds, we explicitly track
@@ -1485,9 +1486,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
       upstream_request.upstreamTiming().last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   // Redirects are not supported for streaming requests yet.
-  if (downstream_end_stream_ &&
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
-      location != nullptr &&
+  if (downstream_end_stream_ && location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location) &&
       callbacks_->recreateStream(&headers)) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();

@@ -901,6 +901,8 @@ public:
 
   uint64_t streamId() const { return stream_id_; }
 
+  Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
+
 private:
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };

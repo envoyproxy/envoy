@@ -145,6 +145,49 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://handle.internal.redirect/test/long/url",
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  // 302 was never returned downstream
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value\n"));
+  // No test header
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, "foobarbizbaz");
+
+  waitForNextUpstreamRequest();
+
   upstream_request_->encodeHeaders(redirect_response_, true);
 
   waitForNextUpstreamRequest();
@@ -223,7 +266,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
 
-TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
+TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(

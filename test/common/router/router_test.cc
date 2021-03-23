@@ -4045,7 +4045,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
 
 // Verifies that the initial host is select with max host count of one, but during retries
 // RetryPolicy will be consulted.
-TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
+TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   router_.reject_all_hosts_ = true;
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -4290,23 +4290,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
-  enableRedirects();
-
-  sendRequest();
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(body_data.get()));
-  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
-
-  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  Buffer::OwnedImpl data("1234567890");
-  response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("upstream_internal_redirect_failed_total")
-                    .value());
-}
-
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
 
@@ -4314,7 +4297,6 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
 
   redirect_headers_->setLocation("https://www.foo.com");
 
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4333,7 +4315,6 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 
   auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
 
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
@@ -4360,7 +4341,6 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4385,7 +4365,6 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 
   redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4405,7 +4384,6 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
 
   redirect_headers_->setLocation("http://www.foo.com");
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
