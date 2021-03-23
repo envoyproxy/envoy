@@ -29,7 +29,6 @@ public:
   Server::Instance* server() { return base_.server(); }
 
 private:
-  PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
   DefaultListenerHooks default_listener_hooks_;
