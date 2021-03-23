@@ -26,7 +26,6 @@ public:
 };
 
 TEST(StartTlsTest, BasicSwitch) {
-  const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config;
   Network::TransportSocketOptionsSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
@@ -35,7 +34,7 @@ TEST(StartTlsTest, BasicSwitch) {
   Buffer::OwnedImpl buf;
 
   std::unique_ptr<StartTlsSocket> socket =
-      std::make_unique<StartTlsSocket>(config, Network::TransportSocketPtr(raw_socket),
+      std::make_unique<StartTlsSocket>(Network::TransportSocketPtr(raw_socket),
                                        Network::TransportSocketPtr(ssl_socket), options);
   socket->setTransportSocketCallbacks(transport_callbacks);
 
@@ -108,14 +107,13 @@ TEST(StartTlsTest, BasicSwitch) {
 
 // Factory test.
 TEST(StartTls, BasicFactoryTest) {
-  const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config;
   NiceMock<Network::MockTransportSocketFactory>* raw_buffer_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
   NiceMock<Network::MockTransportSocketFactory>* ssl_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
-  std::unique_ptr<ServerStartTlsSocketFactory> factory =
-      std::make_unique<ServerStartTlsSocketFactory>(
-          config, Network::TransportSocketFactoryPtr(raw_buffer_factory),
+  std::unique_ptr<StartTlsSocketFactory> factory =
+      std::make_unique<StartTlsSocketFactory>(
+          Network::TransportSocketFactoryPtr(raw_buffer_factory),
           Network::TransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
   ASSERT_FALSE(factory->usesProxyProtocolOptions());
