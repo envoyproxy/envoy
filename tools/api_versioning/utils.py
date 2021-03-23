@@ -19,12 +19,10 @@ def get_api_version(input_path):
     a namedtuple containing the major, minor, patch versions.
   """
     lines = pathlib.Path(input_path).read_text().splitlines()
-    assert (len(lines) == 1)
+    assert len(lines) == 1
 
     # Mapping each field to int verifies it is a valid version
-    version = ApiVersion(*map(int, lines[0].split('.')))
-
-    return version
+    return ApiVersion(*map(int, lines[0].split('.')))
 
 
 def compute_oldest_api_version(current_version: ApiVersion):

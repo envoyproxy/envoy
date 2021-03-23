@@ -7,7 +7,6 @@ import pathlib
 import string
 import sys
 import utils
-from utils import ApiVersion
 
 FILE_TEMPLATE = string.Template("""#pragma once
 #include "common/version/api_version_struct.h"
@@ -34,7 +33,7 @@ def generate_header_file(input_path):
     assert (len(lines) == 1)
 
     # Mapping each field to int verifies it is a valid version
-    version = ApiVersion(*map(int, lines[0].split('.')))
+    version = utils.ApiVersion(*map(int, lines[0].split('.')))
     oldest_version = utils.compute_oldest_api_version(version)
 
     header_file_contents = FILE_TEMPLATE.substitute({
@@ -48,7 +47,7 @@ def generate_header_file(input_path):
     return header_file_contents
 
 
-def compute_oldest_api_version(current_version: ApiVersion):
+def compute_oldest_api_version(current_version: utils.ApiVersion):
     """Computest the oldest API version the client supports. According to the
     specification (see: api/API_VERSIONING.md), Envoy supports up to 2 most
     recent minor versions. Therefore if the latest API version "X.Y.Z", Envoy's
@@ -63,7 +62,7 @@ def compute_oldest_api_version(current_version: ApiVersion):
     Returns:
         the oldest supported API version.
     """
-    return ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
+    return utils.ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
 
 
 if __name__ == '__main__':

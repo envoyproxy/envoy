@@ -26,14 +26,17 @@ from tools.type_whisperer import type_whisperer, types_pb2
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
-from udpa.annotations import deprecation_pb2, migrate_pb2, status_pb2
+from envoy.annotations import deprecation_pb2
+from udpa.annotations import migrate_pb2, status_pb2
 
-PROTO_PACKAGES = ("google.api.annotations", "validate.validate",
-                  "envoy.annotations.resource", "udpa.annotations.migrate",
-                  "udpa.annotations.security", "udpa.annotations.status",
-                  "udpa.annotations.versioning", "udpa.annotations.sensitive")
+PROTO_PACKAGES = ("google.api.annotations", "validate.validate", "envoy.annotations.resource",
+                  "udpa.annotations.migrate", "udpa.annotations.security",
+                  "udpa.annotations.status", "udpa.annotations.versioning",
+                  "udpa.annotations.sensitive")
 
 NEXT_FREE_FIELD_MIN = 5
+
+ENVOY_DEPRECATED_UNAVIALABLE_NAME = 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE'
 
 
 class ProtoPrintError(Exception):
@@ -584,7 +587,7 @@ def validate_deprecation_version(version: str):
             return False
         if minor < 0:
             return False
-    except:
+    except ValueError:
         return False
     return True
 
@@ -602,6 +605,41 @@ class ProtoFormatVisitor(visitor.Visitor):
         self._needs_deprecation_annotation_import = False
         self._frozen_proto = frozen_proto
 
+    def _add_deprecation_version(self, field_or_evalue, deprecation_tag, disallowed_tag):
+        """Adds a deprecation version annotation if needed to the given field or enum value.
+        The annotation is added if all the following hold:
+        - The field or enum value are marked as deprecated.
+        - The proto is not frozen.
+        - The field or enum value are not marked as hidden.
+        - The field or enum value do not already have a version annotation.
+        - The field or enum value name is not ENVOY_DEPRECATED_UNAVIALABLE_NAME.
+        If a field or enum value are marked with an annotation, the
+        _needs_deprecation_annotation_import flag is set.
+        The function also validates that if a field or enum value already have the deprecated
+        annotation value, then this value is a valid one ("X.Y" where X and Y are valid major,
+        and minor versions, respectively).
+        """
+        if field_or_evalue.options.deprecated and not self._frozen_proto and \
+                not protoxform_options.has_hide_option(field_or_evalue.options):
+            # If the field or enum value has annotation from deprecation.proto, need to import it.
+            if field_or_evalue.options.HasExtension(deprecation_tag) or \
+                    field_or_evalue.options.HasExtension(disallowed_tag):
+                self._needs_deprecation_annotation_import = True
+            if field_or_evalue.name != ENVOY_DEPRECATED_UNAVIALABLE_NAME:
+                # If there's a deprecated version annotation, ensure it is valid.
+                if field_or_evalue.options.HasExtension(deprecation_tag):
+                    if not validate_deprecation_version(
+                            field_or_evalue.options.Extensions[deprecation_tag]):
+                        raise ProtoPrintError(
+                            'Error while parsing "deprecated_at_minor_version_enum" annotation "%s" value for enum value %s.'
+                            % (field_or_evalue.options.Extensions[deprecation_tag],
+                               field_or_evalue.name))
+                else:
+                    # Add the current version as a deprecated version annotation.
+                    self._needs_deprecation_annotation_import = True
+                    field_or_evalue.options.Extensions[
+                        deprecation_tag] = self._deprecated_annotation_version_value
+
     def visit_service(self, service_proto, type_context):
         leading_comment, trailing_comment = format_type_context_comments(type_context)
         methods = '\n'.join(
@@ -617,24 +655,8 @@ class ProtoFormatVisitor(visitor.Visitor):
         # Verify that not hidden deprecated enum values of non-frozen protos have valid version
         # annotations.
         for v in enum_proto.value:
-            if v.options.deprecated and not self._frozen_proto and \
-                    not protoxform_options.has_hide_option(v.options):
-                # If the enum value has annotation from deprecation.proto, need to import it.
-                if v.options.HasExtension(deprecation_pb2.deprecated_at_minor_version_enum) or \
-                        v.options.HasExtension(deprecation_pb2.disallowed_by_default_enum):
-                    self._needs_deprecation_annotation_import = True
-                if v.name != 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE':
-                    if v.options.HasExtension(deprecation_pb2.deprecated_at_minor_version_enum):
-                        if not validate_deprecation_version(v.options.Extensions[
-                                deprecation_pb2.deprecated_at_minor_version_enum]):
-                            raise ProtoPrintError(
-                                'Error while parsing "deprecated_at_minor_version_enum" annotation value for enum value %s.'
-                                % v.name)
-                    else:
-                        self._needs_deprecation_annotation_import = True
-                        v.options.Extensions[
-                            deprecation_pb2.
-                            deprecated_at_minor_version_enum] = self._deprecated_annotation_version_value
+            self._add_deprecation_version(v, deprecation_pb2.deprecated_at_minor_version_enum,
+                                          deprecation_pb2.disallowed_by_default_enum)
         leading_comment, trailing_comment = format_type_context_comments(type_context)
         formatted_options = format_options(enum_proto.options)
         reserved_fields = format_reserved(enum_proto)
@@ -682,19 +704,8 @@ class ProtoFormatVisitor(visitor.Visitor):
                                                   format_options(oneof_proto.options))
             # Verify that deprecated fields (that are not hidden and are not of frozen protos)
             # have a minor version annotation.
-            if field.options.deprecated and not self._frozen_proto and \
-                    not protoxform_options.has_hide_option(field.options):
-                self._needs_deprecation_annotation_import = True
-                if field.options.HasExtension(deprecation_pb2.deprecated_at_minor_version):
-                    if not validate_deprecation_version(
-                            field.options.Extensions[deprecation_pb2.deprecated_at_minor_version]):
-                        raise ProtoPrintError(
-                            'Error while parsing "deprecated_at_minor_version" annotation value for field %s.'
-                            % field.name)
-                else:
-                    field.options.Extensions[
-                        deprecation_pb2.
-                        deprecated_at_minor_version] = self._deprecated_annotation_version_value
+            self._add_deprecation_version(field, deprecation_pb2.deprecated_at_minor_version,
+                                          deprecation_pb2.disallowed_by_default)
             fields += format_block(format_field(type_context.extend_field(index, field.name),
                                                 field))
         if oneof_index is not None:
