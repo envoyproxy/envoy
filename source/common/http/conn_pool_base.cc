@@ -13,10 +13,6 @@ namespace Http {
 Network::TransportSocketOptionsSharedPtr
 wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
                            std::vector<Protocol> protocols) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_default_alpn")) {
-    return transport_socket_options;
-  }
-
   std::vector<std::string> fallbacks;
   for (auto protocol : protocols) {
     // If configured to do so, we override the ALPN to use for the upstream connection to match the
