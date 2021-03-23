@@ -229,6 +229,19 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
 }
 
+TEST_F(CodeUtilityTest, EmptyPerZoneStats) {
+  // Empty from-zone / to-zone stats should not be emitted.
+  addResponse(200, false, false, "", "", "from_az");
+  EXPECT_EQ(0U, cluster_scope_.counter("prefix.zone.from_az..upstream_rq_completed").value());
+  EXPECT_EQ(0U, cluster_scope_.counter("prefix.zone.from_az..upstream_rq_200").value());
+  EXPECT_EQ(0U, cluster_scope_.counter("prefix.zone.from_az..upstream_rq_2xx").value());
+
+  addResponse(200, false, false, "", "", "", "to_az");
+  EXPECT_EQ(0U, cluster_scope_.counter("prefix.zone..to_az.upstream_rq_completed").value());
+  EXPECT_EQ(0U, cluster_scope_.counter("prefix.zone..to_az.upstream_rq_200").value());
+  EXPECT_EQ(0U, cluster_scope_.counter("prefix.zone..to_az.upstream_rq_2xx").value());
+}
+
 TEST_F(CodeUtilityTest, ResponseTimingTest) {
   Stats::MockStore global_store;
   Stats::MockStore cluster_scope;
