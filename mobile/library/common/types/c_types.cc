@@ -41,9 +41,8 @@ envoy_map copy_envoy_data_map(envoy_map src) {
   envoy_map_entry* dst_entries =
       static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * src.length));
   for (envoy_map_size_t i = 0; i < src.length; i++) {
-    envoy_map_entry new_entry = {
-        copy_envoy_data(src.entries[i].key.length, src.entries[i].key.bytes),
-        copy_envoy_data(src.entries[i].value.length, src.entries[i].value.bytes)};
+    envoy_map_entry new_entry = {copy_envoy_data(src.entries[i].key),
+                                 copy_envoy_data(src.entries[i].value)};
     dst_entries[i] = new_entry;
   }
   envoy_map dst = {src.length, dst_entries};
@@ -52,13 +51,12 @@ envoy_map copy_envoy_data_map(envoy_map src) {
 
 envoy_headers copy_envoy_headers(envoy_headers src) { return copy_envoy_data_map(src); }
 
-envoy_data copy_envoy_data(size_t length, const uint8_t* src_bytes) {
-  uint8_t* dst_bytes = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * length));
-  memcpy(dst_bytes, src_bytes, length);
+envoy_data copy_envoy_data(envoy_data src) {
+  uint8_t* dst_bytes = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * src.length));
+  memcpy(dst_bytes, src.bytes, src.length); // NOLINT(safe-memcpy)
   // Note: since this function is copying the bytes over to freshly allocated memory, free is an
   // appropriate release function and dst_bytes is an appropriate context.
-  envoy_data dst = {length, dst_bytes, free, dst_bytes};
-  return dst;
+  return {src.length, dst_bytes, free, dst_bytes};
 }
 
 const envoy_data envoy_nodata = {0, NULL, envoy_noop_release, NULL};

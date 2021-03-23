@@ -8,7 +8,7 @@
 
 #include "library/common/api/external.h"
 #include "library/common/buffer/bridge_fragment.h"
-#include "library/common/buffer/utility.h"
+#include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_type_definitions.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
@@ -23,8 +23,8 @@ namespace {
 void replaceHeaders(Http::HeaderMap& headers, envoy_headers c_headers) {
   headers.clear();
   for (envoy_map_size_t i = 0; i < c_headers.length; i++) {
-    headers.addCopy(Http::LowerCaseString(Http::Utility::convertToString(c_headers.entries[i].key)),
-                    Http::Utility::convertToString(c_headers.entries[i].value));
+    headers.addCopy(Http::LowerCaseString(Data::Utility::copyToString(c_headers.entries[i].key)),
+                    Data::Utility::copyToString(c_headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(c_headers);
@@ -201,9 +201,9 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
 
   if (prebuffer_data) {
     internal_buffer->move(data);
-    in_data = Buffer::Utility::copyToBridgeData(*internal_buffer);
+    in_data = Data::Utility::copyToBridgeData(*internal_buffer);
   } else {
-    in_data = Buffer::Utility::copyToBridgeData(data);
+    in_data = Data::Utility::copyToBridgeData(data);
   }
 
   ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_*_data", parent_.filter_name_);
@@ -360,7 +360,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
     const auto error_message_header = headers.get(Http::InternalHeaders::get().ErrorMessage);
     if (!error_message_header.empty()) {
       error_message =
-          Buffer::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
+          Data::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
     }
 
     int32_t attempt_count;
@@ -474,7 +474,7 @@ void PlatformBridgeFilter::FilterBase::onResume() {
     pending_headers = &bridged_headers;
   }
   if (internal_buffer) {
-    bridged_data = Buffer::Utility::copyToBridgeData(*internal_buffer);
+    bridged_data = Data::Utility::copyToBridgeData(*internal_buffer);
     pending_data = &bridged_data;
   }
   if (pending_trailers_) {

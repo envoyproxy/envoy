@@ -2,7 +2,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/common/buffer/utility.h"
+#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/main_interface.h"
 
@@ -36,8 +36,8 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   Http::ResponseHeaderMapPtr transformed_headers = Http::ResponseHeaderMapImpl::create();
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(
-        Http::LowerCaseString(Http::Utility::convertToString(headers.entries[i].key)),
-        Http::Utility::convertToString(headers.entries[i].value));
+        Http::LowerCaseString(Data::Utility::copyToString(headers.entries[i].key)),
+        Data::Utility::copyToString(headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
@@ -103,7 +103,7 @@ TEST(MainInterfaceTest, BasicStream) {
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
   Http::TestRequestTrailerMapImpl trailers;
   envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);
@@ -214,7 +214,7 @@ TEST(MainInterfaceTest, UsingMainInterfaceWithoutARunningEngine) {
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
   Http::TestRequestTrailerMapImpl trailers;
   envoy_headers c_trailers = Http::Utility::toBridgeHeaders(trailers);

@@ -146,11 +146,10 @@ envoy_headers copy_envoy_headers(envoy_headers src);
 
 /**
  * Helper function to copy envoy_data.
- * @param length, the length of the data to copy.
- * @param src_bytes, the byte array to copy from.
+ * @param src, the envoy_data to copy from.
  * @return envoy_data, the envoy_data copied from the src.
  */
-envoy_data copy_envoy_data(size_t length, const uint8_t* src_bytes);
+envoy_data copy_envoy_data(envoy_data src);
 
 #ifdef __cplusplus
 } // utility functions

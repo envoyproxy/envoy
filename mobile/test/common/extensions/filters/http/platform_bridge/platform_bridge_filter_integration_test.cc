@@ -9,11 +9,6 @@
 
 namespace Envoy {
 
-// TODO: consolidate all instances of this function to one utility class.
-std::string to_string(envoy_data data) {
-  return std::string(reinterpret_cast<const char*>(data.bytes), data.length);
-}
-
 class PlatformBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:

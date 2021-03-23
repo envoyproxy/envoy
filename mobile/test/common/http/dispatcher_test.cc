@@ -14,7 +14,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "library/common/buffer/utility.h"
+#include "library/common/data/utility.h"
 #include "library/common/http/dispatcher.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
@@ -33,8 +33,9 @@ namespace Http {
 ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
   ResponseHeaderMapPtr transformed_headers = ResponseHeaderMapImpl::create();
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
-    transformed_headers->addCopy(LowerCaseString(Utility::convertToString(headers.entries[i].key)),
-                                 Utility::convertToString(headers.entries[i].value));
+    transformed_headers->addCopy(
+        LowerCaseString(Data::Utility::copyToString(headers.entries[i].key)),
+        Data::Utility::copyToString(headers.entries[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
@@ -443,7 +444,7 @@ TEST_F(DispatcherTest, BasicStreamData) {
   bridge_callbacks.context = &cc;
   bridge_callbacks.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void* {
     EXPECT_TRUE(end_stream);
-    EXPECT_EQ(Http::Utility::convertToString(c_data), "response body");
+    EXPECT_EQ(Data::Utility::copyToString(c_data), "response body");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_data_calls++;
     c_data.release(c_data.context);
@@ -457,7 +458,7 @@ TEST_F(DispatcherTest, BasicStreamData) {
 
   // Build body data
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
   // Create a stream.
   Event::PostCb start_stream_post_cb;
@@ -590,11 +591,11 @@ TEST_F(DispatcherTest, MultipleDataStream) {
 
   // Build first body data
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
 
   // Build second body data
   Buffer::OwnedImpl request_data2 = Buffer::OwnedImpl("request body2");
-  envoy_data c_data2 = Buffer::Utility::toBridgeData(request_data2);
+  envoy_data c_data2 = Data::Utility::toBridgeData(request_data2);
 
   // Create a stream.
   Event::PostCb start_stream_post_cb;
