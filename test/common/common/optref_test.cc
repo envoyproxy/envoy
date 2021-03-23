@@ -45,8 +45,10 @@ TEST(OptRefTest, Conversion) {
 
   // Copy construct conversion.
   OptRef<Foo> converted_ref(bar);
+  OptRef<Foo> converted_optref(bar_ref);
 
   // Assignment conversion.
+  foo_ref = bar;
   foo_ref = bar_ref;
 }
 
