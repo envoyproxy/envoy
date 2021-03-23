@@ -6,6 +6,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/common/containers.h"
 #include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
@@ -25,23 +26,6 @@ void validateTypeUrlHelper(const std::string& type_url,
   }
 }
 
-// Updates each provider with update_cb, triggering done_cb once this has been applied to all
-// providers.
-void updateProviders(
-    const absl::flat_hash_set<DynamicFilterConfigProviderImpl*>& filter_config_providers,
-    std::function<void(DynamicFilterConfigProviderImpl*, std::function<void()>)> update_cb,
-    std::function<void()> done_cb) {
-
-  auto remaining_providers =
-      std::make_shared<std::atomic<uint64_t>>(filter_config_providers.size());
-  for (auto* provider : filter_config_providers) {
-    update_cb(provider, [remaining_providers, done_cb] {
-      if (--(*remaining_providers) == 0) {
-        done_cb();
-      }
-    });
-  }
-}
 } // namespace
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
@@ -177,7 +161,7 @@ void FilterConfigSubscription::onConfigUpdate(
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  updateProviders(
+  Common::applyToAllWithCompletionCallback(
       filter_config_providers_,
       [&factory_callback, &version_info](DynamicFilterConfigProviderImpl* provider,
                                          std::function<void()> cb) {
@@ -196,7 +180,7 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    updateProviders(
+    Common::applyToAllWithCompletionCallback(
         filter_config_providers_,
         [](DynamicFilterConfigProviderImpl* provider, std::function<void()> cb) {
           provider->onConfigRemoved(cb);

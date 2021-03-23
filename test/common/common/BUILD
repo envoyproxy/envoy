@@ -31,6 +31,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "containers_test",
+    srcs = ["containers_test.cc"],
+    deps = [
+        "//source/common/common:containers_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "assert2_test",
     srcs = ["assert2_test.cc"],
     deps = [
