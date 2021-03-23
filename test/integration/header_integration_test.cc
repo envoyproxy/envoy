@@ -1,4 +1,5 @@
 #include "envoy/api/v2/endpoint.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -206,6 +207,7 @@ public:
   }
 
   void prepareEDS() {
+
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
@@ -283,6 +285,19 @@ public:
                 hcm) {
           // Overwrite default config with our own.
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
+
+          if (forwarding_transformation_.has_value()) {
+            hcm.mutable_path_normalization_options()->mutable_forwarding_transformation()->CopyFrom(
+                TestUtility::parseYaml<envoy::type::http::v3::PathTransformation>(
+                    forwarding_transformation_.value()));
+          }
+          if (filter_transformation_.has_value()) {
+            hcm.mutable_path_normalization_options()
+                ->mutable_http_filter_transformation()
+                ->CopyFrom(TestUtility::parseYaml<envoy::type::http::v3::PathTransformation>(
+                    filter_transformation_.value()));
+          }
+
           envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
           hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
@@ -357,7 +372,6 @@ public:
             }
           }
         });
-
     initialize();
   }
 
@@ -451,7 +465,9 @@ protected:
   bool normalize_path_{false};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
-};
+  absl::optional<std::string> forwarding_transformation_;
+  absl::optional<std::string> filter_transformation_;
+}; // namespace Envoy
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
@@ -1053,6 +1069,133 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
           {"x-unmodified", "response"},
           {":status", "200"},
       });
+}
+
+TEST_P(HeaderIntegrationTest, TestForwardingPathNormalizationVisibleToUpstream) {
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
+  filter_transformation_ = std::string(
+      R"EOF(
+      operations:
+              )EOF");
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/public"},
+                                     {":method", "GET"},
+                                     {"x-site", "public"}},
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validate that filter path normalization is not visible to upstream server.
+TEST_P(HeaderIntegrationTest, TestFilterPathNormalizationInvisibleToUpstream) {
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+              )EOF");
+  filter_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/../public"},
+                                     {":method", "GET"},
+                                     {"x-site", "public"}},
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validate that new path normalization api take precedence.
+// Old api set path normalization off, new api set path normalization on, should normalize.
+TEST_P(HeaderIntegrationTest, TestOldPathNormalizationApiIgnoreWhenNewApiConfigured) {
+  normalize_path_ = false;
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
+  filter_transformation_ = std::string(
+      R"EOF(
+      operations:
+              )EOF");
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/public"},
+                                     {":method", "GET"},
+                                     {"x-site", "public"}},
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validate that envoy reject configuration when operations are duplicate in the same
+// transformation.
+TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+      - normalize_path_rfc_3986: {}
+              )EOF");
+  filter_transformation_ = std::string(
+      R"EOF(
+      operations:
+              )EOF");
+  EXPECT_DEATH(
+      initializeFilter(HeaderMode::Append, false),
+      "rejected_counter == nullptr || rejected_counter->value() == 0. Details: Lds update failed.");
 }
 
 // Validates behavior when normalize path is on.

@@ -569,7 +569,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 
   // Restore the forwarding path if none of the filter mutate the path.
   if (headers.Path() && headers.getFilterPath() == headers.getPathValue()) {
-    headers.setPath(std::string(headers.getPathValue()));
+    headers.setPath(std::string(headers.getForwardingPath()));
   }
 
   if (!host_rewrite_.empty()) {
