@@ -368,6 +368,7 @@ envoy_cc_test(
     srcs = ["runtime_utility_test.cc"],
     deps = [
         "//source/common/config:runtime_utility_lib",
+        "//source/common/stats:tag_extractor_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
