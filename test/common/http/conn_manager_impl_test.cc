@@ -1501,8 +1501,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce(Invoke([&](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                           const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
