@@ -40,9 +40,9 @@ protected:
   }
 
   // GzipFilterTest Helpers
-  void setUpFilter(std::string&& yaml) {
+  void setUpFilter(std::string&& json) {
     envoy::extensions::filters::http::gzip::v3::Gzip gzip;
-    TestUtility::loadFromYaml(yaml, gzip);
+    TestUtility::loadFromJson(json, gzip);
     config_ = std::make_shared<GzipFilterConfig>(gzip, "test.", stats_, runtime_);
     filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
