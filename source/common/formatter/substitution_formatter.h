@@ -204,6 +204,9 @@ using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                    bool omit_empty_values)
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
+  JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                     bool omit_empty_values, const std::vector<CommandParserPtr>& commands)
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands) {}
 
