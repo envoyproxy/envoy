@@ -60,8 +60,8 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
                                                              context);
 
   Network::TransportSocketFactoryPtr tls_socket_factory =
-      tls_socket_config_factory.createTransportSocketFactory(
-          outer_config.tls_socket_config(), context);
+      tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
+                                                             context);
 
   return std::make_unique<StartTlsSocketFactory>(std::move(raw_socket_factory),
                                                  std::move(tls_socket_factory));
@@ -72,7 +72,8 @@ ProtobufTypes::MessagePtr DownstreamStartTlsSocketFactory::createEmptyConfigProt
 }
 
 ProtobufTypes::MessagePtr UpstreamStartTlsSocketFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig>();
+  return std::make_unique<
+      envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig>();
 }
 
 REGISTER_FACTORY(DownstreamStartTlsSocketFactory,

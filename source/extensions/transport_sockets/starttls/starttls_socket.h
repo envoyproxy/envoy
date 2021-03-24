@@ -70,9 +70,8 @@ class StartTlsSocketFactory : public Network::TransportSocketFactory,
 public:
   ~StartTlsSocketFactory() override = default;
 
-  StartTlsSocketFactory(
-      Network::TransportSocketFactoryPtr raw_socket_factory,
-      Network::TransportSocketFactoryPtr tls_socket_factory)
+  StartTlsSocketFactory(Network::TransportSocketFactoryPtr raw_socket_factory,
+                        Network::TransportSocketFactoryPtr tls_socket_factory)
       : raw_socket_factory_(std::move(raw_socket_factory)),
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 

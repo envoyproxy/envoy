@@ -194,13 +194,12 @@ void StartTlsIntegrationTest::initialize() {
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
 
-
   conn_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_, address, Network::Address::InstanceConstSharedPtr(),
-          Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_), move(tls_context_)).createTransportSocket(
-            std::make_shared<Network::TransportSocketOptionsImpl>(
-        absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()
-        )),
+      Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_),
+                                                                    move(tls_context_))
+          .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+              absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())),
       nullptr);
 
   conn_->enableHalfClose(true);

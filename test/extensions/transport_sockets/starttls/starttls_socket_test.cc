@@ -33,9 +33,8 @@ TEST(StartTlsTest, BasicSwitch) {
   Network::MockTransportSocket* ssl_socket = new Network::MockTransportSocket;
   Buffer::OwnedImpl buf;
 
-  std::unique_ptr<StartTlsSocket> socket =
-      std::make_unique<StartTlsSocket>(Network::TransportSocketPtr(raw_socket),
-                                       Network::TransportSocketPtr(ssl_socket), options);
+  std::unique_ptr<StartTlsSocket> socket = std::make_unique<StartTlsSocket>(
+      Network::TransportSocketPtr(raw_socket), Network::TransportSocketPtr(ssl_socket), options);
   socket->setTransportSocketCallbacks(transport_callbacks);
 
   // StartTls socket is initial clear-text state. All calls should be forwarded to raw socket.
@@ -111,10 +110,9 @@ TEST(StartTls, BasicFactoryTest) {
       new NiceMock<Network::MockTransportSocketFactory>;
   NiceMock<Network::MockTransportSocketFactory>* ssl_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
-  std::unique_ptr<StartTlsSocketFactory> factory =
-      std::make_unique<StartTlsSocketFactory>(
-          Network::TransportSocketFactoryPtr(raw_buffer_factory),
-          Network::TransportSocketFactoryPtr(ssl_factory));
+  std::unique_ptr<StartTlsSocketFactory> factory = std::make_unique<StartTlsSocketFactory>(
+      Network::TransportSocketFactoryPtr(raw_buffer_factory),
+      Network::TransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
   ASSERT_FALSE(factory->usesProxyProtocolOptions());
 }
