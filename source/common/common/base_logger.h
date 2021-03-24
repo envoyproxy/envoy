@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include <absl/strings/string_view.h>
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -36,7 +38,7 @@ public:
   spdlog::level::level_enum level() const { return logger_->level(); }
 
   template <typename... Args>
-  void log(spdlog::source_loc loc, spdlog::level::level_enum lvl, std::string_view fmt,
+  void log(spdlog::source_loc loc, spdlog::level::level_enum lvl, absl::string_view fmt,
            const Args&... args) {
     logger_->log(loc, lvl, fmt, args...);
   }
