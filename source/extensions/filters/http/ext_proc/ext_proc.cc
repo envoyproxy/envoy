@@ -24,12 +24,17 @@ using Http::ResponseHeaderMap;
 
 static const std::string kErrorPrefix = "ext_proc error";
 
-void Filter::openStream() {
+Filter::StreamOpenState Filter::openStream() {
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this);
     stats_.streams_started_.inc();
+    if (processing_complete_) {
+      // Stream failed while starting and either onGrpcError or onGrpcClose was already called
+      return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
+    }
   }
+  return StreamOpenState::Ok;
 }
 
 void Filter::startMessageTimer(Event::TimerPtr& timer) {
@@ -61,12 +66,16 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   }
 
   // We're at the start, so start the stream and send a headers message
-  openStream();
-  if (processing_complete_) {
-    // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-    return sent_immediate_response_ ? FilterHeadersStatus::StopIteration
-                                    : FilterHeadersStatus::Continue;
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
   }
+
   request_headers_ = &headers;
   ProcessingRequest req;
   auto* headers_req = req.mutable_request_headers();
@@ -94,12 +103,16 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
       ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
-      openStream();
-      if (processing_complete_) {
-        // Stream failed while opening
-        return sent_immediate_response_ ? FilterDataStatus::StopIterationNoBuffer
-                                        : FilterDataStatus::Continue;
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
       }
+
       // The body has been buffered and we need to send the buffer
       decoder_callbacks_->addDecodedData(data, false);
       request_state_ = FilterState::BufferedBody;
@@ -130,12 +143,16 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   }
 
   // Depending on processing mode this may or may not be the first message
-  openStream();
-  if (processing_complete_) {
-    // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-    return sent_immediate_response_ ? FilterHeadersStatus::StopIteration
-                                    : FilterHeadersStatus::Continue;
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterHeadersStatus::StopIteration;
+  case StreamOpenState::IgnoreError:
+    return FilterHeadersStatus::Continue;
+  case StreamOpenState::Ok:
+    // Fall through
+    break;
   }
+
   response_headers_ = &headers;
   ProcessingRequest req;
   auto* headers_req = req.mutable_response_headers();
@@ -161,11 +178,16 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   case ProcessingMode::BUFFERED:
     if (end_stream) {
       ENVOY_BUG(response_state_ == FilterState::Idle, "Invalid filter state on response path");
-      openStream();
-      if (processing_complete_) {
-        return sent_immediate_response_ ? FilterDataStatus::StopIterationNoBuffer
-                                        : FilterDataStatus::Continue;
+      switch (openStream()) {
+      case StreamOpenState::Error:
+        return FilterDataStatus::StopIterationNoBuffer;
+      case StreamOpenState::IgnoreError:
+        return FilterDataStatus::Continue;
+      case StreamOpenState::Ok:
+        // Fall through
+        break;
       }
+
       encoder_callbacks_->addEncodedData(data, false);
       response_state_ = FilterState::BufferedBody;
       startMessageTimer(response_message_timer_);

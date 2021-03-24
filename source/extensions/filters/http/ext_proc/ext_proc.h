@@ -90,6 +90,18 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
     BufferedBody,
   };
 
+  // The result of an attempt to open the stream
+  enum class StreamOpenState {
+    // The stream was opened successfully
+    Ok,
+    // The stream was not opened successfully and an error was delivered
+    // downstream -- processing should stop
+    Error,
+    // The stream was not opened successfully but processing should
+    // continue as if the stream was already closed.
+    IgnoreError,
+  };
+
 public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
@@ -115,7 +127,7 @@ public:
   void onGrpcClose() override;
 
 private:
-  void openStream();
+  StreamOpenState openStream();
   void startMessageTimer(Event::TimerPtr& timer);
   void onMessageTimeout();
   void cleanUpTimers();
