@@ -1161,26 +1161,16 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-TEST_P(IntegrationTest, UpstreamProtocolError) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+// Test that Envoy by default returns HTTP code 502 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolErrorDefault) {
+  testRouterUpstreamProtocolError("502", "UPE");
+}
 
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
-  auto response = std::move(encoder_decoder.second);
-
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
-  // be fixed.
-  std::string data;
-  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
-  ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
+// Test runtime overwrite to return 503 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolErrorRuntimeOverwrite) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.return_502_for_upstream_protocol_errors", "false");
+  testRouterUpstreamProtocolError("503", "UC");
 }
 
 TEST_P(IntegrationTest, TestHead) {
@@ -1547,6 +1537,7 @@ TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
 // Send continuous pipelined requests while not reading responses, to check
 // HTTP/1.1 response flood protection.
 TEST_P(IntegrationTest, TestFlood) {
+  config_helper_.setListenerSendBufLimits(1024);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1585,6 +1576,7 @@ TEST_P(IntegrationTest, TestFlood) {
 }
 
 TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
+  config_helper_.setListenerSendBufLimits(1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });

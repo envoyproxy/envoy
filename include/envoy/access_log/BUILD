@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["access_log.h"],
     deps = [
         "//include/envoy/config:typed_config_interface",
+        "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/protobuf",

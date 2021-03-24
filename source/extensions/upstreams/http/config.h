@@ -41,7 +41,7 @@ public:
 
   const Envoy::Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
-  absl::optional<envoy::config::core::v3::Http3ProtocolOptions> http3_options_{};
+  const envoy::config::core::v3::Http3ProtocolOptions http3_options_{};
   const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;

@@ -165,15 +165,15 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
-  cx_pool_open, Gauge, Whether the connection pool circuit breaker is closed (0) or open (1)
-  rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
-  rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
-  rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)
-  remaining_cx, Gauge, Number of remaining connections until the circuit breaker opens
-  remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker opens
-  remaining_rq, Gauge, Number of remaining requests until the circuit breaker opens
-  remaining_retries, Gauge, Number of remaining retries until the circuit breaker opens
+  cx_open, Gauge, Whether the connection circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  cx_pool_open, Gauge, Whether the connection pool circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  rq_pending_open, Gauge, Whether the pending requests circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  rq_open, Gauge, Whether the requests circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  rq_retry_open, Gauge, Whether the retry circuit breaker is under its concurrency limit (0) or is at capacity and no longer admitting (1)
+  remaining_cx, Gauge, Number of remaining connections until the circuit breaker reaches its concurrency limit
+  remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker reaches its concurrency limit
+  remaining_rq, Gauge, Number of remaining requests until the circuit breaker reaches its concurrency limit
+  remaining_retries, Gauge, Number of remaining retries until the circuit breaker reaches its concurrency limit
 
 .. _config_cluster_manager_cluster_stats_timeout_budgets:
 

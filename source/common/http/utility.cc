@@ -547,10 +547,14 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   if (local_reply_data.is_grpc_) {
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
-    response_headers->setGrpcStatus(
-        std::to_string(enumToInt(local_reply_data.grpc_status_
-                                     ? local_reply_data.grpc_status_.value()
-                                     : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+
+    if (response_headers->getGrpcStatusValue().empty()) {
+      response_headers->setGrpcStatus(std::to_string(
+          enumToInt(local_reply_data.grpc_status_
+                        ? local_reply_data.grpc_status_.value()
+                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+    }
+
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
@@ -853,6 +857,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote refused stream reset";
   case Http::StreamResetReason::ConnectError:
     return "remote error with CONNECT request";
+  case Http::StreamResetReason::ProtocolError:
+    return "protocol error";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1032,21 +1038,19 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
   // so is not worth it since the DNS resolver should handle it for us.
   bool is_ip_address = false;
-  try {
-    absl::string_view potential_ip_address = host_to_resolve;
-    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
-    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
-    // now, just do all the trimming here, but in the future we should consider whether we can
-    // have unified [] handling as low as possible in the stack.
-    if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
-        potential_ip_address.back() == ']') {
-      potential_ip_address.remove_prefix(1);
-      potential_ip_address.remove_suffix(1);
-    }
-    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+  absl::string_view potential_ip_address = host_to_resolve;
+  // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+  // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+  // now, just do all the trimming here, but in the future we should consider whether we can
+  // have unified [] handling as low as possible in the stack.
+  if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
+      potential_ip_address.back() == ']') {
+    potential_ip_address.remove_prefix(1);
+    potential_ip_address.remove_suffix(1);
+  }
+  if (Network::Utility::parseInternetAddressNoThrow(std::string(potential_ip_address)) != nullptr) {
     is_ip_address = true;
     host_to_resolve = potential_ip_address;
-  } catch (const EnvoyException&) {
   }
 
   return {is_ip_address, host_to_resolve, port};

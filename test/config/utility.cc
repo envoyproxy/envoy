@@ -213,7 +213,10 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      udp_listener_name: "quiche_quic_listener"
+      listener_config:
+        name: quic_listener_config
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
 )EOF",
                                                            Platform::null_device_path));
 }
@@ -732,7 +735,7 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
 }
 
 void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
+  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
@@ -941,6 +944,17 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   }
 }
 
+void ConfigHelper::setListenerSendBufLimits(uint32_t limit) {
+  RELEASE_ASSERT(!finalized_, "");
+  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* options = listener->add_socket_options();
+  options->set_description("SO_SNDBUF");
+  options->set_level(SOL_SOCKET);
+  options->set_int_value(limit);
+  options->set_name(SO_SNDBUF);
+}
+
 void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
   addConfigModifier(
       [timeout](
@@ -1109,6 +1123,7 @@ void ConfigHelper::initializeTls(
     validation_context->add_verify_certificate_hash(
         options.expect_client_ecdsa_cert_ ? TEST_CLIENT_ECDSA_CERT_HASH : TEST_CLIENT_CERT_HASH);
   }
+  validation_context->set_allow_expired_certificate(options.allow_expired_certificate_);
 
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
@@ -1136,6 +1151,10 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
+  }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
   }
 }
 
