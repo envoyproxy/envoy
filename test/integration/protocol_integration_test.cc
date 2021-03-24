@@ -164,6 +164,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
   auto host_foo = config_helper_.createVirtualHost("cluster_0 vhost", "/some/path", "cluster_0");
   config_helper_.addVirtualHost(host_foo);
 
+  initialize();
+
   std::string ip;
   if (GetParam().version == Network::Address::IpVersion::v4) {
     ip = "127.0.0.1";
@@ -180,8 +182,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
       {":authority", "cluster_0"},
       {"x-envoy-original-dst-host", ip_port_pair},
   };
-
-  initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
