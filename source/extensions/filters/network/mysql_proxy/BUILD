@@ -140,6 +140,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_pool_manager_interface",
+    hdrs = [
+        "conn_pool_manager.h",
+    ],
+    deps = [
+        ":new_conn_pool_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_pool_manager_lib",
+    srcs = [
+        "conn_pool_manager_impl.cc",
+    ],
+    hdrs = [
+        "conn_pool_manager_impl.h",
+    ],
+    deps = [
+        ":conn_pool_manager_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "new_conn_pool_lib",
     srcs = [
         "new_conn_pool_impl.cc",

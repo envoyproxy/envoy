@@ -48,24 +48,39 @@ class ClientPoolCallBack {
 public:
   virtual ~ClientPoolCallBack() = default;
   /**
-   * onClientReady called when connection is ready and pass the MySQL connection phase
-   * @param client_data Client Data of ready connection
+   * Called when a pool error occurred and no connection could be acquired for making the request.
+   * @param reason supplies the failure reason.
+   * @param host supplies the description of the host that caused the failure. This may be nullptr
+   *             if no host was involved in the failure (for example overflow).
    */
-  virtual void onClientReady(ClientDataPtr&& client_data) PURE;
+  virtual void onPoolFailure(MySQLPoolFailureReason reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
+
   /**
-   * onClientFailure called when proxy failed to get connection of upstream or failed to pass
-   * connection phase.
-   * @param reason reason of failure
+   * Called when a connection is available to process a request/response. Connections may be
+   * released back to the pool for re-use by resetting the ConnectionDataPtr. If the connection is
+   * no longer viable for reuse (e.g. due to some kind of protocol error), the underlying
+   * ClientConnection should be closed to prevent its reuse.
+   *
+   * @param conn supplies the connection data to use.
+   * @param host supplies the description of the host that will carry the request. For logical
+   *             connection pools the description may be different each time this is called.
    */
-  virtual void onClientFailure(MySQLPoolFailureReason reason) PURE;
+  virtual void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                           Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
-class ConnPoolImpl;
+
+class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
+public:
+  ~Instance() override = default;
+  virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callback) PURE;
+  virtual void closeConnections() PURE;
+};
 
 struct MySQLAttachContext : public Envoy::ConnectionPool::AttachContext {
-  MySQLAttachContext(Tcp::ConnectionPool::Callbacks* callbacks) : callbacks_(callbacks) {}
+  MySQLAttachContext(ClientPoolCallBack* callbacks) : callbacks_(callbacks) {}
   //  replace with mysql callbacks
-  Tcp::ConnectionPool::Callbacks* callbacks_;
-  ClientPoolCallBack* mysql_client_callbacks_;
+  ClientPoolCallBack* callbacks_;
 };
 
 class MySQLPendingStream : public Envoy::ConnectionPool::PendingStream {
@@ -87,9 +102,8 @@ public:
         decode_buffer_.move(data);
         decoder_->onData(decode_buffer_);
         return Network::FilterStatus::Continue;
-      } else {
-        parent_.close();
       }
+      return Network::FilterStatus::StopIteration;
     }
     // DecoderCallbacks
     void onProtocolError() override;
@@ -128,6 +142,7 @@ public:
     }
 
     Network::ClientConnection& connection() override { return connection_; }
+
     void setConnectionState(Tcp::ConnectionPool::ConnectionStatePtr&& state) override {
       parent_->connection_state_ = std::move(state);
     }
@@ -157,7 +172,6 @@ public:
   void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
-  void makeRequest(MySQLCodec&, uint8_t);
   bool isNewClient() { return is_new_client_; }
 
   absl::optional<Http::Protocol> protocol() const override { return {}; }
@@ -166,9 +180,11 @@ public:
   bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }
 
+  virtual void clearCallbacks();
+
   void onFailure(MySQLPoolFailureReason);
   void onAuthPassed();
-  virtual void clearCallbacks();
+  void makeRequest(MySQLCodec&, uint8_t);
 
   std::shared_ptr<Auther> read_filter_handle_;
   Envoy::ConnectionPool::ConnPoolImplBase& parent_;
@@ -183,8 +199,7 @@ public:
   bool is_new_client_{true};
 };
 
-class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase,
-                     public Tcp::ConnectionPool::Instance {
+class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase, public Instance {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -220,7 +235,7 @@ public:
     }
   }
 
-  ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
+  ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) override {
     MySQLAttachContext context(&callbacks);
     return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
   }
@@ -245,24 +260,9 @@ public:
                                                Envoy::ConnectionPool::ConnPoolImplBase::host(), 1);
   }
 
-  void onCommandPhasePass(Envoy::ConnectionPool::ActiveClient& client,
-                          Envoy::ConnectionPool::AttachContext& context) {
-    ActiveMySQLClient* tcp_client = static_cast<ActiveMySQLClient*>(&client);
-    // tcp_client->readEnableIfNew();
-    auto* callbacks = typedContext<MySQLAttachContext>(context).callbacks_;
-    std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
-        std::make_unique<ActiveMySQLClient::TcpConnectionData>(*tcp_client,
-                                                               *tcp_client->connection_);
-    callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
-  }
-
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                    Envoy::ConnectionPool::AttachContext& context) override {
     ActiveMySQLClient* tcp_client = static_cast<ActiveMySQLClient*>(&client);
-    if (tcp_client->isNewClient()) {
-      // into auth phase
-      return;
-    }
     auto* callbacks = typedContext<MySQLAttachContext>(context).callbacks_;
     std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
         std::make_unique<ActiveMySQLClient::TcpConnectionData>(*tcp_client,
@@ -274,17 +274,16 @@ public:
                      absl::string_view, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
     auto* callbacks = typedContext<MySQLAttachContext>(context).callbacks_;
-    callbacks->onPoolFailure(reason, host_description);
+    callbacks->onPoolFailure(static_cast<MySQLPoolFailureReason>(reason), host_description);
   }
 
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}
-
-private:
-  // base busy -> unauthed -> authed -> ready
-  std::list<ConnectionPool::ActiveClientPtr> authing_clients_;
 };
+
+using ConnectionPoolPtr = std::unique_ptr<ConnPoolImpl>;
+
 } // namespace ConnPool
 } // namespace MySQLProxy
 } // namespace NetworkFilters

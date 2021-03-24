@@ -161,31 +161,39 @@ void ActiveMySQLClient::clearCallbacks() {
 }
 
 void ActiveMySQLClient::onAuthPassed() {
-  tcp_connection_data_->connection().readDisable(true);
-  auto* pool = &parent_;
+  connection_->readDisable(true);
+  connection_->removeReadFilter(read_filter_handle_);
+
   parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
-  pool->scheduleOnUpstreamReady();
+  parent_.scheduleOnUpstreamReady();
+}
+
+void ActiveMySQLClient::makeRequest(MySQLCodec& codec, uint8_t seq) {
+  Buffer::OwnedImpl buffer;
+  codec.encode(buffer);
+  BufferHelper::encodeHdr(buffer, seq);
+  connection_->write(buffer, false);
 }
 
 void ActiveMySQLClient::onEvent(Network::ConnectionEvent event) {
-
   // when connection complete, we need wait for authenticate phase passed till poolReady
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
     conn_connect_ms_.reset();
     ASSERT(state_ == ActiveClient::State::CONNECTING);
     parent_.checkForDrained();
-  } else {
-    Envoy::ConnectionPool::ActiveClient::onEvent(event);
-    if (callbacks_) {
-      if (tcp_connection_data_) {
-        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
-      }
-      callbacks_->onEvent(event);
-      callbacks_ = nullptr;
+    return;
+  }
+  Envoy::ConnectionPool::ActiveClient::onEvent(event);
+  if (callbacks_) {
+    if (tcp_connection_data_) {
+      Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
     }
+    callbacks_->onEvent(event);
+    callbacks_ = nullptr;
   }
 }
+
 } // namespace ConnPool
 } // namespace MySQLProxy
 } // namespace NetworkFilters
