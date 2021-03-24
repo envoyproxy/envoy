@@ -1257,7 +1257,6 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
         connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
             [this]() -> void { onStreamMaxDurationReached(); });
   }
-  std::cout << "enabling timer::" << std::to_string(route->timeout().count()) << "\n";
   max_stream_duration_timer_->enableTimer(timeout);
 }
 
@@ -1586,8 +1585,6 @@ const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {
-    std::cout << "calling refresh cached route from clusterInfo"
-              << "\n";
     refreshCachedRoute();
   }
 
