@@ -158,8 +158,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   if (saw_content_length || disable_chunk_encoding_) {
     chunk_encoding_ = false;
   } else {
-    if (status && *status == 100) {
+    if (status && (*status < 200 || *status == 204)) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
+      // Generally, for 1xx and 204 responses, do not send the chunked encoding header
+      // or enable chunked encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
@@ -177,14 +179,6 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
-      chunk_encoding_ = false;
-    } else if (status && (*status < 200 || *status == 204) &&
-               connection_.strict1xxAnd204Headers()) {
-      // TODO(zuercher): when the "envoy.reloadable_features.strict_1xx_and_204_response_headers"
-      // feature flag is removed, this block can be coalesced with the 100 Continue logic above.
-
-      // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
-      // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
@@ -487,8 +481,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats), codec_settings_(settings),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
                                [&]() -> void { this->onBelowLowWatermark(); },
                                [&]() -> void { this->onAboveHighWatermark(); },
@@ -881,8 +873,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
-     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
-     << DUMP_MEMBER(buffered_body_.length());
+     << DUMP_MEMBER(processing_trailers_) << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on headers.
   os << DUMP_MEMBER(header_parsing_state_);
@@ -1300,7 +1291,7 @@ Envoy::StatusOr<ConnectionImpl::HttpParserCode> ClientConnectionImpl::onHeadersC
       handling_upgrade_ = true;
     }
 
-    if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {
+    if (parser_.status_code < 200 || parser_.status_code == 204) {
       if (headers->TransferEncoding()) {
         RETURN_IF_ERROR(
             sendProtocolError(Http1ResponseCodeDetails::get().TransferEncodingNotAllowed));
