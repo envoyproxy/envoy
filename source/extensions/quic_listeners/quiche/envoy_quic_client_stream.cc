@@ -151,7 +151,6 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
-  ASSERT(headers_decompressed() && !header_list.empty());
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
@@ -159,7 +158,14 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
-  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+  const absl::optional<uint64_t> optional_status =
+      Http::Utility::getResponseStatusNoThrow(*headers);
+  if (!optional_status.has_value()) {
+    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    return;
+  }
+  ASSERT(headers_decompressed() && !header_list.empty());
+  const uint64_t status = optional_status.value();
   if (Http::CodeUtility::is1xx(status)) {
     if (status == enumToInt(Http::Code::SwitchingProtocols)) {
       // HTTP3 doesn't support the HTTP Upgrade mechanism or 101 (Switching Protocols) status code.

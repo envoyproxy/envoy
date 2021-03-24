@@ -342,7 +342,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
 
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
-  EXCLUDE_UPSTREAM_HTTP3; // buffer bug.
+  EXCLUDE_UPSTREAM_HTTP3; // tsan flake?
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
@@ -378,7 +378,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // TODO(danzh) re-enable after plumbing through http2 option
   // "allow_connect".
   EXCLUDE_DOWNSTREAM_HTTP3;
-  EXCLUDE_UPSTREAM_HTTP3; // buffer bug.
+  EXCLUDE_UPSTREAM_HTTP3; // use after free.
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1030,7 +1030,6 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 // connection error is not detected under these circumstances.
 #if !defined(__APPLE__)
 TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
-  EXCLUDE_UPSTREAM_HTTP3;
   testEnvoyHandling100Continue(false, "", true);
 }
 #endif
@@ -1060,7 +1059,8 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) {
-  EXCLUDE_UPSTREAM_HTTP3; // Hits assert in switchStreamBlockState.
+  // hits assert "Upper stream buffer limit is reached before response body is delivered."
+  EXCLUDE_UPSTREAM_HTTP3;
   testTwoRequests(true);
 }
 
@@ -1239,57 +1239,54 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
-  EXCLUDE_UPSTREAM_HTTP3; // Protocol-specific framing.
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
-  FakeRawConnectionPtr fake_upstream_connection;
-  // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT(fake_upstream_connection != nullptr);
-
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // The http1 codec won't send illegal status codes so send raw HTTP/1.1
+    FakeRawConnectionPtr fake_upstream_connection;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    ASSERT(fake_upstream_connection != nullptr);
     ASSERT_TRUE(fake_upstream_connection->write(
         "HTTP/1.1 11111111111111111111111111111111111111111111111111111111111111111 OK\r\n",
         false));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   } else {
-    Http::Http2::Http2Frame::SettingsFlags settings_flags =
-        static_cast<Http::Http2::Http2Frame::SettingsFlags>(0);
-    Http2Frame setting_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
-    // Ack settings
-    settings_flags = static_cast<Http::Http2::Http2Frame::SettingsFlags>(1); // ack
-    Http2Frame ack_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
-    ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
-    ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
-    Http::Http2::Http2Frame overflowed_status = Http::Http2::Http2Frame::makeHeadersFrameWithStatus(
-        "11111111111111111111111111111111111111111111111111111111111111111", 0);
-    ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
+    waitForNextUpstreamRequest();
+    default_response_headers_.setStatus(
+        "11111111111111111111111111111111111111111111111111111111111111111");
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    } else {
+      // TODO(#14829) QUIC won't disconnect on invalid messaging.
+      ASSERT_TRUE(upstream_request_->waitForReset());
+    }
   }
 
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   response->waitForEndStream();
   EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("protocol_error"));
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
-  EXCLUDE_UPSTREAM_HTTP3; // Protocol-specific framing.
   initialize();
 
-  FakeRawConnectionPtr fake_upstream_connection;
   // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT(fake_upstream_connection != nullptr);
-
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    FakeRawConnectionPtr fake_upstream_connection;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    ASSERT(fake_upstream_connection != nullptr);
     ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 OK\r\n", false));
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  } else {
+  } else if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+    FakeRawConnectionPtr fake_upstream_connection;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
     Http::Http2::Http2Frame::SettingsFlags settings_flags =
         static_cast<Http::Http2::Http2Frame::SettingsFlags>(0);
     Http2Frame setting_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
@@ -1300,9 +1297,14 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
     Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(0);
     ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  } else {
+    waitForNextUpstreamRequest();
+    default_response_headers_.removeStatus();
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   response->waitForEndStream();
   EXPECT_EQ("502", response->headers().getStatusValue());
 }
@@ -1311,7 +1313,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
   // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // QUIC_STREAM_EXCESSIVE_LOAD
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1336,7 +1338,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
   // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // QUIC_STREAM_EXCESSIVE_LOAD
   // Set header count limit to 2010.
   uint32_t max_count = 2010;
   config_helper_.addConfigModifier(
@@ -1549,7 +1551,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
   // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // requires configutable header limits.
   // Send one 95 kB URL with limit 96 kB headers.
   testLargeRequestUrl(95, 96);
 }
@@ -1561,7 +1563,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // requires configutable header limits.
   // Send one 95 kB header with limit 96 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 96, 100);
 }
@@ -1581,7 +1583,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // QUICHE doesn't limit number of headers.
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3; // buffer bug.
   // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -1609,7 +1610,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
-  EXCLUDE_UPSTREAM_HTTP3;
+  EXCLUDE_UPSTREAM_HTTP3; // assert failure: validHeaderString
   // Set header (and trailer) count limit to 200.
   uint32_t max_count = 200;
   config_helper_.addConfigModifier(

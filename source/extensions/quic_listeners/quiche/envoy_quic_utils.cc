@@ -82,6 +82,8 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::ConnectionFailure;
+  case quic::QUIC_BAD_APPLICATION_PAYLOAD:
+    return Http::StreamResetReason::ProtocolError;
   default:
     return Http::StreamResetReason::LocalReset;
   }
