@@ -16,7 +16,7 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                   crypto_config, push_promise_index),
       host_name_(server_id.host()) {
   // HTTP/3 header limits should be configurable, but for now hard-code to Envoy defaults.
-  set_max_inbound_header_list_size(Http::DEFAULT_MAX_REQUEST_HEADERS_KB * 1000);
+  SetMaxInboundHeaderListSize(Http::DEFAULT_MAX_REQUEST_HEADERS_KB * 1000);
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
