@@ -41,5 +41,42 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
+absl::optional<std::string> AdditionalFormatter::format(const Http::RequestHeaderMap&,
+                                                        const Http::ResponseHeaderMap&,
+                                                        const Http::ResponseTrailerMap&,
+                                                        const StreamInfo::StreamInfo&,
+                                                        absl::string_view) const {
+  return "AdditionalFormatter";
+}
+
+ProtobufWkt::Value AdditionalFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                    const Http::ResponseHeaderMap&,
+                                                    const Http::ResponseTrailerMap&,
+                                                    const StreamInfo::StreamInfo&,
+                                                    absl::string_view) const {
+  return ValueUtil::stringValue("");
+}
+
+FormatterProviderPtr AdditionalCommandParser::parse(const std::string& token, size_t,
+                                                    size_t) const {
+  if (absl::StartsWith(token, "ADDITIONAL_EXTENSION")) {
+    return std::make_unique<AdditionalFormatter>();
+  }
+
+  return nullptr;
+}
+
+CommandParserPtr AdditionalCommandFactory::createCommandParserFromProto(const Protobuf::Message&) {
+  return std::make_unique<AdditionalCommandParser>();
+}
+
+std::string AdditionalCommandFactory::configType() { return "google.protobuf.UInt32Value"; }
+
+ProtobufTypes::MessagePtr AdditionalCommandFactory::createEmptyConfigProto() {
+  return std::make_unique<ProtobufWkt::UInt32Value>();
+}
+
+std::string AdditionalCommandFactory::name() const { return "envoy.formatter.AdditionalFormatter"; }
+
 } // namespace Formatter
 } // namespace Envoy
