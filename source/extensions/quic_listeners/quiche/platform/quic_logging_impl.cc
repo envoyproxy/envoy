@@ -89,7 +89,7 @@ QuicLogEmitter::~QuicLogEmitter() {
     }
   }
 
-  if (level_ == FATAL) {
+  if (level_ == static_cast<quic::QuicLogLevel>(LogLevelFATAL)) {
     GetLogger().flush();
 #ifdef NDEBUG
     // Release mode.

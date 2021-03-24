@@ -24,10 +24,8 @@ from __future__ import print_function
 
 import datetime
 from datetime import date
-from collections import defaultdict
 import os
 import re
-import subprocess
 import sys
 
 import github
@@ -55,10 +53,10 @@ def get_confirmation():
 def create_issues(access_token, runtime_and_pr):
     """Create issues in GitHub for code to clean up old runtime guarded features.
 
-  Args:
-    access_token: GitHub access token (see comment at top of file).
-    runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
-  """
+    Args:
+        access_token: GitHub access token (see comment at top of file).
+        runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
+    """
     git = github.Github(access_token)
     repo = git.get_repo('envoyproxy/envoy')
 
@@ -134,7 +132,7 @@ def create_issues(access_token, runtime_and_pr):
 
 def get_runtime_and_pr():
     """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
-  """
+    """
     repo = Repo(os.getcwd())
 
     # grep source code looking for reloadable features which are true to find the
