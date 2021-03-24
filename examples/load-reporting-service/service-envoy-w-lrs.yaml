@@ -65,10 +65,6 @@ cluster_manager:
     - envoy_grpc:
         cluster_name: load_reporting_cluster
 admin:
-  access_log:
-  - name: envoy.access_loggers.stdoutput
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
   address:
     socket_address:
       address: 0.0.0.0

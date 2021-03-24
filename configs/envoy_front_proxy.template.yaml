@@ -186,10 +186,6 @@ layered_runtime:
     - name: admin
       admin_layer: {}
 admin:
-  access_log:
-  - name: envoy.access_loggers.stdoutput
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
   address:
     socket_address:
       protocol: TCP

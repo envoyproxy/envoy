@@ -1,10 +1,6 @@
 # This will proxy CONNECT requests from a downstream connecting on 127.0.0.1:10001
 # to an upstream listening on 127.0.0.1:10002
 admin:
-  access_log:
-  - name: envoy.access_loggers.stdoutput
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
   address:
     socket_address:
       protocol: TCP
