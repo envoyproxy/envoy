@@ -106,13 +106,15 @@ FilterHeadersStatus GrpcCallContext::onRequestHeaders(uint32_t, bool end_of_stre
   if (end_of_stream) {
     if (root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value,
                                 1000, std::unique_ptr<GrpcCallHandlerBase>(root()->handler_)) ==
-        WasmResult::Ok) {
-      logError("expected failure did not occur");
+        WasmResult::InternalFailure) {
+      logError("expected failure occurred");
     }
     return FilterHeadersStatus::Continue;
   }
-  root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value, 1000,
-                          std::unique_ptr<GrpcCallHandlerBase>(root()->handler_));
+  if (root()->grpcCallHandler("cluster", "service", "method", initial_metadata, value, 1000,
+                          std::unique_ptr<GrpcCallHandlerBase>(root()->handler_)) == WasmResult::Ok) {
+    logError("cluster call succeeded");
+  }
   return FilterHeadersStatus::StopIteration;
 }
 
