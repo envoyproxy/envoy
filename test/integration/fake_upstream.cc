@@ -297,8 +297,8 @@ class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
 public:
   using Http::Http1::ServerConnectionImpl::ServerConnectionImpl;
 
-  void onMessageComplete() override {
-    ServerConnectionImpl::onMessageComplete();
+  Http::Http1::ParserStatus onMessageCompleteBase() override {
+    auto rc = ServerConnectionImpl::onMessageCompleteBase();
 
     if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
       // Undo the read disable from the base class - we have many tests which
@@ -306,6 +306,7 @@ public:
       // receive the disconnect if reading is disabled.
       activeRequest().value().response_encoder_.readDisable(false);
     }
+    return rc;
   }
   ~TestHttp1ServerConnectionImpl() override {
     if (activeRequest().has_value()) {

@@ -445,6 +445,29 @@ TEST_F(Http1ServerConnectionImplTest, LargeBodyOptimization) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+// Regression test for checking if content length exists when all bits are set (e.g. 3).
+TEST_F(Http1ServerConnectionImplTest, ContentLengthAllBitsSet) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {"content-length", "3"}, {":path", "/"}, {":method", "POST"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
+      .WillOnce(Invoke([&](Http::RequestHeaderMapPtr&, bool) -> void {
+        connection_.state_ = Network::Connection::State::Closing;
+      }));
+  EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ncontent-length: 3\r\n\r\n123");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_NE(0U, buffer.length());
+}
+
 // Verify that data in the two body chunks is merged before the call to decodeData.
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
   initialize();
