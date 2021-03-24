@@ -146,6 +146,11 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
   }
+  case GEN_EMAIL: {
+    ASN1_STRING* str = general_name->d.rfc822Name;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
       sockaddr_in sin;

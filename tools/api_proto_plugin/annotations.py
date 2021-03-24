@@ -56,14 +56,14 @@ class AnnotationError(Exception):
 def extract_annotations(s, inherited_annotations=None):
     """Extract annotations map from a given comment string.
 
-  Args:
-    s: string that may contains annotations.
-    inherited_annotations: annotation map from file-level inherited annotations
-      (or None) if this is a file-level comment.
+    Args:
+        s: string that may contains annotations.
+        inherited_annotations: annotation map from file-level inherited annotations
+           (or None) if this is a file-level comment.
 
-  Returns:
-    Annotation map.
-  """
+    Returns:
+        Annotation map.
+    """
     annotations = {
         k: v for k, v in (inherited_annotations or {}).items() if k in INHERITED_ANNOTATIONS
     }
@@ -80,17 +80,17 @@ def extract_annotations(s, inherited_annotations=None):
 def xform_annotation(s, annotation_xforms):
     """Return transformed string with annotation transformers.
 
-  The annotation will be replaced with the new value returned by the transformer.
-  If the transformer returns None, then the annotation will be removed.
-  If the annotation presented in transformers doesn't exist in the original string,
-  a new annotation will be appended to the end of string.
+    The annotation will be replaced with the new value returned by the transformer.
+    If the transformer returns None, then the annotation will be removed.
+    If the annotation presented in transformers doesn't exist in the original string,
+    a new annotation will be appended to the end of string.
 
-  Args:
-    annotation_xforms: a dict of transformers for annotations.
+    Args:
+        annotation_xforms: a dict of transformers for annotations.
 
-  Returns:
-    transformed string.
-  """
+    Returns:
+        transformed string.
+    """
     present_annotations = set()
 
     def xform(match):

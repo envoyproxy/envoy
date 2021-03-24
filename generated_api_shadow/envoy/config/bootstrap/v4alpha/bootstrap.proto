@@ -297,7 +297,7 @@ message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Admin";
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
-  // Output the access log for the administration server.
+  // emitted by the administration server.
   repeated accesslog.v4alpha.AccessLog access_log = 5;
 
   // The path to write the access log for the administration server. If no
