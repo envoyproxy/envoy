@@ -155,6 +155,12 @@ StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
       commands_(commands), struct_output_format_(toFormatMapValue(format_mapping)) {}
 
+StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                                 bool omit_empty_values)
+    : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+      empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
+      commands_(absl::nullopt), struct_output_format_(toFormatMapValue(format_mapping)) {}
+
 StructFormatter::StructFormatMapWrapper
 StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
@@ -206,7 +212,11 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 
 std::vector<FormatterProviderPtr>
 StructFormatter::toFormatStringValue(const std::string& string_format) const {
-  return SubstitutionFormatParser::parse(string_format, commands_);
+  if (commands_.has_value()) {
+    return SubstitutionFormatParser::parse(string_format, commands_.value());
+  }
+
+  return SubstitutionFormatParser::parse(string_format);
 }
 
 ProtobufWkt::Value StructFormatter::providersCallback(

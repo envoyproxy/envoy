@@ -134,6 +134,8 @@ template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVis
 class StructFormatter {
 public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                  bool omit_empty_values);
+  StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                   bool omit_empty_values, const std::vector<CommandParserPtr>& commands);
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
@@ -189,8 +191,11 @@ private:
   const bool omit_empty_values_;
   const bool preserve_types_;
   const std::string empty_value_;
-  // Note: don't use this ref beyond the constructor.
-  const std::vector<CommandParserPtr>& commands_;
+
+  // Note: don't use this ref outside of the constructor.
+  using CommandsRef = std::reference_wrapper<const std::vector<CommandParserPtr>>;
+  const absl::optional<CommandsRef> commands_;
+
   const StructFormatMapWrapper struct_output_format_;
 };
 
