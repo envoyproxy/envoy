@@ -200,6 +200,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "win32_event_logger_impl_lib",
+    srcs = select({
+        "//bazel:windows_x86_64": ["win32/event_logger_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:windows_x86_64": ["win32/event_logger_impl.h"],
+        "//conditions:default": [],
+    }),
+    strip_include_prefix = "win32",
+    deps = [":base_logger_lib"],
+)
+
+envoy_cc_library(
     name = "mutex_tracer_lib",
     srcs = ["mutex_tracer_impl.cc"],
     hdrs = ["mutex_tracer_impl.h"],

@@ -7,6 +7,8 @@
 #include <functional>
 #include <string>
 
+#include "common/common/event_logger_impl.h"
+
 #include "envoy/event/signal.h"
 
 #include "exe/service_status.h"
@@ -54,5 +56,11 @@ private:
   SERVICE_STATUS_HANDLE handle_;
   ServiceStatus status_;
   Event::SignalEventPtr sigterm_;
+  // You might be wondering why we use a raw logger here. The reason is that
+  // this code is doing work before we parse the command line and the loggers have
+  // not be initialized. When Envoy is running as service the user might not have access to
+  // the standard error which makes it really hard to diagnose start up failures with
+  // just the error code.
+  Logger::WindowsEventLogger windows_event_logger_{"win32-scm-logger"};
 };
 } // namespace Envoy
