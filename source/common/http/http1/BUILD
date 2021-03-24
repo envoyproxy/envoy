@@ -31,10 +31,11 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = ["http_parser"],
     deps = [
         ":codec_stats_lib",
         ":header_formatter_lib",
+        ":legacy_parser_lib",
+        ":parser_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/http:codec_interface",
@@ -93,5 +94,24 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+)
+
+envoy_cc_library(
+    name = "parser_interface",
+    hdrs = ["parser.h"],
+    deps = [
+        "//source/common/common:statusor_lib",
+        "//source/common/http:status_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "legacy_parser_lib",
+    srcs = ["legacy_parser_impl.cc"],
+    hdrs = ["legacy_parser_impl.h"],
+    external_deps = ["http_parser"],
+    deps = [
+        ":parser_interface",
+        "//source/common/common:assert_lib",
     ],
 )
