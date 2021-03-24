@@ -5,6 +5,7 @@
 #include <string>
 
 #include "common/http/codec_client.h"
+#include "common/http/http3/quic_client_connection_factory.h"
 #include "common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
@@ -105,6 +106,8 @@ public:
                       const std::string& config = ConfigHelper::httpProxyConfig());
   ~HttpIntegrationTest() override;
 
+  void initialize() override;
+
 protected:
   void useAccessLog(absl::string_view format = "",
                     std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
@@ -114,6 +117,9 @@ protected:
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
+  // Makes a downstream network connection object based on client codec version.
+  Network::ClientConnectionPtr makeClientConnectionWithOptions(
+      uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   // Makes a http connection object with asserting a connected state.
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
@@ -243,6 +249,10 @@ protected:
   // Prefix listener stat with IP:port, including IP version dependent loopback address.
   std::string listenerStatPrefix(const std::string& stat_name);
 
+  Network::TransportSocketFactoryPtr quic_transport_socket_factory_;
+  // Must outlive |codec_client_| because it may not close connection till the end of its life
+  // scope.
+  std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
   // A placeholder for the first upstream connection.
@@ -259,6 +269,9 @@ protected:
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+
+  bool set_reuse_port_{false};
+  std::string san_to_match_{"spiffe://lyft.com/backend-team"};
 };
 
 // Helper class for integration tests using raw HTTP/2 frames
