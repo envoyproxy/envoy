@@ -8,7 +8,7 @@ namespace JwtAuthn {
 JwtCache::JwtCache(int cache_size) { jwt_cache_.setMaxSize(cache_size); }
 
 ::google::jwt_verify::Jwt* JwtCache::find(const std::string& token) {
-  ::google::jwt_verify::Jwt* jwt_cache_lookup;
+  ::google::jwt_verify::Jwt* jwt_cache_lookup{};
   SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>::ScopedLookup lookup(&jwt_cache_, token);
   if (lookup.found()) {
     jwt_cache_lookup = lookup.value();
