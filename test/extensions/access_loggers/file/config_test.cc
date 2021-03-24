@@ -5,8 +5,8 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/access_loggers/file/config.h"
-#include "extensions/access_loggers/file/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -56,8 +56,8 @@ public:
     config.mutable_typed_config()->PackFrom(fal_config);
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
-    EXPECT_CALL(context_.access_log_manager_, createAccessLog(fal_config.path()))
-        .WillOnce(Return(file));
+    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fal_config.path()};
+    EXPECT_CALL(context_.access_log_manager_, createAccessLog(file_info)).WillOnce(Return(file));
 
     AccessLog::InstanceSharedPtr logger = AccessLog::AccessLogFactory::fromProto(config, context_);
 

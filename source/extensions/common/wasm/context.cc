@@ -20,6 +20,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/safe_memcpy.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -200,15 +201,16 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   auto buffer = std::unique_ptr<char[]>(new char[s]);
   char* b = buffer.get();
   uint32_t n = response.size();
-  memcpy(b, &n, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &n);
   b += sizeof(uint32_t);
   for (auto& e : response) {
     uint32_t ttl = e.ttl_.count();
-    memcpy(b, &ttl, sizeof(uint32_t));
+    safeMemcpyUnsafeDst(b, &ttl);
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
-    memcpy(b, e.address_->asStringView().data(), e.address_->asStringView().size());
+    memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
+           e.address_->asStringView().size());
     b += e.address_->asStringView().size();
     *b++ = 0;
   };
@@ -269,45 +271,46 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   auto buffer = std::unique_ptr<char[]>(new char[counter_block_size + gauge_block_size]);
   char* b = buffer.get();
 
-  memcpy(b, &counter_block_size, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &counter_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &counter_type, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &counter_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_counters, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &num_counters);
   b += sizeof(uint32_t);
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       n = counter.counter_.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t));
+      safeMemcpyUnsafeDst(b, &n);
       b += sizeof(uint32_t);
-      memcpy(b, counter.counter_.get().name().data(), counter.counter_.get().name().size());
+      memcpy(b, counter.counter_.get().name().data(), // NOLINT(safe-memcpy)
+             counter.counter_.get().name().size());
       b = align<uint64_t>(b + counter.counter_.get().name().size());
       v = counter.counter_.get().value();
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
       v = counter.delta_;
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
 
-  memcpy(b, &gauge_block_size, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &gauge_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &gauge_type, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &gauge_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_gauges, sizeof(uint32_t));
+  safeMemcpyUnsafeDst(b, &num_gauges);
   b += sizeof(uint32_t);
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       n = gauge.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t));
+      safeMemcpyUnsafeDst(b, &n);
       b += sizeof(uint32_t);
-      memcpy(b, gauge.get().name().data(), gauge.get().name().size());
+      memcpy(b, gauge.get().name().data(), gauge.get().name().size()); // NOLINT(safe-memcpy)
       b = align<uint64_t>(b + gauge.get().name().size());
       v = gauge.get().value();
-      memcpy(b, &v, sizeof(uint64_t));
+      safeMemcpyUnsafeDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
@@ -952,6 +955,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
 
   uint32_t token = nextHttpCallToken();
   auto& handler = http_request_[token];
+  handler.context_ = this;
+  handler.token_ = token;
 
   // set default hash policy to be based on :authority to enable consistent hash
   Http::AsyncClient::RequestOptions options;
@@ -965,8 +970,6 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     http_request_.erase(token);
     return WasmResult::InternalFailure;
   }
-  handler.context_ = this;
-  handler.token_ = token;
   handler.request_ = http_request;
   *token_ptr = token;
   return WasmResult::Ok;
@@ -1012,11 +1015,11 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client = clusterManager()
-                         .grpcAsyncClientManager()
-                         .factoryForGrpcService(service_proto, *wasm()->scope_,
-                                                Grpc::AsyncClientFactoryClusterChecks::Skip)
-                         ->create();
+  auto grpc_client =
+      clusterManager()
+          .grpcAsyncClientManager()
+          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
+          ->create();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1083,11 +1086,11 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client = clusterManager()
-                         .grpcAsyncClientManager()
-                         .factoryForGrpcService(service_proto, *wasm()->scope_,
-                                                Grpc::AsyncClientFactoryClusterChecks::Skip)
-                         ->create();
+  auto grpc_client =
+      clusterManager()
+          .grpcAsyncClientManager()
+          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
+          ->create();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1778,12 +1781,16 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
     });
     return;
   }
+  auto handler = http_request_.find(token);
+  if (handler == http_request_.end()) {
+    return;
+  }
   http_call_response_ = &response;
   uint32_t body_size = response->body().length();
   onHttpCallResponse(token, response->headers().size(), body_size,
                      headerSize(response->trailers()));
   http_call_response_ = nullptr;
-  http_request_.erase(token);
+  http_request_.erase(handler);
 }
 
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
@@ -1792,13 +1799,17 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
     wasm()->addAfterVmCallAction([this, token, reason] { onHttpCallFailure(token, reason); });
     return;
   }
+  auto handler = http_request_.find(token);
+  if (handler == http_request_.end()) {
+    return;
+  }
   status_code_ = static_cast<uint32_t>(WasmResult::BrokenConnection);
   // This is the only value currently.
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   status_message_ = "reset";
   onHttpCallResponse(token, 0, 0, 0);
   status_message_ = "";
-  http_request_.erase(token);
+  http_request_.erase(handler);
 }
 
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {

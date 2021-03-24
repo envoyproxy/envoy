@@ -11,6 +11,7 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/http/status.h"
 
@@ -213,6 +214,11 @@ public:
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+
+  /**
+   * @return StreamInfo::StreamInfo& the stream_info for this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 /**
@@ -270,7 +276,9 @@ enum class StreamResetReason {
   // The stream was reset because of a resource overflow.
   Overflow,
   // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
-  ConnectError
+  ConnectError,
+  // Received payload did not conform to HTTP protocol.
+  ProtocolError
 };
 
 /**

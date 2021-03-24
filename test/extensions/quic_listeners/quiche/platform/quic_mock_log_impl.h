@@ -51,14 +51,14 @@ private:
 // behavior is restored.
 class ScopedDisableExitOnDFatal {
 public:
-  ScopedDisableExitOnDFatal() : previous_value_(IsDFatalExitDisabled()) {
-    SetDFatalExitDisabled(true);
+  ScopedDisableExitOnDFatal() : previous_value_(isDFatalExitDisabled()) {
+    setDFatalExitDisabled(true);
   }
 
   ScopedDisableExitOnDFatal(const ScopedDisableExitOnDFatal&) = delete;
   ScopedDisableExitOnDFatal& operator=(const ScopedDisableExitOnDFatal&) = delete;
 
-  ~ScopedDisableExitOnDFatal() { SetDFatalExitDisabled(previous_value_); }
+  ~ScopedDisableExitOnDFatal() { setDFatalExitDisabled(previous_value_); }
 
 private:
   const bool previous_value_;

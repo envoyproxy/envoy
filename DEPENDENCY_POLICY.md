@@ -61,7 +61,7 @@ Dependency declarations must:
 When build or test code references Python modules, they should be specified via `pip_install` in
 [bazel/repositories_extra.bzl](bazel/repositories_extra.bzl). Python modules should not be listed in
 `repository_locations.bzl` entries. `requirements.txt` files for Python dependencies must pin to
-exact versions, e.g. `PyYAML==5.3.1` and ideally also include a [SHA256
+exact versions, e.g. `PyYAML==5.4.1` and ideally also include a [SHA256
 checksum](https://davidwalsh.name/hashin).
 
 Pure developer tooling and documentation builds may reference Python via standalone
