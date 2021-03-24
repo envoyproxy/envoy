@@ -32,7 +32,7 @@ which in the demo configuration is ``0.0.0.0:9901``.
 In this example, the logs are simply discarded.
 
 .. code-block:: yaml
-   :emphasize-lines: 2, 5-6
+   :emphasize-lines: 4-5
 
    admin:
      address:
