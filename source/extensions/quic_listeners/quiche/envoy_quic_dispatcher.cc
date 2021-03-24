@@ -54,9 +54,9 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   quic::QuicConfig quic_config = config();
   // TODO(danzh) setup flow control window via config.
   quic_config.SetInitialStreamFlowControlWindowToSend(
-      2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
   quic_config.SetInitialSessionFlowControlWindowToSend(
-      3 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listen_socket_);

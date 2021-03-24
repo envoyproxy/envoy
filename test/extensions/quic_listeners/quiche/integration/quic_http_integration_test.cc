@@ -102,9 +102,9 @@ public:
     // TODO(danzh) defer setting flow control window till getting http3 options. This requires
     // QUICHE support to set the session's flow controller after instantiation.
     quic_config_.SetInitialStreamFlowControlWindowToSend(
-        2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     quic_config_.SetInitialSessionFlowControlWindowToSend(
-        3 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        1.5 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(

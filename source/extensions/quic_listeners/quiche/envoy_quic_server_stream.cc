@@ -171,6 +171,8 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   }
 
   bool fin_read_and_no_trailers = IsDoneReading();
+  ENVOY_STREAM_LOG(debug, "Received {} bytes of data {} FIN.", *this, buffer->length(),
+                   fin_read_and_no_trailers ? "with" : "without");
   // If this call is triggered by an empty frame with FIN which is not from peer
   // but synthesized by stream itself upon receiving HEADERS with FIN or
   // TRAILERS, do not deliver end of stream here. Because either decodeHeaders
