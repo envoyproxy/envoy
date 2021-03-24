@@ -60,10 +60,6 @@ public:
                       const std::string& config = ConfigHelper::httpProxyConfig());
   virtual ~BaseIntegrationTest() = default;
 
-  // TODO(jmarantz): Remove this once
-  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
-  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
-
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
   // Set up the fake upstream connections. This is called by initialize() and
