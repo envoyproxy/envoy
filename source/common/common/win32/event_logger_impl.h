@@ -8,7 +8,7 @@ namespace Logger {
 #define GENERATE_WIN32_NATIVE_LOGGER(X) WindowsEventLogger(#X),
 
 /**
- * Logger that uses spdlog::sinks::win_eventlog_sink.
+ * Logger that uses `spdlog::sinks::win_eventlog_sink`.
  */
 class WindowsEventLogger : public Logger {
 public:
