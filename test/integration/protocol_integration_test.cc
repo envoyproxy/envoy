@@ -1551,7 +1551,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
   // TODO(danzh) re-enable this test after quic headers size become configurable.
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3; // requires configutable header limits.
+  EXCLUDE_UPSTREAM_HTTP3; // requires configurable header limits.
   // Send one 95 kB URL with limit 96 kB headers.
   testLargeRequestUrl(95, 96);
 }
@@ -1563,7 +1563,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   EXCLUDE_DOWNSTREAM_HTTP3
-  EXCLUDE_UPSTREAM_HTTP3; // requires configutable header limits.
+  EXCLUDE_UPSTREAM_HTTP3; // requires configurable header limits.
   // Send one 95 kB header with limit 96 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 96, 100);
 }
