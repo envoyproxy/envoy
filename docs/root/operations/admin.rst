@@ -24,11 +24,6 @@ modify different aspects of the server:
   .. code-block:: yaml
 
     admin:
-      access_log:
-      - name: envoy.access_loggers.file
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-          path: /tmp/admin_access.log
       profile_path: /tmp/envoy.prof
       address:
         socket_address: { address: 127.0.0.1, port_value: 9901 }

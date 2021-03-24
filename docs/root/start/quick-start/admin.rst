@@ -29,20 +29,12 @@ the administration server.
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in the demo configuration is ``0.0.0.0:9901``.
 
-You must set the :ref:`access_log_path <envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path>` to
-specify where to send admin access logs.
-
 In this example, the logs are simply discarded.
 
 .. code-block:: yaml
    :emphasize-lines: 2, 5-6
 
    admin:
-      access_log:
-      - name: envoy.access_loggers.file
-         typed_config:
-            "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-            path: /dev/null
      address:
        socket_address:
          address: 0.0.0.0
