@@ -1,6 +1,4 @@
 import jinja2
-import json
-from collections import OrderedDict
 import os
 import shutil
 import sys
