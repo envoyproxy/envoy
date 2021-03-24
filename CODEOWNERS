@@ -115,11 +115,9 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/common/fault @rshriram @alyssawilk
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
-/*/extensions/filters/http/ext_authz @gsagula @dio
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
-/*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
 /*/extensions/filters/listener/tls_inspector @ggreenway @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -137,7 +135,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/retry/priority/previous_priorities @snowp @alyssawilk
 /*/extensions/retry/host @snowp @alyssawilk
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
-/*/extensions/filters/network/ext_authz @gsagula @dio
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
 /*/extensions/filters/network/echo @htuch @alyssawilk
 /*/extensions/filters/udp/dns_filter @abaptiste @mattklein123
@@ -174,3 +171,11 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
+# External Rate Limit
+/*/extensions/filters/common/ratelimit @esmet @mattklein123
+/*/extensions/filters/http/ratelimit @esmet @mattklein123
+/*/extensions/filters/network/ratelimit @esmet @mattklein123
+# External Authorization
+/*/extensions/filters/common/ext_authz @esmet @gsagula @dio
+/*/extensions/filters/http/ext_authz @esmet @gsagula @dio
+/*/extensions/filters/network/ext_authz @esmet @gsagula @dio
