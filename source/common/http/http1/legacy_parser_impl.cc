@@ -2,6 +2,8 @@
 
 #include <http_parser.h>
 
+#include <cstdint>
+
 #include "common/common/assert.h"
 #include "common/http/http1/parser.h"
 
@@ -111,8 +113,7 @@ public:
     // An unset content length will be have all bits set.
     // See
     // https://github.com/nodejs/http-parser/blob/ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d/http_parser.h#L311
-    if ((parser_.content_length & (parser_.content_length + 1)) == 0 &&
-        parser_.content_length != 0) {
+    if (parser_.content_length == ULLONG_MAX) {
       return absl::nullopt;
     }
     return parser_.content_length;

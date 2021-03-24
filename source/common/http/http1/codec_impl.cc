@@ -1,6 +1,5 @@
 #include "common/http/http1/codec_impl.h"
 
-#include <cstdint>
 #include <memory>
 #include <string>
 
