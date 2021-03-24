@@ -221,12 +221,6 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           : 20000;
   quic_config_.set_max_time_before_crypto_handshake(
       quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-  // TODO(danzh) defer setting flow control window till getting filter chain. This requires
-  // QUICHE support to set the session's flow controller after instantiation.
-  quic_config_.SetInitialStreamFlowControlWindowToSend(
-      2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
-  quic_config_.SetInitialSessionFlowControlWindowToSend(
-      3 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
   int32_t max_streams =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);

@@ -151,7 +151,8 @@ public:
         3 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, supported_versions_, std::move(connection), server_id_, crypto_config_.get(),
-        &push_promise_index_, *dispatcher_, 0);
+        &push_promise_index_, *dispatcher_,
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
     session->Initialize();
     return session;
   }
@@ -367,6 +368,19 @@ TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
+  // upstream_response_timeout.
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
+    auto* timeout = route->mutable_timeout();
+    timeout->set_seconds(2 * timeout_ms / 1000);
+  });
+#endif
+
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
                                        false);
@@ -379,6 +393,19 @@ TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
 }
 
 TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
+  // upstream_response_timeout.
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
+    auto* timeout = route->mutable_timeout();
+    timeout->set_seconds(2 * timeout_ms / 1000);
+  });
+#endif
+
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
                                  /*downstream_buffer_limit=*/128 * 1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024,
