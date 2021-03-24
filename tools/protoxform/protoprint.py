@@ -19,7 +19,7 @@ import subprocess
 import sys
 
 from tools.api_proto_plugin import annotations, traverse, visitor
-import tools.api_versioning.utils as api_version_utils
+from tools.api_versioning import utils as api_version_utils
 from tools.protoxform import options as protoxform_options, utils
 from tools.type_whisperer import type_whisperer, types_pb2
 
@@ -622,9 +622,10 @@ class ProtoFormatVisitor(visitor.Visitor):
         if field_or_evalue.options.deprecated and not self._frozen_proto and \
                 not protoxform_options.has_hide_option(field_or_evalue.options):
             # If the field or enum value has annotation from deprecation.proto, need to import it.
-            if field_or_evalue.options.HasExtension(deprecation_tag) or \
-                    field_or_evalue.options.HasExtension(disallowed_tag):
-                self._needs_deprecation_annotation_import = True
+            self._needs_deprecation_annotation_import = (
+                self._needs_deprecation_annotation_import or
+                field_or_evalue.options.HasExtension(deprecation_tag) or
+                field_or_evalue.options.HasExtension(disallowed_tag))
             if field_or_evalue.name != ENVOY_DEPRECATED_UNAVIALABLE_NAME:
                 # If there's a deprecated version annotation, ensure it is valid.
                 if field_or_evalue.options.HasExtension(deprecation_tag):

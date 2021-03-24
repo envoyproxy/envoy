@@ -6,6 +6,7 @@ from collections import namedtuple
 import pathlib
 import string
 import sys
+
 import utils
 
 FILE_TEMPLATE = string.Template("""#pragma once

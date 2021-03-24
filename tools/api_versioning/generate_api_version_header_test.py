@@ -1,12 +1,13 @@
 """Tests the api version header file generation.
 """
-import generate_api_version_header
-import utils
 import os
 import pathlib
 import string
 import tempfile
 import unittest
+
+import generate_api_version_header
+import utils
 
 
 class GenerateApiVersionHeaderTest(unittest.TestCase):
