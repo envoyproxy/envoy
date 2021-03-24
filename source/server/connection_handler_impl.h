@@ -5,7 +5,6 @@
 #include <list>
 #include <memory>
 
-#include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
