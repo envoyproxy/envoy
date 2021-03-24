@@ -63,8 +63,11 @@ REAL_TIME_ALLOWLIST = (
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
 # perform temporary registrations.
-REGISTER_FACTORY_TEST_ALLOWLIST = ("./test/common/config/registry_test.cc",
-                                   "./test/integration/clusters/", "./test/integration/filters/")
+REGISTER_FACTORY_TEST_ALLOWLIST = (
+    "./test/common/config/registry_test.cc", "./test/integration/clusters/",
+    "./test/integration/filters/",
+    "./test/extensions/http/header_formatters/preserve_case/preserve_case_formatter_integration_test.cc"
+)
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (

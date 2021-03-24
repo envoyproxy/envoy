@@ -845,7 +845,7 @@ Status ConnectionImpl::onMessageBegin() {
   protocol_ = Protocol::Http11;
   processing_trailers_ = false;
   header_parsing_state_ = HeaderParsingState::Field;
-  allocHeaders(codec_settings_);
+  allocHeaders(statefulFormatterFromSettings(codec_settings_));
   return onMessageBeginBase();
 }
 
