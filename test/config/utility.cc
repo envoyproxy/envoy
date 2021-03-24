@@ -145,7 +145,10 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::httpProxyConfig() {
+std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
+  if (downstream_use_quic) {
+    return quicHttpProxyConfig();
+  }
   return absl::StrCat(baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
@@ -1059,6 +1062,24 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   }
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+}
+
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+      quic_transport_socket_config;
+  auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+  ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
+                              *tls_context->mutable_common_tls_context());
+  for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
+    if (listener.udp_listener_config().listener_config().typed_config().type_url() ==
+        "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
+      ASSERT(listener.filter_chains_size() > 0);
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+      listener.set_reuse_port(reuse_port);
+    }
+  }
 }
 
 bool ConfigHelper::setAccessLog(

@@ -179,6 +179,7 @@ envoy_cc_library(
     srcs = ["quic_filter_manager_connection_impl.cc"],
     hdrs = ["quic_filter_manager_connection_impl.h"],
     tags = ["nofips"],
+    visibility = ["//test:__subpackages__"],
     deps = [
         ":envoy_quic_connection_lib",
         ":envoy_quic_simulated_watermark_buffer_lib",
