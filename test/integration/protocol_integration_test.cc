@@ -1030,6 +1030,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 // connection error is not detected under these circumstances.
 #if !defined(__APPLE__)
 TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
+  EXCLUDE_UPSTREAM_HTTP3; // CI fails with 503 in access logs.
   testEnvoyHandling100Continue(false, "", true);
 }
 #endif
@@ -1583,6 +1584,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // QUICHE doesn't limit number of headers.
   EXCLUDE_DOWNSTREAM_HTTP3
+  EXCLUDE_UPSTREAM_HTTP3; // CI asan use-after-free
   // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());

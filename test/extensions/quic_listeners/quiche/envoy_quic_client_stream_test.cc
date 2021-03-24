@@ -253,7 +253,7 @@ TEST_P(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
 
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
