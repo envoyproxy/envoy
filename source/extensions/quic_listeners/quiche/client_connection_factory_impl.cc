@@ -29,6 +29,8 @@ QuicClientConnectionFactoryImpl::createQuicNetworkConnection(
     Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
     Network::Address::InstanceConstSharedPtr server_addr,
     Network::Address::InstanceConstSharedPtr local_addr) {
+  // This flag fix a QUICHE issue which may crash Envoy during connection close.
+  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
 
   auto connection = std::make_unique<EnvoyQuicClientConnection>(

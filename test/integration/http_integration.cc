@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
@@ -32,6 +33,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/ssl_utility.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -40,6 +42,7 @@
 #include "test/test_common/registry.h"
 
 #include "absl/time/time.h"
+#include "base_integration_test.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -212,6 +215,23 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
   }
 }
 
+Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOptions(
+    uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  if (downstream_protocol_ <= Http::CodecClient::Type::HTTP2) {
+    return BaseIntegrationTest::makeClientConnectionWithOptions(port, options);
+  }
+  // Setting socket options is not supported for HTTP3.
+  ASSERT(!options);
+  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  return Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+             Http::QuicCodecNames::get().Quiche)
+      .createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_, server_addr,
+                                   local_addr);
+}
+
 IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port) {
   return makeHttpConnection(makeClientConnection(port));
 }
@@ -232,8 +252,19 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
       timeSystem())};
-  return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                  host_description, downstream_protocol_);
+  // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
+  // in-connection version negotiation.
+  auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                        host_description, downstream_protocol_);
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP3 && codec->disconnected()) {
+    // Connection may get closed during version negotiation or handshake.
+    // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
+    // INVALID_VERSION error to caller and let caller to use server advertised version list to
+    // create a new connection with mutually supported version and make client codec again.
+    ENVOY_LOG(error, "Fail to connect to server with error: {}",
+              codec->connection()->transportFailureReason());
+  }
+  return codec;
 }
 
 IntegrationCodecClientPtr
@@ -274,6 +305,32 @@ void HttpIntegrationTest::useAccessLog(
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
+
+void HttpIntegrationTest::initialize() {
+  if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
+    return BaseIntegrationTest::initialize();
+  }
+  // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
+  // according to the config.
+  quic_transport_socket_factory_ =
+      IntegrationUtil::createQuicUpstreamTransportSocketFactory(*api_, san_to_match_);
+
+  // Needed to config QUIC transport socket factory, and needs to be added before base class calls
+  // initialize().
+  config_helper_.addQuicDownstreamTransportSocketConfig(set_reuse_port_);
+
+  BaseIntegrationTest::initialize();
+  registerTestServerPorts({"http"});
+
+  Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(fmt::format(
+      "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
+  // Needs to outlive all QUIC connections.
+  quic_connection_persistent_info_ =
+      Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
+          Http::QuicCodecNames::get().Quiche)
+          .createNetworkConnectionInfo(*dispatcher_, *quic_transport_socket_factory_, stats_store_,
+                                       timeSystem(), server_addr);
+}
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
@@ -524,7 +581,6 @@ void HttpIntegrationTest::testRouterNotFound() {
 void HttpIntegrationTest::testRouterNotFoundWithBody() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   initialize();
-
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
@@ -1005,11 +1061,13 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.addFilter(R"EOF(
-  name: pause-filter
+    config_helper_.addFilter(
+        fmt::format(R"EOF(
+  name: pause-filter{}
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
-  )EOF");
+  )EOF",
+                    downstreamProtocol() == Http::CodecClient::Type::HTTP3 ? "-for-quic" : ""));
   }
   initialize();
 

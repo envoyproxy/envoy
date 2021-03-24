@@ -121,7 +121,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(ClientSslTransportOptions().setSan(true));
+    return makeSslClientConnection(ClientSslTransportOptions().setSan(san_to_match_));
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();
@@ -130,7 +130,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(true));
+    return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(san_to_match_));
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();

@@ -76,7 +76,7 @@ public:
     }
 
     // Validate that the stats JSON has expected histograms element.
-    EXPECT_EQ(expected_hist_count, histogram_count);
+    EXPECT_EQ(expected_hist_count, histogram_count) << stats_json;
   }
 };
 

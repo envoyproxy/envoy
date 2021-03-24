@@ -31,11 +31,22 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
+    // Ensure that decodeData is only called for HTTP/3 (where protocol is set at the
+    // connection level). In HTTP/3 the FIN arrives separately so we will get
+    // decodeData() with an empty body.
+    if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() &&
+        data.length() == 0u) {
+      data.add("body");
+    }
+    return Http::FilterDataStatus::Continue;
+  }
+
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     // Ensure that encodeData is only called for HTTP/3 (where protocol is set at the
     // connection level). In HTTP/3 the FIN arrives separately so we will get
     // encodeData() with an empty body.
-    ASSERT(end_stream == false || decoder_callbacks_->connection()->streamInfo().protocol());
+    ASSERT(!end_stream || decoder_callbacks_->connection()->streamInfo().protocol());
     data.add("body");
     return Http::FilterDataStatus::Continue;
   }

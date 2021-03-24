@@ -12,6 +12,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
 
 namespace Envoy {
+
+class TestPauseFilterForQuic;
+
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
@@ -123,6 +126,8 @@ protected:
   EnvoyQuicConnection* quic_connection_{nullptr};
 
 private:
+  friend class Envoy::TestPauseFilterForQuic;
+
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();
   // Called when aggregated buffered bytes across all the streams declines to low watermark.

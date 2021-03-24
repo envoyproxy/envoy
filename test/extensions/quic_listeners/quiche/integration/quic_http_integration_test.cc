@@ -9,7 +9,6 @@
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
-#include "test/integration/ssl_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -27,6 +26,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "extensions/quic_listeners/quiche/client_connection_factory_impl.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
@@ -56,51 +56,7 @@ void updateResource(AtomicFileUpdater& updater, double pressure) {
   updater.update(absl::StrCat(pressure));
 }
 
-std::unique_ptr<QuicClientTransportSocketFactory>
-createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& options, Api::Api& api,
-                                       const std::string& san_to_match) {
-  std::string yaml_plain = R"EOF(
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
-)EOF";
-  envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
-      quic_transport_socket_config;
-  auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
-  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), *tls_context);
-  auto* common_context = tls_context->mutable_common_tls_context();
-
-  if (options.alpn_) {
-    common_context->add_alpn_protocols("h3");
-  }
-  if (options.san_) {
-    common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
-        san_to_match);
-  }
-  for (const std::string& cipher_suite : options.cipher_suites_) {
-    common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
-  }
-  if (!options.sni_.empty()) {
-    tls_context->set_sni(options.sni_);
-  }
-
-  common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
-  common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
-
-  envoy::config::core::v3::TransportSocket message;
-  message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
-  auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(api));
-  return std::unique_ptr<QuicClientTransportSocketFactory>(
-      static_cast<QuicClientTransportSocketFactory*>(
-          config_factory
-              .createTransportSocketFactory(quic_transport_socket_config, mock_factory_ctx)
-              .release()));
-}
-
+// A test that sets up its own client connection with customized quic version and connection ID.
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
   QuicHttpIntegrationTest()
@@ -143,31 +99,25 @@ public:
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
+    ASSERT(quic_connection_persistent_info_ != nullptr);
+    auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
-        quic_config_, supported_versions_, std::move(connection), server_id_, crypto_config_.get(),
-        &push_promise_index_, *dispatcher_, 0);
+        quic_config_, supported_versions_, std::move(connection), persistent_info.server_id_,
+        persistent_info.crypto_config_.get(), &push_promise_index_, *dispatcher_, 0);
     session->Initialize();
     return session;
   }
 
-  // This call may fail because of INVALID_VERSION, because QUIC connection doesn't support
-  // in-connection version negotiation.
-  // TODO(#8479) Propagate INVALID_VERSION error to caller and let caller to use server advertised
-  // version list to create a new connection with mutually supported version and make client codec
-  // again.
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
     IntegrationCodecClientPtr codec =
         HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
-    if (codec->disconnected()) {
-      // Connection may get closed during version negotiation or handshake.
-      ENVOY_LOG(error, "Fail to connect to server with error: {}",
-                codec->connection()->transportFailureReason());
-    } else {
+    if (!codec->disconnected()) {
       codec->setCodecClientCallbacks(client_codec_callback_);
+      EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+                codec->connection()->requestedServerName());
     }
-    EXPECT_EQ(server_id_.host(), codec->connection()->requestedServerName());
     return codec;
   }
 
@@ -182,18 +132,6 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
-          quic_transport_socket_config;
-      auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
-      ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
-                                  *tls_context->mutable_common_tls_context());
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
-
-      bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
-
       const std::string overload_config =
           fmt::format(R"EOF(
         refresh_interval:
@@ -241,14 +179,12 @@ public:
     updateResource(file_updater_1_, 0);
     updateResource(file_updater_2_, 0);
     HttpIntegrationTest::initialize();
+    // Latch quic_transport_socket_factory_ which is instantiated in initialize().
+    transport_socket_factory_ =
+        static_cast<QuicClientTransportSocketFactory*>(quic_transport_socket_factory_.get());
     registerTestServerPorts({"http"});
-    crypto_config_ =
-        std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
-            stats_store_,
-            createQuicClientTransportSocketFactory(
-                Ssl::ClientSslTransportOptions().setAlpn(true).setSan(true), *api_, san_to_match_)
-                ->clientContextConfig(),
-            timeSystem()));
+
+    ASSERT(&transport_socket_factory_->clientContextConfig());
   }
 
   void testMultipleQuicConnections() {
@@ -297,22 +233,19 @@ public:
 
 protected:
   quic::QuicConfig quic_config_;
-  quic::QuicServerId server_id_{"lyft.com", 443, false};
-  std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
-  std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
   EnvoyQuicClientConnection* quic_connection_{nullptr};
-  bool set_reuse_port_{false};
   const std::string injected_resource_filename_1_;
   const std::string injected_resource_filename_2_;
   AtomicFileUpdater file_updater_1_;
   AtomicFileUpdater file_updater_2_;
   std::list<quic::QuicConnectionId> designated_connection_ids_;
+  Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,

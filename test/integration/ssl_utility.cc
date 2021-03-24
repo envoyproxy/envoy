@@ -1,7 +1,5 @@
 #include "test/integration/ssl_utility.h"
 
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
@@ -23,9 +21,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Ssl {
 
-Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
-                                      ContextManager& context_manager, Api::Api& api) {
+void initializeUpstreamTlsContextConfig(
+    const ClientSslTransportOptions& options,
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
   std::string yaml_plain = R"EOF(
   common_tls_context:
     validation_context:
@@ -58,17 +56,17 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 )EOF";
   }
 
-  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
     common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
     common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http3);
   }
-  if (options.san_) {
-    common_context->mutable_validation_context()
-        ->add_hidden_envoy_deprecated_verify_subject_alt_name("spiffe://lyft.com/backend-team");
+  if (!options.san_.empty()) {
+    common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
+        options.san_);
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
@@ -79,6 +77,13 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
   common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
+}
+
+Network::TransportSocketFactoryPtr
+createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
+                                      ContextManager& context_manager, Api::Api& api) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  initializeUpstreamTlsContextConfig(options, tls_context);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));

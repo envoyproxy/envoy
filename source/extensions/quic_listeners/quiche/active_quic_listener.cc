@@ -42,6 +42,9 @@ ActiveQuicListener::ActiveQuicListener(
           &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       kernel_worker_routing_(kernel_worker_routing) {
+  // This flag fix a QUICHE issue which may crash Envoy during connection close.
+  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
+
   if (Runtime::LoaderSingleton::getExisting()) {
     enabled_.emplace(Runtime::FeatureFlag(enabled, Runtime::LoaderSingleton::get()));
   }
