@@ -10,9 +10,9 @@ namespace PreserveCase {
 
 TEST(PreserveCaseFormatterTest, All) {
   PreserveCaseHeaderFormatter formatter;
-  formatter.rememberOriginalHeaderKey("Foo");
-  formatter.rememberOriginalHeaderKey("Bar");
-  formatter.rememberOriginalHeaderKey("BAR");
+  formatter.processKey("Foo");
+  formatter.processKey("Bar");
+  formatter.processKey("BAR");
 
   EXPECT_EQ("Foo", formatter.format("foo"));
   EXPECT_EQ("Foo", formatter.format("Foo"));

@@ -260,6 +260,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
+    // TODO(mattklein123): Wire up the formatter if someone actually asks for this (very unlikely).
     trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
       encodeFormattedHeader(header.key().getStringView(), header.value().getStringView(),
                             HeaderKeyFormatterOptConstRef());
@@ -532,7 +533,7 @@ Status ConnectionImpl::completeLastHeader() {
     // converting to lower case.
     auto formatter = headers_or_trailers.formatter();
     if (formatter.has_value()) {
-      formatter->rememberOriginalHeaderKey(current_header_field_.getStringView());
+      formatter->processKey(current_header_field_.getStringView());
     }
     current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
 

@@ -27,14 +27,15 @@ Stateless formatters
 Stateless formatters are run on encoding and do not depend on any previous knowledge of the headers.
 An example of this type of formatter is the :ref:`proper case words
 <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.HeaderKeyFormat.proper_case_words>`
-formatter. These formatters are useful when converting from non-HTTP/1 to HTTP/1 or when stateful
-formatting is not desired due to increased memory requirements.
+formatter. These formatters are useful when converting from non-HTTP/1 to HTTP/1 (within a single
+proxy or across multiple hops) or when stateful formatting is not desired due to increased memory
+requirements.
 
 Stateful formatters
 -------------------
 
-Stateful formatters are instantiated on decoding, passed every decoded header, attached to the
-header map, and then available during encoding to format the headers prior to writing. Thus, they
+Stateful formatters are instantiated on decoding, called for every decoded header, attached to the
+header map, and are then available during encoding to format the headers prior to writing. Thus, they
 traverse the entire proxy stack. An example of this type of formatter is the :ref:`preserve case
 formatter
 <envoy_v3_api_msg_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig>`

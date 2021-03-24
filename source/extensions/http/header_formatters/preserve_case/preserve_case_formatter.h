@@ -14,7 +14,7 @@ class PreserveCaseHeaderFormatter : public Envoy::Http::StatefulHeaderKeyFormatt
 public:
   // Envoy::Http::StatefulHeaderKeyFormatter
   std::string format(absl::string_view key) const override;
-  void rememberOriginalHeaderKey(absl::string_view key) override;
+  void processKey(absl::string_view key) override;
 
 private:
   StringUtil::CaseUnorderedSet original_header_keys_;

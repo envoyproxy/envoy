@@ -32,7 +32,7 @@ public:
   /**
    * Called for each header key received by the codec.
    */
-  virtual void rememberOriginalHeaderKey(absl::string_view key) PURE;
+  virtual void processKey(absl::string_view key) PURE;
 };
 
 using StatefulHeaderKeyFormatterPtr = std::unique_ptr<StatefulHeaderKeyFormatter>;
