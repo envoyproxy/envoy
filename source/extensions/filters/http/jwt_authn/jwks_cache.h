@@ -7,7 +7,7 @@
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/token_cache.h"
+#include "extensions/filters/http/jwt_authn/jwt_cache.h"
 
 #include "jwt_verify_lib/jwks.h"
 
@@ -64,7 +64,7 @@ public:
     setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
 
     // Get Token Cache
-    virtual TokenCache& getTokenCache() PURE;
+    virtual JwtCache& getJwtCache() PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.

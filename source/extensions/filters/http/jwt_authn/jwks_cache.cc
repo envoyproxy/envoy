@@ -26,8 +26,6 @@ namespace {
 
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
-// The default number of entries in JWT cache is 100.
-constexpr int kJwtCacheSize = 100;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
@@ -66,15 +64,13 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
-  TokenCache& getTokenCache() override {
-    if (token_cache_ == nullptr) {
-      if (jwt_provider_.token_cache_size() > 0) {
-        token_cache_ = std::make_unique<TokenCache>(jwt_provider_.token_cache_size());
-      } else {
-        token_cache_ = std::make_unique<TokenCache>(kJwtCacheSize);
+  JwtCache& getJwtCache() override {
+    if (jwt_cache_ == nullptr) {
+      if (jwt_provider_.jwt_cache_size() > 0) {
+        jwt_cache_ = std::make_unique<JwtCache>(jwt_provider_.jwt_cache_size());
       }
     }
-    return *token_cache_;
+    return *jwt_cache_;
   }
 
 private:
@@ -106,8 +102,8 @@ private:
   TimeSource& time_source_;
   // The pubkey expiration time.
   MonotonicTime expiration_time_;
-  // The TokenCache object
-  std::unique_ptr<TokenCache> token_cache_;
+  // The JwtCache object
+  std::unique_ptr<JwtCache> jwt_cache_;
 };
 
 class JwksCacheImpl : public JwksCache {

@@ -212,13 +212,13 @@ message JwtProvider {
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
 
-  // Cache is a LRU cache, its size is specified by token_cache_size.
+  // Cache is a LRU cache, its size is specified by jwt_cache_size.
   // Only cache good JWT.
   // Cache JWT only removed when it is expired or removed by LRU purge.
-  bool enable_token_cache = 11;
+  bool enable_jwt_cache = 11;
 
   // The unit is number of JWT tokens, default to 100.
-  uint32 token_cache_size = 12;
+  uint32 jwt_cache_size = 12;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

@@ -58,6 +58,9 @@ private:
   // Verify with a specific public key.
   void verifyKey();
 
+  // Handle Good Jwt either Cache JWT or verified public key.
+  void handleGoodJwt();
+
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
 
@@ -143,8 +146,8 @@ void AuthenticatorImpl::startVerify() {
 
   if (provider_) {
     jwks_data_ = jwks_cache_.findByProvider(provider_.value());
-    if (jwks_data_->getJwtProvider().enable_token_cache()) {
-      jwt_ = jwks_data_->getTokenCache().find(curr_token_->token());
+    if (jwks_data_->getJwtProvider().enable_jwt_cache()) {
+      jwt_ = jwks_data_->getJwtCache().find(curr_token_->token());
       if (jwt_) {
         use_cache_jwt_ = true;
       }
@@ -219,7 +222,16 @@ void AuthenticatorImpl::startVerify() {
     // the key cached, if we do proceed to verify else try a new JWKS retrieval.
     // JWTs without a kid header field in the JWS we might be best to get each
     // time? This all only matters for remote JWKS.
-    verifyKey();
+
+    if (use_cache_jwt_) {
+      handleGoodJwt();
+    } else {
+      verifyKey();
+      if (provider_ && jwks_data_->getJwtProvider().enable_jwt_cache()) {
+        ENVOY_LOG(debug, "JWT {} added in cache", curr_token_->token());
+        jwks_data_->getJwtCache().add(curr_token_->token(), jwt_);
+      }
+    }
     return;
   }
 
@@ -259,17 +271,17 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  Status status;
-  if (use_cache_jwt_) {
-    status = Status::Ok;
-  } else {
-    status = ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
-  }
+  const Status status =
+      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
+
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
   }
+  handleGoodJwt();
+}
 
+void AuthenticatorImpl::handleGoodJwt() {
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
 
@@ -288,10 +300,7 @@ void AuthenticatorImpl::verifyKey() {
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
-  if (provider_ && jwks_data_->getJwtProvider().enable_token_cache() && !use_cache_jwt_) {
-    ENVOY_LOG(debug, "JWT {} added in cache", curr_token_->token());
-    jwks_data_->getTokenCache().insert(curr_token_->token(), owned_jwt_.release(), 1);
-  }
+
   doneWithStatus(Status::Ok);
 }
 
@@ -300,7 +309,6 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
             ::google::jwt_verify::getStatusString(status));
 
   if (use_cache_jwt_) {
-    jwks_data_->getTokenCache().release(curr_token_->token(), jwt_);
     use_cache_jwt_ = false;
   }
 

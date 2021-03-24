@@ -19,11 +19,18 @@ namespace JwtAuthn {
 
 // Cache key is the JWT string, value is parsed JWT struct.
 
-class TokenCache : public SimpleLRUCache<std::string, ::google::jwt_verify::Jwt> {
+// The default number of entries in JWT cache is 100.
+constexpr int kJwtCacheSize = 100;
+
+class JwtCache {
 public:
-  TokenCache(int cache_size);
-  ~TokenCache() override { clear(); }
+  JwtCache(int cache_size);
+  ~JwtCache() { jwt_cache_.clear(); }
   ::google::jwt_verify::Jwt* find(const std::string& token);
+  void add(const std::string& token, ::google::jwt_verify::Jwt* jwt);
+
+private:
+  SimpleLRUCache<std::string, ::google::jwt_verify::Jwt> jwt_cache_{kJwtCacheSize};
 };
 
 } // namespace JwtAuthn
