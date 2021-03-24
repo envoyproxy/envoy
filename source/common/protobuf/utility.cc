@@ -624,10 +624,7 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     throw EnvoyException(e.what());
   }
   catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the Envoy Exception text.
+    // Catch unknown YAML parsing exceptions.
     throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
   if (block_print) {
