@@ -5408,23 +5408,6 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_EQ("8", headers.get_("x-envoy-expected-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("grpc-timeout"));
   }
-  {
-    NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, usingNewTimeouts()).WillRepeatedly(Return(true));
-    EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
-    EXPECT_CALL(route, maxStreamDuration())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>()));
-    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
-    Http::TestRequestHeaderMapImpl headers{};
-
-    FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false, false);
-    EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
-    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
-    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
-    EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
-  }
 }
 
 TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {

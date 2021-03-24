@@ -2048,7 +2048,61 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
-// Test timeout variants.
+// Test timeout when route timeout needs to be used if max_stream_duration is not specified.
+// Regression test for https://github.com/envoyproxy/envoy/issues/15530.
+// TODO(ramaraochavali): move this test to DurationTimeout test.
+TEST_F(HttpConnectionManagerImplTest, DurationTimeoutFromRouteTimeout) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  setupFilterChain(1, 0);
+  RequestHeaderMap* latched_headers = nullptr;
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Create the stream.
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        Event::MockTimer* idle_timer = setUpTimer();
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        EXPECT_CALL(*idle_timer, disableTimer());
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        latched_headers = headers.get();
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->clusterInfo();
+
+  Event::MockTimer* timer = setUpTimer();
+
+  // With max stream duration not set and timer is set to route's timeout.
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+      .WillRepeatedly(Return(absl::nullopt));
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, usingNewTimeouts())
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
+      .WillRepeatedly((Return(std::chrono::milliseconds(35))));
+  decoder_filters_[0]->callbacks_->clearRouteCache();
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(35), _));
+  decoder_filters_[0]->callbacks_->clusterInfo();
+
+  // Cleanup.
+  EXPECT_CALL(*timer, disableTimer());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");

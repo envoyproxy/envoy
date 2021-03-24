@@ -1176,8 +1176,14 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
   std::chrono::milliseconds timeout;
   bool disable_timer = false;
-
-  if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
+  if (route->usingNewTimeouts()) {
+    // If we are using new timeouts and MaxStreamDuration is not set, use the route's timeout
+    // value. This is the case when route's MaxStreamDuration is specified without inner
+    // MaxStreamDuration i.e. only grpc_timeout_header_max is set.
+    if (!route->maxStreamDuration()) {
+      timeout = route->timeout();
+    }
+  } else if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
     // Either there is no grpc-timeout header or special timeouts for it are not
     // configured. Use stream duration.
     if (route->maxStreamDuration()) {
@@ -1251,6 +1257,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
         connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
             [this]() -> void { onStreamMaxDurationReached(); });
   }
+  std::cout << "enabling timer::" << std::to_string(route->timeout().count()) << "\n";
   max_stream_duration_timer_->enableTimer(timeout);
 }
 
@@ -1579,6 +1586,8 @@ const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {
+    std::cout << "calling refresh cached route from clusterInfo"
+              << "\n";
     refreshCachedRoute();
   }
 
