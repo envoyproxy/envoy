@@ -140,6 +140,23 @@ static const QuicLogLevel DFATAL = ERROR;
 static const QuicLogLevel DFATAL = FATAL;
 #endif
 
+// NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
+// a nullptr_t, or a null char* or const char*, in which case it returns
+// "(null)". This allows streaming NullGuard<T>::guard(v) to an output stream
+// without hitting undefined behavior for null values.
+template <typename T> struct NullGuard {
+  static const T& guard(const T& v) { return v; }
+};
+template <> struct NullGuard<char*> {
+  static const char* guard(const char* v) { return v ? v : "(null)"; }
+};
+template <> struct NullGuard<const char*> {
+  static const char* guard(const char* v) { return v ? v : "(null)"; }
+};
+template <> struct NullGuard<std::nullptr_t> {
+  static const char* guard(const std::nullptr_t&) { return "(null)"; }
+};
+
 class QuicLogEmitter {
 public:
   // |file_name| and |function_name| MUST be valid for the lifetime of the QuicLogEmitter. This is
@@ -153,23 +170,6 @@ public:
     is_perror_ = true;
     return *this;
   }
-
-  // NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
-  // a nullptr_t, or a null char* or const char*, in which case it returns
-  // "(null)". This allows streaming NullGuard<T>::guard(v) to an output stream
-  // without hitting undefined behavior for null values.
-  template <typename T> struct NullGuard {
-    static const T& guard(const T& v) { return v; }
-  };
-  template <> struct NullGuard<char*> {
-    static const char* guard(const char* v) { return v ? v : "(null)"; }
-  };
-  template <> struct NullGuard<const char*> {
-    static const char* guard(const char* v) { return v ? v : "(null)"; }
-  };
-  template <> struct NullGuard<std::nullptr_t> {
-    static const char* guard(const std::nullptr_t&) { return "(null)"; }
-  };
 
   template <typename T> QuicLogEmitter& operator<<(const T& v) {
     stream_ << NullGuard<T>::guard(v);
