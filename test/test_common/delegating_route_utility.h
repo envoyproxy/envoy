@@ -26,7 +26,7 @@ class ExampleDerivedDelegatingRoute : public Router::DelegatingRoute {
 public:
   ExampleDerivedDelegatingRoute(Router::RouteConstSharedPtr base_route,
                                 const std::string& cluster_name_override)
-      : DelegatingRoute(std::move(base_route)),
+      : DelegatingRoute(base_route),
         custom_route_entry_(std::make_unique<const ExampleDerivedDelegatingRouteEntry>(
             base_route, cluster_name_override)) {}
 
