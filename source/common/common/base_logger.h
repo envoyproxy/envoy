@@ -4,7 +4,6 @@
 #include <string>
 
 #include "absl/strings/string_view.h"
-
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
