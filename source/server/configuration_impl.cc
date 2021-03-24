@@ -204,8 +204,8 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     admin_.access_logs_.emplace_back(current_access_log);
   }
 
-  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, admin.access_log_path()};
   if (!admin.access_log_path().empty()) {
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, admin.access_log_path()};
     admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
         file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
         server.accessLogManager()));
