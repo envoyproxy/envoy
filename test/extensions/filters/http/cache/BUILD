@@ -97,3 +97,14 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "cache_custom_headers_test",
+    srcs = [
+        "cache_custom_headers_test.cc",
+    ],
+    extension_name = "envoy.filters.http.cache",
+    deps = [
+        "//source/extensions/filters/http/cache:cache_custom_headers",
+    ],
+)

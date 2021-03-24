@@ -5,7 +5,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 
-#include "extensions/filters/http/cache/inline_headers_handles.h"
+#include "extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,7 +50,8 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest.
-  return headers.Path() && headers.Host() && !headers.getInline(authorization_handle.handle()) &&
+  return headers.Path() && headers.Host() &&
+         !headers.getInline(CacheCustomHeaders::authorization()) &&
          (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
@@ -58,7 +59,8 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
                                             const VaryHeader& vary_allow_list) {
-  absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
+  absl::string_view cache_control =
+      headers.getInlineValue(CacheCustomHeaders::responseCacheControl());
   ResponseCacheControl response_cache_control(cache_control);
 
   // Only cache responses with enough data to calculate freshness lifetime as per:
@@ -67,9 +69,9 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   //    "no-cache" cache-control directive (requires revalidation anyway).
   //    "max-age" or "s-maxage" cache-control directives.
   //    Both "Expires" and "Date" headers.
-  const bool has_validation_data = response_cache_control.must_validate_ ||
-                                   response_cache_control.max_age_.has_value() ||
-                                   (headers.Date() && headers.getInline(expires_handle.handle()));
+  const bool has_validation_data =
+      response_cache_control.must_validate_ || response_cache_control.max_age_.has_value() ||
+      (headers.Date() && headers.getInline(CacheCustomHeaders::expires()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
