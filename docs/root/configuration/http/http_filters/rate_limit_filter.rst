@@ -1,45 +1,36 @@
 .. _config_http_filters_rate_limit:
 
-Rate limit
+限流
 ==========
 
-* Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
-* This filter should be configured with the name *envoy.filters.http.ratelimit*.
+* 全局限流 :ref:`架构概览 <arch_overview_global_rate_limit>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
+* 此过滤器应使用 *envoy.filters.http.ratelimit* 名称进行配置。
 
-The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
-has one or more :ref:`rate limit configurations<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
-that match the filter stage setting. The :ref:`route<envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>`
-can optionally include the virtual host rate limit configurations. More than one configuration can
-apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
+当请求的路由或者虚拟主机有一个或者多个 :ref:`限流配置<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` 匹配到过滤级设置时，HTTP 限流过滤器将会调用限流服务。:ref:`路由<envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>` 可以选择包括虚拟主机的限流配置。多项配置可以同时应用到一个请求上。每项配置都会使描述符被发送到限流服务上。
 
-If the rate limit service is called, and the response for any of the descriptors is over limit, a
-429 response is returned. The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header.
+如果限流服务被调用，并且有任何的描述符响应超出限制，则返回 429 响应。限流过滤器还会为响应设置 :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` 头部。
 
-If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is 
-set to true, a 500 response is returned.
+如果调用限流服务时发生错误，或者限流服务返回错误，并且 :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` 的设置为 true，则返回 500 响应。
 
 .. _config_http_filters_rate_limit_composing_actions:
 
-Composing Actions
+组合动作
 -----------------
 
-Each :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>` on the route or
-virtual host populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
-create more complex rate limit descriptors, actions can be composed in any order. The descriptor
-will be populated in the order the actions are specified in the configuration.
+路由或虚拟主机上的每个 :ref:`限流动作 <envoy_v3_api_msg_config.route.v3.RateLimit>` 都会填充一个描述符条目。描述符条目的向量组成描述符。要创建更复杂的限流描述符，可以按任意顺序组合动作。描述符将按照配置中指定动作的顺序进行填充。
 
-Example 1
+示例 1
 ^^^^^^^^^
 
-For example, to generate the following descriptor:
+例如，要生成如下的描述符：
 
 .. code-block:: cpp
 
   ("generic_key", "some_value")
   ("source_cluster", "from_cluster")
 
-The configuration would be:
+配置将会是：
 
 .. code-block:: yaml
 
@@ -47,13 +38,12 @@ The configuration would be:
       - {source_cluster: {}}
       - {generic_key: {descriptor_value: some_value}}
 
-Example 2
+示例 2
 ^^^^^^^^^
 
-If an action doesn't append a descriptor entry, no descriptor is generated for
-the configuration.
+如果动作中没有附加描述符条目，则配置中不会生成描述符。
 
-For the following configuration:
+对于以下配置：
 
 .. code-block:: yaml
 
@@ -63,11 +53,9 @@ For the following configuration:
       - {generic_key: {descriptor_value: some_value}}
 
 
-If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`,
-no descriptor is generated.
+如果请求未设置 :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`，则不会生成描述符。
 
-If a request sets :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`, the
-the following descriptor is generated:
+如果请求设置了 :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`，则会生成如下的描述符：
 
 .. code-block:: cpp
 
@@ -77,23 +65,17 @@ the following descriptor is generated:
 
 .. _config_http_filters_rate_limit_rate_limit_override:
 
-Rate Limit Override
+限流覆盖
 -------------------
 
-A :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>` can optionally contain
-a :ref:`limit override <envoy_v3_api_msg_config.route.v3.RateLimit.Override>`. The limit value
-will be appended to the descriptor produced by the action and sent to the ratelimit service,
-overriding the static service configuration.
+:ref:`限流动作 <envoy_v3_api_msg_config.route.v3.RateLimit>` 可以选择包含 :ref:`限流覆盖 <envoy_v3_api_msg_config.route.v3.RateLimit.Override>`。限制值将附加到动作产生的描述符中，并发送到限流服务，从而覆盖静态服务配置。
 
-The override can be configured to be taken from the :ref:`Dynamic Metadata
-<envoy_v3_api_msg_config.core.v3.Metadata>` under a specified :ref: `key
-<envoy_v3_api_msg_config.type.metadata.v3.MetadataKey>`. If the value is misconfigured
-or key does not exist, the override configuration is ignored.
+可以将覆盖配置为从指定的 :ref:`动态元数据 <envoy_v3_api_msg_config.core.v3.Metadata>` 下的 :ref: `键 <envoy_v3_api_msg_config.type.metadata.v3.MetadataKey>` 中获取。如果该值配置错误或者键不存在，则覆盖配置将会被忽略。
 
-Example 3
+示例 3
 ^^^^^^^^^
 
-The following configuration
+如下配置
 
 .. code-block:: yaml
 
@@ -107,10 +89,7 @@ The following configuration
 
 .. _config_http_filters_rate_limit_override_dynamic_metadata:
 
-Will lookup the value of the dynamic metadata. The value must be a structure with integer field
-"requests_per_unit" and a string field "unit" which is parseable to :ref:`RateLimitUnit enum
-<envoy_v3_api_enum_type.v3.RateLimitUnit>`. For example, with the following dynamic metadata
-the rate limit override of 42 requests per hour will be appended to the rate limit descriptor.
+将查找动态元数据的值。这个值必须是有整数字段 “requests_per_unit” 和字符串字段 “unit”，可以解析为 :ref:`RateLimitUnit 枚举 <envoy_v3_api_enum_type.v3.RateLimitUnit>` 的结构。例如，使用如下动态元数据，则每小时限制 42 个请求的限流覆盖将被附加到限流描述符中。
 
 .. code-block:: yaml
 
@@ -119,35 +98,30 @@ the rate limit override of 42 requests per hour will be appended to the rate lim
           requests_per_unit: 42
           unit: HOUR
 
-Statistics
+统计
 ----------
 
-The rate limit filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
-429 responses are emitted to the normal cluster :ref:`dynamic HTTP statistics
-<config_cluster_manager_cluster_stats_dynamic_http>`.
+限流过滤器会输出 *cluster.<route target cluster>.ratelimit.* 命名空间下的统计信息。429 响应会被发送到常规集群 :ref:`动态 HTTP 统计信息 <config_cluster_manager_cluster_stats_dynamic_http>` 中。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  ok, Counter, Total under limit responses from the rate limit service
-  error, Counter, Total errors contacting the rate limit service
-  over_limit, Counter, total over limit responses from the rate limit service
-  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` set to false."
+  ok, Counter, 处于限流服务限制之下的响应总数
+  error, Counter, 与限流服务相关的错误总数
+  over_limit, Counter, 超出限流服务限制的响应总数
+  failure_mode_allowed, Counter, "出错但由于 :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` 设置为 false 而被允许通过的请求总数。"
 
-Runtime
+运行时
 -------
 
-The HTTP rate limit filter supports the following runtime settings:
+HTTP 限流过滤器支持如下的运行时设置：
 
 ratelimit.http_filter_enabled
-  % of requests that will call the rate limit service. Defaults to 100.
+  将调用限流服务的请求百分比。默认值为 100。
 
 ratelimit.http_filter_enforcing
-  % of requests that that will have the rate limit service decision enforced. Defaults to 100.
-  This can be used to test what would happen before fully enforcing the outcome.
+  将强制决定执行限流服务的请求百分比。默认值为 100。这可以用来在完全执行结果之前测试会发生什么。
 
 ratelimit.<route_key>.http_filter_enabled
-  % of requests that will call the rate limit service for a given *route_key* specified in the
-  :ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>`. Defaults to 100.
+  在 :ref:`限流配置 <envoy_v3_api_msg_config.route.v3.RateLimit>` 中指定了 *route_key* 的情况下，将会调用限流服务的请求百分比。默认值为 100。
