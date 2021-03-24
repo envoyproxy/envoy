@@ -76,7 +76,7 @@ protected:
   QuicPlatformTest()
       : log_level_(GetLogger().level()), verbosity_log_threshold_(getVerbosityLogThreshold()) {
     setVerbosityLogThreshold(0);
-    GetLogger().set_level(ERROR);
+    GetLogger().set_level(spdlog::level::err);
   }
 
   ~QuicPlatformTest() override {
@@ -194,7 +194,7 @@ TEST_F(QuicPlatformTest, QuicMapUtil) {
 }
 
 TEST_F(QuicPlatformTest, QuicMockLog) {
-  ASSERT_EQ(ERROR, GetLogger().level());
+  ASSERT_EQ(spdlog::level::err, GetLogger().level());
 
   {
     // Test a mock log that is not capturing logs.
@@ -291,7 +291,7 @@ TEST_F(QuicPlatformTest, QuicPtrUtil) {
 
 TEST_F(QuicPlatformTest, QuicLog) {
   // By default, tests emit logs at level ERROR or higher.
-  ASSERT_EQ(ERROR, GetLogger().level());
+  ASSERT_EQ(spdlog::level::err, GetLogger().level());
 
   int i = 0;
 
@@ -310,7 +310,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_EQ(12, i);
 
   // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   ASSERT_EQ(0, getVerbosityLogThreshold());
 
@@ -334,7 +334,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
 #endif
 
 TEST_F(QuicPlatformTest, LogIoManipulators) {
-  GetLogger().set_level(ERROR);
+  GetLogger().set_level(spdlog::level::err);
   QUIC_DLOG(ERROR) << "aaaa" << std::endl;
   EXPECT_LOG_CONTAINS("error", "aaaa\n\n", QUIC_LOG(ERROR) << "aaaa" << std::endl << std::endl);
   EXPECT_LOG_NOT_CONTAINS("error", "aaaa\n\n\n",
@@ -348,14 +348,14 @@ TEST_F(QuicPlatformTest, LogIoManipulators) {
 TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
 
-  GetLogger().set_level(ERROR);
+  GetLogger().set_level(spdlog::level::err);
 
   QUIC_DLOG(INFO) << (i = 10);
   QUIC_DLOG_IF(INFO, false) << i++;
   QUIC_DLOG_IF(INFO, true) << i++;
   EXPECT_EQ(0, i);
 
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   QUIC_DLOG(INFO) << (i = 10);
   QUIC_DLOG_IF(INFO, false) << i++;
@@ -419,7 +419,7 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 }
 
 TEST_F(QuicPlatformTest, QuicBranchPrediction) {
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
     QUIC_LOG(INFO) << "Go buy some lottery tickets.";
@@ -461,7 +461,7 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
   Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   EXPECT_LOG_NOT_CONTAINS("warn", "", QuicRecordTrace("quic_test_output.1", "output 1 content\n"));
   EXPECT_LOG_NOT_CONTAINS("error", "", QuicRecordTrace("quic_test_output.2", "output 2 content\n"));

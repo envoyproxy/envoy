@@ -73,14 +73,16 @@ using QuicMockLogImpl = quic::QuicEnvoyMockLog;
 #define EXPECT_QUIC_LOG_CALL_IMPL(log) EXPECT_CALL(log, Log(testing::_, testing::_))
 
 #define EXPECT_QUIC_LOG_CALL_CONTAINS_IMPL(log, level, content)                                    \
-  EXPECT_CALL(log, Log(quic::level, testing::HasSubstr(content)))
+  EXPECT_CALL(log, Log(static_cast<quic::QuicLogLevel>(quic::LogLevel##level),                     \
+                       testing::HasSubstr(content)))
 
 // Not part of the api exposed by quic_mock_log.h. This is used by
 // quic_expect_bug_impl.h.
 #define EXPECT_QUIC_LOG_IMPL(statement, level, matcher)                                            \
   do {                                                                                             \
     quic::QuicEnvoyMockLog mock_log;                                                               \
-    EXPECT_CALL(mock_log, Log(quic::level, matcher)).Times(testing::AtLeast(1));                   \
+    EXPECT_CALL(mock_log, Log(static_cast<quic::QuicLogLevel>(quic::LogLevel##level), matcher))    \
+        .Times(testing::AtLeast(1));                                                               \
     mock_log.StartCapturingLogs();                                                                 \
     { statement; }                                                                                 \
     mock_log.StopCapturingLogs();                                                                  \
