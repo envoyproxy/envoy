@@ -127,9 +127,9 @@ void ActiveInternalListener::removeConnection(ActiveInternalConnection& connecti
     // because the previously contained connection is deferred deleted.
     dispatcher().deferredDelete(std::move(iter->second));
     // The erase will break the iteration over the connections_by_context_ during the deletion.
-    // if (!is_deleting_) {
-    //   connections_by_context_.erase(`iter`);
-    // }
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
   }
 }
 

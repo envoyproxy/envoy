@@ -82,7 +82,7 @@ public:
   NiceMock<Network::MockFilterChainManager> manager_;
 
   NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;
-  const std::shared_ptr<Network::MockFilterChain> filter_chain_;
+  std::shared_ptr<Network::MockFilterChain> filter_chain_;
 
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
 
@@ -115,39 +115,49 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   EXPECT_CALL(*test_listener_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+}
 
-  // auto* connection = new NiceMock<Network::MockServerConnection>();
-  // EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
-  // EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
-  // (*listener_callbacks)->onAccept(Network::ConnectionSocketPtr{accepted_socket});
-  // EXPECT_EQ(1UL, handler_->numConnections());
+TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
 
-  // EXPECT_CALL(*listener, onDestroy());
-  // EXPECT_CALL(*access_log_, log(_, _, _, _));
-  // auto all_matcher = std::make_shared<Network::MockListenerFilterMatcher>();
-  // auto* disabled_listener_filter = new Network::MockListenerFilter();
-  // auto* enabled_filter = new Network::MockListenerFilter();
-  // EXPECT_CALL(factory_, createListenerFilterChain(_))
-  //     .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
-  //       manager.addAcceptFilter(all_matcher,
-  //       Network::ListenerFilterPtr{disabled_listener_filter});
-  //       manager.addAcceptFilter(listener_filter_matcher_,
-  //                               Network::ListenerFilterPtr{enabled_filter});
-  //       return true;
-  //     }));
+  addListener();
+  expectFilterChainFactory();
 
-  // // The all matcher matches any incoming traffic and disables the listener filter.
-  // EXPECT_CALL(*all_matcher, matches(_)).WillOnce(Return(true));
-  // EXPECT_CALL(*disabled_listener_filter, onAccept(_)).Times(0);
+  Network::MockListenerFilter* test_listener_filter = new Network::MockListenerFilter();
+  // FIX-ME: replace by mock socket
+  Network::Address::InstanceConstSharedPtr original_dst_address(
+      new Network::Address::Ipv4Instance("127.0.0.2", 8080));
 
-  // // The non matcher acts as if always enabled.
-  // EXPECT_CALL(*enabled_filter, onAccept(_)).WillOnce(Return(Network::FilterStatus::Continue));
-  // EXPECT_CALL(*disabled_listener_filter, destroy_());
-  // EXPECT_CALL(*enabled_filter, destroy_());
-  // EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
-  // EXPECT_CALL(*access_log_, log(_, _, _, _));
-  // listener_callbacks->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
-  // EXPECT_CALL(*listener, onDestroy());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        manager.addAcceptFilter(listener_filter_matcher_,
+                                Network::ListenerFilterPtr{test_listener_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_listener_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().addressProvider().restoreLocalAddress(original_dst_address);
+        return Network::FilterStatus::Continue;
+      }));
+  EXPECT_CALL(*test_listener_filter, destroy_());
+  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  auto transport_socket_factory = Network::Test::createRawBufferSocketFactory();
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(*filter_chain_, transportSocketFactory)
+      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_.clearDeferredDeleteList();
+  // EXPECT_CALL(*generic_listener_, onDestroy());
 }
 } // namespace
 } // namespace Server
