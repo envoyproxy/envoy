@@ -1,23 +1,23 @@
 .. _config_http_conn_man_local_reply:
 
-Local reply modification
-========================
+本地回复修改
+=================
 
-The :ref:`HTTP connection manager <arch_overview_http_conn_man>` supports modification of local reply which is response returned by Envoy itself.
+:ref:`HTTP 连接管理器 <arch_overview_http_conn_man>` 支持本地回复修改，这个回复是 Envoy 返回的响应。
 
-Features:
+功能：
 
-* :ref:`Local reply content modification<config_http_conn_man_local_reply_modification>`.
-* :ref:`Local reply format modification<config_http_conn_man_local_reply_format>`.
+* :ref:`本地回复内容修改 <config_http_conn_man_local_reply_modification>`。
+* :ref:`本地回复格式修改 <config_http_conn_man_local_reply_format>`。
 
 .. _config_http_conn_man_local_reply_modification:
 
-Local reply content modification
---------------------------------
+本地回复内容修改
+-----------------------
 
-The local response content returned by Envoy can be customized. A list of :ref:`mappers <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` can be specified. Each mapper must have a :ref:`filter <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`. It may have following rewrite rules; a :ref:`status_code <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.status_code>` rule to rewrite response code, a :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` rule to add/override/append response HTTP headers, a :ref:`body <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body>` rule to rewrite the local reply body and a :ref:`body_format_override <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format_override>` to specify the response body format. Envoy checks each `mapper` according to the specified order until the first one is matched. If a `mapper` is matched, all its rewrite rules will apply.
+Envoy 返回的本地响应内容是可以定制的。可以指定 :ref:`映射器 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.mappers>` 列表。每个映射器必须具有一个 :ref:`过滤器 <envoy_v3_api_field_config.accesslog.v3.AccessLog.filter>`。它可能具有以下重写规则；用于重写响应代码的 :ref:`status_code <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.status_code>` 规则，用于添加/覆盖/追加响应 HTTP 头部的 :ref:`headers_to_add <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.headers_to_add>` 规则，用于重写本地回复正文的 :ref:`body <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body>` 规则以及用于指定响应正文格式的 :ref:`body_format_override <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format_override>` 规则。Envoy 根据指定的顺序检查每个`映射器`，直到第一个匹配。如果`映射器`匹配，则应用其所有重写规则。
 
-Example of a LocalReplyConfig
+LocalReplyConfig 示例
 
 .. code-block::
 
@@ -38,20 +38,20 @@ Example of a LocalReplyConfig
     body:
       inline_string: "not allowed"
 
-In above example, if the status_code is 400,  it will be rewritten to 401, the response body will be rewritten to as "not allowed".
+在上面的示例中，如果 status_code 为 400，它将被重写为 401，响应正文将被重写为 “not allowed”。
 
 .. _config_http_conn_man_local_reply_format:
 
-Local reply format modification
--------------------------------
+本地回复格式修改
+-----------------------
 
-The response body content type can be customized. If not specified, the content type is plain/text. There are two `body_format` fields; one is the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>` field in the :ref:`LocalReplyConfig <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig>` message and the other :ref:`body_format_override <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format_override>` field in the `mapper`. The latter is only used when its mapper is matched. The former is used if there is no any matched mappers, or the matched mapper doesn't have the `body_format` specified.
+响应主体内容类型可以自定义。如果未指定，则内容类型为 plain/text。有两个 `body_format` 字段；一个是 :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>` 在 :ref:`LocalReplyConfig <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig>` message 和另一个 :ref:`body_format_override <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.ResponseMapper.body_format_override>` 字段在`映射器`中。后者仅在其映射器匹配时使用。如果没有匹配的映射器，或者匹配的映射器没有指定 body_format，则使用前者。
 
-Local reply format can be specified as :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`. It supports :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
+本地回复格式可以指定为 :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`。它支持 :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` 和 :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`。
 
-Optionally, content-type can be modified further via :ref:`content_type <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` field. If not specified, default content-type is `text/plain` for :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and `application/json` for :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
+以后也可以通过 :ref:`content_type <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` 字段修改 content-type。如果没有指定，:ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` content-type 默认是 `text/plain`，:ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>` content-type 默认是 `application/json`。
 
-Example of a LocalReplyConfig with `body_format` field.
+带有 `body_format` 字段的 LocalReplyConfig 示例
 
 .. code-block::
 
@@ -78,4 +78,4 @@ Example of a LocalReplyConfig with `body_format` field.
   body_format:
     text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 
-In above example, there is a `body_format_override` inside the first `mapper` with a filter matching `status_code == 400`. It generates the response body in plain text format by concatenating %LOCAL_REPLY_BODY% with the `:path` request header. It is only used when the first mapper is matched. There is a `body_format` at the bottom of the config and at the same level as field `mappers`. It is used when non of the mappers is matched or the matched mapper doesn't have its own `body_format_override` specified.
+在上面的示例中，第一个`映射器`中有一个 `body_format_override`，该`映射器`中的过滤器匹配 `status_code == 400`。通过将 %LOCAL_REPLY_BODY% 与 `:path` 请求头部连接在一起，它以纯文本格式生成响应主体。它仅在第一个映射器匹配时使用。在配置的底部有一个 `body_format`，与字段`映射器`处于同一级别。当不匹配任何映射器或匹配的映射器未指定自己的 `body_format_override` 时使用。
