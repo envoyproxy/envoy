@@ -127,7 +127,7 @@ namespace quic {
 using QuicLogLevel = spdlog::level::level_enum;
 
 static const QuicLogLevel TRACE = spdlog::level::trace;
-static const QuicLogLevel DEBUG = spdlog::level::debug;
+static const QuicLogLevel QDEBUG = spdlog::level::debug;
 static const QuicLogLevel INFO = spdlog::level::info;
 static const QuicLogLevel WARNING = spdlog::level::warn;
 static const QuicLogLevel ERROR = spdlog::level::err;
@@ -184,7 +184,7 @@ inline spdlog::logger& GetLogger() {
 #define QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(severity)                                                 \
   inline bool isLogLevelEnabled##severity() { return quic::severity >= GetLogger().level(); }
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(TRACE)
-QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(DEBUG)
+QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(QDEBUG)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(INFO)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(WARNING)
 QUICHE_IS_LOG_LEVEL_ENABLED_IMPL(ERROR)
