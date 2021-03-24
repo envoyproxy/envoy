@@ -69,7 +69,7 @@ public:
 
     void insert(const std::string& key, const std::string& value);
     void remove(const std::string& key);
-    const std::string* lookup(const std::string& key);
+    const std::string* lookup(const std::string& key) const;
 
     // Http::HeaderMap wrapper to attachment.
     const Http::HeaderMap& headers() const { return *headers_; }
@@ -100,11 +100,11 @@ public:
 
   bool hasParameters() const { return parameters_ != nullptr; }
   const Parameters& parameters() const;
-  ParametersPtr& mutableParameters();
+  ParametersPtr& mutableParameters() const;
 
   bool hasAttachment() const { return attachment_ != nullptr; }
   const Attachment& attachment() const;
-  AttachmentPtr& mutableAttachment();
+  AttachmentPtr& mutableAttachment() const;
 
   void setParametersLazyCallback(ParametersLazyCallback&& callback) {
     parameters_lazy_callback_ = std::move(callback);

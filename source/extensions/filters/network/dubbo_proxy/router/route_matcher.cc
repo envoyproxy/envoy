@@ -98,7 +98,7 @@ RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& meta
   for (auto& config_data : parameter_data_list_) {
     if (config_data.index_ >= parameters.size()) {
       ENVOY_LOG(debug,
-                "dubbo route matcher: parameter matching failed, there are no parameter in the "
+                "dubbo route matcher: parameter matching failed, there is no parameter in the "
                 "user request, index '{}'",
                 config_data.index_);
       return nullptr;

@@ -12,7 +12,7 @@ RpcInvocationImpl::Attachment::Attachment(MapPtr&& value, size_t offset)
   headers_ = Http::RequestHeaderMapImpl::create();
 
   ASSERT(attachment_);
-  ASSERT(attachment_->toMutableUntypedMap()); 
+  ASSERT(attachment_->toMutableUntypedMap());
 
   for (const auto& pair : *attachment_->toMutableUntypedMap()) {
     const auto key = pair.first->toString();
@@ -46,7 +46,7 @@ void RpcInvocationImpl::Attachment::remove(const std::string& key) {
   headers_->remove(Http::LowerCaseString(key));
 }
 
-const std::string* RpcInvocationImpl::Attachment::lookup(const std::string& key) {
+const std::string* RpcInvocationImpl::Attachment::lookup(const std::string& key) const {
   ASSERT(attachment_->toMutableUntypedMap());
 
   auto map = attachment_->toMutableUntypedMap();
@@ -88,7 +88,7 @@ const RpcInvocationImpl::Attachment& RpcInvocationImpl::attachment() const {
   return *attachment_;
 }
 
-RpcInvocationImpl::AttachmentPtr& RpcInvocationImpl::mutableAttachment() {
+RpcInvocationImpl::AttachmentPtr& RpcInvocationImpl::mutableAttachment() const {
   assignAttachmentIfNeed();
   return attachment_;
 }
@@ -98,7 +98,7 @@ const RpcInvocationImpl::Parameters& RpcInvocationImpl::parameters() const {
   return *parameters_;
 }
 
-RpcInvocationImpl::ParametersPtr& RpcInvocationImpl::mutableParameters() {
+RpcInvocationImpl::ParametersPtr& RpcInvocationImpl::mutableParameters() const {
   assignParametersIfNeed();
   return parameters_;
 }

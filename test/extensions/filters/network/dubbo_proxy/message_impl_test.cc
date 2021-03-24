@@ -42,7 +42,7 @@ TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
   map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("map_key"),
                                       std::make_unique<Hessian2::UntypedMapObject>());
 
-  RpcInvocationImpl::Attachment attachment(std::move(map));
+  RpcInvocationImpl::Attachment attachment(std::move(map), 23333);
 
   EXPECT_EQ(4, attachment.attachment().toUntypedMap().value()->size());
   // Only string type key/value pairs will be inserted to header map.
@@ -75,6 +75,7 @@ TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
   EXPECT_EQ("test_value", *attachment.lookup("test"));
 
   EXPECT_TRUE(attachment.attachmentUpdated());
+  EXPECT_EQ(23333, attachment.attachmentOffset());
 }
 
 TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
@@ -104,7 +105,7 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
     map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
                                         std::make_unique<Hessian2::StringObject>("fake_group"));
 
-    auto attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map));
+    auto attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map), 0);
 
     set_attachment = true;
 

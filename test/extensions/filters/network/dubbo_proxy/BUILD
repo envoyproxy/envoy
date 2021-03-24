@@ -134,6 +134,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.dubbo_proxy",
     deps = [
         ":mocks_lib",
+        ":utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:app_exception_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_hessian2_serializer_impl_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",

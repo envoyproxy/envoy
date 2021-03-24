@@ -75,7 +75,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
 }
 
 TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
-  RpcInvocationImpl::Attachment attach(std::make_unique<RpcInvocationImpl::Attachment::Map>());
+  RpcInvocationImpl::Attachment attach(std::make_unique<RpcInvocationImpl::Attachment::Map>(), 0);
   attach.insert("test1", "test_value1");
   attach.insert("test2", "test_value2");
   attach.insert("test3", "test_value3");
@@ -111,6 +111,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
     }
     // Encode an untyped map object as fourth parameter.
     encoder.encode<Hessian2::Object>(attach.attachment());
+
+    size_t expected_attachment_offset = buffer.length();
 
     // Encode attachment
     encoder.encode<Hessian2::Object>(attach.attachment());
@@ -148,8 +150,6 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
                                    ->second->toString()
                                    .value()));
 
-    EXPECT_EQ(false, invo->hasAttachment());
-
     auto& result_attach = invo->mutableAttachment();
     EXPECT_EQ("test_value2", *(result_attach->attachment()
                                    .toUntypedMap()
@@ -157,6 +157,8 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
                                    ->find(std::make_unique<Hessian2::StringObject>("test2"))
                                    ->second->toString()
                                    .value()));
+
+    EXPECT_EQ(expected_attachment_offset, result_attach->attachmentOffset());
   }
   {
     DubboHessian2SerializerImpl serializer;
