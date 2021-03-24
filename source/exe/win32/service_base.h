@@ -7,9 +7,9 @@
 #include <functional>
 #include <string>
 
-#include "common/common/event_logger_impl.h"
-
 #include "envoy/event/signal.h"
+
+#include "common/common/event_logger_impl.h"
 
 #include "exe/service_status.h"
 
