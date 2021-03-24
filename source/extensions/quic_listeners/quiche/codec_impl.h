@@ -77,7 +77,7 @@ class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectio
 public:
   std::unique_ptr<Http::ClientConnection>
   createQuicClientConnection(Network::Connection& connection,
-                             Http::ConnectionCallbacks& callbacks) override;
+                             Http::ConnectionCallbacks& callbacks, const uint32_t max_request_headers_kb) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
 };
@@ -87,7 +87,9 @@ class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectio
 public:
   std::unique_ptr<Http::ServerConnection>
   createQuicServerConnection(Network::Connection& connection,
-                             Http::ConnectionCallbacks& callbacks) override;
+                             Http::ConnectionCallbacks& callbacks, const uint32_t max_request_headers_kb,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
 };
