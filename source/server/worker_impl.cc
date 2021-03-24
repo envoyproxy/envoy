@@ -44,7 +44,7 @@ void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
   // bind to an address, but then fail to listen() with `EADDRINUSE`. During initial startup, we
   // want to surface this.
   dispatcher_->post([this, overridden_listener, &listener, completion]() -> void {
-    // TODO(chaoqin-li1123): Make addlistener return a error status instead of catching an
+    // TODO(chaoqin-li1123): Make add listener return a error status instead of catching an
     // exception.
     TRY_NEEDS_AUDIT {
       handler_->addListener(overridden_listener, listener);
