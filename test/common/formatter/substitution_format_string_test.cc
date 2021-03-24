@@ -135,5 +135,38 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionU
                             "Formatter not found: envoy.formatter.TestFormatterUnknown");
 }
 
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) {
+  TestCommandFactory factory;
+  Registry::InjectFactory<CommandParserFactory> command_register(factory);
+
+  const std::string yaml = R"EOF(
+  json_format:
+    text: "plain text %COMMAND_EXTENSION()%"
+    path: "%REQ(:path)%"
+    code: "%RESPONSE_CODE%"
+    headers:
+      content-type: "%REQ(CONTENT-TYPE)%"
+  formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
+                                          stream_info_, body_);
+
+  const std::string expected = R"EOF({
+    "text": "plain text TestFormatter",
+    "path": "/bar/foo",
+    "code": 200,
+    "headers": {
+      "content-type": "application/json"
+    }
+})EOF";
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
 } // namespace Formatter
 } // namespace Envoy

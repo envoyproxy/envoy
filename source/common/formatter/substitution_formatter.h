@@ -134,7 +134,7 @@ template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVis
 class StructFormatter {
 public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                  bool omit_empty_values);
+                  bool omit_empty_values, const std::vector<CommandParserPtr>& commands);
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
@@ -189,16 +189,18 @@ private:
   const bool omit_empty_values_;
   const bool preserve_types_;
   const std::string empty_value_;
+  // Note: don't use this ref beyond the constructor.
+  const std::vector<CommandParserPtr>& commands_;
   const StructFormatMapWrapper struct_output_format_;
-}; // namespace Formatter
+};
 
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 
 class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                    bool omit_empty_values)
-      : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
+                    bool omit_empty_values, const std::vector<CommandParserPtr>& commands)
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,

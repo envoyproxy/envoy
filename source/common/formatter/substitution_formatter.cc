@@ -149,10 +149,11 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
 }
 
 StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                                 bool omit_empty_values)
+                                 bool omit_empty_values,
+                                 const std::vector<CommandParserPtr>& commands)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      struct_output_format_(toFormatMapValue(format_mapping)) {}
+      commands_(commands), struct_output_format_(toFormatMapValue(format_mapping)) {}
 
 StructFormatter::StructFormatMapWrapper
 StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
@@ -177,7 +178,7 @@ StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) cons
     }
   }
   return {std::move(output)};
-};
+}
 
 StructFormatter::StructFormatListWrapper
 StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const {
@@ -205,8 +206,8 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 
 std::vector<FormatterProviderPtr>
 StructFormatter::toFormatStringValue(const std::string& string_format) const {
-  return SubstitutionFormatParser::parse(string_format);
-};
+  return SubstitutionFormatParser::parse(string_format, commands_);
+}
 
 ProtobufWkt::Value StructFormatter::providersCallback(
     const std::vector<FormatterProviderPtr>& providers,
