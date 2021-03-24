@@ -12,10 +12,10 @@ TEST(ApplyToAllWithCompletionCallbackTest, BasicUsage) {
 
   applyToAllWithCompletionCallback(
       container,
-      [&cb_invoked_with, &done_cb_called](int i, std::function<void()> doneF) {
+      [&cb_invoked_with, &done_cb_called](int i, std::function<void()> done_f) {
         cb_invoked_with.emplace_back(i);
         EXPECT_FALSE(done_cb_called);
-        doneF();
+        done_f();
       },
       [&done_cb_called]() { done_cb_called = true; });
 
