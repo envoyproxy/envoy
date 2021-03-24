@@ -60,7 +60,7 @@ Install Git
 
 The Envoy project is managed using `Git <https://git-scm.com/>`_.
 
-You can `find instructions for installing Git on various operating systems here <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_.
+You can find instructions for installing Git on various operating systems `here <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_.
 
 .. _start_sandboxes_setup_envoy:
 
@@ -96,7 +96,7 @@ curl
 Many of the examples use the `curl <https://curl.se/>`_ utility to make ``HTTP`` requests.
 
 Instructions for installing `curl <https://curl.se/>`_ on many platforms and operating systems
-can be `found on the curl website <https://curl.haxx.se/download.html>`_.
+can be found on the `curl website <https://curl.haxx.se/download.html>`_.
 
 .. _start_sandboxes_setup_jq:
 
@@ -107,7 +107,7 @@ The `jq <https://stedolan.github.io/jq/>`_ tool is very useful for parsing ``jso
 whether it be ``HTTP`` response data, logs or statistics.
 
 Instructions for installing `jq <https://stedolan.github.io/jq/>`_ on many platforms and operating systems
-can be `found on the jq website <https://stedolan.github.io/jq/download/>`_.
+can be found on the `jq website <https://stedolan.github.io/jq/download/>`_.
 
 .. _start_sandboxes_setup_openssl:
 
