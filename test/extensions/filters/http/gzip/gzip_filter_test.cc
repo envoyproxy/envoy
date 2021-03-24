@@ -3,7 +3,6 @@
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
-#include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
@@ -41,10 +40,9 @@ protected:
   }
 
   // GzipFilterTest Helpers
-  void setUpFilter(std::string&& json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
+  void setUpFilter(std::string&& yaml) {
     envoy::extensions::filters::http::gzip::v3::Gzip gzip;
-    TestUtility::loadFromJson(json, gzip);
+    TestUtility::loadFromYaml(yaml, gzip);
     config_ = std::make_shared<GzipFilterConfig>(gzip, "test.", stats_, runtime_);
     filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
