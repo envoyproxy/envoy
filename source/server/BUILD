@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
     "envoy_select_hot_restart",
 )
 
@@ -370,14 +371,16 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+    ]),
 )
 
 envoy_cc_library(

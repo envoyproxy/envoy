@@ -10,34 +10,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "quic_upstream_test",
-    srcs = ["quic_upstream_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
-    deps = [
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:strict_dns_cluster_lib",
-        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
-        "//source/extensions/upstreams/http:config",
-        "//test/common/upstream:utility_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/mocks/upstream:health_checker_mocks",
-        "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = ["envoy_quic_alarm_test.cc"],
     external_deps = ["quiche_quic_platform"],
