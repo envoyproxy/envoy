@@ -288,9 +288,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ContinueAfterLocalReply) {
         EXPECT_TRUE(response->complete());
         EXPECT_EQ("200", response->headers().getStatusValue());
       },
-      "envoy bug failure: !state_.local_complete_ || status == "
-      "FilterHeadersStatus::StopIteration. Details: Filters should return "
-      "FilterHeadersStatus::StopIteration after sending a local reply.");
+      "envoy bug failure: !continue_iteration || !state_.local_complete_. "
+      "Details: Filter did not return StopAll or StopIteration after sending a local reply.");
 }
 
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
@@ -426,6 +425,28 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
                                      {":authority", "host"},
                                      {"remove-method", "yes"},
                                      {"send-reply", "yes"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing method
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"},
+                                                                        {"remove-method", "yes"},
+                                                                        {"send-reply", "yes"}},
+                                         1024);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
