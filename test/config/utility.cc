@@ -145,7 +145,10 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::httpProxyConfig() {
+std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
+  if (downstream_use_quic) {
+    return quicHttpProxyConfig();
+  }
   return absl::StrCat(baseConfig(), fmt::format(R"EOF(
     filter_chains:
       filters:
@@ -944,6 +947,17 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   }
 }
 
+void ConfigHelper::setListenerSendBufLimits(uint32_t limit) {
+  RELEASE_ASSERT(!finalized_, "");
+  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  auto* options = listener->add_socket_options();
+  options->set_description("SO_SNDBUF");
+  options->set_level(SOL_SOCKET);
+  options->set_int_value(limit);
+  options->set_name(SO_SNDBUF);
+}
+
 void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
   addConfigModifier(
       [timeout](
@@ -1050,6 +1064,24 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
+void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
+      quic_transport_socket_config;
+  auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
+  ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
+                              *tls_context->mutable_common_tls_context());
+  for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
+    if (listener.udp_listener_config().listener_config().typed_config().type_url() ==
+        "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
+      ASSERT(listener.filter_chains_size() > 0);
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+      listener.set_reuse_port(reuse_port);
+    }
+  }
+}
+
 bool ConfigHelper::setAccessLog(
     const std::string& filename, absl::string_view format,
     std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters) {
@@ -1140,6 +1172,10 @@ void ConfigHelper::initializeTls(
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
           "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
     }
+  }
+  if (!options.san_matchers_.empty()) {
+    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
+                                                              options.san_matchers_.end()};
   }
 }
 
