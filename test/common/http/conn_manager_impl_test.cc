@@ -2103,6 +2103,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeoutFromRouteTimeout) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test timeout variants.
 TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
