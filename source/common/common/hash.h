@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include "common/common/macros.h"
+#include "common/common/safe_memcpy.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
@@ -58,7 +61,7 @@ public:
 private:
   static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
-    memcpy(&result, p, sizeof(result));
+    safeMemcpyUnsafeSrc(&result, p);
     return result;
   }
 

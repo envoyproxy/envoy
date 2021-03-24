@@ -7,7 +7,6 @@
 
 #include "server/active_udp_listener.h"
 #include "server/connection_handler_impl.h"
-#include "server/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -34,9 +33,7 @@ ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
   return std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
 }
 
-std::string ActiveRawUdpListenerConfigFactory::name() const {
-  return UdpListenerNames::get().RawUdp;
-}
+std::string ActiveRawUdpListenerConfigFactory::name() const { return "default_udp_listener"; }
 
 REGISTER_FACTORY(ActiveRawUdpListenerConfigFactory, Server::ActiveUdpListenerConfigFactory);
 
