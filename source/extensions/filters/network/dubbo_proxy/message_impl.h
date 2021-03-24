@@ -85,7 +85,7 @@ public:
     MapPtr attachment_;
 
     // The binary offset of attachment in the original message. Retaining this value can help
-    // subsequent re-serialization of the attachment without reserializing the parameters.
+    // subsequent re-serialization of the attachment without re-serializing the parameters.
     size_t attachment_offset_{};
 
     // To reuse the HeaderMatcher API and related tools provided by Envoy, we store the key/value
