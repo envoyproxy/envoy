@@ -37,6 +37,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/grpc:status",
         "//include/envoy/network:address_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/http:status_lib",
     ],
 )

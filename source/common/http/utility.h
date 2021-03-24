@@ -39,6 +39,7 @@ public:
   const std::string Http11 = "http/1.1";
   const std::string Http2 = "h2";
   const std::string Http2c = "h2c";
+  const std::string Http3 = "h3";
 };
 
 using AlpnNames = ConstSingleton<AlpnNameValues>;

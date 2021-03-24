@@ -61,7 +61,11 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& he
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
-    headers->addCopy(Http::LowerCaseString(key), entry.second);
+    // QUICHE coalesces multiple trailer values with the same key with '\0'.
+    std::vector<absl::string_view> values = absl::StrSplit(entry.second, '\0');
+    for (const absl::string_view& value : values) {
+      headers->addCopy(Http::LowerCaseString(key), value);
+    }
   }
   return headers;
 }
