@@ -136,7 +136,8 @@ TEST_F(IsCacheableResponseTest, ValidationData) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
   // No cache control headers, but there is an expires header
   response_headers_.remove(Http::CustomHeaders::get().CacheControl);
-  response_headers_.setReferenceKey(Http::Headers::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
+  response_headers_.setReferenceKey(Http::CustomHeaders::get().Expires,
+                                    "Sun, 06 Nov 1994 09:49:37 GMT");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
 }
 
@@ -157,19 +158,19 @@ TEST_F(IsCacheableResponseTest, ResponsePrivate) {
 
 TEST_F(IsCacheableResponseTest, EmptyVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
-  response_headers_.setCopy(Http::Headers::get().Vary, "");
+  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
 }
 
 TEST_F(IsCacheableResponseTest, AllowedVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
-  response_headers_.setCopy(Http::Headers::get().Vary, "accept");
+  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "accept");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
 }
 
 TEST_F(IsCacheableResponseTest, NotAllowedVary) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
-  response_headers_.setCopy(Http::Headers::get().Vary, "*");
+  response_headers_.setCopy(Http::CustomHeaders::get().Vary, "*");
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_, vary_allow_list_));
 }
 

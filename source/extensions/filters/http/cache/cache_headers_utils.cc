@@ -9,7 +9,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 
-#include "extensions/filters/http/cache/inline_headers_handles.h"
+#include "extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"
@@ -155,7 +155,7 @@ Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_
   const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
 
   long age_value;
-  const absl::string_view age_header = response_headers.getInlineValue(age_handle.handle());
+  const absl::string_view age_header = response_headers.getInlineValue(CacheCustomHeaders::age());
   if (!absl::SimpleAtoi(age_header, &age_value)) {
     age_value = 0;
   }
@@ -245,7 +245,7 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
   }
 
   std::vector<std::string> varied_headers =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
 
   for (const std::string& header : varied_headers) {
     bool valid = false;
@@ -273,7 +273,7 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
 
 bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
   // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
-  const auto vary_header = headers.get(Http::Headers::get().Vary);
+  const auto vary_header = headers.get(Http::CustomHeaders::get().Vary);
   return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 

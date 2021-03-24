@@ -3,7 +3,6 @@
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
@@ -202,7 +201,7 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
+              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, 0);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
@@ -224,7 +223,7 @@ TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_THAT(*lookup_response.headers_,
-              HeaderHasValueRef(Http::Headers::get().Age, GetParam().expected_age));
+              HeaderHasValueRef(Http::CustomHeaders::get().Age, GetParam().expected_age));
   EXPECT_EQ(lookup_response.content_length_, content_length);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);

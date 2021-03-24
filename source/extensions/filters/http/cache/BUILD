@@ -17,10 +17,10 @@ envoy_cc_library(
     srcs = ["cache_filter.cc"],
     hdrs = ["cache_filter.h"],
     deps = [
+        ":cache_custom_headers",
         ":cache_headers_utils_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
-        ":inline_headers_handles",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
@@ -37,8 +37,8 @@ envoy_cc_library(
     srcs = ["cacheability_utils.cc"],
     hdrs = ["cacheability_utils.h"],
     deps = [
+        ":cache_custom_headers",
         ":cache_headers_utils_lib",
-        ":inline_headers_handles",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],
@@ -54,8 +54,8 @@ envoy_cc_library(
     srcs = ["http_cache.cc"],
     hdrs = ["http_cache.h"],
     deps = [
+        ":cache_custom_headers",
         ":cache_headers_utils_lib",
-        ":inline_headers_handles",
         ":key_cc_proto",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -76,7 +76,7 @@ envoy_cc_library(
     hdrs = ["cache_headers_utils.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":inline_headers_handles",
+        ":cache_custom_headers",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:matchers_lib",
@@ -89,8 +89,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "inline_headers_handles",
-    hdrs = ["inline_headers_handles.h"],
+    name = "cache_custom_headers",
+    srcs = ["cache_custom_headers.cc"],
+    hdrs = ["cache_custom_headers.h"],
     deps = [
         "//source/common/http:headers_lib",
     ],
