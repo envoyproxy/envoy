@@ -1296,6 +1296,8 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
 
   ProtobufWkt::Value val;
   // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
+  // Access logger conversion from protobufs occurs via json intermediate state, which can throw
+  // when converting that to a structure.
   TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
   catch (EnvoyException& ex) {
     return unspecifiedValue();
