@@ -19,6 +19,7 @@ namespace Http2 {
   COUNTER(inbound_empty_frames_flood)                                                              \
   COUNTER(inbound_priority_frames_flood)                                                           \
   COUNTER(inbound_window_update_frames_flood)                                                      \
+  COUNTER(metadata_empty_frames)                                                                   \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \

@@ -72,7 +72,11 @@ envoy_cc_test_library(
     name = "http2_frame",
     srcs = ["http2_frame.cc"],
     hdrs = ["http2_frame.h"],
+    external_deps = [
+        "nghttp2",
+    ],
     deps = [
+        "//include/envoy/http:metadata_interface_with_external_headers",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
     ],
