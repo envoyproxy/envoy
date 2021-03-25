@@ -6,8 +6,10 @@
 namespace Envoy {
 namespace Http {
 
-bool contains(std::vector<Http::Protocol>& protocols,
-              std::vector<Http::Protocol> expected_protocols) {
+// Helper function to make sure each protocol in expected_protocols is present
+// in protocols (only used for an ASSERT in debug builds)
+bool contains(const std::vector<Http::Protocol>& protocols,
+              const std::vector<Http::Protocol>& expected_protocols) {
   for (auto protocol : expected_protocols) {
     if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
       return false;
@@ -21,6 +23,7 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      PoolIterator pool_it,
                                                      ConnectionPool::Callbacks& callbacks)
     : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks), pool_it_(pool_it) {
+  // TODO(#15649) add trace logging.
   cancellable_ = pool().newStream(decoder_, *this);
 }
 
@@ -78,8 +81,9 @@ ConnectivityGrid::ConnectivityGrid(
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
-  // Ignore drained callbacks during teardown.
+  // Ignore drained callbacks while the pools are destroyed below.
   destroying_ = true;
+  pools_.clear();
 }
 
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
@@ -100,12 +104,12 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,
                                                            priority_, options_,
                                                            transport_socket_options_, state_));
-  return pools_.begin()++;
+  return std::next(pools_.begin());
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
   // This is O(n) but the function is constant and there are no plans for n > 8.
-  for (auto& pool : pools_) {
+  for (const auto& pool : pools_) {
     if (pool->hasActiveConnections()) {
       return true;
     }
@@ -136,7 +140,8 @@ void ConnectivityGrid::addDrainedCallback(DrainedCb cb) {
 
   // If this is the first time a drained callback has been added, track the
   // number of pools which need to be drained in order to pass drain-completion
-  // up to the callers.
+  // up to the callers. Note that no new pools can be created from this point on
+  // as createNextPool fast-fails if drained callbacks are present.
   drains_needed_ = pools_.size();
   for (auto& pool : pools_) {
     pool->addDrainedCallback([this]() -> void { onDrainReceived(); });

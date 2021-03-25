@@ -13,7 +13,8 @@ namespace Http {
 class ConnectivityGrid : public ConnectionPool::Instance {
 public:
   struct ConnectivityOptions {
-    ConnectivityOptions(std::vector<Http::Protocol> protocols) : protocols_(protocols) {}
+    explicit ConnectivityOptions(const std::vector<Http::Protocol>& protocols)
+        : protocols_(protocols) {}
     std::vector<Http::Protocol> protocols_;
   };
 
@@ -50,11 +51,12 @@ public:
     // The decoder for the original newStream, needed to create streams on subsequent pools.
     Http::ResponseDecoder& decoder_;
     // The callbacks from the original caller, which must get onPoolFailure or
-    // onPoolReady unless there is call to cancel()
+    // onPoolReady unless there is call to cancel().
     ConnectionPool::Callbacks& inner_callbacks_;
     // The current pool being connected to.
     PoolIterator pool_it_;
     // The handle to cancel the request to the current pool.
+    // This is owned by the pool which created it.
     Cancellable* cancellable_;
   };
 
@@ -89,7 +91,7 @@ private:
   // have been created.
   virtual absl::optional<PoolIterator> createNextPool();
 
-  // This batch of member variables are latched objections required for pool creation.
+  // This batch of member variables are latched objects required for pool creation.
   Event::Dispatcher& dispatcher_;
   Random::RandomGenerator& random_generator_;
   Upstream::HostConstSharedPtr host_;

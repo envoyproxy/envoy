@@ -96,33 +96,33 @@ public:
 
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
-  EXPECT_TRUE(grid_.first() == nullptr);
+  EXPECT_EQ(grid_.first(), nullptr);
 
   grid_.newStream(decoder_, callbacks_);
-  EXPECT_TRUE(grid_.first() != nullptr);
+  EXPECT_NE(grid_.first(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
-  ASSERT_TRUE(grid_.callbacks() != nullptr);
+  ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
 }
 
 // Test the first pool failing and the second connecting.
 TEST_F(ConnectivityGridTest, FailureThenSuccess) {
-  EXPECT_TRUE(grid_.first() == nullptr);
+  EXPECT_EQ(grid_.first(), nullptr);
 
   grid_.newStream(decoder_, callbacks_);
-  EXPECT_TRUE(grid_.first() != nullptr);
+  EXPECT_NE(grid_.first(), nullptr);
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should fail over to the second pool.
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_.callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                    "reason", host_);
-  ASSERT_TRUE(grid_.second() != nullptr);
+  ASSERT_NE(grid_.second(), nullptr);
 
   // onPoolReady should be passed from the pool back to the original caller.
-  ASSERT_TRUE(grid_.callbacks() != nullptr);
+  ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
 }
@@ -140,7 +140,7 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnections) {
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_.callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                    "reason", host_);
-  ASSERT_TRUE(grid_.second() != nullptr);
+  ASSERT_NE(grid_.second(), nullptr);
 
   // Fail the second connection, and verify the second pool gets another newStream call.
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
@@ -155,10 +155,10 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnections) {
 
 // Test both pools failing
 TEST_F(ConnectivityGridTest, FailureTwice) {
-  EXPECT_TRUE(grid_.first() == nullptr);
+  EXPECT_EQ(grid_.first(), nullptr);
 
   auto cancel = grid_.newStream(decoder_, callbacks_);
-  EXPECT_TRUE(grid_.first() != nullptr);
+  EXPECT_NE(grid_.first(), nullptr);
 
   // cancel should be passed through the WrapperCallbacks to the connection pool.
   EXPECT_CALL(grid_.cancel_, cancel(_));
