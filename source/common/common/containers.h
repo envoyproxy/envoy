@@ -10,6 +10,9 @@ namespace Common {
  * Invokes a function for all elements in a container that accepts a completion callback which will
  * be invoked asynchronously, invoking a final completion callback once all callbacks associated
  * with elements have been invoked.
+ *
+ * The callback provided to update_cb should be executed on the same thread as this function,
+ * as this code is not thread safe.
  */
 template <class ContainerT, class UpdateCbT>
 void applyToAllWithCompletionCallback(const ContainerT& container, UpdateCbT update_cb,
