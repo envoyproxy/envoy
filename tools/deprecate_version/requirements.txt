@@ -16,9 +16,9 @@ GitPython==3.1.8 \
 idna==2.10 \
     --hash=sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6 \
     --hash=sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0
-PyGithub==1.53 \
-    --hash=sha256:776befaddab9d8fddd525d52a6ca1ac228cf62b5b1e271836d766f4925e1452e \
-    --hash=sha256:8ad656bf79958e775ec59f7f5a3dbcbadac12147ae3dc42708b951064096af15
+PyGithub==1.54.1 \
+    --hash=sha256:87afd6a67ea582aa7533afdbf41635725f13d12581faed7e3e04b1579c0c0627 \
+    --hash=sha256:300bc16e62886ca6537b0830e8f516ea4bc3ef12d308e0c5aff8bdbd099173d4
 PyJWT==1.7.1 \
     --hash=sha256:5c6eca3c2940464d106b99ba83b00c6add741c9becaec087fb7ccdefea71350e \
     --hash=sha256:8d59a976fb773f3e6a39c85636357c4f0e242707394cadadd9814f5cbaa20e96
