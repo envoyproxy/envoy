@@ -216,9 +216,10 @@ void SslSocket::drainErrorQueue() {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
-                                        ERR_func_error_string(err), ":",
-                                        ERR_reason_error_string(err)));
+    failure_reason_.append(absl::StrCat(" ", err, ":",
+                                        absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
+                                        absl::NullSafeStringView(ERR_func_error_string(err)), ":",
+                                        absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
   ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
   if (saw_error && !saw_counted_error) {
