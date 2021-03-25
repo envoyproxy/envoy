@@ -27,7 +27,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "containers_lib",
     hdrs = ["containers.h"],
-    deps = [":assert_lib"],
+    deps = [
+        ":cleanup_lib",
+        ],
 )
 
 envoy_cc_library(

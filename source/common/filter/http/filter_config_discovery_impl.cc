@@ -161,11 +161,11 @@ void FilterConfigSubscription::onConfigUpdate(
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  Common::applyToAllWithCompletionCallback(
+  Common::applyToAllWithCleanup(
       filter_config_providers_,
       [&factory_callback, &version_info](DynamicFilterConfigProviderImpl* provider,
-                                         std::function<void()> cb) {
-        provider->onConfigUpdate(factory_callback, version_info, cb);
+                                         std::shared_ptr<Cleanup> cleanup) {
+        provider->onConfigUpdate(factory_callback, version_info, [cleanup] {});
       },
       [this]() { stats_.config_reload_.inc(); });
   last_config_hash_ = new_hash;
@@ -180,10 +180,10 @@ void FilterConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    Common::applyToAllWithCompletionCallback(
+    Common::applyToAllWithCleanup(
         filter_config_providers_,
-        [](DynamicFilterConfigProviderImpl* provider, std::function<void()> cb) {
-          provider->onConfigRemoved(cb);
+        [](DynamicFilterConfigProviderImpl* provider, std::shared_ptr<Cleanup> cleanup) {
+          provider->onConfigRemoved([cleanup] {});
         },
         [this]() { stats_.config_reload_.inc(); });
 

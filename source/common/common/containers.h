@@ -3,28 +3,26 @@
 #include <functional>
 #include <memory>
 
+#include "common/common/cleanup.h"
+
 namespace Envoy {
 namespace Common {
 
 /**
- * Invokes a function for all elements in a container that accepts a completion callback which will
- * be invoked asynchronously, invoking a final completion callback once all callbacks associated
- * with elements have been invoked.
+ * Invokes a function for all elements in a container, providing a cleanup function that will be
+ * executed after all the elements have been processed. The Cleanup object is provided to allow each
+ * update callback to delay cleanup until some arbitrary time: the completion callback will be
+ * invoked once no more references to the provided shared pointer exists.
  *
- * The callback provided to update_cb should be executed on the same thread as this function,
- * as this code is not thread safe.
+ * This provides a thread safe way of tracking the completion of callbacks based on a the elements
+ * of a container that may require asynchronous processing.
  */
 template <class ContainerT, class UpdateCbT>
-void applyToAllWithCompletionCallback(const ContainerT& container, UpdateCbT update_cb,
-                                      std::function<void()> done_cb) {
-
-  auto remaining_elements = std::make_shared<uint64_t>(container.size());
+void applyToAllWithCleanup(const ContainerT& container, UpdateCbT update_cb,
+                           std::function<void()> done_cb) {
+  auto cleanup = std::make_shared<Cleanup>(done_cb);
   for (auto element : container) {
-    update_cb(element, [remaining_elements, done_cb] {
-      if (--(*remaining_elements) == 0) {
-        done_cb();
-      }
-    });
+    update_cb(element, cleanup);
   }
 }
 } // namespace Common
