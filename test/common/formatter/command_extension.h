@@ -58,5 +58,13 @@ public:
   std::string name() const override;
 };
 
+class FailCommandFactory : public CommandParserFactory {
+public:
+  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  std::string configType() override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  std::string name() const override;
+};
+
 } // namespace Formatter
 } // namespace Envoy

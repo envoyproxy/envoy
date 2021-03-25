@@ -119,6 +119,26 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
                                                           response_trailers_, stream_info_, body_));
 }
 
+TEST_F(SubstitutionFormatStringUtilsTest,
+       TestFromProtoConfigFormatterExtensionFailsToCreateParser) {
+  FailCommandFactory fail_factory;
+  Registry::InjectFactory<CommandParserFactory> command_register(fail_factory);
+
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "plain text"
+  formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.UInt64Value
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+                            EnvoyException,
+                            "Failed to create command parser: envoy.formatter.TestFormatter");
+}
+
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionUnknown) {
   const std::string yaml = R"EOF(
   text_format_source:

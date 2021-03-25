@@ -78,5 +78,17 @@ ProtobufTypes::MessagePtr AdditionalCommandFactory::createEmptyConfigProto() {
 
 std::string AdditionalCommandFactory::name() const { return "envoy.formatter.AdditionalFormatter"; }
 
+CommandParserPtr FailCommandFactory::createCommandParserFromProto(const Protobuf::Message&) {
+  return nullptr;
+}
+
+std::string FailCommandFactory::configType() { return "google.protobuf.UInt64Value"; }
+
+ProtobufTypes::MessagePtr FailCommandFactory::createEmptyConfigProto() {
+  return std::make_unique<ProtobufWkt::UInt64Value>();
+}
+
+std::string FailCommandFactory::name() const { return "envoy.formatter.FailFormatter"; }
+
 } // namespace Formatter
 } // namespace Envoy
