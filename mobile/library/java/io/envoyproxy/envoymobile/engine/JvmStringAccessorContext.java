@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import java.nio.charset.StandardCharsets;
 
 class JvmStringAccessorContext {
   private final EnvoyStringAccessor accessor;
@@ -12,7 +13,11 @@ class JvmStringAccessorContext {
    * Changing naming of this class or methods will likely require an audit across the jni usages
    * and proguard rules.
    *
-   * @return String, the string retrieved from the platform.
+   * @return byte[], the string retrieved from the platform.
    */
-  public String getEnvoyString() { return accessor.getEnvoyString(); }
+  public byte[] getEnvoyString() {
+    // This class returns a byte[] instead of a String because dealing with Java Strings in the
+    // JNI is a bit finicky.
+    return accessor.getEnvoyString().getBytes(StandardCharsets.UTF_8);
+  }
 }
