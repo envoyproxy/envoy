@@ -23,7 +23,6 @@ public:
 
 class TestCommandParser : public CommandParser {
 public:
-  TestCommandParser() = default;
   FormatterProviderPtr parse(const std::string& token, size_t, size_t) const override;
 };
 
@@ -48,7 +47,6 @@ public:
 
 class AdditionalCommandParser : public CommandParser {
 public:
-  AdditionalCommandParser() = default;
   FormatterProviderPtr parse(const std::string& token, size_t, size_t) const override;
 };
 
