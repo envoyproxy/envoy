@@ -1904,8 +1904,7 @@ TEST_P(Http2FloodMitigationTest, DownstreamSendingEmptyMetadata) {
 
   const uint32_t client_stream_idx = 1;
   // Send request.
-  const Http2Frame request =
-      Http2Frame::makePostRequest(client_stream_idx, "host", "/");
+  const Http2Frame request = Http2Frame::makePostRequest(client_stream_idx, "host", "/");
   sendFame(request);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
