@@ -1204,7 +1204,11 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
   std::string bad_yaml = R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: /dev/null
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}

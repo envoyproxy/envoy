@@ -24,7 +24,6 @@ modify different aspects of the server:
   .. code-block:: yaml
 
     admin:
-      access_log_path: /tmp/admin_access.log
       profile_path: /tmp/envoy.prof
       address:
         socket_address: { address: 127.0.0.1, port_value: 9901 }

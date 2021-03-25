@@ -19,7 +19,6 @@ overload_manager:
         value: 0.98
 
 admin:
-  access_log_path: "/var/log/envoy_admin.log"
   address:
     socket_address:
       address: 127.0.0.1

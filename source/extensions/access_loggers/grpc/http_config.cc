@@ -20,10 +20,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-AccessLog::InstanceSharedPtr
-HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                                  AccessLog::FilterPtr&& filter,
-                                                  Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::CommonFactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

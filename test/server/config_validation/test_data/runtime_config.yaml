@@ -20,7 +20,6 @@ static_resources:
               typed_config:
                 "@type": type.googleapis.com/google.protobuf.Struct
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

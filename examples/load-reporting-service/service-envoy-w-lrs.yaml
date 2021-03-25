@@ -60,7 +60,6 @@ cluster_manager:
     - envoy_grpc:
         cluster_name: load_reporting_cluster
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

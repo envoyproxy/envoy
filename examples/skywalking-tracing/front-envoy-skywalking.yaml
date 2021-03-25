@@ -81,7 +81,6 @@ static_resources:
                 address: skywalking-oap
                 port_value: 11800
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

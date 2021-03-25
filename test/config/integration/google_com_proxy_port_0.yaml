@@ -1,5 +1,9 @@
 admin:
-  access_log_path: "{{ null_device_path }}"
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{{ null_device_path }}"
   address:
     socket_address:
       address: "{{ ip_any_address }}"

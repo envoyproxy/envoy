@@ -281,7 +281,7 @@ public:
    * Read a filter definition from proto and instantiate an Instance.
    */
   static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                                     Server::Configuration::FactoryContext& context);
+                                     Server::Configuration::CommonFactoryContext& context);
 };
 
 } // namespace AccessLog

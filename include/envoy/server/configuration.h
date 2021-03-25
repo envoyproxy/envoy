@@ -123,9 +123,9 @@ public:
   virtual ~Admin() = default;
 
   /**
-   * @return const std::string& the admin access log path.
+   * @return std::list<AccessLog::InstanceSharedPtr> the list of access loggers.
    */
-  virtual const std::string& accessLogPath() const PURE;
+  virtual std::list<AccessLog::InstanceSharedPtr> accessLogs() const PURE;
 
   /**
    * @return const std::string& profiler output path.

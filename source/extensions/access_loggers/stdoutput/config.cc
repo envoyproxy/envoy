@@ -22,10 +22,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 
-AccessLog::InstanceSharedPtr
-StdoutputAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                                   AccessLog::FilterPtr&& filter,
-                                                   Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr StdoutputAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::CommonFactoryContext& context) {
   return AccessLoggers::createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stdoutput::v3::StdoutputAccessLog,
       Filesystem::DestinationType::Stdout>(config, std::move(filter), context);

@@ -8,11 +8,14 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/access_log_impl.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -58,10 +61,15 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
+  access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
       admin_bad_address_out_path.startHttpListener(
-          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+          access_logs, bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
           listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }

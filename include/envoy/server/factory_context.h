@@ -107,6 +107,32 @@ public:
    * @return Api::Api& a reference to the api object.
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
+   */
+  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
+   * @return the init manager of the particular context. This can be used for extensions that need
+   *         to initialize after cluster manager init but before the server starts listening.
+   *         All extensions should register themselves during configuration load. initialize()
+   *         will be called on  each registered target after cluster manager init but before the
+   *         server starts listening. Once all targets have initialized and invoked their callbacks,
+   *         the server will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
 };
 
 /**
@@ -134,21 +160,6 @@ public:
   virtual Envoy::Server::DrainManager& drainManager() PURE;
 
   /**
-   * @return the server's init manager. This can be used for extensions that need to initialize
-   *         after cluster manager init but before the server starts listening. All extensions
-   *         should register themselves during configuration load. initialize() will be called on
-   *         each registered target after cluster manager init but before the server starts
-   *         listening. Once all targets have initialized and invoked their callbacks, the server
-   *         will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
-
-  /**
-   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
-   */
-  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
-
-  /**
    * @return StatsConfig& the servers stats configuration.
    */
   virtual StatsConfig& statsConfig() PURE;
@@ -174,11 +185,6 @@ public:
   virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
-
-  /**
    * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
    * the local proxy.
    */
@@ -194,21 +200,6 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return the server's init manager. This can be used for extensions that need to initialize
-   *         after cluster manager init but before the server starts listening. All extensions
-   *         should register themselves during configuration load. initialize() will be called on
-   *         each registered target after cluster manager init but before the server starts
-   *         listening. Once all targets have initialized and invoked their callbacks, the server
-   *         will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
-
-  /**
-   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
-   */
-  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
    * @return Stats::Scope& the listener's stats scope.
@@ -246,12 +237,6 @@ public:
    * process context. Will be unset when running in validation mode.
    */
   virtual ProcessContextOptRef processContext() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**

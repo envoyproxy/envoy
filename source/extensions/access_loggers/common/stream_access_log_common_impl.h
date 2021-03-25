@@ -14,7 +14,7 @@ namespace AccessLoggers {
 template <class T, Filesystem::DestinationType destination_type>
 AccessLog::InstanceSharedPtr
 createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                              Server::Configuration::FactoryContext& context) {
+                              Server::Configuration::CommonFactoryContext& context) {
   const auto& fal_config =
       MessageUtil::downcastAndValidate<const T&>(config, context.messageValidationVisitor());
   Formatter::FormatterPtr formatter;

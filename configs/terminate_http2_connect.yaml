@@ -2,7 +2,6 @@
 # It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
 # or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       protocol: TCP
