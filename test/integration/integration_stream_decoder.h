@@ -29,6 +29,7 @@ public:
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
+  uint32_t metadataMapsDecodedCount() const { return metadata_maps_decoded_count_; }
   void waitForContinueHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
@@ -70,6 +71,7 @@ private:
   bool waiting_for_headers_{};
   bool saw_reset_{};
   Http::StreamResetReason reset_reason_{};
+  uint32_t metadata_maps_decoded_count_{};
 };
 
 using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;

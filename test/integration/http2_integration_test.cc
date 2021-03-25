@@ -181,6 +181,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the second request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -200,6 +201,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the third request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -219,6 +221,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the fourth request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -239,6 +242,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the fifth request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -259,6 +263,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadataMap().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the sixth request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -309,6 +314,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   // Verifies multiple metadata are received by the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+  EXPECT_EQ(4, response->metadataMapsDecodedCount());
   for (int i = 0; i < size; i++) {
     for (const auto& metadata : *multiple_vecs[i][0]) {
       EXPECT_EQ(response->metadataMap().find(metadata.first)->second, metadata.second);
@@ -342,6 +348,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   // Verifies metadata is not received by the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+  EXPECT_EQ(0, response->metadataMapsDecodedCount());
   EXPECT_EQ(response->metadataMap().size(), 0);
 }
 
@@ -383,6 +390,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("data");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 2);
+  EXPECT_EQ(2, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, data and trailers.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -397,6 +405,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 3);
+  EXPECT_EQ(4, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, 100-continue and data.
   response =
@@ -419,6 +428,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("100-continue");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 4);
+  EXPECT_EQ(4, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers and metadata that will not be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -437,6 +447,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("aaa");
   expected_metadata_keys.insert("keep");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
+  EXPECT_EQ(2, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, data and metadata that will be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -456,6 +467,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("replace");
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 2);
+  EXPECT_EQ(3, response->metadataMapsDecodedCount());
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
