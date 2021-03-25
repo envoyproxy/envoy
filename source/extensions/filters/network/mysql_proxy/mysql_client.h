@@ -51,8 +51,8 @@ using ClientPtr = std::unique_ptr<Client>;
 class ClientFactory {
 public:
   virtual ~ClientFactory() = default;
-  virtual ClientPtr create(ConnectionPool::ClientDataPtr&& conn, DecoderFactory& decoder_factory,
-                           ClientCallBack&) PURE;
+  virtual ClientPtr create(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                           DecoderFactory& decoder_factory, ClientCallBack&) PURE;
 };
 
 } // namespace MySQLProxy

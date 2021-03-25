@@ -26,6 +26,7 @@ envoy_cc_library(
         ":conn_pool_lib",
         ":decoder_lib",
         ":message_helper_lib",
+        ":new_conn_pool_lib",
         ":route_lib",
         "//include/envoy/network:filter_interface",
         "//include/envoy/server:filter_config_interface",
@@ -121,6 +122,7 @@ envoy_cc_library(
         "route_impl.h",
     ],
     deps = [
+        ":conn_pool_manager_lib",
         ":route_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
@@ -163,6 +165,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "new_conn_pool_interface",
+    hdrs = [
+        "new_conn_pool.h",
+    ],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "new_conn_pool_lib",
     srcs = [
         "new_conn_pool_impl.cc",
@@ -173,9 +186,9 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":codec_lib",
-        ":conn_pool_interface",
         ":decoder_lib",
         ":message_helper_lib",
+        ":new_conn_pool_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:linked_object",

@@ -12,7 +12,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/mysql_proxy/conn_pool.h"
+#include "extensions/filters/network/mysql_proxy/new_conn_pool_impl.h"
 #include "extensions/filters/network/mysql_proxy/mysql_client.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
@@ -78,7 +78,7 @@ using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
 class MySQLFilter : public Network::ReadFilter,
                     public DecoderCallbacks,
                     public ClientCallBack,
-                    public ConnectionPool::ClientPoolCallBack,
+                    public ConnPool::ClientPoolCallBack,
                     public Network::ConnectionCallbacks,
                     public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -107,9 +107,11 @@ public:
   void onCommand(Command& message) override;
   void onCommandResponse(CommandResponse&) override{};
 
-  // ConnectionPool::ClientPoolCallBack
-  void onClientReady(ConnectionPool::ClientDataPtr&&) override;
-  void onClientFailure(ConnectionPool::MySQLPoolFailureReason) override;
+  // ConnPool::ClientPoolCallBack
+  void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                   Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolFailure(ConnPool::MySQLPoolFailureReason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
 
   // ClientCallBack
   void onResponse(MySQLCodec&, uint8_t seq) override;

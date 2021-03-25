@@ -12,6 +12,7 @@
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 
+#include "envoy/upstream/outlier_detection.h"
 #include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/message_helper.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
@@ -84,38 +85,51 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   }
 }
 
-void MySQLFilter::onClientReady(ConnectionPool::ClientDataPtr&& client_data) {
-  client_ = client_factory_.create(std::move(client_data), decoder_factory_, *this);
+void MySQLFilter::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                              Upstream::HostDescriptionConstSharedPtr) {
+  client_ = client_factory_.create(std::move(conn), decoder_factory_, *this);
   canceler_ = nullptr;
   read_callbacks_->continueReading();
   ENVOY_LOG(trace, "upstream client is ready, continue reading");
 }
 
-void MySQLFilter::onClientFailure(ConnectionPool::MySQLPoolFailureReason reason) {
+void MySQLFilter::onPoolFailure(ConnPool::MySQLPoolFailureReason reason,
+                                Upstream::HostDescriptionConstSharedPtr host) {
   config_->stats_.login_failures_.inc();
+
+  std::string host_info;
+  if (host != nullptr) {
+    host_info = " remote host address " + host->address()->asString();
+  }
   // triggers the release of the current stream at the end of the filter's callback.
   switch (reason) {
-  case ConnectionPool::MySQLPoolFailureReason::Overflow:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: too many connections");
+  case ConnPool::MySQLPoolFailureReason::Overflow:
+    ENVOY_LOG(info, "mysql proxy upstream connection pool: too many connections, {}", host_info);
     break;
-  case ConnectionPool::MySQLPoolFailureReason::LocalConnectionFailure:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: local connection failure");
+  case ConnPool::MySQLPoolFailureReason::LocalConnectionFailure:
+    ENVOY_LOG(info, "mysql proxy upstream connection pool:onocal connection failure, {}",
+              host_info);
     break;
-  case ConnectionPool::MySQLPoolFailureReason::RemoteConnectionFailure:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: remote connection failure");
+  case ConnPool::MySQLPoolFailureReason::RemoteConnectionFailure:
+    ENVOY_LOG(info, "mysql proxy upstream connection pool: remote connection failure, {}",
+              host_info);
     break;
-  case ConnectionPool::MySQLPoolFailureReason::Timeout:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: connection failure due to time out");
+  case ConnPool::MySQLPoolFailureReason::Timeout:
+    ENVOY_LOG(info, "mysql proxy upstream connection pool: connection failure due to time out, {}",
+              host_info);
     break;
-  case ConnectionPool::MySQLPoolFailureReason::AuthFailure:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: connection failure due to auth");
+  case ConnPool::MySQLPoolFailureReason::AuthFailure:
+    ENVOY_LOG(info, "mysql proxy upstream connection pool: connection failure due to auth, {}",
+              host_info);
     break;
-  case ConnectionPool::MySQLPoolFailureReason::ParseFailure:
-    ENVOY_LOG(info,
-              "mysql proxy upstream connection pool: connection failure due to error of parsing");
+  case ConnPool::MySQLPoolFailureReason::ParseFailure:
+    ENVOY_LOG(
+        info,
+        "mysql proxy upstream connection pool: connection failure due to error of parsing, {}",
+        host_info);
     break;
   default:
-    ENVOY_LOG(error, "mysql proxy upstream connection pool: unknown error");
+    ENVOY_LOG(error, "mysql proxy upstream connection pool: unknown error, {}", host_info);
   }
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }

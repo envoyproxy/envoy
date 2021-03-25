@@ -296,9 +296,9 @@ protected:
   // if all CONNECTING connections become connected.
   uint32_t connecting_stream_capacity_{0};
 
-private:
   std::list<PendingStreamPtr> pending_streams_;
 
+private:
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
 

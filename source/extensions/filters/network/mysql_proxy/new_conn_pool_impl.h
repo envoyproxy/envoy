@@ -7,10 +7,15 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 #include "common/conn_pool/conn_pool_base.h"
 #include "common/common/linked_object.h"
@@ -18,64 +23,15 @@
 #include "common/network/filter_impl.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "extensions/filters/network/mysql_proxy/new_conn_pool.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 namespace ConnPool {
-using PoolFailureReason = Tcp::ConnectionPool::PoolFailureReason;
-
-enum class MySQLPoolFailureReason {
-  // A resource overflowed and policy prevented a new connection from being created.
-  Overflow = static_cast<int>(PoolFailureReason::Overflow),
-  // A local connection failure took place while creating a new connection.
-  LocalConnectionFailure = static_cast<int>(PoolFailureReason::LocalConnectionFailure),
-  // A remote connection failure took place while creating a new connection.
-  RemoteConnectionFailure = static_cast<int>(PoolFailureReason::RemoteConnectionFailure),
-  // A timeout occurred while creating a new connection.
-  Timeout = static_cast<int>(PoolFailureReason::Timeout),
-  // A auth failure when connect to upstream
-  AuthFailure,
-  // A parse error when parse upstream data
-  ParseFailure,
-};
-/**
- * MySQL Client Pool call back
- */
-class ClientPoolCallBack {
-public:
-  virtual ~ClientPoolCallBack() = default;
-  /**
-   * Called when a pool error occurred and no connection could be acquired for making the request.
-   * @param reason supplies the failure reason.
-   * @param host supplies the description of the host that caused the failure. This may be nullptr
-   *             if no host was involved in the failure (for example overflow).
-   */
-  virtual void onPoolFailure(MySQLPoolFailureReason reason,
-                             Upstream::HostDescriptionConstSharedPtr host) PURE;
-
-  /**
-   * Called when a connection is available to process a request/response. Connections may be
-   * released back to the pool for re-use by resetting the ConnectionDataPtr. If the connection is
-   * no longer viable for reuse (e.g. due to some kind of protocol error), the underlying
-   * ClientConnection should be closed to prevent its reuse.
-   *
-   * @param conn supplies the connection data to use.
-   * @param host supplies the description of the host that will carry the request. For logical
-   *             connection pools the description may be different each time this is called.
-   */
-  virtual void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
-                           Upstream::HostDescriptionConstSharedPtr host) PURE;
-};
-
-class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
-public:
-  ~Instance() override = default;
-  virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callback) PURE;
-  virtual void closeConnections() PURE;
-};
+class ConnPoolImpl;
 
 struct MySQLAttachContext : public Envoy::ConnectionPool::AttachContext {
   MySQLAttachContext(ClientPoolCallBack* callbacks) : callbacks_(callbacks) {}
@@ -116,11 +72,14 @@ public:
     void onCommand(Command&) override;
     void onCommandResponse(CommandResponse&) override;
 
+    void onFailure(MySQLPoolFailureReason reason);
+    std::string username() const;
+    std::string password() const;
+    std::string database() const;
+
     DecoderPtr decoder_;
     AuthMethod auth_method_{AuthMethod::Unknown};
     std::vector<uint8_t> seed_;
-    std::string username_;
-    std::string password_;
     Buffer::OwnedImpl decode_buffer_;
     ActiveMySQLClient& parent_;
   };
@@ -162,8 +121,8 @@ public:
     Network::ClientConnection& connection_;
   };
 
-  ActiveMySQLClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
-                    const Upstream::HostConstSharedPtr& host, uint64_t concurrent_stream_limit);
+  ActiveMySQLClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
+                    uint64_t concurrent_stream_limit);
   ~ActiveMySQLClient() override;
 
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
@@ -182,22 +141,20 @@ public:
 
   virtual void clearCallbacks();
 
-  void onFailure(MySQLPoolFailureReason);
   void onAuthPassed();
   void makeRequest(MySQLCodec&, uint8_t);
 
+  ConnPoolImpl& parent_;
   std::shared_ptr<Auther> read_filter_handle_;
-  Envoy::ConnectionPool::ConnPoolImplBase& parent_;
   Tcp::ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
   Tcp::ConnectionPool::ConnectionStatePtr connection_state_;
   TcpConnectionData* tcp_connection_data_{};
 
-  std::string username_;
-  std::string password_;
-  std::string db_;
   bool is_new_client_{true};
 };
+
+class ThreadLocalPool;
 
 class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase, public Instance {
 public:
@@ -205,9 +162,10 @@ public:
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsSharedPtr transport_socket_options,
-               Upstream::ClusterConnectivityState& state)
+               Upstream::ClusterConnectivityState& state, ThreadLocalPool& parent)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options, state) {}
+                                                transport_socket_options, state),
+        parent_(parent) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -277,12 +235,70 @@ public:
     callbacks->onPoolFailure(static_cast<MySQLPoolFailureReason>(reason), host_description);
   }
 
-  // These two functions exist for testing parity between old and new Tcp Connection Pools.
-  virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
-  virtual void onConnDestroyed() {}
+  void onMySQLFailure(MySQLPoolFailureReason reason);
+
+  ThreadLocalPool& parent_;
+};
+
+class ConnectionPoolManagerImpl;
+
+/**
+ * ThreadLocalPool, per connection pool per host.
+ */
+class ThreadLocalPool : public Upstream::ClusterUpdateCallbacks,
+                        public ThreadLocal::ThreadLocalObject,
+                        public Logger::Loggable<Logger::Id::pool> {
+public:
+  ThreadLocalPool(
+      std::weak_ptr<ConnectionPoolManagerImpl> parent, Event::Dispatcher&,
+      Upstream::ClusterManager*,
+      const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
+      const std::string& username, const std::string& password);
+  ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks);
+
+  void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
+  void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
+  void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
+    onClusterAddOrUpdateNonVirtual(cluster);
+  }
+  void onClusterRemoval(const std::string& cluster_name) override;
+  friend class ConnPoolImpl;
+  friend class ActiveMySQLClient;
+
+private:
+  std::weak_ptr<ConnectionPoolManagerImpl> parent_;
+  Event::Dispatcher& dispatcher_;
+  Upstream::ThreadLocalCluster* cluster_;
+  Envoy::Common::CallbackHandlePtr host_set_member_update_cb_handle_;
+  Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
+  absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
+  absl::node_hash_map<Upstream::HostConstSharedPtr, InstancePtr> pools_;
+  std::list<InstancePtr> pools_to_drain_;
+  std::string username_;
+  std::string password_;
+  std::string cluster_name_;
+  std::string database_;
 };
 
 using ConnectionPoolPtr = std::unique_ptr<ConnPoolImpl>;
+
+class ConnectionPoolManagerImpl : public ConnectionPoolManager,
+                                  public std::enable_shared_from_this<ConnectionPoolManagerImpl> {
+public:
+  ConnectionPoolManagerImpl(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls);
+  ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) override;
+  void init(const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
+            const std::string& username, const std::string& password);
+
+private:
+  friend class ThreadLocalPool;
+  Upstream::ClusterConnectivityState cluster_manager_state_;
+  Upstream::ClusterManager* cm_;
+  ThreadLocal::SlotPtr tls_;
+};
 
 } // namespace ConnPool
 } // namespace MySQLProxy
