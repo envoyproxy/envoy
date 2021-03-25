@@ -35,7 +35,8 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
 
     # General success pattern when valid file contents is detected.
     def successful_test_template(
-            self, output_string, current_version: utils.ApiVersion, oldest_version: utils.ApiVersion):
+            self, output_string, current_version: utils.ApiVersion,
+            oldest_version: utils.ApiVersion):
         pathlib.Path(self._temp_fname).write_text(output_string)
 
         # Read the string from the file, and parse the version.
@@ -64,8 +65,8 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
         self.successful_test_template('1.2.3', utils.ApiVersion(1, 2, 3), utils.ApiVersion(1, 1, 0))
 
     def test_valid_version_newline(self):
-        self.successful_test_template('3.2.1\n', utils.ApiVersion(3, 2, 1),
-                                      utils.ApiVersion(3, 1, 0))
+        self.successful_test_template(
+            '3.2.1\n', utils.ApiVersion(3, 2, 1), utils.ApiVersion(3, 1, 0))
 
     def test_invalid_version_string(self):
         self.failed_test_template('1.2.abc3', ValueError)
@@ -87,7 +88,8 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
                                         (utils.ApiVersion(2, 0, 3), utils.ApiVersion(2, 0, 0))]
 
         for latest_version, expected_oldest_version in expected_latest_oldest_pairs:
-            self.assertEqual(expected_oldest_version, utils.compute_oldest_api_version(latest_version))
+            self.assertEqual(
+                expected_oldest_version, utils.compute_oldest_api_version(latest_version))
 
 
 if __name__ == '__main__':
