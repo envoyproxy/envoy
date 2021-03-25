@@ -146,6 +146,7 @@ private:
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
+    MessageMetadataSharedPtr metadata() override { return parent_.metadata(); }
 
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
@@ -217,6 +218,7 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+    MessageMetadataSharedPtr metadata() override { return metadata_; }
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {

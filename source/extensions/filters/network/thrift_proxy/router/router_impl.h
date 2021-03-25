@@ -164,7 +164,13 @@ private:
   COUNTER(route_missing)                                                                           \
   COUNTER(unknown_cluster)                                                                         \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(no_healthy_upstream)
+  COUNTER(no_healthy_upstream)                                                                     \
+  COUNTER(request_call)                                                                            \
+  COUNTER(request_oneway)                                                                          \
+  COUNTER(request_invalid_type)                                                                    \
+  COUNTER(response_reply)                                                                          \
+  COUNTER(response_exception)                                                                      \
+  COUNTER(response_invalid_type)
 
 struct RouterStats {
   ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
@@ -179,6 +185,13 @@ public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
          Stats::Scope& scope)
       : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
+        stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
+        request_call_(stat_name_set_->add("request_call")),
+        request_oneway_(stat_name_set_->add("request_oneway")),
+        request_invalid_type_(stat_name_set_->add("request_invalid_type")),
+        response_reply_(stat_name_set_->add("response_reply")),
+        response_exception_(stat_name_set_->add("response_exception")),
+        response_invalid_type_(stat_name_set_->add("response_invalid_type")),
         passthrough_supported_(false) {}
 
   ~Router() override = default;
@@ -187,6 +200,11 @@ public:
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   bool passthroughSupported() const override { return passthrough_supported_; }
+
+  // Stats
+  void incClusterScopeCounter(Stats::StatName name) {
+    cluster_->statsScope().counterFromStatName(name).inc();
+  }
 
   // ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -259,6 +277,13 @@ private:
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
+  Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName request_call_;
+  const Stats::StatName request_oneway_;
+  const Stats::StatName request_invalid_type_;
+  const Stats::StatName response_reply_;
+  const Stats::StatName response_exception_;
+  const Stats::StatName response_invalid_type_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};

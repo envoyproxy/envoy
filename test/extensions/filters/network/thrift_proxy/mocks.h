@@ -255,10 +255,12 @@ public:
   MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(MessageMetadataSharedPtr, metadata, ());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  MessageMetadataSharedPtr metadata_;
   std::shared_ptr<Router::MockRoute> route_;
 };
 

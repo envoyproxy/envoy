@@ -98,6 +98,11 @@ public:
    * @return StreamInfo for logging purposes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Metadata contained in the callbacks.
+   */
+  virtual MessageMetadataSharedPtr metadata() PURE;
 };
 
 /**
