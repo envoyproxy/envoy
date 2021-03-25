@@ -1067,7 +1067,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
   if (!status.ok()) {
     // This branch can happen when a misbehaving filter chain removed critical headers or set
-    // mulformed header values.
+    // malformed header values.
     const auto request_headers = filter_manager_callbacks_.requestHeaders();
     sendLocalReply(request_headers.has_value() &&
                        Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
