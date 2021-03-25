@@ -29,7 +29,7 @@ envoy_cc_library(
     hdrs = ["containers.h"],
     deps = [
         ":cleanup_lib",
-        ],
+    ],
 )
 
 envoy_cc_library(
