@@ -175,12 +175,13 @@ class SpellChecker:
 
         # Start an aspell process.
         aspell_args = ["aspell", "pipe", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws]
-        self.aspell = subprocess.Popen(aspell_args,
-                                       bufsize=4096,
-                                       stdin=subprocess.PIPE,
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT,
-                                       universal_newlines=True)
+        self.aspell = subprocess.Popen(
+            aspell_args,
+            bufsize=4096,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True)
 
         # Read the version line that aspell emits on startup.
         self.aspell.stdout.readline()
@@ -542,16 +543,18 @@ def fix_error(checker, file, line_offset, lines, errors):
             elif choice[:1] == "f":
                 replacement = choice[1:].strip()
                 if replacement == "":
-                    print("Invalid choice: '%s'. Must specify a replacement (e.g. 'f corrected')." %
-                          (choice))
+                    print(
+                        "Invalid choice: '%s'. Must specify a replacement (e.g. 'f corrected')." %
+                        (choice))
                     continue
             elif choice == "i":
                 replacement = word
             elif choice[:1] == "r" or choice[:1] == "R":
                 replacement = choice[1:].strip()
                 if replacement == "":
-                    print("Invalid choice: '%s'. Must specify a replacement (e.g. 'r corrected')." %
-                          (choice))
+                    print(
+                        "Invalid choice: '%s'. Must specify a replacement (e.g. 'r corrected')." %
+                        (choice))
                     continue
 
                 if choice[:1] == "R":
@@ -576,8 +579,8 @@ def fix_error(checker, file, line_offset, lines, errors):
                 additions += [add]
             else:
                 print(
-                    "Cannot add %s to the dictionary: it may only contain letter and apostrophes" %
-                    add)
+                    "Cannot add %s to the dictionary: it may only contain letter and apostrophes"
+                    % add)
 
     if len(errors) != len(replacements):
         print("Internal error %d errors with %d replacements" % (len(errors), len(replacements)))
@@ -661,8 +664,8 @@ def extract_comments(lines):
         pos = text.find(SPELLCHECK_ON)
         if pos != -1:
             # Ignored because spellchecking isn't disabled. Just mask out the command.
-            comments[n].text = text[:pos] + ' ' * len(SPELLCHECK_ON) + text[pos +
-                                                                            len(SPELLCHECK_ON):]
+            comments[n].text = text[:pos] + ' ' * len(SPELLCHECK_ON) + text[pos
+                                                                            + len(SPELLCHECK_ON):]
             result.append(comments[n])
             n += 1
         elif SPELLCHECK_OFF in text or SPELLCHECK_SKIP_BLOCK in text:
@@ -752,8 +755,9 @@ def execute(files, dictionary_file, fix):
 
     checker.stop()
 
-    print("Checked %d file(s) and %d comment(s), found %d error(s)." %
-          (total_files, total_comments, total_errors))
+    print(
+        "Checked %d file(s) and %d comment(s), found %d error(s)." %
+        (total_files, total_comments, total_errors))
 
     return total_errors == 0
 
@@ -769,35 +773,33 @@ if __name__ == "__main__":
     default_dictionary = os.path.join(CURR_DIR, 'spelling_dictionary.txt')
 
     parser = argparse.ArgumentParser(description="Check comment spelling.")
-    parser.add_argument('operation_type',
-                        type=str,
-                        choices=['check', 'fix'],
-                        help="specify if the run should 'check' or 'fix' spelling.")
-    parser.add_argument('target_paths',
-                        type=str,
-                        nargs="*",
-                        help="specify the files for the script to process.")
-    parser.add_argument('-d',
-                        '--debug',
-                        action='count',
-                        default=0,
-                        help="Debug spell checker subprocess.")
-    parser.add_argument('--mark',
-                        action='store_true',
-                        help="Emits extra output to mark misspelled words.")
-    parser.add_argument('--dictionary',
-                        type=str,
-                        default=default_dictionary,
-                        help="specify a location for Envoy-specific dictionary words")
-    parser.add_argument('--color',
-                        type=str,
-                        choices=['on', 'off', 'auto'],
-                        default="auto",
-                        help="Controls colorized output. Auto limits color to TTY devices.")
-    parser.add_argument('--test-ignore-exts',
-                        dest='test_ignore_exts',
-                        action='store_true',
-                        help="For testing, ignore file extensions.")
+    parser.add_argument(
+        'operation_type',
+        type=str,
+        choices=['check', 'fix'],
+        help="specify if the run should 'check' or 'fix' spelling.")
+    parser.add_argument(
+        'target_paths', type=str, nargs="*", help="specify the files for the script to process.")
+    parser.add_argument(
+        '-d', '--debug', action='count', default=0, help="Debug spell checker subprocess.")
+    parser.add_argument(
+        '--mark', action='store_true', help="Emits extra output to mark misspelled words.")
+    parser.add_argument(
+        '--dictionary',
+        type=str,
+        default=default_dictionary,
+        help="specify a location for Envoy-specific dictionary words")
+    parser.add_argument(
+        '--color',
+        type=str,
+        choices=['on', 'off', 'auto'],
+        default="auto",
+        help="Controls colorized output. Auto limits color to TTY devices.")
+    parser.add_argument(
+        '--test-ignore-exts',
+        dest='test_ignore_exts',
+        action='store_true',
+        help="For testing, ignore file extensions.")
     args = parser.parse_args()
 
     COLOR = args.color == "on" or (args.color == "auto" and sys.stdout.isatty())
