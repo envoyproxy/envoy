@@ -97,6 +97,8 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> par
     auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent->api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent->api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
+  } else {
+    ENVOY_LOG(debug, "Redis connection pool init without password");
   }
 }
 
@@ -127,6 +129,12 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
     // Treat an update as a removal followed by an add.
     ThreadLocalPool::onClusterRemoval(cluster_name_);
   }
+  auto parent = parent_.lock();
+  if (parent == nullptr) {
+    return;
+  }
+  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster.info(), parent->api_);
+  auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster.info(), parent->api_);
 
   ASSERT(cluster_ == nullptr);
   cluster_ = &cluster;
