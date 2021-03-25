@@ -1094,6 +1094,63 @@ TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
   EXPECT_EQ(config.mainThreadWatchdogConfig().missTimeout(), std::chrono::milliseconds(2000));
   EXPECT_EQ(config.workerWatchdogConfig().missTimeout(), std::chrono::milliseconds(500));
 }
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWithAccessLog)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": { 
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
+}
 } // namespace
 } // namespace Configuration
 } // namespace Server
