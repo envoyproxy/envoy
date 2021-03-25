@@ -8,7 +8,8 @@ import sys
 
 import protodoc
 
-EMPTY_EXTENSION_DOCS_TEMPLATE = string.Template("""$header
+EMPTY_EXTENSION_DOCS_TEMPLATE = string.Template(
+    """$header
 
 $description
 
@@ -29,9 +30,9 @@ def generate_empty_extension_docs(extension, details, api_extensions_root):
     description = details.get('description', '')
     reflink = ''
     if 'ref' in details:
-        reflink = '%s %s.' % (details['title'],
-                              protodoc.format_internal_link('configuration overview',
-                                                            details['ref']))
+        reflink = '%s %s.' % (
+            details['title'], protodoc.format_internal_link(
+                'configuration overview', details['ref']))
     content = EMPTY_EXTENSION_DOCS_TEMPLATE.substitute(
         header=protodoc.format_header('=', details['title']),
         description=description,

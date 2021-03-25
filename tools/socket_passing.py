@@ -45,8 +45,8 @@ def generate_new_config(original_yaml, admin_address, updated_json):
                     path = discovered['local_address']['pipe']['path']
                     for index in range(index + 1, len(raw_yaml) - 1):
                         if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
-                            raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + path + '"',
-                                                         raw_yaml[index + 1])
+                            raw_yaml[index + 1] = re.sub(
+                                'path:.*', 'path: "' + path + '"', raw_yaml[index + 1])
                             replaced = True
                             break
                 else:
@@ -55,21 +55,22 @@ def generate_new_config(original_yaml, admin_address, updated_json):
                     if addr[0] == '[':
                         addr = addr[1:-1]  # strip [] from ipv6 address.
                     for index in range(index + 1, len(raw_yaml) - 2):
-                        if ('socket_address:' in raw_yaml[index] and
-                                'address:' in raw_yaml[index + 1] and
-                                'port_value:' in raw_yaml[index + 2]):
-                            raw_yaml[index + 1] = re.sub('address:.*', 'address: "' + addr + '"',
-                                                         raw_yaml[index + 1])
-                            raw_yaml[index + 2] = re.sub('port_value:.*', 'port_value: ' + port,
-                                                         raw_yaml[index + 2])
+                        if ('socket_address:' in raw_yaml[index]
+                                and 'address:' in raw_yaml[index + 1]
+                                and 'port_value:' in raw_yaml[index + 2]):
+                            raw_yaml[index + 1] = re.sub(
+                                'address:.*', 'address: "' + addr + '"', raw_yaml[index + 1])
+                            raw_yaml[index + 2] = re.sub(
+                                'port_value:.*', 'port_value: ' + port, raw_yaml[index + 2])
                             replaced = True
                             break
                 if replaced:
-                    sys.stderr.write('replaced listener at line ' + str(index) + ' with ' +
-                                     str(discovered) + '\n')
+                    sys.stderr.write(
+                        'replaced listener at line ' + str(index) + ' with ' + str(discovered)
+                        + '\n')
                 else:
-                    sys.stderr.write('Failed to replace a discovered listener ' + str(discovered) +
-                                     '\n')
+                    sys.stderr.write(
+                        'Failed to replace a discovered listener ' + str(discovered) + '\n')
                     return False
             with open(updated_json, 'w') as outfile:
                 outfile.writelines(raw_yaml)
@@ -81,21 +82,24 @@ def generate_new_config(original_yaml, admin_address, updated_json):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Replace listener addressses in json file.')
-    parser.add_argument('-o',
-                        '--original_json',
-                        type=str,
-                        required=True,
-                        help='Path of the original config json file')
-    parser.add_argument('-a',
-                        '--admin_address_path',
-                        type=str,
-                        required=True,
-                        help='Path of the admin address file')
-    parser.add_argument('-u',
-                        '--updated_json',
-                        type=str,
-                        required=True,
-                        help='Path to output updated json config file')
+    parser.add_argument(
+        '-o',
+        '--original_json',
+        type=str,
+        required=True,
+        help='Path of the original config json file')
+    parser.add_argument(
+        '-a',
+        '--admin_address_path',
+        type=str,
+        required=True,
+        help='Path of the admin address file')
+    parser.add_argument(
+        '-u',
+        '--updated_json',
+        type=str,
+        required=True,
+        help='Path to output updated json config file')
     args = parser.parse_args()
     admin_address_path = args.admin_address_path
 

@@ -39,9 +39,10 @@ def validate_fragment(type_name, fragment):
     all_protos_pb_text_path = r.Rlocation(
         'envoy/tools/type_whisperer/all_protos_with_ext_pb_text.pb_text')
     file_desc_set = descriptor_pb2.FileDescriptorSet()
-    text_format.Parse(pathlib.Path(all_protos_pb_text_path).read_text(),
-                      file_desc_set,
-                      allow_unknown_extension=True)
+    text_format.Parse(
+        pathlib.Path(all_protos_pb_text_path).read_text(),
+        file_desc_set,
+        allow_unknown_extension=True)
 
     pool = descriptor_pool.DescriptorPool()
     for f in file_desc_set.file:

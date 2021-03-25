@@ -340,8 +340,8 @@ def main(args):
         if class_name not in classname_to_impl:
             print("Warning: empty class {}".format(class_name))
         else:
-            impl_include = impl_includes.replace(decl_filename,
-                                                 "{}.h".format(to_filename(class_name)))
+            impl_include = impl_includes.replace(
+                decl_filename, "{}.h".format(to_filename(class_name)))
             # we need to enclose methods with namespaces
             namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
             class_impl = impl_include + namespace_prefix + \

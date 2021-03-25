@@ -4,7 +4,8 @@ import pathlib
 import string
 import sys
 
-CC_SOURCE_TEMPLATE = string.Template("""namespace Envoy {
+CC_SOURCE_TEMPLATE = string.Template(
+    """namespace Envoy {
 namespace Tools {
 namespace TypeWhisperer {
 

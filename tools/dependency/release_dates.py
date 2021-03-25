@@ -39,8 +39,9 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date):
     try:
         latest_release = repo.get_latest_release()
         if latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
-            print(f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
-                  f'{latest_release.tag_name}@<{latest_release.created_at}>')
+            print(
+                f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
+                f'{latest_release.tag_name}@<{latest_release.created_at}>')
     except github.UnknownObjectException:
         pass
 
@@ -102,9 +103,10 @@ if __name__ == '__main__':
     spec_loader = exports.repository_locations_utils.load_repository_locations_spec
     path_module = exports.load_module('repository_locations', path)
     try:
-        verify_and_print_release_dates(spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC),
-                                       github.Github(access_token))
+        verify_and_print_release_dates(
+            spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token))
     except ReleaseDateError as e:
-        print(f'An error occurred while processing {path}, please verify the correctness of the '
-              f'metadata: {e}')
+        print(
+            f'An error occurred while processing {path}, please verify the correctness of the '
+            f'metadata: {e}')
         sys.exit(1)

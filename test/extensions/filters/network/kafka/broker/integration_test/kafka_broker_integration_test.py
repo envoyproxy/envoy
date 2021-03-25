@@ -57,8 +57,8 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     This test verifies that consumer sends fetches correctly, and receives nothing.
     """
 
-        consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
-                                 fetch_max_wait_ms=500)
+        consumer = KafkaConsumer(
+            bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(), fetch_max_wait_ms=500)
         consumer.assign([TopicPartition('test_kafka_consumer_with_no_messages_received', 0)])
         for _ in range(10):
             records = consumer.poll(timeout_ms=1000)
@@ -83,15 +83,15 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
 
         producer = KafkaProducer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address())
         for _ in range(messages_to_send):
-            future = producer.send(value=b'some_message_bytes',
-                                   topic=partition.topic,
-                                   partition=partition.partition)
+            future = producer.send(
+                value=b'some_message_bytes', topic=partition.topic, partition=partition.partition)
             send_status = future.get()
             self.assertTrue(send_status.offset >= 0)
 
-        consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
-                                 auto_offset_reset='earliest',
-                                 fetch_max_bytes=100)
+        consumer = KafkaConsumer(
+            bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
+            auto_offset_reset='earliest',
+            fetch_max_bytes=100)
         consumer.assign([partition])
         received_messages = []
         while (len(received_messages) < messages_to_send):
@@ -116,9 +116,10 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
         consumer_count = 10
         consumers = []
         for id in range(consumer_count):
-            consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
-                                     group_id='test',
-                                     client_id='test-%s' % id)
+            consumer = KafkaConsumer(
+                bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
+                group_id='test',
+                client_id='test-%s' % id)
             consumer.subscribe(['test_consumer_with_consumer_groups'])
             consumers.append(consumer)
 
@@ -168,8 +169,8 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
         self.assertEqual(error_data[0], (new_topic_spec.name, 0, None))
 
         # Alter topic (change some Kafka-level property).
-        config_resource = ConfigResource(ConfigResourceType.TOPIC, new_topic_spec.name,
-                                         {'flush.messages': 42})
+        config_resource = ConfigResource(
+            ConfigResourceType.TOPIC, new_topic_spec.name, {'flush.messages': 42})
         alter_response = admin_client.alter_configs([config_resource])
         error_data = alter_response.resources
         self.assertEqual(len(error_data), 1)
@@ -376,32 +377,33 @@ class ServicesHolder:
                     os.path.abspath(envoy_binary), '-c', envoy_config_file, '--base-id',
                     str(random.randint(1, 999999))
                 ]
-                envoy_handle = subprocess.Popen(envoy_args,
-                                                stdout=subprocess.PIPE,
-                                                stderr=subprocess.PIPE)
-                self.envoy_worker = ProcessWorker(envoy_handle, 'Envoy',
-                                                  'starting main dispatch loop')
+                envoy_handle = subprocess.Popen(
+                    envoy_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                self.envoy_worker = ProcessWorker(
+                    envoy_handle, 'Envoy', 'starting main dispatch loop')
                 self.envoy_worker.await_startup()
 
                 # Start Zookeeper in background, pointing to rendered config file.
                 zk_binary = os.path.join(kafka_bin_dir, 'zookeeper-server-start.sh')
                 zk_args = [os.path.abspath(zk_binary), zookeeper_config_file]
-                zk_handle = subprocess.Popen(zk_args,
-                                             env=launcher_environment,
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE)
+                zk_handle = subprocess.Popen(
+                    zk_args,
+                    env=launcher_environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE)
                 self.zk_worker = ProcessWorker(zk_handle, 'Zookeeper', 'binding to port')
                 self.zk_worker.await_startup()
 
                 # Start Kafka in background, pointing to rendered config file.
                 kafka_binary = os.path.join(kafka_bin_dir, 'kafka-server-start.sh')
                 kafka_args = [os.path.abspath(kafka_binary), kafka_config_file]
-                kafka_handle = subprocess.Popen(kafka_args,
-                                                env=launcher_environment,
-                                                stdout=subprocess.PIPE,
-                                                stderr=subprocess.PIPE)
-                self.kafka_worker = ProcessWorker(kafka_handle, 'Kafka',
-                                                  '[KafkaServer id=0] started')
+                kafka_handle = subprocess.Popen(
+                    kafka_args,
+                    env=launcher_environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE)
+                self.kafka_worker = ProcessWorker(
+                    kafka_handle, 'Kafka', '[KafkaServer id=0] started')
                 self.kafka_worker.await_startup()
 
                 # All services have started without problems - now we can finally finish.
@@ -502,11 +504,11 @@ class ProcessWorker:
 
         self.state_worker = Thread(target=ProcessWorker.initialization_worker, args=(self,))
         self.state_worker.start()
-        self.out_worker = Thread(target=ProcessWorker.pipe_handler,
-                                 args=(self, self.process_handle.stdout, 'out'))
+        self.out_worker = Thread(
+            target=ProcessWorker.pipe_handler, args=(self, self.process_handle.stdout, 'out'))
         self.out_worker.start()
-        self.err_worker = Thread(target=ProcessWorker.pipe_handler,
-                                 args=(self, self.process_handle.stderr, 'err'))
+        self.err_worker = Thread(
+            target=ProcessWorker.pipe_handler, args=(self, self.process_handle.stderr, 'err'))
         self.err_worker.start()
 
     @staticmethod
@@ -534,9 +536,10 @@ class ProcessWorker:
                     # some time has passed and mark the service as running.
                     current_time = int(round(time.time()))
                     if current_time - startup_message_ts >= ProcessWorker.INITIALIZATION_WAIT_SECONDS:
-                        print('Startup message seen %s seconds ago, and service is still running' %
-                              (ProcessWorker.INITIALIZATION_WAIT_SECONDS),
-                              flush=True)
+                        print(
+                            'Startup message seen %s seconds ago, and service is still running' %
+                            (ProcessWorker.INITIALIZATION_WAIT_SECONDS),
+                            flush=True)
                         owner.initialization_ok = True
                         owner.initialization_semaphore.release()
                         break
@@ -556,8 +559,9 @@ class ProcessWorker:
                 line = raw_line.decode().rstrip()
                 print('%s(%s):' % (owner.name, pipe_name), line, flush=True)
                 if owner.startup_message in line:
-                    print('%s initialization message [%s] has been logged' %
-                          (owner.name, owner.startup_message))
+                    print(
+                        '%s initialization message [%s] has been logged' %
+                        (owner.name, owner.startup_message))
                     owner.startup_message_ts = int(round(time.time()))
         finally:
             pipe.close()
@@ -620,8 +624,8 @@ class RenderingHelper:
         import sys
         # Templates are resolved relatively to main start script, due to main & test templates being
         # stored in different directories.
-        env = jinja2.Environment(loader=jinja2.FileSystemLoader(
-            searchpath=os.path.dirname(os.path.abspath(__file__))))
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(__file__))))
         return env.get_template(template)
 
 

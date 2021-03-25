@@ -21,15 +21,16 @@ TestCase = namedtuple('TestCase', ['name', 'description'])
 
 # List of test in the form [(file_name, explanation)]
 TESTS = list(
-    map(lambda x: TestCase(*x), [
-        ('deprecate', 'Deprecations'),
-        ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
-        ('using_decl', 'UsingDecl upgrades for named types'),
-        ('rename', 'Annotation-based renaming'),
-        ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
-        ('no_boost_file', 'API_NO_BOOST_FILE annotations'),
-        ('validate', 'Validation proto header inference'),
-    ]))
+    map(
+        lambda x: TestCase(*x), [
+            ('deprecate', 'Deprecations'),
+            ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
+            ('using_decl', 'UsingDecl upgrades for named types'),
+            ('rename', 'Annotation-based renaming'),
+            ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
+            ('no_boost_file', 'API_NO_BOOST_FILE annotations'),
+            ('validate', 'Validation proto header inference'),
+        ]))
 
 TESTDATA_PATH = 'tools/api_boost/testdata'
 
@@ -80,11 +81,12 @@ if __name__ == '__main__':
         # Validate output against golden files.
         for test in TESTS:
             if should_run_test(test.name):
-                delta = diff(os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
-                             os.path.join(path, test.name + '.cc'))
+                delta = diff(
+                    os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
+                    os.path.join(path, test.name + '.cc'))
                 if delta is not None:
-                    messages.append('Non-empty diff for %s (%s):\n%s\n' %
-                                    (test.name, test.description, delta))
+                    messages.append(
+                        'Non-empty diff for %s (%s):\n%s\n' % (test.name, test.description, delta))
 
     if len(messages) > 0:
         logging.error('FAILED:\n{}'.format('\n'.join(messages)))

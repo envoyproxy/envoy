@@ -89,12 +89,12 @@ except ImportError:
     class DummySnappy(object):
 
         def compress(self, buf):
-            raise TTransportException(TTransportException.INVALID_TRANSFORM,
-                                      'snappy module not available')
+            raise TTransportException(
+                TTransportException.INVALID_TRANSFORM, 'snappy module not available')
 
         def decompress(self, buf):
-            raise TTransportException(TTransportException.INVALID_TRANSFORM,
-                                      'snappy module not available')
+            raise TTransportException(
+                TTransportException.INVALID_TRANSFORM, 'snappy module not available')
 
     snappy = DummySnappy()  # type: ignore
 
@@ -197,8 +197,9 @@ class THeaderTransport(TTransportBase, CReadableTransport):
 
     def set_max_frame_size(self, size):
         if size > MAX_BIG_FRAME_SIZE:
-            raise TTransportException(TTransportException.INVALID_FRAME_SIZE,
-                                      "Cannot set max frame size > %s" % MAX_BIG_FRAME_SIZE)
+            raise TTransportException(
+                TTransportException.INVALID_FRAME_SIZE,
+                "Cannot set max frame size > %s" % MAX_BIG_FRAME_SIZE)
         if size > MAX_FRAME_SIZE and self.__client_type != CLIENT_TYPE.HEADER:
             raise TTransportException(
                 TTransportException.INVALID_FRAME_SIZE,
@@ -336,8 +337,9 @@ class THeaderTransport(TTransportBase, CReadableTransport):
                 self.read_header_format(sz - 10, header_size, data)
             else:
                 self.__client_type = CLIENT_TYPE.UNKNOWN
-                raise TTransportException(TTransportException.INVALID_CLIENT_TYPE,
-                                          "Could not detect client transport type")
+                raise TTransportException(
+                    TTransportException.INVALID_CLIENT_TYPE,
+                    "Could not detect client transport type")
 
         if self.__client_type not in self.__supported_client_types:
             raise TTransportException(
@@ -350,8 +352,8 @@ class THeaderTransport(TTransportBase, CReadableTransport):
 
         header_size = header_size * 4
         if header_size > sz:
-            raise TTransportException(TTransportException.INVALID_FRAME_SIZE,
-                                      "Header size is larger than frame")
+            raise TTransportException(
+                TTransportException.INVALID_FRAME_SIZE, "Header size is larger than frame")
         end_header = header_size + data.tell()
 
         self.__proto_id = readVarint(data)
@@ -359,8 +361,8 @@ class THeaderTransport(TTransportBase, CReadableTransport):
 
         if self.__proto_id == 1 and self.__client_type != \
                 CLIENT_TYPE.HTTP_SERVER:
-            raise TTransportException(TTransportException.INVALID_CLIENT_TYPE,
-                                      "Trying to recv JSON encoding over binary")
+            raise TTransportException(
+                TTransportException.INVALID_CLIENT_TYPE, "Trying to recv JSON encoding over binary")
 
         # Read the headers.  Data for each header varies.
         for _ in range(0, num_headers):
@@ -370,12 +372,14 @@ class THeaderTransport(TTransportBase, CReadableTransport):
             elif trans_id == TRANSFORM.SNAPPY:
                 self.__read_transforms.insert(0, trans_id)
             elif trans_id == TRANSFORM.HMAC:
-                raise TApplicationException(TApplicationException.INVALID_TRANSFORM,
-                                            "Hmac transform is no longer supported: %i" % trans_id)
+                raise TApplicationException(
+                    TApplicationException.INVALID_TRANSFORM,
+                    "Hmac transform is no longer supported: %i" % trans_id)
             else:
                 # TApplicationException will be sent back to client
-                raise TApplicationException(TApplicationException.INVALID_TRANSFORM,
-                                            "Unknown transform in client request: %i" % trans_id)
+                raise TApplicationException(
+                    TApplicationException.INVALID_TRANSFORM,
+                    "Unknown transform in client request: %i" % trans_id)
 
         # Clear out previous info headers.
         self.__read_headers.clear()
@@ -411,8 +415,8 @@ class THeaderTransport(TTransportBase, CReadableTransport):
             elif trans_id == TRANSFORM.SNAPPY:
                 buf = snappy.compress(buf)
             else:
-                raise TTransportException(TTransportException.INVALID_TRANSFORM,
-                                          "Unknown transform during send")
+                raise TTransportException(
+                    TTransportException.INVALID_TRANSFORM, "Unknown transform during send")
         return buf
 
     def untransform(self, buf):
@@ -499,8 +503,8 @@ class THeaderTransport(TTransportBase, CReadableTransport):
         self.__wbuf.truncate()
 
         if self.__proto_id == 1 and self.__client_type != CLIENT_TYPE.HTTP_SERVER:
-            raise TTransportException(TTransportException.INVALID_CLIENT_TYPE,
-                                      "Trying to send JSON encoding over binary")
+            raise TTransportException(
+                TTransportException.INVALID_CLIENT_TYPE, "Trying to send JSON encoding over binary")
 
         buf = StringIO()
         if self.__client_type == CLIENT_TYPE.HEADER:
@@ -518,14 +522,13 @@ class THeaderTransport(TTransportBase, CReadableTransport):
             buf.write(wout)
             self.__client_type == CLIENT_TYPE.HEADER
         elif self.__client_type == CLIENT_TYPE.UNKNOWN:
-            raise TTransportException(TTransportException.INVALID_CLIENT_TYPE,
-                                      "Unknown client type")
+            raise TTransportException(
+                TTransportException.INVALID_CLIENT_TYPE, "Unknown client type")
 
         # We don't include the framing bytes as part of the frame size check
         frame_size = buf.tell() - (4 if wsz < MAX_FRAME_SIZE else 12)
-        _frame_size_check(frame_size,
-                          self.__max_frame_size,
-                          header=self.__client_type == CLIENT_TYPE.HEADER)
+        _frame_size_check(
+            frame_size, self.__max_frame_size, header=self.__client_type == CLIENT_TYPE.HEADER)
         self.getTransport().write(buf.getvalue())
         if oneway:
             self.getTransport().onewayFlush()

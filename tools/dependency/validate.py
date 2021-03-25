@@ -22,12 +22,12 @@ def load_module(name, path):
     return module
 
 
-envoy_repository_locations = load_module('envoy_repository_locations',
-                                         'bazel/repository_locations.bzl')
-api_repository_locations = load_module('api_repository_locations',
-                                       'api/bazel/repository_locations.bzl')
-extensions_build_config = load_module('extensions_build_config',
-                                      'source/extensions/extensions_build_config.bzl')
+envoy_repository_locations = load_module(
+    'envoy_repository_locations', 'bazel/repository_locations.bzl')
+api_repository_locations = load_module(
+    'api_repository_locations', 'api/bazel/repository_locations.bzl')
+extensions_build_config = load_module(
+    'extensions_build_config', 'source/extensions/extensions_build_config.bzl')
 
 REPOSITORY_LOCATIONS_SPEC = dict(envoy_repository_locations.REPOSITORY_LOCATIONS_SPEC)
 REPOSITORY_LOCATIONS_SPEC.update(api_repository_locations.REPOSITORY_LOCATIONS_SPEC)
@@ -82,8 +82,9 @@ class DependencyInfo(object):
     Returns:
       Set of dependency identifiers that match use_category.
     """
-        return set(name for name, metadata in REPOSITORY_LOCATIONS_SPEC.items()
-                   if use_category in metadata['use_category'])
+        return set(
+            name for name, metadata in REPOSITORY_LOCATIONS_SPEC.items()
+            if use_category in metadata['use_category'])
 
     def get_metadata(self, dependency):
         """Obtain repository metadata for a dependency.
@@ -101,9 +102,8 @@ class DependencyInfo(object):
 class BuildGraph(object):
     """Models the Bazel build graph."""
 
-    def __init__(self,
-                 ignore_deps=IGNORE_DEPS,
-                 repository_locations_spec=REPOSITORY_LOCATIONS_SPEC):
+    def __init__(
+            self, ignore_deps=IGNORE_DEPS, repository_locations_spec=REPOSITORY_LOCATIONS_SPEC):
         self._ignore_deps = ignore_deps
         # Reverse map from untracked dependencies implied by other deps back to the dep.
         self._implied_untracked_deps_revmap = {}
@@ -175,9 +175,10 @@ class Validator(object):
             '//source/exe:envoy_main_common_with_core_extensions_lib', '//source/extensions/...')
         queried_all_deps = self._build_graph.query_external_deps('//source/...')
         if queried_all_deps != queried_core_ext_deps:
-            raise DependencyError('Invalid build graph structure. deps(//source/...) != '
-                                  'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
-                                  'union deps(//source/extensions/...)')
+            raise DependencyError(
+                'Invalid build graph structure. deps(//source/...) != '
+                'deps(//source/exe:envoy_main_common_with_core_extensions_lib) '
+                'union deps(//source/extensions/...)')
 
     def validate_test_only_deps(self):
         """Validate that test-only dependencies aren't included in //source/...

@@ -91,8 +91,8 @@ def create_issues(access_token, runtime_and_pr):
         body = (
             'Your change %s (%s) introduced a runtime guarded feature. It has been 6 months since '
             'the new code has been exercised by default, so it\'s time to remove the old code '
-            'path. This issue tracks source code cleanup so we don\'t forget.') % (number,
-                                                                                   change_title)
+            'path. This issue tracks source code cleanup so we don\'t forget.') % (
+                number, change_title)
 
         print(title)
         print(body)
@@ -123,8 +123,9 @@ def create_issues(access_token, runtime_and_pr):
                     if login:
                         body += '\ncc @' + login
                     repo.create_issue(title, body=body, labels=labels)
-                    print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
-                           'and assign it their way.') % (title, login))
+                    print((
+                        'unable to assign issue %s to %s. Add them to the Envoy proxy org'
+                        'and assign it their way.') % (title, login))
                 except github.GithubException as e:
                     print('GithubException while creating issue.')
                     raise
@@ -167,8 +168,9 @@ def get_runtime_and_pr():
                 pr_date = date.fromtimestamp(commit.committed_date)
                 removable = (pr_date < removal_date)
                 # Add the runtime guard and PR to the list to file issues about.
-                print('Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' ' +
-                      (removable and 'and is safe to remove' or 'is not ready to remove'))
+                print(
+                    'Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' '
+                    + (removable and 'and is safe to remove' or 'is not ready to remove'))
                 if removable:
                     features_to_flip.append((runtime_guard, pr, commit))
     print('Failed to find test_feature_false.  Script needs fixing')

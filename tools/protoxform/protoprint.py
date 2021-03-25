@@ -26,10 +26,10 @@ from google.protobuf import text_format
 
 from udpa.annotations import migrate_pb2, status_pb2
 
-PROTO_PACKAGES = ("google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
-                  "envoy.annotations.resource", "udpa.annotations.migrate",
-                  "udpa.annotations.security", "udpa.annotations.status",
-                  "udpa.annotations.versioning", "udpa.annotations.sensitive")
+PROTO_PACKAGES = (
+    "google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
+    "envoy.annotations.resource", "udpa.annotations.migrate", "udpa.annotations.security",
+    "udpa.annotations.status", "udpa.annotations.versioning", "udpa.annotations.sensitive")
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -177,8 +177,8 @@ def format_header_from_file(source_code_info, file_proto, empty_file):
     typedb = utils.get_type_db()
     # Figure out type dependencies in this .proto.
     types = types_pb2.Types()
-    text_format.Merge(traverse.traverse_file(file_proto, type_whisperer.TypeWhispererVisitor()),
-                      types)
+    text_format.Merge(
+        traverse.traverse_file(file_proto, type_whisperer.TypeWhispererVisitor()), types)
     type_dependencies = sum([list(t.type_dependencies) for t in types.types.values()], [])
     for service in file_proto.service:
         for m in service.method:
@@ -318,8 +318,8 @@ def normalize_field_type_name(type_context, field_fqn):
         normalized_splits = deque([field_fqn_splits[-1]])
 
         if list(remaining_field_fqn_splits)[:1] != type_context_splits[:1] and (
-                len(remaining_field_fqn_splits) == 0 or
-                remaining_field_fqn_splits[0] in type_context_splits[1:]):
+                len(remaining_field_fqn_splits) == 0
+                or remaining_field_fqn_splits[0] in type_context_splits[1:]):
             # Notice that in some cases it is error-prone to normalize a type name.
             # E.g., it would be an error to replace ".external.Type" with "external.Type"
             # in the context of "envoy.extensions.type.external.vX.Config".
@@ -393,7 +393,8 @@ def format_field_type(type_context, field):
         if type_context.map_typenames and type_name_from_fqn(
                 field.type_name) in type_context.map_typenames:
             return 'map<%s, %s>' % tuple(
-                map(functools.partial(format_field_type, type_context),
+                map(
+                    functools.partial(format_field_type, type_context),
                     type_context.map_typenames[type_name_from_fqn(field.type_name)]))
         return type_name
     elif field.type_name:
@@ -457,9 +458,9 @@ def format_field(type_context, field):
         return ''
     leading_comment, trailing_comment = format_type_context_comments(type_context)
 
-    return '%s%s %s = %d%s;\n%s' % (leading_comment, format_field_type(
-        type_context, field), field.name, field.number, format_options(
-            field.options), trailing_comment)
+    return '%s%s %s = %d%s;\n%s' % (
+        leading_comment, format_field_type(type_context, field), field.name, field.number,
+        format_options(field.options), trailing_comment)
 
 
 def format_enum_value(type_context, value):
@@ -476,8 +477,8 @@ def format_enum_value(type_context, value):
         return ''
     leading_comment, trailing_comment = format_type_context_comments(type_context)
     formatted_annotations = format_options(value.options)
-    return '%s%s = %d%s;\n%s' % (leading_comment, value.name, value.number, formatted_annotations,
-                                 trailing_comment)
+    return '%s%s = %d%s;\n%s' % (
+        leading_comment, value.name, value.number, formatted_annotations, trailing_comment)
 
 
 def text_format_value(field, value):
@@ -509,23 +510,26 @@ def format_options(options):
 
     formatted_options = []
     for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
-        option_name = '({})'.format(option_descriptor.full_name
-                                   ) if option_descriptor.is_extension else option_descriptor.name
+        option_name = '({})'.format(
+            option_descriptor.full_name
+        ) if option_descriptor.is_extension else option_descriptor.name
         if option_descriptor.message_type and option_descriptor.label != option_descriptor.LABEL_REPEATED:
             formatted_options.extend([
                 '{}.{} = {}'.format(option_name, subfield.name, text_format_value(subfield, value))
                 for subfield, value in option_value.ListFields()
             ])
         else:
-            formatted_options.append('{} = {}'.format(
-                option_name, text_format_value(option_descriptor, option_value)))
+            formatted_options.append(
+                '{} = {}'.format(option_name, text_format_value(option_descriptor, option_value)))
 
     if formatted_options:
         if options.DESCRIPTOR.name in ('EnumValueOptions', 'FieldOptions'):
             return '[{}]'.format(','.join(formatted_options))
         else:
-            return format_block(''.join(
-                'option {};\n'.format(formatted_option) for formatted_option in formatted_options))
+            return format_block(
+                ''.join(
+                    'option {};\n'.format(formatted_option)
+                    for formatted_option in formatted_options))
     return ''
 
 
@@ -545,8 +549,8 @@ def format_reserved(enum_or_msg_proto):
         if rr.start == rr.end:
             rr.end += 1
     reserved_fields = format_block(
-        'reserved %s;\n' %
-        ','.join(map(str, sum([list(range(rr.start, rr.end)) for rr in rrs], [])))) if rrs else ''
+        'reserved %s;\n'
+        % ','.join(map(str, sum([list(range(rr.start, rr.end)) for rr in rrs], [])))) if rrs else ''
     if enum_or_msg_proto.reserved_name:
         reserved_fields += format_block(
             'reserved %s;\n' % ', '.join('"%s"' % n for n in enum_or_msg_proto.reserved_name))
@@ -565,8 +569,8 @@ class ProtoFormatVisitor(visitor.Visitor):
             format_service_method(type_context.extend_method(index, m.name), m)
             for index, m in enumerate(service_proto.method))
         options = format_block(format_options(service_proto.options))
-        return '%sservice %s {\n%s%s%s\n}\n' % (leading_comment, service_proto.name, options,
-                                                trailing_comment, methods)
+        return '%sservice %s {\n%s%s%s\n}\n' % (
+            leading_comment, service_proto.name, options, trailing_comment, methods)
 
     def visit_enum(self, enum_proto, type_context):
         if protoxform_options.has_hide_option(enum_proto.options):
@@ -579,8 +583,9 @@ class ProtoFormatVisitor(visitor.Visitor):
             for index, value in enumerate(enum_proto.value)
         ]
         joined_values = ('\n' if any('//' in v for v in values) else '').join(values)
-        return '%senum %s {\n%s%s%s%s\n}\n' % (leading_comment, enum_proto.name, trailing_comment,
-                                               formatted_options, reserved_fields, joined_values)
+        return '%senum %s {\n%s%s%s%s\n}\n' % (
+            leading_comment, enum_proto.name, trailing_comment, formatted_options, reserved_fields,
+            joined_values)
 
     def visit_message(self, msg_proto, type_context, nested_msgs, nested_enums):
         # Skip messages synthesized to represent map types.
@@ -613,11 +618,11 @@ class ProtoFormatVisitor(visitor.Visitor):
                 oneof_proto = msg_proto.oneof_decl[oneof_index]
                 oneof_leading_comment, oneof_trailing_comment = format_type_context_comments(
                     type_context.extend_oneof(oneof_index, field.name))
-                fields += '%soneof %s {\n%s%s' % (oneof_leading_comment, oneof_proto.name,
-                                                  oneof_trailing_comment,
-                                                  format_options(oneof_proto.options))
-            fields += format_block(format_field(type_context.extend_field(index, field.name),
-                                                field))
+                fields += '%soneof %s {\n%s%s' % (
+                    oneof_leading_comment, oneof_proto.name, oneof_trailing_comment,
+                    format_options(oneof_proto.options))
+            fields += format_block(
+                format_field(type_context.extend_field(index, field.name), field))
         if oneof_index is not None:
             fields += '}\n\n'
         return '%smessage %s {\n%s%s%s%s%s%s\n}\n' % (

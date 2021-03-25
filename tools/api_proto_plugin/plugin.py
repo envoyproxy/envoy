@@ -30,8 +30,8 @@ OutputDescriptor = namedtuple(
 
 
 def direct_output_descriptor(output_suffix, visitor, want_params=False):
-    return OutputDescriptor(output_suffix, visitor,
-                            (lambda x, _: x) if want_params else lambda x: x, want_params)
+    return OutputDescriptor(
+        output_suffix, visitor, (lambda x, _: x) if want_params else lambda x: x, want_params)
 
 
 # TODO(phlax): make this into a class
@@ -75,13 +75,13 @@ def plugin(output_descriptors):
             else:
                 xformed_proto = od.xform(file_proto)
                 visitor_factory = od.visitor_factory()
-            f.content = traverse.traverse_file(xformed_proto,
-                                               visitor_factory) if xformed_proto else ''
+            f.content = traverse.traverse_file(
+                xformed_proto, visitor_factory) if xformed_proto else ''
         if cprofile_enabled:
             pr.disable()
             stats_stream = io.StringIO()
-            ps = pstats.Stats(pr, stream=stats_stream).sort_stats(
-                os.getenv('CPROFILE_SORTBY', 'cumulative'))
+            ps = pstats.Stats(
+                pr, stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
             stats_file = response.file.add()
             stats_file.name = file_proto.name + '.profile'
             ps.print_stats()

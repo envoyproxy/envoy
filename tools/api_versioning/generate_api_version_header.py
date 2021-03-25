@@ -9,7 +9,8 @@ import sys
 
 ApiVersion = namedtuple('ApiVersion', ['major', 'minor', 'patch'])
 
-FILE_TEMPLATE = string.Template("""#pragma once
+FILE_TEMPLATE = string.Template(
+    """#pragma once
 #include "common/version/api_version_struct.h"
 
 namespace Envoy {

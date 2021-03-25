@@ -35,8 +35,8 @@ def emit_stdout_as_error(stdout):
 
 def expect_error(filename, status, stdout, expected_substrings):
     if status == 0:
-        logging.error("%s: Expected %d errors, but succeeded" %
-                      (filename, len(expected_substrings)))
+        logging.error(
+            "%s: Expected %d errors, but succeeded" % (filename, len(expected_substrings)))
         return 1
     errors = 0
     for expected_substring in expected_substrings:

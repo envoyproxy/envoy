@@ -28,9 +28,11 @@ TRACE_HEADERS_TO_PROPAGATE = [
 
 @app.route('/service/<service_number>')
 def hello(service_number):
-    return ('Hello from behind Envoy (service {})! hostname: {} resolved'
-            'hostname: {}\n'.format(os.environ['SERVICE_NAME'], socket.gethostname(),
-                                    socket.gethostbyname(socket.gethostname())))
+    return (
+        'Hello from behind Envoy (service {})! hostname: {} resolved'
+        'hostname: {}\n'.format(
+            os.environ['SERVICE_NAME'], socket.gethostname(),
+            socket.gethostbyname(socket.gethostname())))
 
 
 @app.route('/trace/<service_number>')
@@ -42,9 +44,11 @@ def trace(service_number):
             if header in request.headers:
                 headers[header] = request.headers[header]
         requests.get("http://localhost:9000/trace/2", headers=headers)
-    return ('Hello from behind Envoy (service {})! hostname: {} resolved'
-            'hostname: {}\n'.format(os.environ['SERVICE_NAME'], socket.gethostname(),
-                                    socket.gethostbyname(socket.gethostname())))
+    return (
+        'Hello from behind Envoy (service {})! hostname: {} resolved'
+        'hostname: {}\n'.format(
+            os.environ['SERVICE_NAME'], socket.gethostname(),
+            socket.gethostbyname(socket.gethostname())))
 
 
 if __name__ == "__main__":

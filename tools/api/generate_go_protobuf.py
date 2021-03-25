@@ -47,8 +47,8 @@ def generate_protobufs(output):
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
         rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-        input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_',
-                                 IMPORT_BASE, rule_dir)
+        input_dir = os.path.join(
+            bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_', IMPORT_BASE, rule_dir)
         input_files = glob.glob(os.path.join(input_dir, '*.go'))
         output_dir = os.path.join(output, rule_dir)
 

@@ -53,7 +53,8 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
     os.environ['ENVOY_BLOB_SHA'])
 
 # Template for formating extension descriptions.
-EXTENSION_TEMPLATE = Template("""
+EXTENSION_TEMPLATE = Template(
+    """
 .. _extension_{{extension}}:
 
 This extension may be referenced by the qualified name *{{extension}}*
@@ -73,7 +74,8 @@ This extension may be referenced by the qualified name *{{extension}}*
 """)
 
 # Template for formating an extension category.
-EXTENSION_CATEGORY_TEMPLATE = Template("""
+EXTENSION_CATEGORY_TEMPLATE = Template(
+    """
 .. _extension_category_{{category}}:
 
 .. tip::
@@ -142,8 +144,8 @@ def github_url(type_context):
         A string with a corresponding data plane API GitHub Url.
     """
     if type_context.location is not None:
-        return DATA_PLANE_API_URL_FMT % (type_context.source_code_info.name,
-                                         type_context.location.span[0])
+        return DATA_PLANE_API_URL_FMT % (
+            type_context.source_code_info.name, type_context.location.span[0])
     return ''
 
 
@@ -234,10 +236,11 @@ def format_extension(extension):
         )
         exit(1)  # Raising the error buries the above message in tracebacks.
 
-    return EXTENSION_TEMPLATE.render(extension=extension,
-                                     status=status,
-                                     security_posture=security_posture,
-                                     categories=categories)
+    return EXTENSION_TEMPLATE.render(
+        extension=extension,
+        status=status,
+        security_posture=security_posture,
+        categories=categories)
 
 
 def format_extension_category(extension_category):
@@ -253,8 +256,8 @@ def format_extension_category(extension_category):
         extensions = EXTENSION_CATEGORIES[extension_category]
     except KeyError as e:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
-    return EXTENSION_CATEGORY_TEMPLATE.render(category=extension_category,
-                                              extensions=sorted(extensions))
+    return EXTENSION_CATEGORY_TEMPLATE.render(
+        category=extension_category, extensions=sorted(extensions))
 
 
 def format_header_from_file(style, source_code_info, proto_name):
@@ -380,7 +383,8 @@ def format_field_type(type_context, field):
             if type_context.map_typenames and type_name_from_fqn(
                     field.type_name) in type_context.map_typenames:
                 return 'map<%s, %s>' % tuple(
-                    map(functools.partial(format_field_type, type_context),
+                    map(
+                        functools.partial(format_field_type, type_context),
                         type_context.map_typenames[type_name_from_fqn(field.type_name)]))
             return format_internal_link(type_name, message_cross_ref_label(type_name))
         if field.type == field.TYPE_ENUM:
@@ -388,14 +392,13 @@ def format_field_type(type_context, field):
     elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
         wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
         return format_external_link(
-            wkt,
-            'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s' %
-            wkt.lower())
+            wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
+            % wkt.lower())
     elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
         rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
         return format_external_link(
-            rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s' %
-            rpc.lower())
+            rpc, 'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
+            % rpc.lower())
     elif field.type_name:
         return field.type_name
 
@@ -463,8 +466,8 @@ def format_security_options(security_option, field, type_context, edge_config):
 
     if security_option.configure_for_untrusted_downstream:
         sections.append(
-            indent(4,
-                   'This field should be configured in the presence of untrusted *downstreams*.'))
+            indent(
+                4, 'This field should be configured in the presence of untrusted *downstreams*.'))
     if security_option.configure_for_untrusted_upstream:
         sections.append(
             indent(4, 'This field should be configured in the presence of untrusted *upstreams*.'))
@@ -476,16 +479,16 @@ def format_security_options(security_option, field, type_context, edge_config):
     field_name = type_context.name.split('.')[-1]
     example = {field_name: example_dict}
     sections.append(
-        indent(4, 'Example configuration for untrusted environments:\n\n') +
-        indent(4, '.. code-block:: yaml\n\n') +
-        '\n'.join(indent_lines(6,
-                               yaml.dump(example).split('\n'))))
+        indent(4, 'Example configuration for untrusted environments:\n\n')
+        + indent(4, '.. code-block:: yaml\n\n')
+        + '\n'.join(indent_lines(6,
+                                 yaml.dump(example).split('\n'))))
 
     return '.. attention::\n' + '\n\n'.join(sections)
 
 
-def format_field_as_definition_list_item(outer_type_context, type_context, field,
-                                         protodoc_manifest):
+def format_field_as_definition_list_item(
+        outer_type_context, type_context, field, protodoc_manifest):
     """Format a FieldDescriptorProto as RST definition list item.
 
     Args:
@@ -502,11 +505,11 @@ def format_field_as_definition_list_item(outer_type_context, type_context, field
     anchor = format_anchor(field_cross_ref_label(normalize_type_context_name(type_context.name)))
     if field.options.HasExtension(validate_pb2.rules):
         rule = field.options.Extensions[validate_pb2.rules]
-        if ((rule.HasField('message') and rule.message.required) or
-            (rule.HasField('duration') and rule.duration.required) or
-            (rule.HasField('string') and rule.string.min_len > 0) or
-            (rule.HasField('string') and rule.string.min_bytes > 0) or
-            (rule.HasField('repeated') and rule.repeated.min_items > 0)):
+        if ((rule.HasField('message') and rule.message.required)
+                or (rule.HasField('duration') and rule.duration.required)
+                or (rule.HasField('string') and rule.string.min_len > 0)
+                or (rule.HasField('string') and rule.string.min_bytes > 0)
+                or (rule.HasField('repeated') and rule.repeated.min_items > 0)):
             field_annotations = ['*REQUIRED*']
     leading_comment = type_context.leading_comment
     formatted_leading_comment = format_comment_with_annotations(leading_comment)
@@ -514,8 +517,8 @@ def format_field_as_definition_list_item(outer_type_context, type_context, field
         return ''
 
     if field.HasField('oneof_index'):
-        oneof_context = outer_type_context.extend_oneof(field.oneof_index,
-                                                        type_context.oneof_names[field.oneof_index])
+        oneof_context = outer_type_context.extend_oneof(
+            field.oneof_index, type_context.oneof_names[field.oneof_index])
         oneof_comment = oneof_context.leading_comment
         formatted_oneof_comment = format_comment_with_annotations(oneof_comment)
         if hide_not_implemented(oneof_comment):
@@ -555,10 +558,11 @@ def format_field_as_definition_list_item(outer_type_context, type_context, field
         field.LABEL_REPEATED: '**repeated** ',
     }
     comment = '(%s) ' % ', '.join(
-        [pretty_label_names[field.label] + format_field_type(type_context, field)] +
-        field_annotations) + formatted_leading_comment
-    return anchor + field.name + '\n' + map_lines(functools.partial(
-        indent, 2), comment + formatted_oneof_comment) + formatted_security_options
+        [pretty_label_names[field.label] + format_field_type(type_context, field)]
+        + field_annotations) + formatted_leading_comment
+    return anchor + field.name + '\n' + map_lines(
+        functools.partial(indent, 2),
+        comment + formatted_oneof_comment) + formatted_security_options
 
 
 def format_message_as_definition_list(type_context, msg, protodoc_manifest):
@@ -692,16 +696,16 @@ class RstFormatVisitor(visitor.Visitor):
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
         # in the common case.
         if (has_messages and not annotations.DOC_TITLE_ANNOTATION
-                in type_context.source_code_info.file_level_annotations and
-                file_proto.name.startswith('envoy')):
+                in type_context.source_code_info.file_level_annotations
+                and file_proto.name.startswith('envoy')):
             raise ProtodocError(
                 'Envoy API proto file missing [#protodoc-title:] annotation: {}'.format(
                     file_proto.name))
 
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
-        header, comment = format_header_from_file('=', type_context.source_code_info,
-                                                  file_proto.name)
+        header, comment = format_header_from_file(
+            '=', type_context.source_code_info, file_proto.name)
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
@@ -710,8 +714,9 @@ class RstFormatVisitor(visitor.Visitor):
         warnings = ''
         if file_proto.options.HasExtension(status_pb2.file_status):
             if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
-                warnings += ('.. warning::\n   This API is work-in-progress and is '
-                             'subject to breaking changes.\n\n')
+                warnings += (
+                    '.. warning::\n   This API is work-in-progress and is '
+                    'subject to breaking changes.\n\n')
         debug_proto = format_proto_as_block_comment(file_proto)
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 

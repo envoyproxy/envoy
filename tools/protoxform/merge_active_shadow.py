@@ -15,10 +15,10 @@ from tools.protoxform import utils
 from google.protobuf import descriptor_pb2, text_format
 from envoy.annotations import deprecation_pb2
 
-PROTO_PACKAGES = ("google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
-                  "envoy.annotations.resource", "udpa.annotations.migrate",
-                  "udpa.annotations.security", "udpa.annotations.status",
-                  "udpa.annotations.sensitive", "udpa.annotations.versioning")
+PROTO_PACKAGES = (
+    "google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
+    "envoy.annotations.resource", "udpa.annotations.migrate", "udpa.annotations.security",
+    "udpa.annotations.status", "udpa.annotations.sensitive", "udpa.annotations.versioning")
 
 
 # Set reserved_range in target_proto to reflect previous_reserved_range skipping
@@ -91,8 +91,8 @@ def adjust_source_code_info(type_context, field_index, field_adjustment):
 
 
 # Merge active/shadow DescriptorProtos to a fresh target DescriptorProto.
-def merge_active_shadow_message(type_context, active_proto, shadow_proto, target_proto,
-                                target_proto_dependencies):
+def merge_active_shadow_message(
+        type_context, active_proto, shadow_proto, target_proto, target_proto_dependencies):
     target_proto.MergeFrom(active_proto)
     if not shadow_proto:
         return
@@ -188,8 +188,9 @@ def merge_active_shadow_message(type_context, active_proto, shadow_proto, target
     del target_proto.enum_type[:]
     shadow_enums = {msg.name: msg for msg in shadow_proto.enum_type}
     for enum in active_proto.enum_type:
-        merge_active_shadow_enum(enum, shadow_enums.get(enum.name), target_proto.enum_type.add(),
-                                 target_proto_dependencies)
+        merge_active_shadow_enum(
+            enum, shadow_enums.get(enum.name), target_proto.enum_type.add(),
+            target_proto_dependencies)
     # Ensure target has any deprecated sub-message types in case they are needed.
     active_msg_names = set([msg.name for msg in active_proto.nested_type])
     for msg in shadow_proto.nested_type:
@@ -200,8 +201,8 @@ def merge_active_shadow_message(type_context, active_proto, shadow_proto, target
 # Merge active/shadow FileDescriptorProtos, returning the resulting FileDescriptorProto.
 def merge_active_shadow_file(active_file_proto, shadow_file_proto):
     target_file_proto = copy.deepcopy(active_file_proto)
-    source_code_info = api_type_context.SourceCodeInfo(target_file_proto.name,
-                                                       target_file_proto.source_code_info)
+    source_code_info = api_type_context.SourceCodeInfo(
+        target_file_proto.name, target_file_proto.source_code_info)
     package_type_context = api_type_context.TypeContext(source_code_info, target_file_proto.package)
     # Visit message types
     del target_file_proto.message_type[:]
@@ -215,8 +216,9 @@ def merge_active_shadow_file(active_file_proto, shadow_file_proto):
     del target_file_proto.enum_type[:]
     shadow_enums = {msg.name: msg for msg in shadow_file_proto.enum_type}
     for enum in active_file_proto.enum_type:
-        merge_active_shadow_enum(enum, shadow_enums.get(enum.name),
-                                 target_file_proto.enum_type.add(), target_file_proto.dependency)
+        merge_active_shadow_enum(
+            enum, shadow_enums.get(enum.name), target_file_proto.enum_type.add(),
+            target_file_proto.dependency)
     # Ensure target has any deprecated message types in case they are needed.
     active_msg_names = set([msg.name for msg in active_file_proto.message_type])
     for msg in shadow_file_proto.message_type:

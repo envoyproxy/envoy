@@ -99,8 +99,8 @@ def replace_includes(mockname):
             changed_list.append(str(test_file.relative_to(Path('.'))) + '\n')
             with test_file.open(mode='w') as f:
                 f.write(
-                    content.replace('#include "test/mocks/{}/mocks.h"\n'.format(mockname),
-                                    replace_includes))
+                    content.replace(
+                        '#include "test/mocks/{}/mocks.h"\n'.format(mockname), replace_includes))
             with (test_file.parent / 'BUILD').open() as f:
                 # write building files
                 content = f.read()
