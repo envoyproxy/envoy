@@ -176,6 +176,9 @@ message Cluster {
     // See the supported cluster for further documentation.
     // [#extension-category: envoy.clusters]
     google.protobuf.Any typed_config = 2;
+
+    // If true, this cluster type supports EDS updates and is configured using eds_cluster_config.
+    bool uses_eds_config = 3;
   }
 
   // Only valid when discovery type is EDS.
