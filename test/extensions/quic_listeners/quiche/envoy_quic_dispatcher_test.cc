@@ -170,6 +170,7 @@ public:
     ASSERT(envoy_connection->addressProvider().localAddress() != nullptr);
     EXPECT_EQ(*listen_socket_->addressProvider().localAddress(),
               *envoy_connection->addressProvider().localAddress());
+    EXPECT_EQ(64 * 1024, envoy_connection->max_inbound_header_list_size());
   }
 
   void processValidChloPacketAndInitializeFilters(bool should_buffer) {
@@ -197,6 +198,7 @@ public:
                             const std::vector<Network::FilterFactoryCb>& filter_factories) {
           EXPECT_EQ(1u, filter_factories.size());
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+          static_cast<EnvoyQuicServerSession&>(connection).SetMaxInboundHeaderListSize(64 * 1024);
           return true;
         }));
     EXPECT_CALL(*read_filter, onNewConnection())

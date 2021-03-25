@@ -58,6 +58,8 @@ public:
   void OnTlsHandshakeComplete() override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
+                                   std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -86,6 +88,7 @@ private:
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
+  bool filters_created_{false};
 };
 
 } // namespace Quic

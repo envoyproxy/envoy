@@ -1309,9 +1309,16 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
-  // TODO(danzh) re-enable this test after quic headers size become configurable.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP3) {
+    // QUICHE Qpack splits concatinated cookies into crumbs to increase
+    // compression ratio. On the receiver side, the total size of these crumbs
+    // may be larger than coalesced cookie headers. Increase the max request
+    // header size to avoid QUIC_HEADERS_TOO_LARGE stream error.
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(96); });
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1334,8 +1341,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
 
 // Validate that lots of tiny cookies doesn't cause a DoS (many cookie headers).
 TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
-  // TODO(danzh) re-enable this test after quic headers size become configurable.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Set header count limit to 2010.
   uint32_t max_count = 2010;
@@ -1547,8 +1552,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
-  // TODO(danzh) re-enable this test after quic headers size become configurable.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Send one 95 kB URL with limit 96 kB headers.
   testLargeRequestUrl(95, 96);
@@ -1560,7 +1563,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Send one 95 kB header with limit 96 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 96, 100);
@@ -1643,7 +1645,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
 // time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
   // TODO(danzh) re-enable this test after quic headers size become configurable.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
@@ -1651,7 +1652,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
   // TODO(danzh) re-enable this test after quic headers size become configurable.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(60, 96);
@@ -1659,7 +1659,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
   // TODO(danzh) investigate why it failed for H3.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(66, 60);
@@ -1668,9 +1667,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
 // time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
-  // Enable after setting QUICHE max_inbound_header_list_size_ from HCM
-  // config.
-  EXCLUDE_DOWNSTREAM_HTTP3
   EXCLUDE_UPSTREAM_HTTP3;
   setMaxRequestHeadersKb(96);
   setMaxRequestHeadersCount(20005);

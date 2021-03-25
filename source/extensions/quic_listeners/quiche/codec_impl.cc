@@ -95,21 +95,23 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
 
 std::unique_ptr<Http::ClientConnection>
 QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, const uint32_t /*max_request_headers_kb*/) {
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+    const uint32_t /*max_request_headers_kb*/) {
   return std::make_unique<Quic::QuicHttpClientConnectionImpl>(
       dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks);
 }
 
 std::unique_ptr<Http::ServerConnection>
 QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, const uint32_t max_request_headers_kb,
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          /*headers_with_underscores_action*/) {
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+    const uint32_t max_request_headers_kb,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+    /*headers_with_underscores_action*/) {
   auto& quic_session = dynamic_cast<Quic::EnvoyQuicServerSession&>(connection);
   quic_session.SetMaxInboundHeaderListSize(max_request_headers_kb * 1024);
+  SetQuicFlag(FLAGS_quic_header_size_limit_counts_overhead, false);
   return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-      quic_session,
-      dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));
+      quic_session, dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));
 }
 
 REGISTER_FACTORY(QuicHttpClientConnectionFactoryImpl, Http::QuicHttpClientConnectionFactory);

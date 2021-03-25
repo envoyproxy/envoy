@@ -19,8 +19,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
-      quic_connection_(std::move(connection)), listener_config_(listener_config) {
-}
+      quic_connection_(std::move(connection)), listener_config_(listener_config) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -101,20 +100,30 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
   if (level != quic::ENCRYPTION_FORWARD_SECURE) {
     return;
   }
-  maybeCreateNetworkFilters();
+  // maybeCreateNetworkFilters();
   // This is only reached once, when handshake is done.
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
+
+void EnvoyQuicServerSession::OnNewEncryptionKeyAvailable(
+    quic::EncryptionLevel level, std::unique_ptr<quic::QuicEncrypter> encrypter) {
+  if (!filters_created_ && level == quic::ENCRYPTION_FORWARD_SECURE) {
+    // Instantiate filters before sending SETTINGS below.
+    maybeCreateNetworkFilters();
+  }
+  quic::QuicServerSessionBase::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
 }
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
-  maybeCreateNetworkFilters();
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
 void EnvoyQuicServerSession::maybeCreateNetworkFilters() {
+  ASSERT(!filters_created_);
+  filters_created_ = true;
   auto proof_source_details =
       dynamic_cast<const EnvoyQuicProofSourceDetails*>(GetCryptoStream()->ProofSourceDetails());
   ASSERT(proof_source_details != nullptr,
