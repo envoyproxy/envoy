@@ -77,8 +77,11 @@ public:
         host_(new NiceMock<Upstream::MockHostDescription>()),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-              Upstream::ResourcePriority::Default, nullptr, nullptr, state_, simTime(), options_) {}
+              Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
+              state_, simTime(), options_) {}
 
+  const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   ConnectivityGrid::ConnectivityOptions options_;
   Upstream::HostDescriptionConstSharedPtr host_;
   Upstream::ClusterConnectivityState state_;
@@ -259,9 +262,8 @@ namespace Http {
 namespace {
 
 TEST_F(ConnectivityGridTest, RealGrid) {
+  testing::InSequence s;
   // Set the cluster up to have a quic transport socket.
-  EXPECT_CALL(dispatcher_, createSchedulableCallback_(_))
-      .WillRepeatedly(Return(new Event::MockSchedulableCallback(&dispatcher_)));
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   auto factory = std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config));
   auto& matcher =
@@ -270,9 +272,10 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, nullptr, nullptr, state_, simTime(), options_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), options_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
