@@ -10,7 +10,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -25,6 +24,10 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#if defined(ENVOY_ENABLE_QUIC)
+#include "common/quic/quic_transport_socket_factory.h"
+#endif
+
 #include "server/api_listener_impl.h"
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
@@ -32,7 +35,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -1007,6 +1009,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
+#if defined(ENVOY_ENABLE_QUIC)
   // The only connection oriented UDP transport protocol right now is QUIC.
   const bool is_quic =
       listener_.udpListenerConfig().has_value() &&
@@ -1018,6 +1021,9 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                      "{}. \nUse QuicDownstreamTransport instead.",
                                      transport_socket.DebugString()));
   }
+#else
+  UNREFERENCED_PARAMETER(listener_);
+#endif
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
 

@@ -3131,7 +3131,7 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
-#ifdef ENVOY_ENABLE_QUICHE
+#ifdef ENVOY_ENABLE_QUIC
 TEST_F(ClusterInfoImplTest, Http3) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
@@ -3205,7 +3205,7 @@ TEST_F(ClusterInfoImplTest, Http3) {
   EXPECT_FALSE(
       downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
 }
-#endif // ENVOY_ENABLE_QUICHE
+#endif // ENVOY_ENABLE_QUIC
 
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {
