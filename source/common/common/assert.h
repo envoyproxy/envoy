@@ -54,6 +54,8 @@ addEnvoyBugFailureRecordAction(const std::function<void(const char* location)>& 
  * Invokes the action set by setDebugAssertionFailureRecordAction, or does nothing if
  * no action has been set.
  *
+ * @param location Unique identifier for the ASSERT, currently source file and line.
+ *
  * This should only be called by ASSERT macros in this file.
  */
 void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly(const char* location);
@@ -62,12 +64,17 @@ void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly(const char* lo
  * Invokes the action set by setEnvoyBugFailureRecordAction, or does nothing if
  * no action has been set.
  *
+ * @param location Unique identifier for the ENVOY_BUG, currently source file and line.
+ *
  * This should only be called by ENVOY_BUG macros in this file.
  */
 void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly(const char* location);
 
 /**
  * Increments power of two counter for EnvoyBugRegistrationImpl.
+ *
+ * @param bug_name Unique identifier for the ENVOY_BUG, currently source file and line.
+ * @return True if the hit count is equal to a power of two after increment.
  *
  * This should only be called by ENVOY_BUG macros in this file.
  */
