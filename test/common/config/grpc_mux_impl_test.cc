@@ -476,7 +476,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   ttl_timer->invokeCallback();
 
   // Increment the time beyond the second resource. This should not send another request since we
-  // alredy have one pending for the empty resource.
+  // already have one pending for the empty resource.
   time_system_.setSystemTime(std::chrono::seconds(100));
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, ""))
       .WillOnce(Invoke([](auto, const auto& removed, auto) {
