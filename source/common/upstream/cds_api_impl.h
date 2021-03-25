@@ -27,6 +27,7 @@ class CdsApiImpl : public CdsApi,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
+                          const xds::core::v3::ResourceLocator* cds_resources_locator,
                           ClusterManager& cm, Stats::Scope& scope,
                           ProtobufMessage::ValidationVisitor& validation_visitor);
 
@@ -46,7 +47,8 @@ private:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
+  CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
+             const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 

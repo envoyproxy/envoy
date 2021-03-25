@@ -7,6 +7,7 @@
 
 #include "envoy/api/v2/route/route_components.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
@@ -44,10 +45,12 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
   const auto resource_name = getResourceName();
+  Envoy::Config::SubscriptionOptions options;
+  options.use_namespace_matching_ = true;
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, true);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {

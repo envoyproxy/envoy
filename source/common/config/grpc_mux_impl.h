@@ -50,7 +50,7 @@ public:
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
-                           const bool use_namespace_matching = false) override;
+                           const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -169,9 +169,10 @@ private:
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
 
-  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
-  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
-  // This string is a type URL.
+  // A queue to store requests while rate limited. Note that when requests
+  // cannot be sent due to the gRPC stream being down, this queue does not
+  // store them; rather, they are simply dropped. This string is a type
+  // URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 
@@ -195,7 +196,8 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) override {
+                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                           const SubscriptionOptions&) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 

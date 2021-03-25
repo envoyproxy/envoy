@@ -838,7 +838,7 @@ public:
         .WillByDefault(testing::Invoke(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                    Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoder&,
-                   bool) -> Config::SubscriptionPtr {
+                   const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());
               rtds_callbacks_.push_back(&callbacks);

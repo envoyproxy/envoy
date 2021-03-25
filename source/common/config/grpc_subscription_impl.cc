@@ -22,11 +22,10 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                            SubscriptionStats stats, absl::string_view type_url,
                                            Event::Dispatcher& dispatcher,
                                            std::chrono::milliseconds init_fetch_timeout,
-                                           bool is_aggregated, bool use_namespace_matching)
+                                           bool is_aggregated, const SubscriptionOptions& options)
     : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(resource_decoder),
       stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated),
-      use_namespace_matching_(use_namespace_matching) {}
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated), options_(options) {}
 
 // Config::Subscription
 void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
@@ -37,8 +36,7 @@ void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resourc
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ =
-      grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, use_namespace_matching_);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, options_);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -147,11 +145,12 @@ GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
     const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
     SubscriptionStats stats, Event::Dispatcher& dispatcher,
-    std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+    std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
+    const SubscriptionOptions& options)
     : GrpcSubscriptionImpl(
           grpc_mux, callbacks, resource_decoder, stats,
           TypeUtil::descriptorFullNameToTypeUrl(collection_locator.resource_type()), dispatcher,
-          init_fetch_timeout, is_aggregated, false),
+          init_fetch_timeout, is_aggregated, options),
       collection_locator_(collection_locator) {}
 
 void GrpcCollectionSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {

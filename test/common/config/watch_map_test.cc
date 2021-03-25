@@ -528,7 +528,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
-  WatchMap watch_map(true);
+  WatchMap watch_map(false);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz/*?some=thing&thing=some"});
 
@@ -564,6 +564,45 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
         watch_map, update,
         {"xdstp://foo/bar/baz/*", "xdstp://foo/bar/baz/a?thing=some&some=thing", "whatevs"},
         "version1");
+  }
+}
+
+// Validate watch behavior when subscribed to xdstp:// singletons.
+TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  WatchMap watch_map(false);
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz?some=thing&thing=some"});
+
+  // verify update
+  {
+    // Verify that we pay attention to all matching resources, no matter the order of context
+    // params.
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    envoy::config::endpoint::v3::ClusterLoadAssignment resource1;
+    resource1.set_cluster_name("xdstp://foo/bar/baz?thing=some&some=thing");
+    update.Add()->PackFrom(resource1);
+    // Ignore non-matching resources.
+    envoy::config::endpoint::v3::ClusterLoadAssignment ignored_resource;
+    ignored_resource.set_cluster_name("xdstp://foo/bar/baz/c?thing=some&some=thing");
+    update.Add()->PackFrom(ignored_resource);
+    ignored_resource.set_cluster_name("xdstp://foo/bar/bazd");
+    update.Add()->PackFrom(ignored_resource);
+    ignored_resource.set_cluster_name("xdstp://blah/bar/baz/e");
+    update.Add()->PackFrom(ignored_resource);
+    ignored_resource.set_cluster_name("whatevs");
+    update.Add()->PackFrom(ignored_resource);
+    expectDeltaUpdate(callbacks, {resource1}, {}, "version0");
+    doDeltaUpdate(watch_map, update, {}, "version0");
+  }
+  // verify removal
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+    expectDeltaUpdate(callbacks, {}, {"xdstp://foo/bar/baz?thing=some&some=thing"}, "version1");
+    doDeltaUpdate(watch_map, update, {"xdstp://foo/bar/baz?thing=some&some=thing", "whatevs"},
+                  "version1");
   }
 }
 

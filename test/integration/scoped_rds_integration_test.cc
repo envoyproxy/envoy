@@ -96,6 +96,10 @@ fragments:
           envoy::config::core::v3::ConfigSource* srds_config_source =
               scoped_routes->mutable_scoped_rds()->mutable_scoped_rds_config_source();
           srds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          if (!srds_resources_locator_.empty()) {
+            scoped_routes->mutable_scoped_rds()->set_srds_resources_locator(
+                srds_resources_locator_);
+          }
 
           // Set Transport api version for scoped_rds.
           envoy::config::core::v3::ApiConfigSource* srds_api_config_source =
@@ -127,7 +131,9 @@ fragments:
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
-    ASSERT(upstream_info->upstream_ != nullptr);
+    if (upstream_info->upstream_ == nullptr) {
+      return;
+    }
 
     AssertionResult result = upstream_info->connection_->close();
     RELEASE_ASSERT(result, result.message());
@@ -248,6 +254,7 @@ fragments:
   const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;
   FakeUpstreamInfo rds_upstream_info_;
+  std::string srds_resources_locator_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
@@ -461,6 +468,49 @@ key:
       456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
       /*cluster_0*/ 0);
   cleanupUpstreamAndDownstream();
+}
+
+// Verify SRDS works when reference via a xdstp:// collection locator.
+TEST_P(ScopedRdsIntegrationTest, XdsTpCollection) {
+  if (!isDelta()) {
+    return;
+  }
+  const std::string scope_route1 = R"EOF(
+name: xdstp://some/envoy.config.route.v3.ScopedRouteConfiguration/namespace/foo_scope1
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  on_server_init_function_ = [this, &scope_route1, &route_config_tmpl]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+    createRdsStream("foo_route1");
+    // CreateRdsStream waits for connection which is fired by RDS subscription.
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  };
+  srds_resources_locator_ =
+      "xdstp://some/envoy.config.route.v3.ScopedRouteConfiguration/namespace/*";
+  initialize();
+  registerTestServerPorts({"http"});
+
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", fmt::format("x-foo-key={}", "foo")}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "cluster_0"}}, 123,
+      /*cluster_0*/ 0);
 }
 
 // Test that a scoped route config update is performed on demand and http request will succeed.
@@ -766,7 +816,8 @@ key:
   // Close the connection and destroy the active stream.
   cleanupUpstreamAndDownstream();
   // Push rds update, on demand updated callback is post to worker thread.
-  // There is no exception thrown even when active stream is dead because weak_ptr can't be locked.
+  // There is no exception thrown even when active stream is dead because weak_ptr can't be
+  // locked.
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);

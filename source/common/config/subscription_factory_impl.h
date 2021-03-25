@@ -24,7 +24,7 @@ public:
                                                absl::string_view type_url, Stats::Scope& scope,
                                                SubscriptionCallbacks& callbacks,
                                                OpaqueResourceDecoder& resource_decoder,
-                                               bool use_namespace_matching) override;
+                                               const SubscriptionOptions& options) override;
   SubscriptionPtr
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,

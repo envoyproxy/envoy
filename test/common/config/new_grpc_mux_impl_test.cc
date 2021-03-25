@@ -106,8 +106,8 @@ public:
 TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   setup();
   InSequence s;
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_);
-  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_);
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   expectSendMessage("bar", {}, {});
@@ -128,7 +128,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_);
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -167,7 +167,9 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, true);
+  SubscriptionOptions options;
+  options.use_namespace_matching_ = true;
+  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -202,7 +204,9 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, true);
+  SubscriptionOptions options;
+  options.use_namespace_matching_ = true;
+  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -228,7 +232,7 @@ TEST_F(NewGrpcMuxImplTest, V3ResourceResponseV2ResourceWatch) {
   const std::string& v3_type_url =
       Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           envoy::config::core::v3::ApiVersion::V3);
-  auto watch = grpc_mux_->addWatch(v2_type_url, {}, callbacks_, resource_decoder_);
+  auto watch = grpc_mux_->addWatch(v2_type_url, {}, callbacks_, resource_decoder_, {});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Cluster is not watched, v3 resource is rejected.
@@ -288,7 +292,7 @@ TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
       Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           envoy::config::core::v3::ApiVersion::V3);
   const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto watch = grpc_mux_->addWatch(v3_type_url, {}, callbacks_, resource_decoder_);
+  auto watch = grpc_mux_->addWatch(v3_type_url, {}, callbacks_, resource_decoder_, {});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
@@ -320,12 +324,15 @@ TEST_F(NewGrpcMuxImplTest, XdsTpGlobCollection) {
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   xds::core::v3::ContextParams context_params;
+  (*context_params.mutable_params())["foo"] = "bar";
   EXPECT_CALL(local_info_.context_provider_, nodeContext()).WillOnce(ReturnRef(context_params));
   // We verify that the gRPC mux normalizes the context parameter order below.
+  SubscriptionOptions options;
+  options.add_xdstp_node_context_params_ = true;
   auto watch = grpc_mux_->addWatch(
       type_url,
       {"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/*?thing=some&some=thing"},
-      callbacks_, resource_decoder_, true);
+      callbacks_, resource_decoder_, options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -337,8 +344,8 @@ TEST_F(NewGrpcMuxImplTest, XdsTpGlobCollection) {
   envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
   load_assignment.set_cluster_name("ignore");
   auto* resource = response->add_resources();
-  resource->set_name(
-      "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/a?some=thing&thing=some");
+  resource->set_name("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/"
+                     "a?foo=bar&some=thing&thing=some");
   resource->mutable_resource()->PackFrom(load_assignment);
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
       .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
@@ -346,6 +353,63 @@ TEST_F(NewGrpcMuxImplTest, XdsTpGlobCollection) {
                                           const std::string&) {
         EXPECT_EQ(1, added_resources.size());
         EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+      }));
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+}
+
+// Validate basic gRPC mux subscriptions to xdstp:// singletons.
+TEST_F(NewGrpcMuxImplTest, XdsTpSingleton) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  EXPECT_CALL(local_info_.context_provider_, nodeContext()).Times(0);
+  // We verify that the gRPC mux normalizes the context parameter order below. Node context
+  // parameters are skipped.
+  SubscriptionOptions options;
+  auto watch = grpc_mux_->addWatch(type_url,
+                                   {
+                                       "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                                       "bar/baz?thing=some&some=thing",
+                                       "opaque_resource_name",
+                                       "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                                       "bar/blah?thing=some&some=thing",
+                                   },
+                                   callbacks_, resource_decoder_, options);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("ignore");
+  {
+    auto* resource = response->add_resources();
+    resource->set_name(
+        "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/baz?some=thing&thing=some");
+    resource->mutable_resource()->PackFrom(load_assignment);
+  }
+  {
+    auto* resource = response->add_resources();
+    resource->set_name("opaque_resource_name");
+    resource->mutable_resource()->PackFrom(load_assignment);
+  }
+  {
+    auto* resource = response->add_resources();
+    resource->set_name("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/"
+                       "blah?some=thing&thing=some");
+    resource->mutable_resource()->PackFrom(load_assignment);
+  }
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
+        EXPECT_EQ(3, added_resources.size());
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[1].get().resource(), load_assignment));
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[2].get().resource(), load_assignment));
       }));
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 }

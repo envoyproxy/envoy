@@ -234,6 +234,7 @@ envoy_cc_library(
         "//source/common/config:resource_name_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:version_converter_lib",
+        "//source/common/config:xds_resource_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

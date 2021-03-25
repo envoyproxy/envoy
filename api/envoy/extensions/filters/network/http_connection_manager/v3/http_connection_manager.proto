@@ -863,6 +863,10 @@ message ScopedRds {
   // Configuration source specifier for scoped RDS.
   config.core.v3.ConfigSource scoped_rds_config_source = 1
       [(validate.rules).message = {required: true}];
+
+  // xdstp:// resource locator for scoped RDS collection.
+  // [#not-implemented-hide:]
+  string srds_resources_locator = 2;
 }
 
 // [#next-free-field: 7]
