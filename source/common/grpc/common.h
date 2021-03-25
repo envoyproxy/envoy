@@ -178,6 +178,8 @@ public:
 
 private:
   static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
+
+  static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
 };
 
 } // namespace Grpc

@@ -2533,6 +2533,19 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
+  // With an invalid gRPC timeout, refreshing cached route will not use header and use stream
+  // duration.
+  latched_headers->setGrpcTimeout("6666666666666H");
+  {
+    // 25ms used already from previous case so timer is set to be 5ms.
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(5), _));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(2)
+        .WillRepeatedly(Return(std::chrono::milliseconds(30)));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
   // Cleanup.
   EXPECT_CALL(*timer, disableTimer());
   EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
