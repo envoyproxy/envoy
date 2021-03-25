@@ -151,6 +151,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the second request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -170,6 +171,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the third request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -189,6 +191,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the fourth request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -209,6 +212,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the fifth request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -229,6 +233,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(response->metadata_map().find(key)->second, value);
+  EXPECT_EQ(1, response->metadataMapsDecodedCount());
 
   // Sends the sixth request.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -279,6 +284,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   // Verifies multiple metadata are received by the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+  EXPECT_EQ(4, response->metadataMapsDecodedCount());
   for (int i = 0; i < size; i++) {
     for (const auto& metadata : *multiple_vecs[i][0]) {
       EXPECT_EQ(response->metadata_map().find(metadata.first)->second, metadata.second);
@@ -312,6 +318,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   // Verifies metadata is not received by the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+  EXPECT_EQ(0, response->metadataMapsDecodedCount());
   EXPECT_EQ(response->metadata_map().size(), 0);
 }
 
@@ -353,6 +360,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("data");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 2);
+  EXPECT_EQ(2, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, data and trailers.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -367,6 +375,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 3);
+  EXPECT_EQ(4, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, 100-continue and data.
   response =
@@ -389,6 +398,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("100-continue");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 4);
+  EXPECT_EQ(4, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers and metadata that will not be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -407,6 +417,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("aaa");
   expected_metadata_keys.insert("keep");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
+  EXPECT_EQ(2, response->metadataMapsDecodedCount());
 
   // Upstream responds with headers, data and metadata that will be consumed.
   response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
@@ -426,6 +437,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   expected_metadata_keys.insert("replace");
   verifyExpectedMetadata(response->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(response->keyCount("duplicate"), 2);
+  EXPECT_EQ(3, response->metadataMapsDecodedCount());
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
@@ -1870,6 +1882,87 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect Downstream Protocol Error
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
+}
+
+// Tests sending an empty metadata map from downstream.
+TEST_P(Http2FloodMitigationTest, DownstreamSendingEmptyMetadata) {
+  // Allow metadata usage.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  // This test uses an Http2Frame and not the encoder's encodeMetadata method,
+  // because encodeMetadata fails when an empty metadata map is sent.
+  beginSession();
+  FakeHttpConnectionPtr fake_upstream_connection;
+  FakeStreamPtr fake_upstream_request;
+
+  const uint32_t client_stream_idx = 1;
+  // Send request.
+  const Http2Frame request =
+      Http2Frame::makePostRequest(client_stream_idx, "host", "/");
+  sendFame(request);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
+
+  // Send metadata frame with empty metadata map.
+  const Http::MetadataMap empty_metadata_map;
+  const Http2Frame empty_metadata_map_frame = Http2Frame::makeMetadataFrameFromMetadataMap(
+      (client_stream_idx << 1) | 1, empty_metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  sendFame(empty_metadata_map_frame);
+
+  // Send an empty data frame to close the stream.
+  const Http2Frame empty_data_frame =
+      Http2Frame::makeEmptyDataFrame(client_stream_idx, Http2Frame::DataFlags::EndStream);
+  sendFame(empty_data_frame);
+
+  // Upstream sends a reply.
+  ASSERT_TRUE(fake_upstream_request->waitForEndStream(*dispatcher_));
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  fake_upstream_request->encodeHeaders(response_headers, true);
+
+  // Make sure that a response from upstream is received by the client, and
+  // close the connection.
+  const auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
+  EXPECT_EQ(1, test_server_->counter("http2.metadata_empty_frames")->value());
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+// Tests that an empty metadata map from upstream is ignored.
+TEST_P(Http2MetadataIntegrationTest, UpstreamSendingEmptyMetadata) {
+  initialize();
+
+  // Send a request and make sure an upstream connection is established.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  auto* upstream = fake_upstreams_.front().get();
+
+  // Send response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  // Send an empty metadata map back from upstream.
+  const Http::MetadataMap empty_metadata_map;
+  const Http2Frame empty_metadata_frame = Http2Frame::makeMetadataFrameFromMetadataMap(
+      1, empty_metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  ASSERT_TRUE(upstream->rawWriteConnection(
+      0, std::string(empty_metadata_frame.begin(), empty_metadata_frame.end())));
+  // Send an empty data frame after the metadata frame to end the stream.
+  upstream_request_->encodeData(0, true);
+
+  // Verifies that no metadata was received by the client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(0, response->metadataMapsDecodedCount());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.metadata_empty_frames")->value());
 }
 
 } // namespace Envoy

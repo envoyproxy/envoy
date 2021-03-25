@@ -283,6 +283,7 @@ TEST_P(IntegrationAdminTest, Admin) {
               "       1 http2.inbound_empty_frames_flood\n"
               "       1 http2.inbound_priority_frames_flood\n"
               "       1 http2.inbound_window_update_frames_flood\n"
+              "       1 http2.metadata_empty_frames\n"
               "       1 http2.outbound_control_flood\n"
               "       1 http2.outbound_flood\n"
               "       1 http2.pending_send_bytes\n"
@@ -295,7 +296,7 @@ TEST_P(IntegrationAdminTest, Admin) {
               "       1 http2.tx_flush_timeout\n"
               "       1 http2.tx_reset\n"
               "\n"
-              "total: 17\n",
+              "total: 18\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP3:

@@ -4,10 +4,16 @@
 
 #include "envoy/common/platform.h"
 
+#include "absl/container/fixed_array.h"
+#include "nghttp2/nghttp2.h"
+
 namespace {
 
 // Make request stream ID in the network byte order
 uint32_t makeRequestStreamId(uint32_t stream_id) { return htonl((stream_id << 1) | 1); }
+
+// Converts stream ID to the network byte order. Supports all values in the range [0, 2^30).
+uint32_t makeNetworkOrderStreamId(uint32_t stream_id) { return htonl(stream_id); }
 
 // All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
 template <typename First, typename... Rest> struct FirstArgType {
@@ -164,6 +170,43 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
                     makeRequestStreamId(stream_index));
   uint32_t increment_net = htonl(increment);
   memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&increment_net), sizeof(uint32_t));
+  return frame;
+}
+
+// Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
+Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
+                                                        const MetadataMap& metadata_map,
+                                                        MetadataFlags flags) {
+  const int numberOfNameValuePairs = metadata_map.size();
+  absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);
+  absl::FixedArray<nghttp2_nv>::iterator iterator = nameValues.begin();
+  for (const auto& metadata : metadata_map) {
+    *iterator = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
+                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
+                 metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
+    ++iterator;
+  }
+
+  nghttp2_hd_deflater* deflater;
+  // Note: this has no effect, as metadata frames do not add onto Dynamic table.
+  const int maxDynamicTableSize = 4096;
+  nghttp2_hd_deflate_new(&deflater, maxDynamicTableSize);
+
+  const size_t upperBoundBufferLength =
+      nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);
+
+  uint8_t* buffer = new uint8_t[upperBoundBufferLength];
+
+  const size_t numberOfBytesInMetadataPayload = nghttp2_hd_deflate_hd(
+      deflater, buffer, upperBoundBufferLength, nameValues.begin(), numberOfNameValuePairs);
+
+  Http2Frame frame;
+  frame.buildHeader(Type::Metadata, numberOfBytesInMetadataPayload, static_cast<uint8_t>(flags),
+                    makeNetworkOrderStreamId(stream_index));
+  std::vector<uint8_t> bufferVector(buffer, buffer + numberOfBytesInMetadataPayload);
+  frame.appendDataAfterHeaders(bufferVector);
+  delete[] buffer;
+  nghttp2_hd_deflate_del(deflater);
   return frame;
 }
 

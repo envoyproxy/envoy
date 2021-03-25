@@ -618,6 +618,11 @@ public:
   // Stops the dispatcher loop and joins the listening thread.
   void cleanUp();
 
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
