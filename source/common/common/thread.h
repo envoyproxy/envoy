@@ -189,7 +189,7 @@ struct MainThread {
    */
   static void initTestThread();
   /*
-   * Delete the injectable main thread singleton, should be called in main thread after threading
+   * Delete the main thread singleton, should be called in main thread after threading
    * has been shut down. Currently called in ~ThreadLocal::InstanceImpl().
    */
   static void clear();
