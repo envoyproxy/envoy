@@ -179,12 +179,12 @@ struct MainThread {
   void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
   static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
   /*
-   * Reigister the main thread id, should be called in main thread before threading is on. Currently
+   * Register the main thread id, should be called in main thread before threading is on. Currently
    * called in ThreadLocal::InstanceImpl().
    */
   static void initMainThread();
   /*
-   * Reigister the test thread id, should be called in test thread before threading is on. Allow
+   * Register the test thread id, should be called in test thread before threading is on. Allow
    * some main thread only code to be executed on test thread.
    */
   static void initTestThread();
