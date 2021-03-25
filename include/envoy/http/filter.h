@@ -228,6 +228,12 @@ public:
   /**
    * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
    *
+   * Passing nullptr in as the route parameter is equivalent to the route config not finding a route
+   * match, which happens when RouteConstSharedPtr route(const RouteCallback& cb, const
+   * Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t
+   * random_value) returns nullptr during a refreshCachedRoute. It is roughly equivalent to a
+   * clearRouteCache(), since in both cases, hasCachedRoute() helper will return false.
+   *
    * NOTE: Similar to route(const Router::RouteCallback& cb), this route that is set will be
    * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
    * of the filter chain.
