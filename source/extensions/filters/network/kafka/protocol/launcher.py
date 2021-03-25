@@ -43,8 +43,8 @@ def main():
     resolver_cc_file = os.path.abspath(sys.argv[3])
     metrics_h_file = os.path.abspath(sys.argv[4])
     input_files = sys.argv[5:]
-    generator.generate_main_code(type, main_header_file, resolver_cc_file, metrics_h_file,
-                                 input_files)
+    generator.generate_main_code(
+        type, main_header_file, resolver_cc_file, metrics_h_file, input_files)
 
 
 if __name__ == "__main__":
