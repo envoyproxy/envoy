@@ -34,7 +34,7 @@ class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
                                         public HttpIntegrationTest {
 public:
   AdmissionControlIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void SetUp() override {}
 

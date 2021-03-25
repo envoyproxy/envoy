@@ -30,8 +30,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 

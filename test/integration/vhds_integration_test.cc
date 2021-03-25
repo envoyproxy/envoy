@@ -152,7 +152,7 @@ class VhdsInitializationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsInitializationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
   }
 
@@ -249,7 +249,7 @@ class VhdsIntegrationTest : public HttpIntegrationTest,
                             public Grpc::GrpcClientIntegrationParamTest {
 public:
   VhdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
   }
 

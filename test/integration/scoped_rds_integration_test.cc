@@ -29,8 +29,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ScopedRdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+  ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
