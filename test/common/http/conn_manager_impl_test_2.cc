@@ -1033,6 +1033,63 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Tests that a filter doing setRoute(nullptr) doesn't cause problems for filters down the line.
+// Ensures that setRoute(nullptr) is equivalent to a clearRouteCache().
+TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
+  setup(false, "");
+
+  setupFilterChain(2, 1);
+  const std::string fake_cluster1_name = "fake_cluster1";
+  const std::string fake_cluster2_name = "fake_cluster2";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{fake_cluster1_name}))
+      .Times(1)
+      .WillRepeatedly(Return(fake_cluster1.get()));
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster2 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{fake_cluster2_name}))
+      .Times(1)
+      .WillRepeatedly(Return(fake_cluster2.get()));
+
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+  std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .Times(2)
+      .WillOnce(Return(route1))
+      .WillOnce(Return(route2));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        // Test usage of setRoute in replacement of clearRouteCache()
+        decoder_filters_[0]->callbacks_->setRoute(nullptr);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster2->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  // Kick off the incoming data.
+  startRequest(true);
+
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
