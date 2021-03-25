@@ -153,7 +153,12 @@ StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool
                                  const std::vector<CommandParserPtr>& commands)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      commands_(commands), struct_output_format_(toFormatMapValue(format_mapping)) {}
+      commands_(commands), struct_output_format_(toFormatMapValue(format_mapping)) {
+  // Note: to avoid copying commands we save the ref in an optional for toFormatMapValue and related
+  // methods to use. Once those are done we need to unset the optional to avoid accidentally
+  // accessing a dangling reference.
+  commands_ = absl::nullopt;
+}
 
 StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                                  bool omit_empty_values)
@@ -212,11 +217,8 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 
 std::vector<FormatterProviderPtr>
 StructFormatter::toFormatStringValue(const std::string& string_format) const {
-  if (commands_.has_value()) {
-    return SubstitutionFormatParser::parse(string_format, commands_.value());
-  }
-
-  return SubstitutionFormatParser::parse(string_format);
+  std::vector<CommandParserPtr> commands;
+  return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
 }
 
 ProtobufWkt::Value StructFormatter::providersCallback(

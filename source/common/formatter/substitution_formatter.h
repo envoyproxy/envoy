@@ -192,9 +192,9 @@ private:
   const bool preserve_types_;
   const std::string empty_value_;
 
-  // Note: don't use this ref outside of the constructor.
+  // Note: this ref becomes invalid outside of the constructor, so we unset it after that.
   using CommandsRef = std::reference_wrapper<const std::vector<CommandParserPtr>>;
-  const absl::optional<CommandsRef> commands_;
+  absl::optional<CommandsRef> commands_;
 
   const StructFormatMapWrapper struct_output_format_;
 };
