@@ -29,7 +29,7 @@ public:
     if (!jwt_cache_) {
       return nullptr;
     }
-    ::google::jwt_verify::Jwt* found_jwt;
+    ::google::jwt_verify::Jwt* found_jwt{};
     SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>::ScopedLookup lookup(jwt_cache_.get(),
                                                                                 token);
     if (lookup.found()) {
