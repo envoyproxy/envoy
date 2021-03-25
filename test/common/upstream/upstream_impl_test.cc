@@ -2401,6 +2401,21 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
   )EOF";
   EXPECT_THROW_WITH_MESSAGE(makeCluster(unexpected_eds_config_yaml), EnvoyException,
                             "eds_cluster_config set in a non-EDS cluster");
+
+  // Custom clusters that use EDS for endpoint discovery can specify eds_cluster_config. This custom
+  // cluster type is registered by linking test/integration/custom/static_cluster.cc.
+  const std::string custom_cluster_using_eds_yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.clusters.custom_static_with_lb
+      uses_eds_config: true
+    lb_policy: CLUSTER_PROVIDED
+    eds_cluster_config:
+      service_name: service_foo
+  )EOF";
+  auto custom_cluster = makeCluster(custom_cluster_using_eds_yaml);
+  EXPECT_EQ(custom_cluster->info()->edsServiceName(), "service_foo");
 }
 
 // Typed metadata loading throws exception.

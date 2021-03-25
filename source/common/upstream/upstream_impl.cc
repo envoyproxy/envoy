@@ -827,7 +827,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (config.has_eds_cluster_config()) {
-    if (config.type() != envoy::config::cluster::v3::Cluster::EDS) {
+    if (config.type() != envoy::config::cluster::v3::Cluster::EDS &&
+        !config.cluster_type().uses_eds_config()) {
       throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
     }
     eds_service_name_ = config.eds_cluster_config().service_name();

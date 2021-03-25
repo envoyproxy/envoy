@@ -291,10 +291,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   // subscription. When this subscription is an API source the cluster will depend on a non-EDS
   // cluster, so the non-EDS clusters must be loaded first.
   auto is_primary_cluster = [](const envoy::config::cluster::v3::Cluster& cluster) -> bool {
-    return cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
-           (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-            cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
-                envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath);
+    return !cluster.has_eds_cluster_config() ||
+           cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
+               envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath;
   };
   // Build book-keeping for which clusters are primary. This is useful when we
   // invoke loadCluster() below and it needs the complete set of primaries.
@@ -359,7 +358,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
+    if (cluster.has_eds_cluster_config() &&
         cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
       loadCluster(cluster, MessageUtil::hash(cluster), "", false, active_clusters_);
