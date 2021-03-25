@@ -263,6 +263,7 @@ namespace {
 
 TEST_F(ConnectivityGridTest, RealGrid) {
   testing::InSequence s;
+  dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   auto factory = std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config));
@@ -280,6 +281,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_TRUE(optional_it1.has_value());
+
   // Create the mixed pool.
   auto optional_it2 = ConnectivityGridForTest::forceCreateNextPool(grid);
   ASSERT_TRUE(optional_it2.has_value());

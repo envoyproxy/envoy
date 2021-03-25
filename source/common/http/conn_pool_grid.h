@@ -32,7 +32,7 @@ public:
   class WrapperCallbacks : public ConnectionPool::Callbacks, public ConnectionPool::Cancellable {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks);
+                     ConnectionPool::Callbacks& callbacks, uint32_t index);
 
     // ConnectionPool::Callbacks
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -58,6 +58,8 @@ public:
     // The handle to cancel the request to the current pool.
     // This is owned by the pool which created it.
     Cancellable* cancellable_;
+    // The index in the grid's wrapped_callbacks_ for easy deletion.
+    uint32_t index_;
   };
 
   ConnectivityGrid(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
@@ -114,6 +116,11 @@ private:
   // True iff under the stack of the destructor, to avoid calling drain
   // callbacks on deletion.
   bool destroying_{};
+
+  // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership and
+  // are removed either on cancelation or pool success/failure.
+  absl::flat_hash_map<uint32_t, std::unique_ptr<WrapperCallbacks>> wrapped_callbacks_;
+  uint32_t wrapped_callbacks_index_{};
 };
 
 } // namespace Http
