@@ -9,7 +9,8 @@ import sys
 
 import utils
 
-FILE_TEMPLATE = string.Template("""#pragma once
+FILE_TEMPLATE = string.Template(
+    """#pragma once
 #include "common/version/api_version_struct.h"
 
 namespace Envoy {

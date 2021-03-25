@@ -90,11 +90,12 @@ def rewrite_includes(args):
 
 
 # Update the Envoy source tree the latest API.
-def api_boost_tree(target_paths,
-                   generate_compilation_database=False,
-                   build_api_booster=False,
-                   debug_log=False,
-                   sequential=False):
+def api_boost_tree(
+        target_paths,
+        generate_compilation_database=False,
+        build_api_booster=False,
+        debug_log=False,
+        sequential=False):
     dep_build_targets = ['//%s/...' % prefix_directory(prefix) for prefix in target_paths]
 
     # Optional setup of state. We need the compilation database and api_booster
@@ -168,8 +169,8 @@ def api_boost_tree(target_paths,
             # any mutation takes place.
             # TODO(htuch): we should move to run-clang-tidy.py once the headers fixups
             # are Clang-based.
-            api_includes = p.map(functools.partial(api_boost_file, llvm_include_path, debug_log),
-                                 file_paths)
+            api_includes = p.map(
+                functools.partial(api_boost_file, llvm_include_path, debug_log), file_paths)
             # Apply Clang replacements before header fixups, since the replacements
             # are all relative to the original file.
             for prefix_dir in set(map(prefix_directory, target_paths)):
@@ -193,8 +194,9 @@ if __name__ == '__main__':
     parser.add_argument('--sequential', action='store_true')
     parser.add_argument('paths', nargs='*', default=['source', 'test', 'include'])
     args = parser.parse_args()
-    api_boost_tree(args.paths,
-                   generate_compilation_database=args.generate_compilation_database,
-                   build_api_booster=args.build_api_booster,
-                   debug_log=args.debug_log,
-                   sequential=args.sequential)
+    api_boost_tree(
+        args.paths,
+        generate_compilation_database=args.generate_compilation_database,
+        build_api_booster=args.build_api_booster,
+        debug_log=args.debug_log,
+        sequential=args.sequential)

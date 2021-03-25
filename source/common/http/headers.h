@@ -51,6 +51,7 @@ private:
 class CustomHeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
+  const LowerCaseString Age{"age"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
@@ -65,6 +66,7 @@ public:
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
+  const LowerCaseString Expires{"expires"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString IfMatch{"if-match"};
   const LowerCaseString IfNoneMatch{"if-none-match"};
@@ -124,7 +126,6 @@ class HeaderValues {
 public:
   const char* prefix() const { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
 
-  const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
@@ -183,7 +184,6 @@ public:
       absl::StrCat(prefix(), "-upstream-healthchecked-cluster")};
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Expect{"expect"};
-  const LowerCaseString Expires{"expires"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
@@ -211,7 +211,6 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
-  const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};

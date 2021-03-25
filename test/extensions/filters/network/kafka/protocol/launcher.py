@@ -41,8 +41,8 @@ def main():
     codec_test_cc_file = os.path.abspath(sys.argv[3])
     utilities_cc_file = os.path.abspath(sys.argv[4])
     input_files = sys.argv[5:]
-    generator.generate_test_code(type, header_test_cc_file, codec_test_cc_file, utilities_cc_file,
-                                 input_files)
+    generator.generate_test_code(
+        type, header_test_cc_file, codec_test_cc_file, utilities_cc_file, input_files)
 
 
 if __name__ == "__main__":

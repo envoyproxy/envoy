@@ -11,7 +11,8 @@ import utils
 
 
 class GenerateApiVersionHeaderTest(unittest.TestCase):
-    EXPECTED_TEMPLATE = string.Template("""#pragma once
+    EXPECTED_TEMPLATE = string.Template(
+        """#pragma once
 #include "common/version/api_version_struct.h"
 
 namespace Envoy {
@@ -33,8 +34,8 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
         pathlib.Path(self._temp_fname).unlink()
 
     # General success pattern when valid file contents is detected.
-    def successful_test_template(self, output_string, current_version: utils.ApiVersion,
-                                 oldest_version: utils.ApiVersion):
+    def successful_test_template(
+            self, output_string, current_version: utils.ApiVersion, oldest_version: utils.ApiVersion):
         pathlib.Path(self._temp_fname).write_text(output_string)
 
         # Read the string from the file, and parse the version.
@@ -86,8 +87,7 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
                                         (utils.ApiVersion(2, 0, 3), utils.ApiVersion(2, 0, 0))]
 
         for latest_version, expected_oldest_version in expected_latest_oldest_pairs:
-            self.assertEqual(expected_oldest_version,
-                             utils.compute_oldest_api_version(latest_version))
+            self.assertEqual(expected_oldest_version, utils.compute_oldest_api_version(latest_version))
 
 
 if __name__ == '__main__':
