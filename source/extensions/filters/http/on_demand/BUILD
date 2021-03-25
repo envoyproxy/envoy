@@ -19,10 +19,14 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/server:filter_config_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/upstream:odcds_api_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
     ],
 )
 

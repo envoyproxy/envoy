@@ -1,7 +1,5 @@
 #include "extensions/filters/http/on_demand/config.h"
 
-#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
-
 #include "extensions/filters/http/on_demand/on_demand_update.h"
 
 namespace Envoy {
@@ -10,12 +8,22 @@ namespace HttpFilters {
 namespace OnDemand {
 
 Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::on_demand::v3::OnDemand&, const std::string&,
-    Server::Configuration::FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(
-        std::make_shared<Extensions::HttpFilters::OnDemand::OnDemandRouteUpdate>());
+    const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
+      proto_config, context.clusterManager(), context.scope(), context.messageValidationVisitor());
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<OnDemandRouteUpdate>(config));
   };
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+OnDemandFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
+    Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  return std::make_shared<const OnDemandFilterConfig>(proto_config, context.clusterManager(),
+                                                      context.scope(), validation_visitor);
 }
 
 /**
