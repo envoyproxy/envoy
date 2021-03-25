@@ -625,7 +625,7 @@ static envoy_data jvm_get_string(const void* context) {
   jclass jcls_JvmStringAccessorContext = env->GetObjectClass(j_context);
   jmethodID jmid_getString =
       env->GetMethodID(jcls_JvmStringAccessorContext, "getEnvoyString", "()[B");
-  jbyteArray j_data = static_cast<jbyteArray>(env->CallObjectMethod(j_context, jmid_getString));
+  jbyteArray j_data = (jbyteArray)env->CallObjectMethod(j_context, jmid_getString);
   envoy_data native_data = array_to_native_data(env, j_data);
 
   env->DeleteLocalRef(jcls_JvmStringAccessorContext);
