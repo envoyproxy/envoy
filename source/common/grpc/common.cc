@@ -166,12 +166,18 @@ Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
   const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   std::chrono::milliseconds timeout;
   if (header_grpc_timeout_entry) {
-    uint64_t grpc_timeout;
-    // TODO(dnoe): Migrate to pure string_view (#6580)
-    std::string grpc_timeout_string(header_grpc_timeout_entry->value().getStringView());
-    const char* unit = StringUtil::strtoull(grpc_timeout_string.c_str(), grpc_timeout);
-    if (unit != nullptr && *unit != '\0') {
-      switch (*unit) {
+    int64_t grpc_timeout;
+    absl::string_view timeout_entry = header_grpc_timeout_entry->value().getStringView();
+    if (timeout_entry.empty()) {
+      // Must be of the form TimeoutValue TimeoutUnit. See
+      // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests.
+      return absl::nullopt;
+    }
+    // TimeoutValue must be a positive integer of at most 8 digits.
+    if (absl::SimpleAtoi(timeout_entry.substr(0, timeout_entry.size() - 1), &grpc_timeout) &&
+        grpc_timeout >= 0 && static_cast<uint64_t>(grpc_timeout) <= MAX_GRPC_TIMEOUT_VALUE) {
+      const char unit = timeout_entry[timeout_entry.size() - 1];
+      switch (unit) {
       case 'H':
         return std::chrono::hours(grpc_timeout);
       case 'M':

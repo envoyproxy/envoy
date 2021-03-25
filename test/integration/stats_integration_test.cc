@@ -288,7 +288,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 39350); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 39400); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {

@@ -78,6 +78,9 @@ TEST(GrpcContextTest, GetGrpcTimeout) {
   Http::TestRequestHeaderMapImpl missing_unit{{"grpc-timeout", "123"}};
   EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(missing_unit));
 
+  Http::TestRequestHeaderMapImpl small_missing_unit{{"grpc-timeout", "1"}};
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(small_missing_unit));
+
   Http::TestRequestHeaderMapImpl illegal_unit{{"grpc-timeout", "123F"}};
   EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(illegal_unit));
 
