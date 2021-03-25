@@ -38,7 +38,9 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSp
           // Flow control receive window should be larger than 8k to fully utilize congestion
           // control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {
+  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+}
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
                                              quic::QuicSpdySession* session, quic::StreamType type)

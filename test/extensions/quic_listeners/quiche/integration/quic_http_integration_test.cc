@@ -56,6 +56,17 @@ void updateResource(AtomicFileUpdater& updater, double pressure) {
   updater.update(absl::StrCat(pressure));
 }
 
+void setUpstreamTimeout(
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
+  auto* route =
+      hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+  uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
+  auto* timeout = route->mutable_timeout();
+  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
+  // upstream_response_timeout.
+  timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+}
+
 // A test that sets up its own client connection with customized quic version and connection ID.
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
@@ -301,19 +312,7 @@ TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
-  // upstream_response_timeout.
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3::HttpConnectionManager& hcm) {
-    auto* route =
-        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
-    uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
-    auto* timeout = route->mutable_timeout();
-    timeout->set_seconds(2 * timeout_ms / 1000);
-  });
-#endif
-
+  config_helper_.addConfigModifier(setUpstreamTimeout);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/10 * 1024 * 1024,
                                        false);
@@ -326,19 +325,7 @@ TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
 }
 
 TEST_P(QuicHttpIntegrationTest, LargeFlowControlOnAndGiantBody) {
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
-  // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
-  // upstream_response_timeout.
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3::HttpConnectionManager& hcm) {
-    auto* route =
-        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
-    uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
-    auto* timeout = route->mutable_timeout();
-    timeout->set_seconds(2 * timeout_ms / 1000);
-  });
-#endif
-
+  config_helper_.addConfigModifier(setUpstreamTimeout);
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/128 * 1024,
                                  /*downstream_buffer_limit=*/128 * 1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/10 * 1024 * 1024,
