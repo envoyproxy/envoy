@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.type.http.v3;
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 

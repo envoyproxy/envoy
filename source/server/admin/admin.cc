@@ -37,7 +37,6 @@
 #include "server/admin/utils.h"
 #include "server/listener_impl.h"
 
-#include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/request_id/uuid/config.h"
 
 #include "absl/strings/str_join.h"
@@ -70,8 +69,7 @@ const char EnvoyFavicon[] =
     "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
     "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
     "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
-    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5"
-    "ErkJggg==";
+    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5";
 
 const char AdminHtmlStart[] = R"(
 <head>
@@ -121,17 +119,14 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(const std::string& access_log_path,
+void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   const Network::Socket::OptionsSharedPtr& socket_options,
                                   Stats::ScopePtr&& listener_scope) {
-  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
-  // hard dependency here.
-  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, access_log_path};
-  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-      server_.accessLogManager()));
+  for (const auto& access_log : access_logs) {
+    access_logs_.emplace_back(access_log);
+  }
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);
@@ -239,8 +234,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
-  // Pass in the null overload manager so that the admin interface is accessible even when Envoy is
-  // overloaded.
+  // Pass in the null overload manager so that the admin interface is accessible even when Envoy
+  // is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
       server_.runtime(), server_.localInfo(), server_.clusterManager(), null_overload_manager_,

@@ -13,11 +13,13 @@ envoy_cc_library(
     srcs = [
         "default_validator.cc",
         "factory.cc",
+        "utility.cc",
     ],
     hdrs = [
         "cert_validator.h",
         "default_validator.h",
         "factory.h",
+        "utility.h",
         "well_known_names.h",
     ],
     external_deps = [

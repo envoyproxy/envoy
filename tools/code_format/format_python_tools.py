@@ -11,9 +11,9 @@ EXCLUDE_LIST = ['generated', 'venv']
 def collect_files():
     """Collect all Python files in the tools directory.
 
-  Returns: A collection of python files in the tools directory excluding
-    any directories in the EXCLUDE_LIST constant.
-  """
+    Returns: A collection of python files in the tools directory excluding
+       any directories in the EXCLUDE_LIST constant.
+    """
     # TODO: Add ability to collect a specific file or files.
     matches = []
     path_parts = os.getcwd().split('/')
@@ -32,8 +32,8 @@ def validate_format(fix=False):
     """Check the format of python files in the tools directory.
 
     Arguments:
-      fix: a flag to indicate if fixes should be applied.
-  """
+          fix: a flag to indicate if fixes should be applied.
+    """
     fixes_required = False
     failed_update_files = set()
     successful_update_files = set()
@@ -68,10 +68,8 @@ def display_fix_results(successful_files, failed_files):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool to format python files.')
-    parser.add_argument('action',
-                        choices=['check', 'fix'],
-                        default='check',
-                        help='Fix invalid syntax in files.')
+    parser.add_argument(
+        'action', choices=['check', 'fix'], default='check', help='Fix invalid syntax in files.')
     args = parser.parse_args()
     is_valid = validate_format(args.action == 'fix')
     sys.exit(0 if is_valid else 1)

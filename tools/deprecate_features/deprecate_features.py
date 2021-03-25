@@ -42,8 +42,8 @@ def deprecate_proto():
     email = ''
     if email_snippets:
         email = (
-            '\nThe following deprecated configuration fields will be disallowed by default:\n' +
-            ''.join(email_snippets))
+            '\nThe following deprecated configuration fields will be disallowed by default:\n'
+            + ''.join(email_snippets))
 
     return email, code
 
@@ -51,8 +51,9 @@ def deprecate_proto():
 # Gather code and suggested email changes.
 deprecate_email, deprecate_code = deprecate_proto()
 
-email = ('The Envoy maintainer team is cutting the next Envoy release.  In the new release ' +
-         deprecate_email)
+email = (
+    'The Envoy maintainer team is cutting the next Envoy release.  In the new release '
+    + deprecate_email)
 
 print('\n\nSuggested envoy-announce email: \n')
 print(email)

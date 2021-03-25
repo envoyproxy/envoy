@@ -90,7 +90,6 @@ static_resources:
     connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
       endpoints:
@@ -113,3 +112,9 @@ static_resources:
               socket_address:
                 address: zipkin
                 port_value: 9411
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 19000

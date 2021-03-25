@@ -4,8 +4,6 @@ package envoy.extensions.access_loggers.stdoutput.v4alpha;
 
 import "envoy/config/core/v4alpha/substitution_format_string.proto";
 
-import "google/protobuf/struct.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
