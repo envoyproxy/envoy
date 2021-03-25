@@ -1,1 +1,3 @@
 FROM redis
+
+CMD ["redis-server", "--requirepass", "123"]

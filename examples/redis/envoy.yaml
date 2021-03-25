@@ -16,11 +16,18 @@ static_resources:
           prefix_routes:
             catch_all_route:
               cluster: redis_cluster
+          downstream_auth_password:
+            inline_string: "123"
   clusters:
   - name: redis_cluster
-    connect_timeout: 1s
-    type: STRICT_DNS # static
+    connect_timeout: 0.25s
+    type: strict_dns
     lb_policy: MAGLEV
+    typed_extension_protocol_options:
+      envoy.filters.network.redis_proxy:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+        auth_password:
+          inline_string: "123"
     load_assignment:
       cluster_name: redis_cluster
       endpoints:

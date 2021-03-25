@@ -1,0 +1,35 @@
+node:
+  id: id_1
+  cluster: test
+
+dynamic_resources:
+  cds_config:
+    path: "/etc/cds.yaml"
+
+static_resources:
+  listeners:
+  - name: redis_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 1999
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.redis_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: redis
+          prefix_routes: 
+            catch_all_route:
+              cluster: redis_cluster
+          settings:
+            op_timeout: 5s
+          downstream_auth_password:
+            inline_string: "123"
+  
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001
