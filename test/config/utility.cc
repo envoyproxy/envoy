@@ -554,13 +554,13 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
                                envoy::config::core::v3::ApiVersion api_version) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: {}
+      name: "{}"
       virtual_hosts:
       - name: integration
         domains: ["*"]
         routes:
         - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
+          route: {{ cluster: "{}" }}
     )EOF",
                                         name, cluster),
                             route, shouldBoost(api_version));
