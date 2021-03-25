@@ -31,6 +31,7 @@ class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger:
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api)
       : jwt_provider_(jwt_provider), time_source_(time_source) {
+    jwt_cache_ = JwtCache::create(jwt_provider.enable_jwt_cache(), jwt_provider.jwt_cache_size());
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
@@ -64,14 +65,7 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
-  JwtCache& getJwtCache() override {
-    if (jwt_cache_ == nullptr) {
-      if (jwt_provider_.jwt_cache_size() > 0) {
-        jwt_cache_ = std::make_unique<JwtCache>(jwt_provider_.jwt_cache_size());
-      }
-    }
-    return *jwt_cache_;
-  }
+  JwtCache& getJwtCache() override { return *jwt_cache_; }
 
 private:
   // Get the expiration time for a remote Jwks
@@ -103,7 +97,7 @@ private:
   // The pubkey expiration time.
   MonotonicTime expiration_time_;
   // The JwtCache object
-  std::unique_ptr<JwtCache> jwt_cache_;
+  JwtCachePtr jwt_cache_;
 };
 
 class JwksCacheImpl : public JwksCache {

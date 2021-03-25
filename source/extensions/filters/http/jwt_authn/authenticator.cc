@@ -59,7 +59,7 @@ private:
   void verifyKey();
 
   // Handle Good Jwt either Cache JWT or verified public key.
-  void handleGoodJwt();
+  void handleGoodJwt(bool cache_hit);
 
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
@@ -83,7 +83,7 @@ private:
   std::vector<JwtLocationConstPtr> tokens_;
   JwtLocationConstPtr curr_token_;
   // The JWT object.
-  std::unique_ptr<::google::jwt_verify::Jwt> owned_jwt_;
+  std::unique_ptr<::google::jwt_verify::Jwt> new_jwt_;
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
@@ -102,7 +102,6 @@ private:
   const bool is_allow_missing_;
   TimeSource& time_source_;
   ::google::jwt_verify::Jwt* jwt_{};
-  bool use_cache_jwt_{};
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -146,23 +145,17 @@ void AuthenticatorImpl::startVerify() {
 
   if (provider_) {
     jwks_data_ = jwks_cache_.findByProvider(provider_.value());
-    if (jwks_data_->getJwtProvider().enable_jwt_cache()) {
-      jwt_ = jwks_data_->getJwtCache().find(curr_token_->token());
-      if (jwt_) {
-        use_cache_jwt_ = true;
-      }
+    jwt_ = jwks_data_->getJwtCache().find(curr_token_->token());
+    if (jwt_) {
+      handleGoodJwt(/*cache_hit=*/true);
+      return;
     }
   }
-  Status status;
-  if (use_cache_jwt_) {
-    ENVOY_LOG(debug, "{}: Skip parsing, Jwt {} is in Cache.", name(), curr_token_->token());
-    status = Status::Ok;
-  } else {
-    ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-    owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-    status = owned_jwt_->parseFromString(curr_token_->token());
-    jwt_ = owned_jwt_.get();
-  }
+
+  ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
+  new_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+  Status status = new_jwt_->parseFromString(curr_token_->token());
+  jwt_ = new_jwt_.get();
 
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -223,15 +216,7 @@ void AuthenticatorImpl::startVerify() {
     // JWTs without a kid header field in the JWS we might be best to get each
     // time? This all only matters for remote JWKS.
 
-    if (use_cache_jwt_) {
-      handleGoodJwt();
-    } else {
-      verifyKey();
-      if (provider_ && jwks_data_->getJwtProvider().enable_jwt_cache()) {
-        ENVOY_LOG(debug, "JWT {} added in cache", curr_token_->token());
-        jwks_data_->getJwtCache().add(curr_token_->token(), jwt_);
-      }
-    }
+    verifyKey();
     return;
   }
 
@@ -278,10 +263,10 @@ void AuthenticatorImpl::verifyKey() {
     doneWithStatus(status);
     return;
   }
-  handleGoodJwt();
+  handleGoodJwt(/*cache_hit=*/false);
 }
 
-void AuthenticatorImpl::handleGoodJwt() {
+void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
 
@@ -300,17 +285,16 @@ void AuthenticatorImpl::handleGoodJwt() {
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
-
+  if (provider_ && !cache_hit && jwks_data_->getJwtProvider().enable_jwt_cache()) {
+    // move the ownership of "new_jwt_" into the function.
+    jwks_data_->getJwtCache().add(curr_token_->token(), std::move(new_jwt_));
+  }
   doneWithStatus(Status::Ok);
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
-
-  if (use_cache_jwt_) {
-    use_cache_jwt_ = false;
-  }
 
   // If a request has multiple tokens, all of them must be valid. Otherwise it may have
   // following security hole: a request has a good token and a bad one, it will pass
