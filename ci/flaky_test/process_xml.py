@@ -107,8 +107,9 @@ def parse_and_print_test_suite_error(testsuite, log_path):
             last_testcase = last_test_fullname.split('.')[1]
 
     if error_msg != "":
-        return print_test_suite_error(last_testsuite, last_testcase, log_path, test_duration,
-                                      test_time, error_msg, test_output)
+        return print_test_suite_error(
+            last_testsuite, last_testcase, log_path, test_duration, test_time, error_msg,
+            test_output)
 
     return ""
 
@@ -135,9 +136,9 @@ def parse_xml(file, visited):
             for testcase in testsuite:
                 for failure_msg in testcase:
                     if (testcase.attrib['name'], testsuite.attrib['name']) not in visited:
-                        ret += print_test_case_failure(testcase.attrib['name'],
-                                                       testsuite.attrib['name'], failure_msg.text,
-                                                       log_file_path)
+                        ret += print_test_case_failure(
+                            testcase.attrib['name'], testsuite.attrib['name'], failure_msg.text,
+                            log_file_path)
                         visited.add((testcase.attrib['name'], testsuite.attrib['name']))
         elif testsuite.attrib['errors'] != '0':
             # If an unexpected error occurred, such as an exception or a timeout, the test suite was
@@ -174,8 +175,8 @@ def get_git_info(CI_TARGET):
         ret += "Target:         {}\n".format(CI_TARGET)
 
     if os.getenv('SYSTEM_STAGEDISPLAYNAME') and os.getenv('SYSTEM_STAGEJOBNAME'):
-        ret += "Stage:          {} {}\n".format(os.environ['SYSTEM_STAGEDISPLAYNAME'],
-                                                os.environ['SYSTEM_STAGEJOBNAME'])
+        ret += "Stage:          {} {}\n".format(
+            os.environ['SYSTEM_STAGEDISPLAYNAME'], os.environ['SYSTEM_STAGEJOBNAME'])
 
     if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv(
             'SYSTEM_PULLREQUEST_PULLREQUESTNUMBER'):
@@ -232,8 +233,9 @@ if __name__ == "__main__":
     find_dir = "{}/**/**/**/**/bazel-testlogs/".format(os.environ['TEST_TMPDIR']).replace('\\', '/')
     if CI_TARGET == "MacOS":
         find_dir = '${TEST_TMPDIR}/'
-    os.system('sh -c "/usr/bin/find {} -name attempt_*.xml > ${{TMP_OUTPUT_PROCESS_XML}}"'.format(
-        find_dir))
+    os.system(
+        'sh -c "/usr/bin/find {} -name attempt_*.xml > ${{TMP_OUTPUT_PROCESS_XML}}"'.format(
+            find_dir))
 
     # All output of find command should be either failed or flaky tests, as only then will
     # a test be rerun and have an 'attempt_n.xml' file. problematic_tests holds a lookup

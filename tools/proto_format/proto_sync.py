@@ -88,8 +88,8 @@ def get_destination_path(src):
     contents = src_path.read_text(encoding='utf8')
     matches = re.findall(PACKAGE_REGEX, contents)
     if len(matches) != 1:
-        raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
-            src, len(matches)))
+        raise RequiresReformatError(
+            "Expect {} has only one package declaration but has {}".format(src, len(matches)))
     return pathlib.Path(get_directory_from_package(
         matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
@@ -404,10 +404,8 @@ def sync(api_root, mode, labels, shadow):
         generate_current_api_dir(api_root_path, current_api_dir)
 
         # These support files are handled manually.
-        for f in [
-                'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
-                'envoy/annotations/BUILD'
-        ]:
+        for f in ['envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+                  'envoy/annotations/BUILD']:
             copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
             copy_dst_dir.mkdir(exist_ok=True)
             shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
@@ -416,8 +414,9 @@ def sync(api_root, mode, labels, shadow):
 
         if diff.strip():
             if mode == "check":
-                print("Please apply following patch to directory '{}'".format(api_root),
-                      file=sys.stderr)
+                print(
+                    "Please apply following patch to directory '{}'".format(api_root),
+                    file=sys.stderr)
                 print(diff.decode(), file=sys.stderr)
                 sys.exit(1)
             if mode == "fix":
