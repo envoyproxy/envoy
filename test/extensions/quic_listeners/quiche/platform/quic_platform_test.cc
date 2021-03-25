@@ -325,6 +325,14 @@ TEST_F(QuicPlatformTest, QuicLog) {
   errno = SOCKET_ERROR_INVAL;
   EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
   EXPECT_EQ(3, i);
+
+  char* null_string = nullptr;
+  EXPECT_LOG_CONTAINS("error", "null_string=(null)",
+                      QUIC_LOG(ERROR) << "null_string=" << null_string);
+  const char* const_null_string = nullptr;
+  EXPECT_LOG_CONTAINS("error", "const_null_string=(null)",
+                      QUIC_LOG(ERROR) << "const_null_string=" << const_null_string);
+  EXPECT_LOG_CONTAINS("error", "nullptr=(null)", QUIC_LOG(ERROR) << "nullptr=" << nullptr);
 }
 
 #ifdef NDEBUG
