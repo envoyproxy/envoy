@@ -128,7 +128,7 @@ TEST_F(SubstitutionFormatStringUtilsTest,
   text_format_source:
     inline_string: "plain text"
   formatters:
-    - name: envoy.formatter.TestFormatter
+    - name: envoy.formatter.FailFormatter
       typed_config:
         "@type": type.googleapis.com/google.protobuf.UInt64Value
 )EOF";
@@ -136,7 +136,7 @@ TEST_F(SubstitutionFormatStringUtilsTest,
 
   EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
                             EnvoyException,
-                            "Failed to create command parser: envoy.formatter.TestFormatter");
+                            "Failed to create command parser: envoy.formatter.FailFormatter");
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionUnknown) {
