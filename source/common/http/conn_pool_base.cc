@@ -27,7 +27,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
       fallbacks.push_back(Http::Utility::AlpnNames::get().Http2);
       break;
     case Http::Protocol::Http3:
-      // TODO(#14829) hard-code H3 ALPN, consider failing if other things are negotiated.
+      // HTTP3 ALPN is set in the QUIC stack based on supported versions.
       break;
     }
   }
