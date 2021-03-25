@@ -1081,7 +1081,6 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
       return WasmResult::ParseFailure;
     }
   }
-
   uint32_t token = nextGrpcStreamToken();
   auto& handler = grpc_stream_[token];
   handler.context_ = this;

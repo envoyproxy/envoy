@@ -1309,9 +1309,9 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     } else {
       cluster_manager_.initializeThreadLocalClusters({"cluster"});
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus service parse failure"))));
+                                 Eq(absl::string_view("expected bogus service parse failure"))));
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus method call failure"))));
+                                 Eq(absl::string_view("expected bogus method call failure"))));
       EXPECT_CALL(filter(),
                   log_(spdlog::level::err, Eq(absl::string_view("cluster call succeeded"))));
     }
@@ -1357,9 +1357,9 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     } else {
       cluster_manager_.initializeThreadLocalClusters({"cluster"});
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus service parse failure"))));
+                                 Eq(absl::string_view("expected bogus service parse failure"))));
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus method call failure"))));
+                                 Eq(absl::string_view("expected bogus method call failure"))));
       EXPECT_CALL(filter(),
                   log_(spdlog::level::err, Eq(absl::string_view("cluster call succeeded"))));
     }
@@ -1405,9 +1405,9 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     } else {
       cluster_manager_.initializeThreadLocalClusters({"cluster"});
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus service parse failure"))));
+                                 Eq(absl::string_view("expected bogus service parse failure"))));
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus method call failure"))));
+                                 Eq(absl::string_view("expected bogus method call failure"))));
       EXPECT_CALL(filter(),
                   log_(spdlog::level::err, Eq(absl::string_view("cluster call succeeded"))));
     }
@@ -1452,9 +1452,9 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     } else {
       cluster_manager_.initializeThreadLocalClusters({"cluster"});
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus service parse failure"))));
+                                 Eq(absl::string_view("expected bogus service parse failure"))));
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus method call failure"))));
+                                 Eq(absl::string_view("expected bogus method call failure"))));
       EXPECT_CALL(filter(),
                   log_(spdlog::level::err, Eq(absl::string_view("cluster call succeeded"))));
     }
@@ -1497,9 +1497,9 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     } else {
       cluster_manager_.initializeThreadLocalClusters({"cluster"});
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus service parse failure"))));
+                                 Eq(absl::string_view("expected bogus service parse failure"))));
       EXPECT_CALL(filter(), log_(spdlog::level::err,
-                                 Eq(absl::string_view("unexpected bogus method call failure"))));
+                                 Eq(absl::string_view("expected bogus method call failure"))));
       EXPECT_CALL(filter(),
                   log_(spdlog::level::err, Eq(absl::string_view("cluster call succeeded"))));
     }

@@ -108,12 +108,12 @@ FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
   if (root()->grpcStreamHandler("bogus service string", "service", "method", initial_metadata,
                                 std::unique_ptr<GrpcStreamHandlerBase>(
                                     new MyGrpcStreamHandler())) == WasmResult::ParseFailure) {
-    logError("unexpected bogus service parse failure");
+    logError("expected bogus service parse failure");
   }
   if (root()->grpcStreamHandler("cluster", "service", "bad method", initial_metadata,
                                 std::unique_ptr<GrpcStreamHandlerBase>(
                                     new MyGrpcStreamHandler())) == WasmResult::InternalFailure) {
-    logError("unexpected bogus method call failure");
+    logError("expected bogus method call failure");
   }
   if (root()->grpcStreamHandler("cluster", "service", "method", initial_metadata,
                             std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler())) == WasmResult::Ok) {
