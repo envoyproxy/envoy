@@ -159,6 +159,11 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   dispatcher_.clearDeferredDeleteList();
   // EXPECT_CALL(*generic_listener_, onDestroy());
 }
+
+TEST_F(ActiveInternalListenerTest, StopListener) {
+  addListener();
+  internal_listener_->shutdownListener();
+}
 } // namespace
 } // namespace Server
 } // namespace Envoy
