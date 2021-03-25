@@ -90,6 +90,18 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
     BufferedBody,
   };
 
+  // The result of an attempt to open the stream
+  enum class StreamOpenState {
+    // The stream was opened successfully
+    Ok,
+    // The stream was not opened successfully and an error was delivered
+    // downstream -- processing should stop
+    Error,
+    // The stream was not opened successfully but processing should
+    // continue as if the stream was already closed.
+    IgnoreError,
+  };
+
 public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
@@ -115,7 +127,7 @@ public:
   void onGrpcClose() override;
 
 private:
-  void openStream();
+  StreamOpenState openStream();
   void startMessageTimer(Event::TimerPtr& timer);
   void onMessageTimeout();
   void cleanUpTimers();
@@ -151,6 +163,10 @@ private:
   // This happens when the processor has closed the stream, or when it has
   // failed.
   bool processing_complete_ = false;
+
+  // Set to true when an "immediate response" has been delivered. This helps us
+  // know what response to return from certain failures.
+  bool sent_immediate_response_ = false;
 
   // The headers that we'll be expected to modify. They are set when
   // received and reset to nullptr when they are no longer valid.

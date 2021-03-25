@@ -2,8 +2,8 @@
 
 from collections import namedtuple
 
-from exports import (api_repository_locations, envoy_repository_locations,
-                     repository_locations_utils)
+from exports import (
+    api_repository_locations, envoy_repository_locations, repository_locations_utils)
 
 
 # All repository location metadata in the Envoy repository.
@@ -50,8 +50,9 @@ def get_github_release_from_urls(urls):
             github_version = components[7]
         # If it's not a GH hash, it's a tagged release.
         tagged_release = len(github_version) != 40
-        return GitHubRelease(organization=components[3],
-                             project=components[4],
-                             version=github_version,
-                             tagged=tagged_release)
+        return GitHubRelease(
+            organization=components[3],
+            project=components[4],
+            version=github_version,
+            tagged=tagged_release)
     return None
