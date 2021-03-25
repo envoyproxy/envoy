@@ -3,8 +3,6 @@
 """
 from collections import namedtuple
 import pathlib
-import string
-import sys
 
 ApiVersion = namedtuple('ApiVersion', ['major', 'minor', 'patch'])
 

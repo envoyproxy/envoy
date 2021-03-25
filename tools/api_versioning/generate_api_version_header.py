@@ -2,7 +2,6 @@
 """Parses a file containing the API version (X.Y.Z format), and outputs (to
 stdout) a C++ header file with the ApiVersion value.
 """
-from collections import namedtuple
 import pathlib
 import string
 import sys
