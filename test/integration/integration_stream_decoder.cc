@@ -123,6 +123,7 @@ void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trai
 }
 
 void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  metadata_maps_decoded_count_++;
   // Combines newly received metadata with the existing metadata.
   for (const auto& metadata : *metadata_map) {
     duplicated_metadata_key_count_[metadata.first]++;
