@@ -329,7 +329,8 @@ Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHea
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
   } else if (!absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
     return absl::InvalidArgumentError(
-        absl::StrCat("missing valid required header: ", Envoy::Http::Headers::get().Status.get()));
+        absl::StrCat("required header: ", Envoy::Http::Headers::get().Status.get(),
+                     " has invalid value: ", headers.getStatusValue()));
   }
   return Http::okStatus();
 }

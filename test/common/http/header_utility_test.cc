@@ -6,6 +6,7 @@
 #include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
+#include "common/http/status.h"
 #include "common/json/json_loader.h"
 
 #include "test/test_common/test_runtime.h"
@@ -720,6 +721,38 @@ TEST(RequiredHeaders, IsModifiableHeader) {
   EXPECT_TRUE(HeaderUtility::isModifiableHeader(""));
   EXPECT_TRUE(HeaderUtility::isModifiableHeader("hostname"));
   EXPECT_TRUE(HeaderUtility::isModifiableHeader("Content-Type"));
+}
+
+TEST(CheckRequiredRequestHeaders, OK) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(
+                                  TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}));
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{
+                                  {":method", "CONNECT"}, {":authority", "localhost:1234"}}));
+}
+
+TEST(CheckRequiredRequestHeaders, NG) {
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :method"),
+            HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{}));
+
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :path"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :authority"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+}
+
+TEST(CheckRequiredResponseHeaders, OK) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredResponseHeaders(
+                                  TestResponseHeaderMapImpl{{":status", "200"}}));
+}
+
+TEST(CheckRequiredResponseHeaders, NG) {
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :status"),
+            HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("required header: :status has invalid value: abcd"),
+      HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
 } // namespace Http
