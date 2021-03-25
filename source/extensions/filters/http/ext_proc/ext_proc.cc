@@ -25,6 +25,7 @@ using Http::ResponseHeaderMap;
 static const std::string kErrorPrefix = "ext_proc error";
 
 Filter::StreamOpenState Filter::openStream() {
+  ENVOY_BUG(!processing_complete_, "openStream should not have been called");
   if (!stream_) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
     stream_ = client_->start(*this);
