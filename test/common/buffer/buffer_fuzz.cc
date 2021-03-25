@@ -68,6 +68,60 @@ void releaseFragmentAllocation(const void* p, size_t, const Buffer::BufferFragme
 // walk off the edge; the caller should be guaranteeing this.
 class StringBuffer : public Buffer::Instance {
 public:
+  /**
+   * Bidirectional iterator for data underlying Instance.
+   */
+  class StringBufferIterator : public Buffer::Iterator {
+  public:
+    uint8_t& operator*() override {
+      return *reinterpret_cast<uint8_t*>(buffer_.mutableStart() + offset_);
+    }
+
+    Iterator& operator++() override {
+      // At the end of buffer
+      if (offset_ == buffer_.size_) {
+        return *this;
+      }
+
+      offset_++;
+      return *this;
+    }
+
+    Iterator& operator--() override {
+      // At the end of buffer
+      if (offset_ == 0) {
+        return *this;
+      }
+
+      offset_--;
+      return *this;
+    }
+
+    bool operator==(const Iterator& rhs) override {
+      const StringBuffer::StringBufferIterator* rhs_str_buf_itr =
+          dynamic_cast<const StringBuffer::StringBufferIterator*>(&rhs);
+
+      return rhs_str_buf_itr != nullptr && &buffer_ == &(rhs_str_buf_itr->buffer_) &&
+             offset_ == rhs_str_buf_itr->offset_;
+    }
+
+    bool operator!=(const Iterator& rhs) override { return !(*this == rhs); }
+    StringBufferIterator(StringBuffer& buffer, const uint32_t offset)
+        : buffer_{buffer}, offset_{offset} {}
+
+  private:
+    StringBuffer& buffer_;
+    uint32_t offset_;
+  };
+
+  Buffer::IteratorPtr begin() noexcept override {
+    return std::make_unique<StringBuffer::StringBufferIterator>(*this, 0);
+  }
+
+  Buffer::IteratorPtr end() noexcept override {
+    return std::make_unique<StringBuffer::StringBufferIterator>(*this, size_);
+  }
+
   void addDrainTracker(std::function<void()> drain_tracker) override {
     // Not implemented well.
     ASSERT(false);
@@ -83,29 +137,6 @@ public:
   void addBufferFragment(Buffer::BufferFragment& fragment) override {
     add(fragment.data(), fragment.size());
     fragment.done();
-  }
-
-  bool insertBufferFragmentAfter(size_t i, Buffer::RawSlice& slice,
-                                 Buffer::BufferFragment& fragment) override {
-    // There is always only one slice in this StringBuffer
-    if (i != size_ || slice.mem_ != start()) {
-      return false;
-    }
-
-    addBufferFragment(fragment);
-    return true;
-  }
-
-  bool insertBufferFragmentBefore(size_t i, Buffer::RawSlice& slice,
-                                  Buffer::BufferFragment& fragment) override {
-    // There is always only one slice in this StringBuffer
-    if (i != size_ || slice.mem_ != start()) {
-      return false;
-    }
-
-    prepend(absl::string_view{static_cast<const char*>(fragment.data()), fragment.size()});
-    fragment.done();
-    return true;
   }
 
   void add(absl::string_view data) override { add(data.data(), data.size()); }
@@ -227,7 +258,7 @@ public:
 
   char* mutableEnd() { return mutableStart() + size_; }
 
-  const char* end() const { return start() + size_; }
+  const char* readonlyEnd() const { return start() + size_; }
 
   std::array<char, 2 * TotalMaxAllocation> data_;
   uint32_t start_{TotalMaxAllocation};

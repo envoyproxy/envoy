@@ -1306,118 +1306,201 @@ TEST_F(OwnedImplTest, DrainAtEnd) {
   EXPECT_EQ(s1, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, InsertBufferFragmentAfterBefore) {
-  size_t release_callback_called_ = 0;
-  std::string lines[] = {{"Hey Diddle, Diddle!"},
-                         {"The cat and the fiddle,"},
-                         {"The cow jumped over the moon;"},
-                         {"The little dog laughed "},
-                         {"To see such fun,"},
-                         {"And the dish ran away with the spoon"}};
+TEST_F(OwnedImplTest, EmptyIterator) {
+  Buffer::OwnedImpl buffer;
+  EXPECT_TRUE(*buffer.begin() == *buffer.end());
+  EXPECT_FALSE(*buffer.begin() != *buffer.end());
+}
+
+TEST_F(OwnedImplTest, ForwardAndReverseIterator) {
+  std::vector<std::string> lines = {{"Hey Diddle, Diddle!"},
+                                    {"The cat and the fiddle,"},
+                                    {"The cow jumped over the moon;"},
+                                    {"The little dog laughed "},
+                                    {"To see such fun,"},
+                                    {"And the dish ran away with the spoon"}};
 
   auto* empty_frag_1 = new BufferFragmentImpl(
-      nullptr, 0, [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      nullptr, 0, [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
   auto* empty_frag_2 = new BufferFragmentImpl(
-      nullptr, 0, [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      nullptr, 0, [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
+  auto* empty_frag_3 = new BufferFragmentImpl(
+      nullptr, 0, [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
+  auto* empty_frag_4 = new BufferFragmentImpl(
+      nullptr, 0, [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
+
   auto* frag1 = new BufferFragmentImpl(
       lines[0].c_str(), lines[0].size(),
-      [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
   auto* frag2 = new BufferFragmentImpl(
       lines[1].c_str(), lines[1].size(),
-      [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
   auto* frag3 = new BufferFragmentImpl(
       lines[2].c_str(), lines[2].size(),
-      [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
   auto* frag4 = new BufferFragmentImpl(
       lines[3].c_str(), lines[3].size(),
-      [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
   auto* frag5 = new BufferFragmentImpl(
       lines[4].c_str(), lines[4].size(),
-      [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
   auto* frag6 = new BufferFragmentImpl(
       lines[5].c_str(), lines[5].size(),
-      [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
-        ++release_callback_called_;
-        delete frag;
-      });
+      [](const void*, size_t, const BufferFragmentImpl* frag) { delete frag; });
 
   Buffer::OwnedImpl buffer;
-  buffer.addBufferFragment(*frag1);
-  EXPECT_EQ(lines[0].size(), buffer.length());
-
   buffer.addBufferFragment(*empty_frag_1);
-  EXPECT_EQ(lines[0].size(), buffer.length());
-
-  buffer.addBufferFragment(*frag3);
-  EXPECT_EQ(lines[0].size() + lines[2].size(), buffer.length());
-
+  buffer.addBufferFragment(*frag1);
+  buffer.addBufferFragment(*frag2);
   buffer.addBufferFragment(*empty_frag_2);
-  EXPECT_EQ(lines[0].size() + lines[2].size(), buffer.length());
-
+  buffer.addBufferFragment(*empty_frag_3);
+  buffer.addBufferFragment(*frag3);
+  buffer.addBufferFragment(*frag4);
   buffer.addBufferFragment(*frag5);
-  EXPECT_EQ(lines[0].size() + lines[2].size() + lines[4].size(), buffer.length());
-  EXPECT_EQ(lines[0] + lines[2] + lines[4], buffer.toString());
+  buffer.addBufferFragment(*frag6);
+  buffer.addBufferFragment(*empty_frag_4);
 
-  auto slices = buffer.getRawSlices();
-  EXPECT_EQ(3, slices.size());
-  for (size_t i = 0, j = 0; i < slices.size(); ++i, j += 2) {
-    EXPECT_EQ(lines[j].size(), slices[i].len_);
-    EXPECT_STREQ(lines[j].c_str(), static_cast<const char*>(slices[i].mem_));
-  }
+  auto start = buffer.begin();
+  auto end = buffer.end();
+  EXPECT_FALSE(*start == *end);
+  EXPECT_TRUE(*start != *end);
 
-  buffer.insertBufferFragmentBefore(1, slices[1], *frag2);
-  buffer.insertBufferFragmentAfter(2, slices[1], *frag4);
-
-  slices = buffer.getRawSlices();
-  EXPECT_EQ(5, slices.size());
-
-  for (size_t i = 0; i < slices.size(); ++i) {
-    EXPECT_EQ(lines[i].size(), slices[i].len_);
-    EXPECT_STREQ(lines[i].c_str(), static_cast<const char*>(slices[i].mem_));
-  }
-
-  buffer.insertBufferFragmentAfter(4, slices[4], *frag6);
-
-  slices = buffer.getRawSlices();
-  EXPECT_EQ(6, slices.size());
-
-  for (size_t i = 0; i < slices.size(); ++i) {
-    EXPECT_EQ(lines[i].size(), slices[i].len_);
-    EXPECT_STREQ(lines[i].c_str(), static_cast<const char*>(slices[i].mem_));
-  }
-
-  for (size_t i = 0, j = 0; i < slices.size(); ++i, ++j) {
-    buffer.drain(lines[i].size());
-    if (i == 0 || i == 3) {
-      // There is an empty slot after slice 0,3 which will be drained as well
-      ++j;
+  auto cur = buffer.begin();
+  for (const auto& line : lines) {
+    for (const auto& ch : line) {
+      std::cout << "Char val: " << **cur << std::endl;
+      EXPECT_EQ(**cur, static_cast<uint8_t>(ch));
+      ++(*cur);
     }
-    EXPECT_EQ(j + 1, release_callback_called_);
   }
 
-  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(*end == *cur);
+  std::cout << "Done forward iteration " << std::endl;
+
+  std::for_each(lines.rbegin(), lines.rend(), [&cur](const std::string line) {
+    std::for_each(line.rbegin(), line.rend(), [&cur](const char ch) {
+      --(*cur);
+      std::cout << "Char val: " << **cur << std::endl;
+      EXPECT_EQ(**cur, static_cast<uint8_t>(ch));
+    });
+  });
+
+  EXPECT_TRUE(*start == *cur);
 }
+// TEST_F(OwnedImplTest, InsertBufferFragmentAfterBefore) {
+//   size_t release_callback_called_ = 0;
+//   std::string lines[] = {{"Hey Diddle, Diddle!"},
+//                          {"The cat and the fiddle,"},
+//                          {"The cow jumped over the moon;"},
+//                          {"The little dog laughed "},
+//                          {"To see such fun,"},
+//                          {"And the dish ran away with the spoon"}};
+
+//   auto* empty_frag_1 = new BufferFragmentImpl(
+//       nullptr, 0, [&release_callback_called_](const void*, size_t, const BufferFragmentImpl*
+//       frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* empty_frag_2 = new BufferFragmentImpl(
+//       nullptr, 0, [&release_callback_called_](const void*, size_t, const BufferFragmentImpl*
+//       frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* frag1 = new BufferFragmentImpl(
+//       lines[0].c_str(), lines[0].size(),
+//       [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* frag2 = new BufferFragmentImpl(
+//       lines[1].c_str(), lines[1].size(),
+//       [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* frag3 = new BufferFragmentImpl(
+//       lines[2].c_str(), lines[2].size(),
+//       [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* frag4 = new BufferFragmentImpl(
+//       lines[3].c_str(), lines[3].size(),
+//       [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* frag5 = new BufferFragmentImpl(
+//       lines[4].c_str(), lines[4].size(),
+//       [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+//   auto* frag6 = new BufferFragmentImpl(
+//       lines[5].c_str(), lines[5].size(),
+//       [&release_callback_called_](const void*, size_t, const BufferFragmentImpl* frag) {
+//         ++release_callback_called_;
+//         delete frag;
+//       });
+
+//   Buffer::OwnedImpl buffer;
+//   buffer.addBufferFragment(*frag1);
+//   EXPECT_EQ(lines[0].size(), buffer.length());
+
+//   buffer.addBufferFragment(*empty_frag_1);
+//   EXPECT_EQ(lines[0].size(), buffer.length());
+
+//   buffer.addBufferFragment(*frag3);
+//   EXPECT_EQ(lines[0].size() + lines[2].size(), buffer.length());
+
+//   buffer.addBufferFragment(*empty_frag_2);
+//   EXPECT_EQ(lines[0].size() + lines[2].size(), buffer.length());
+
+//   buffer.addBufferFragment(*frag5);
+//   EXPECT_EQ(lines[0].size() + lines[2].size() + lines[4].size(), buffer.length());
+//   EXPECT_EQ(lines[0] + lines[2] + lines[4], buffer.toString());
+
+//   auto slices = buffer.getRawSlices();
+//   EXPECT_EQ(3, slices.size());
+//   for (size_t i = 0, j = 0; i < slices.size(); ++i, j += 2) {
+//     EXPECT_EQ(lines[j].size(), slices[i].len_);
+//     EXPECT_STREQ(lines[j].c_str(), static_cast<const char*>(slices[i].mem_));
+//   }
+
+//   buffer.insertBufferFragmentBefore(1, slices[1], *frag2);
+//   buffer.insertBufferFragmentAfter(2, slices[1], *frag4);
+
+//   slices = buffer.getRawSlices();
+//   EXPECT_EQ(5, slices.size());
+
+//   for (size_t i = 0; i < slices.size(); ++i) {
+//     EXPECT_EQ(lines[i].size(), slices[i].len_);
+//     EXPECT_STREQ(lines[i].c_str(), static_cast<const char*>(slices[i].mem_));
+//   }
+
+//   buffer.insertBufferFragmentAfter(4, slices[4], *frag6);
+
+//   slices = buffer.getRawSlices();
+//   EXPECT_EQ(6, slices.size());
+
+//   for (size_t i = 0; i < slices.size(); ++i) {
+//     EXPECT_EQ(lines[i].size(), slices[i].len_);
+//     EXPECT_STREQ(lines[i].c_str(), static_cast<const char*>(slices[i].mem_));
+//   }
+
+//   for (size_t i = 0, j = 0; i < slices.size(); ++i, ++j) {
+//     buffer.drain(lines[i].size());
+//     if (i == 0 || i == 3) {
+//       // There is an empty slot after slice 0,3 which will be drained as well
+//       ++j;
+//     }
+//     EXPECT_EQ(j + 1, release_callback_called_);
+//   }
+
+//   EXPECT_EQ(0, buffer.length());
+// }
 
 } // namespace
 } // namespace Buffer

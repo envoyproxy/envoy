@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 
@@ -86,6 +87,25 @@ public:
 using ReservationSlicesOwnerPtr = std::unique_ptr<ReservationSlicesOwner>;
 
 /**
+ * Minimal Bidirectional iterator for data underlying Instance.
+ * @details Iterators and abstract classes don't play nice for example:
+ * 1. Iterators must be returned by reference by begin/end but references to temporaries cannot be
+ * returned so will have to be returned as smart pointers.
+ * 2. Postfix operators require return by value but abstract types do not allow it so this is a
+ * minimal implementation.
+ */
+class Iterator {
+public:
+  virtual ~Iterator() = default;
+  virtual uint8_t& operator*() PURE;
+  virtual Iterator& operator++() PURE;
+  virtual Iterator& operator--() PURE;
+  virtual bool operator==(const Iterator& rhs) PURE;
+  virtual bool operator!=(const Iterator& rhs) PURE;
+};
+
+using IteratorPtr = std::unique_ptr<Iterator>;
+/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -117,31 +137,10 @@ public:
    */
   virtual void addBufferFragment(BufferFragment& fragment) PURE;
 
-  /**
-   * Insert externally owned data into the buffer after given RawSlice and its index. No copying is
-   * done. fragment is not owned. When the fragment->data() is no longer needed, fragment->done() is
-   * called. If RawSlice.mem_ and RawSlice.len_ not same in the Instance, BufferFragment insertion
-   * is not performed and false is returned.
-   *
-   * @param i index of RawSlice in RawSlice array obtained from getRawSlices method.
-   * @param slice slice from RawSlice array obtained from getRawSlices method.
-   * @param fragment the externally owned data to insert in to the buffer.
-   * @return true if insertion was successful or false and no change is made to the buffer
-   */
-  virtual bool insertBufferFragmentAfter(size_t i, RawSlice& slice, BufferFragment& fragment) PURE;
+  virtual IteratorPtr begin() noexcept PURE;
 
-  /**
-   * Insert externally owned data into the buffer after given RawSlice and its index. No copying is
-   * done. fragment is not owned. When the fragment->data() is no longer needed, fragment->done() is
-   * called. If RawSlice.mem_ and RawSlice.len_ not same in the Instance, BufferFragment insertion
-   * is not performed and false is returned.
-   *
-   * @param i index of RawSlice in RawSlice array obtained from getRawSlices method.
-   * @param slice slice from RawSlice array obtained from getRawSlices method.
-   * @param fragment the externally owned data to insert in to the buffer.
-   * @return true if insertion was successful or false and no change is made to the buffer.
-   */
-  virtual bool insertBufferFragmentBefore(size_t i, RawSlice& slice, BufferFragment& fragment) PURE;
+  virtual IteratorPtr end() noexcept PURE;
+
   /**
    * Copy a string into the buffer.
    * @param data supplies the string to copy.

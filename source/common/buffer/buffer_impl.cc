@@ -67,28 +67,6 @@ std::pair<bool, size_t> findDequeIndex(size_t i, RawSlice& slice, SliceDeque& sl
   return {false, deque_index + empty_slices};
 }
 
-bool OwnedImpl::insertBufferFragmentAfter(size_t i, RawSlice& slice, BufferFragment& fragment) {
-  auto deque_index = findDequeIndex(i, slice, slices_);
-  if (!deque_index.first) {
-    return false;
-  }
-
-  length_ += fragment.size();
-  slices_.emplace_insert(deque_index.second + 1, Slice{fragment});
-  return true;
-}
-
-bool OwnedImpl::insertBufferFragmentBefore(size_t i, RawSlice& slice, BufferFragment& fragment) {
-  auto deque_index = findDequeIndex(i, slice, slices_);
-  if (!deque_index.first) {
-    return false;
-  }
-
-  length_ += fragment.size();
-  slices_.emplace_insert(deque_index.second, Slice{fragment});
-  return true;
-}
-
 void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
@@ -631,6 +609,78 @@ std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const
     slices.push_back(slice.describeSliceForTest());
   }
   return slices;
+}
+
+/**
+ * Invariant:
+ *    slice_index_ >= first non empty slice or 0 and slice_index_ <= owned_impl_.slices_.size()
+ *    offset_ >= first readable offset or 0 and offset_ <=
+ * ownned_impl_.slices_[slice_index_].dataSize()
+ */
+
+Iterator& OwnedImpl::OwnendImplIterator::operator++() {
+  // One past the end of buffer
+  if (slice_index_ == owned_impl_.slices_.size()) {
+    return *this;
+  }
+
+  const auto& slice = owned_impl_.slices_[slice_index_];
+
+  // Successful increment
+  if (++offset_ < slice.dataSize()) {
+    return *this;
+  }
+
+  // Done iterating through current slice, skip empty slices and  move to next
+  do {
+    slice_index_++;
+  } while (slice_index_ < owned_impl_.slices_.size() &&
+           owned_impl_.slices_[slice_index_].dataSize() == 0);
+
+  offset_ = 0;
+  return *this;
+}
+
+/**
+ * Invariant:
+ *    slice_index_ >= 0 and slice_index_ <= owned_impl_.slices_.size()
+ *    offset_ >= 0 and offset_ <= ownned_impl_.slices_[slice_index_].dataSize()
+ */
+Iterator& OwnedImpl::OwnendImplIterator::operator--() {
+  // At the begining of buffer
+  if (slice_index_ == 0 && offset_ == 0) {
+    return *this;
+  }
+
+  if (offset_ > 0) { // Guard against underflow
+    offset_--;
+    return *this;
+  }
+
+  // Successful decrement
+  // Skip empty slices
+  do {
+    slice_index_--;
+  } while (slice_index_ > 0 && owned_impl_.slices_[slice_index_].dataSize() == 0);
+
+  offset_ = owned_impl_.slices_[slice_index_].dataSize() > 0
+                ? owned_impl_.slices_[slice_index_].dataSize() - 1
+                : 0;
+  return *this;
+}
+
+bool OwnedImpl::OwnendImplIterator::operator==(const Iterator& rhs) {
+  const OwnedImpl::OwnendImplIterator* rhs_owned_impl_itr =
+      dynamic_cast<const OwnedImpl::OwnendImplIterator*>(&rhs);
+
+  return rhs_owned_impl_itr != nullptr && &owned_impl_ == &(rhs_owned_impl_itr->owned_impl_) &&
+         slice_index_ == rhs_owned_impl_itr->slice_index_ && offset_ == rhs_owned_impl_itr->offset_;
+}
+
+bool OwnedImpl::OwnendImplIterator::operator!=(const Iterator& rhs) { return !(*this == rhs); }
+
+uint8_t& OwnedImpl::OwnendImplIterator::operator*() {
+  return *(owned_impl_.slices_[slice_index_].data() + offset_);
 }
 
 } // namespace Buffer

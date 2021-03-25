@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -700,8 +701,6 @@ public:
   void addDrainTracker(std::function<void()> drain_tracker) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
-  bool insertBufferFragmentAfter(size_t i, RawSlice& slice, BufferFragment& fragment) override;
-  bool insertBufferFragmentBefore(size_t i, RawSlice& slice, BufferFragment& fragment) override;
   void add(absl::string_view data) override;
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
@@ -721,6 +720,59 @@ public:
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;
+
+  /**
+   * Bidirectional iterator for data underlying Instance.
+   */
+  class OwnendImplIterator : public Iterator {
+  public:
+    uint8_t& operator*() override;
+    Iterator& operator++() override;
+    Iterator& operator--() override;
+    bool operator==(const Iterator& rhs) override;
+    bool operator!=(const Iterator& rhs) override;
+
+    friend class OwnedImpl;
+
+  private:
+    OwnendImplIterator(OwnedImpl& owned_impl, size_t slice_index, uint64_t offset)
+        : owned_impl_{owned_impl}, slice_index_{slice_index}, offset_{offset} {}
+
+    /**
+     * Return first readable slice index and offset from start of the buffer or 0,0 when all slices
+     * are empty
+     */
+    static std::pair<size_t, uint64_t> firstReadbleOffset(const OwnedImpl& owned_impl) {
+      size_t slice_index = 0;
+
+      // Skip empty slices in the beginning of the buffer
+      while (slice_index < owned_impl.slices_.size() &&
+             owned_impl.slices_[slice_index].dataSize() == 0) {
+        slice_index++;
+      }
+      // At the end of buffer
+      if (slice_index == owned_impl.slices_.size()) {
+        return {0, 0};
+      }
+
+      return {slice_index, 0};
+    }
+
+    OwnedImpl& owned_impl_;
+    size_t slice_index_;
+    uint64_t offset_;
+  };
+
+  IteratorPtr begin() noexcept override {
+    auto loc = OwnedImpl::OwnendImplIterator::firstReadbleOffset(*this);
+    return std::unique_ptr<OwnedImpl::OwnendImplIterator>{
+        new OwnedImpl::OwnendImplIterator{*this, loc.first, loc.second}};
+  }
+
+  IteratorPtr end() noexcept override {
+    return std::unique_ptr<OwnedImpl::OwnendImplIterator>{
+        new OwnedImpl::OwnendImplIterator{*this, slices_.size(), 0}};
+  }
 
   // LibEventInstance
   void postProcess() override;
