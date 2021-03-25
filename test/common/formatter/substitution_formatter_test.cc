@@ -1352,11 +1352,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   stream_info.filter_state_->setData("key-no-serialization",
                                      std::make_unique<StreamInfo::FilterState::Object>(),
                                      StreamInfo::FilterState::StateType::ReadOnly);
-  /*
-stream_info.filter_state_->setData("serialized",
-    std::make_unique<TestSerializedUnknownFilterState>(),
-    StreamInfo::FilterState::StateType::ReadOnly,
-    StreamInfo::FilterState::LifeSpan::FilterChain);*/
+
   stream_info.filter_state_->setData(
       "key-serialization-error",
       std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
