@@ -28,7 +28,7 @@ public:
                                 const std::string& cluster_name_override)
       : DelegatingRoute(base_route),
         custom_route_entry_(std::make_unique<const ExampleDerivedDelegatingRouteEntry>(
-            base_route, cluster_name_override)) {}
+            std::move(base_route), cluster_name_override)) {}
 
   const Router::RouteEntry* routeEntry() const override { return custom_route_entry_.get(); }
 
