@@ -323,9 +323,10 @@ void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
   absl::flat_hash_set<std::string> all_expired;
   all_expired.insert(expired.begin(), expired.end());
 
+  auto& api_state = api_state_.find(type_url)->second;
   // Note: We can blindly dereference the lookup here since the only time we call this is in a
   // callback that is created at the same time as we insert the ApiState for this type.
-  for (auto watch : api_state_.find(type_url)->second->watches_) {
+  for (auto watch : api_state->watches_) {
     Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
 
     for (const auto& resource : expired) {
@@ -335,6 +336,15 @@ void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
     }
 
     watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
+  }
+
+  // Now that we've forgotten about the resource, enqueue a new request with an empty version to
+  // signal to the management server that we need an update. The check here ensures that we only
+  // send schedule one request, even if multiple resources for the same type expires around the same
+  // time.
+  if (!api_state->request_.version_info().empty()) {
+    api_state->request_.clear_version_info();
+    queueDiscoveryRequest(type_url);
   }
 }
 
