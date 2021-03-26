@@ -66,48 +66,52 @@ envoy_status_t set_preferred_network(envoy_network_t network) {
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t record_counter_inc(envoy_engine_t, const char* elements, uint64_t count) {
+envoy_status_t record_counter_inc(envoy_engine_t, const char* elements, envoy_stats_tags tags,
+                                  uint64_t count) {
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordCounterInc(std::string(elements), count);
+    return e->recordCounterInc(std::string(elements), tags, count);
   }
   return ENVOY_FAILURE;
 }
 
-envoy_status_t record_gauge_set(envoy_engine_t, const char* elements, uint64_t value) {
+envoy_status_t record_gauge_set(envoy_engine_t, const char* elements, envoy_stats_tags tags,
+                                uint64_t value) {
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordGaugeSet(std::string(elements), value);
+    return e->recordGaugeSet(std::string(elements), tags, value);
   }
   return ENVOY_FAILURE;
 }
 
-envoy_status_t record_gauge_add(envoy_engine_t, const char* elements, uint64_t amount) {
+envoy_status_t record_gauge_add(envoy_engine_t, const char* elements, envoy_stats_tags tags,
+                                uint64_t amount) {
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordGaugeAdd(std::string(elements), amount);
+    return e->recordGaugeAdd(std::string(elements), tags, amount);
   }
   return ENVOY_FAILURE;
 }
 
-envoy_status_t record_gauge_sub(envoy_engine_t, const char* elements, uint64_t amount) {
+envoy_status_t record_gauge_sub(envoy_engine_t, const char* elements, envoy_stats_tags tags,
+                                uint64_t amount) {
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordGaugeSub(std::string(elements), amount);
+    return e->recordGaugeSub(std::string(elements), tags, amount);
   }
   return ENVOY_FAILURE;
 }
 
-envoy_status_t record_histogram_value(envoy_engine_t, const char* elements, uint64_t value,
-                                      envoy_histogram_stat_unit_t unit_measure) {
+envoy_status_t record_histogram_value(envoy_engine_t, const char* elements, envoy_stats_tags tags,
+                                      uint64_t value, envoy_histogram_stat_unit_t unit_measure) {
   // TODO: use specific engine once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
   if (auto e = engine_.lock()) {
-    return e->recordHistogramValue(std::string(elements), value, unit_measure);
+    return e->recordHistogramValue(std::string(elements), tags, value, unit_measure);
   }
   return ENVOY_FAILURE;
 }

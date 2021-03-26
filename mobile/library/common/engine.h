@@ -38,44 +38,53 @@ public:
   /**
    * Increment a counter with a given string of elements and by the given count.
    * @param elements, joined elements of the timeseries.
+   * @param tags, custom tags of the reporting stat.
    * @param count, amount to add to the counter.
    */
-  envoy_status_t recordCounterInc(const std::string& elements, uint64_t count);
+  envoy_status_t recordCounterInc(const std::string& elements, envoy_stats_tags tags,
+                                  uint64_t count);
 
   /**
    * Set a gauge of a given string of elements with the given value.
    * @param elements, joined elements of the timeseries.
+   * @param tags, custom tags of the reporting stat.
    * @param value, value to set to the gauge.
    */
-  envoy_status_t recordGaugeSet(const std::string& elements, uint64_t value);
+  envoy_status_t recordGaugeSet(const std::string& elements, envoy_stats_tags tags, uint64_t value);
 
   /**
    * Add to the gauge with the given string of elements and by the given amount.
    * @param elements, joined elements of the timeseries.
+   * @param tags, custom tags of the reporting stat.
    * @param amount, amount to add to the gauge.
    */
-  envoy_status_t recordGaugeAdd(const std::string& elements, uint64_t amount);
+  envoy_status_t recordGaugeAdd(const std::string& elements, envoy_stats_tags tags,
+                                uint64_t amount);
 
   /**
    * Subtract from the gauge with the given string of elements and by the given amount.
    * @param elements, joined elements of the timeseries.
+   * @param tags, custom tags of the reporting stat.
    * @param amount, amount to subtract from the gauge.
    */
-  envoy_status_t recordGaugeSub(const std::string& elements, uint64_t amount);
+  envoy_status_t recordGaugeSub(const std::string& elements, envoy_stats_tags tags,
+                                uint64_t amount);
 
   /**
    * Record a value for the histogram with the given string of elements and unit measurement
    * @param elements, joined elements of the timeseries.
+   * @param tags, custom tags of the reporting stat.
    * @param value, value to add to the aggregated distribution of values for quantile calculations
    * @param unit_measure, the unit of measurement (e.g. milliseconds, bytes, etc.)
    */
-  envoy_status_t recordHistogramValue(const std::string& elements, uint64_t value,
-                                      envoy_histogram_stat_unit_t unit_measure);
+  envoy_status_t recordHistogramValue(const std::string& elements, envoy_stats_tags tags,
+                                      uint64_t value, envoy_histogram_stat_unit_t unit_measure);
 
 private:
   envoy_status_t run(std::string config, std::string log_level);
 
   Stats::ScopePtr client_scope_;
+  Stats::StatNameSetPtr stat_name_set_;
   envoy_engine_callbacks callbacks_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;

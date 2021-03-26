@@ -278,10 +278,10 @@ TEST(EngineTest, RecordCounter) {
                                      exit->on_exit.Notify();
                                    } /*on_exit*/,
                                    &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_counter_inc(0, "counter", 1));
+  EXPECT_EQ(ENVOY_FAILURE, record_counter_inc(0, "counter", envoy_stats_notags, 1));
   run_engine(0, callbacks, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-  EXPECT_EQ(ENVOY_SUCCESS, record_counter_inc(0, "counter", 1));
+  EXPECT_EQ(ENVOY_SUCCESS, record_counter_inc(0, "counter", envoy_stats_notags, 1));
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -299,12 +299,12 @@ TEST(EngineTest, SetGauge) {
                                      exit->on_exit.Notify();
                                    } /*on_exit*/,
                                    &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_gauge_set(0, "gauge", 1));
+  EXPECT_EQ(ENVOY_FAILURE, record_gauge_set(0, "gauge", envoy_stats_notags, 1));
   run_engine(0, callbacks, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
 
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  EXPECT_EQ(ENVOY_SUCCESS, record_gauge_set(0, "gauge", 1));
+  EXPECT_EQ(ENVOY_SUCCESS, record_gauge_set(0, "gauge", envoy_stats_notags, 1));
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -322,12 +322,12 @@ TEST(EngineTest, AddToGauge) {
                                      exit->on_exit.Notify();
                                    } /*on_exit*/,
                                    &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_gauge_add(0, "gauge", 30));
+  EXPECT_EQ(ENVOY_FAILURE, record_gauge_add(0, "gauge", envoy_stats_notags, 30));
 
   run_engine(0, callbacks, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  EXPECT_EQ(ENVOY_SUCCESS, record_gauge_add(0, "gauge", 30));
+  EXPECT_EQ(ENVOY_SUCCESS, record_gauge_add(0, "gauge", envoy_stats_notags, 30));
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -345,14 +345,14 @@ TEST(EngineTest, SubFromGauge) {
                                      exit->on_exit.Notify();
                                    } /*on_exit*/,
                                    &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_gauge_sub(0, "gauge", 30));
+  EXPECT_EQ(ENVOY_FAILURE, record_gauge_sub(0, "gauge", envoy_stats_notags, 30));
 
   run_engine(0, callbacks, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  record_gauge_add(0, "gauge", 30);
+  record_gauge_add(0, "gauge", envoy_stats_notags, 30);
 
-  EXPECT_EQ(ENVOY_SUCCESS, record_gauge_sub(0, "gauge", 30));
+  EXPECT_EQ(ENVOY_SUCCESS, record_gauge_sub(0, "gauge", envoy_stats_notags, 30));
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
@@ -370,14 +370,16 @@ TEST(EngineTest, RecordHistogramValue) {
                                      exit->on_exit.Notify();
                                    } /*on_exit*/,
                                    &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE, record_histogram_value(0, "histogram", 99, MILLISECONDS));
+  EXPECT_EQ(ENVOY_FAILURE,
+            record_histogram_value(0, "histogram", envoy_stats_notags, 99, MILLISECONDS));
 
   run_engine(0, callbacks, MINIMAL_NOOP_CONFIG.c_str(), LEVEL_DEBUG.c_str());
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
-  record_histogram_value(0, "histogram", 99, MILLISECONDS);
+  record_histogram_value(0, "histogram", envoy_stats_notags, 99, MILLISECONDS);
 
-  EXPECT_EQ(ENVOY_SUCCESS, record_histogram_value(0, "histogram", 99, MILLISECONDS));
+  EXPECT_EQ(ENVOY_SUCCESS,
+            record_histogram_value(0, "histogram", envoy_stats_notags, 99, MILLISECONDS));
 
   terminate_engine(0);
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));

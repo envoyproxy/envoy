@@ -106,43 +106,53 @@ envoy_status_t set_preferred_network(envoy_network_t network);
  * Increment a counter with the given elements and by the given count.
  * @param engine, the engine that owns the counter.
  * @param elements, the string that identifies the counter to increment.
+ * @param tags, a map of {key, value} pairs of tags.
  * @param count, the count to increment by.
  */
-envoy_status_t record_counter_inc(envoy_engine_t engine, const char* elements, uint64_t count);
+envoy_status_t record_counter_inc(envoy_engine_t, const char* elements, envoy_stats_tags tags,
+                                  uint64_t count);
 
 /**
  * Set a gauge of a given string of elements with the given value.
  * @param engine, the engine that owns the gauge.
  * @param elements, the string that identifies the gauge to set value with.
+ * @param tags, a map of {key, value} pairs of tags.
  * @param value, the value to set to the gauge.
  */
-envoy_status_t record_gauge_set(envoy_engine_t engine, const char* elements, uint64_t value);
+envoy_status_t record_gauge_set(envoy_engine_t engine, const char* elements, envoy_stats_tags tags,
+                                uint64_t value);
 
 /**
  * Add the gauge with the given string of elements and by the given amount.
  * @param engine, the engine that owns the gauge.
  * @param elements, the string that identifies the gauge to add to.
+ * @param tags, a map of {key, value} pairs of tags.
  * @param amount, the amount to add to the gauge.
  */
-envoy_status_t record_gauge_add(envoy_engine_t engine, const char* elements, uint64_t amount);
+envoy_status_t record_gauge_add(envoy_engine_t engine, const char* elements, envoy_stats_tags tags,
+                                uint64_t amount);
 
 /**
  * Subtract from the gauge with the given string of elements and by the given amount.
  * @param engine, the engine that owns the gauge.
  * @param elements, the string that identifies the gauge to subtract from.
+ * @param tags, a map of {key, value} pairs of tags.
  * @param amount, amount to subtract from the gauge.
  */
-envoy_status_t record_gauge_sub(envoy_engine_t engine, const char* elements, uint64_t amount);
+envoy_status_t record_gauge_sub(envoy_engine_t engine, const char* elements, envoy_stats_tags tags,
+                                uint64_t amount);
 
 /**
  * Add another recorded amount to the histogram with the given string of elements and unit
  * measurement.
  * @param engine, the engine that owns the histogram.
  * @param elements, the string that identifies the histogram to subtract from.
+ * @param tags, a map of {key, value} pairs of tags.
  * @param value, amount to record as a new value for the histogram distribution.
  * @param unit_measure, the unit of measurement (e.g. milliseconds, bytes, etc.)
  */
-envoy_status_t record_histogram_value(envoy_engine_t engine, const char* elements, uint64_t value,
+envoy_status_t record_histogram_value(envoy_engine_t engine, const char* elements,
+                                      envoy_stats_tags tags, uint64_t value,
                                       envoy_histogram_stat_unit_t unit_measure);
 
 /**
