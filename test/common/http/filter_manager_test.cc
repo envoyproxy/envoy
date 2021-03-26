@@ -33,6 +33,8 @@ public:
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
+  ~FilterManagerTest() override { filter_manager_->destroyFilters(); }
+
   std::unique_ptr<FilterManager> filter_manager_;
   NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
   Event::MockDispatcher dispatcher_;
@@ -89,7 +91,6 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
   filter_manager_->decodeHeaders(*grpc_headers, true);
-  filter_manager_->destroyFilters();
 }
 
 // Verifies that the local reply persists the gRPC classification even if the request headers are
@@ -145,7 +146,6 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
   filter_manager_->decodeHeaders(*grpc_headers, true);
-  filter_manager_->destroyFilters();
 }
 
 struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
@@ -202,7 +202,6 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionDecodingHeaders) {
 
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*grpc_headers, true);
-  filter_manager_->destroyFilters();
 }
 
 TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
@@ -268,8 +267,6 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
 
   RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"trailer", ""}}};
   filter_manager_->decodeTrailers(*trailers);
-
-  filter_manager_->destroyFilters();
 }
 
 // Verify that we propagate custom match actions to a decoding filter.
@@ -303,7 +300,6 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingHeaders) {
 
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*grpc_headers, true);
-  filter_manager_->destroyFilters();
 }
 
 // Verify that we propagate custom match actions to a decoding filter when matching on request
@@ -349,7 +345,6 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingTrailers) {
   filter_manager_->decodeTrailers(*trailers);
 
   EXPECT_CALL(*decoder_filter, onDestroy());
-  filter_manager_->destroyFilters();
 }
 
 // Verify that we propagate custom match actions to an encoding filter when matching on response
@@ -399,7 +394,6 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
   EXPECT_CALL(*filter, encodeTrailers(_));
   filter_manager_->decodeHeaders(*grpc_headers, true);
   EXPECT_CALL(*filter, onDestroy());
-  filter_manager_->destroyFilters();
 }
 
 // Verify that we propagate custom match actions exactly once to a dual filter.
@@ -441,7 +435,6 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(*filter, onMatchCallback(_));
   filter_manager_->decodeHeaders(*grpc_headers, true);
-  filter_manager_->destroyFilters();
 }
 
 TEST_F(FilterManagerTest, OnLocalReply) {
@@ -482,8 +475,6 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
-
-  filter_manager_->destroyFilters();
 }
 
 TEST_F(FilterManagerTest, MultipleOnLocalReply) {
@@ -541,8 +532,25 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+}
 
-  filter_manager_->destroyFilters();
+TEST_F(FilterManagerTest, MaybeEndEncode) {
+  initialize();
+
+  // endStream must not be called.
+  filter_manager_->maybeEndEncode(false);
+
+  // Must be called since end_stream = true && streamEnded returns false.
+  EXPECT_CALL(filter_manager_callbacks_, streamEnded()).WillOnce(Invoke([]() -> bool {
+    return false;
+  }));
+  filter_manager_->maybeEndEncode(true);
+
+  // Must not be called since streamEnded returns true.
+  EXPECT_CALL(filter_manager_callbacks_, streamEnded()).WillOnce(Invoke([]() -> bool {
+    return true;
+  }));
+  filter_manager_->maybeEndEncode(true);
 }
 
 } // namespace
