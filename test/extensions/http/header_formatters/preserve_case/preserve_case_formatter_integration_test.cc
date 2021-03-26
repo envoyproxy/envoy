@@ -1,5 +1,6 @@
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace {
@@ -23,14 +24,11 @@ public:
 
 constexpr char PreserveCaseFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<PreserveCaseFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    encoder_register_;
-
 class PreserveCaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  PreserveCaseIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  PreserveCaseIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()), registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::extensions::filters::network::
@@ -61,6 +59,9 @@ public:
 
     HttpIntegrationTest::initialize();
   }
+
+  SimpleFilterConfig<PreserveCaseFilter> factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseIntegrationTest,

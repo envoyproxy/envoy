@@ -332,6 +332,10 @@ protected:
   virtual HeaderEntryImpl** inlineHeaders() PURE;
 
   HeaderList headers_;
+  // TODO(mattklein123): The formatter does not currently get copied when a header map gets
+  // copied. This may be problematic in certain cases like request shadowing. This is omitted
+  // on purpose until someone asks for it, at which point a clone() method can be created to
+  // avoid using extra space/processing for a shared_ptr.
   StatefulHeaderKeyFormatterPtr formatter_;
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
