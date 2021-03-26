@@ -3,9 +3,8 @@
 #include "common/http/conn_manager_impl.h"
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/path_utility.h"
 #include "common/network/address_impl.h"
-
-#include "source/common/http/_virtual_includes/path_utility_lib/common/http/path_utility.h"
 
 #include "extensions/access_loggers/common/file_access_log_impl.h"
 
