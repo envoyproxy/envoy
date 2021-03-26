@@ -178,18 +178,24 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.internal_redirects_with_body", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("POST");
+
+  // First request to original upstream.
   IntegrationStreamDecoderPtr response =
       codec_client_->makeRequestWithBody(default_request_headers_, "foobarbizbaz");
-
   waitForNextUpstreamRequest();
 
+  // Respond with a redirect.
   upstream_request_->encodeHeaders(redirect_response_, true);
 
+  // Second request to redirected upstream.
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
@@ -198,6 +204,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
   EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
 
+  // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForEndStream();

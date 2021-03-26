@@ -118,6 +118,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // TODO(derekargueta) flip to true after a release cycle.
+    "envoy.reloadable_features.internal_redirects_with_body",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

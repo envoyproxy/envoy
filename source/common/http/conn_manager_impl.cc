@@ -101,7 +101,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
-      time_source_(time_source) {}
+      time_source_(time_source),
+      enable_internal_redirects_with_body_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_redirects_with_body")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
   static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
@@ -1615,10 +1617,13 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   response_encoder_ = nullptr;
 
   Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
-  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
-  const bool proxy_body = buffered_request_data != nullptr && buffered_request_data->length() > 0;
+  bool proxy_body = connection_manager_.enable_internal_redirects_with_body_;
   if (proxy_body) {
-    request_data->move(*filter_manager_.bufferedRequestData());
+    const auto& buffered_request_data = filter_manager_.bufferedRequestData();
+    proxy_body = buffered_request_data != nullptr && buffered_request_data->length() > 0;
+    if (proxy_body) {
+      request_data->move(*filter_manager_.bufferedRequestData());
+    }
   }
 
   response_encoder->getStream().removeCallbacks(*this);

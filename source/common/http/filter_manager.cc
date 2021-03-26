@@ -1372,6 +1372,13 @@ void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
 uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
+  // Because the filter's and the HCM view of if the stream has a body and if
+  // the stream is complete may differ, re-check bytesReceived() to make sure
+  // there was no body from the HCM's point of view.
+  if (!parent_.enableInternalRedirectsWithBody() && (!complete() || parent_.stream_info_.bytesReceived() != 0)) {
+    return false;
+  }
+
   parent_.stream_info_.setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
