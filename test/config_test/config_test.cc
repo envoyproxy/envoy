@@ -92,7 +92,7 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap, options);
+    Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
@@ -164,8 +164,24 @@ public:
 
 void testMerge() {
   Api::ApiPtr api = Api::createApiForTest();
-
-  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  const std::string overlay = R"EOF(
+        {
+          admin: {
+            "address": {
+              "socket_address": {
+                "address": "1.2.3.4",
+                "port_value": 5678
+              }
+            }
+          },
+          static_resources: { 
+            clusters: [
+              {
+                name: 'foo'
+              }
+            ]
+          }
+        })EOF";
   OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;

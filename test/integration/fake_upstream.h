@@ -206,6 +206,10 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    RELEASE_ASSERT(false, "initialize if this is needed");
+    return *stream_info_;
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -239,6 +243,7 @@ private:
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool received_data_{false};
 };
 
@@ -528,12 +533,26 @@ private:
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 struct FakeUpstreamConfig {
-  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {}
+  struct UdpConfig {
+    absl::optional<uint64_t> max_rx_datagram_size_;
+  };
+
+  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {
+    http2_options_ = ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options_);
+    // Legacy options which are always set.
+    http2_options_.set_allow_connect(true);
+    http2_options_.set_allow_metadata(true);
+  }
 
   Event::TestTimeSystem& time_system_;
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   bool enable_half_close_{};
-  bool udp_fake_upstream_{};
+  absl::optional<UdpConfig> udp_fake_upstream_;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
 };
 
 /**
@@ -567,13 +586,9 @@ public:
 
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult waitForHttpConnection(
-      Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-      uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-      uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT,
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  testing::AssertionResult
+  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -641,6 +656,8 @@ public:
   rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
@@ -667,9 +684,9 @@ private:
     Network::SocketSharedPtr socket_;
   };
 
-  class FakeUpstreamUdpFilter : public Network::UdpListenerReadFilter {
+  class FakeUdpFilter : public Network::UdpListenerReadFilter {
   public:
-    FakeUpstreamUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
+    FakeUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
 
     // Network::UdpListenerReadFilter
@@ -682,20 +699,41 @@ private:
 
   class FakeListener : public Network::ListenerConfig {
   public:
+    struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
+      UdpListenerConfigImpl()
+          : writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
+            listener_worker_router_(1) {}
+
+      // Network::UdpListenerConfig
+      Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
+      Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+      Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
+        return listener_worker_router_;
+      }
+      const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+
+      envoy::config::listener::v3::UdpListenerConfig config_;
+      std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
+      std::unique_ptr<Network::UdpPacketWriterFactory> writer_factory_;
+      Network::UdpListenerWorkerRouterImpl listener_worker_router_;
+    };
+
     FakeListener(FakeUpstream& parent, bool is_quic = false)
-        : parent_(parent), name_("fake_upstream"),
-          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
-          udp_listener_worker_router_(1), init_manager_(nullptr) {
+        : parent_(parent), name_("fake_upstream"), init_manager_(nullptr) {
       if (is_quic) {
         envoy::config::listener::v3::QuicProtocolOptions config;
         auto& config_factory =
             Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
                 "quiche_quic_listener");
-        udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(config, 1);
+        udp_listener_config_.listener_factory_ =
+            config_factory.createActiveUdpListenerFactory(config, 1);
       } else {
-        udp_listener_factory_ = std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+        udp_listener_config_.listener_factory_ =
+            std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
       }
     }
+
+    UdpListenerConfigImpl udp_listener_config_;
 
   private:
     // Network::ListenerConfig
@@ -712,15 +750,7 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      return udp_listener_factory_.get();
-    }
-    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-      return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
-    }
-    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-      return udp_listener_worker_router_;
-    }
+    Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -740,9 +770,6 @@ private:
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
-    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
-    const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-    Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
@@ -755,6 +782,7 @@ private:
   runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;
   ConditionalInitializer server_initialized_;
@@ -773,6 +801,7 @@ private:
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
+  const FakeUpstreamConfig config_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;

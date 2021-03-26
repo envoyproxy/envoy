@@ -54,7 +54,7 @@ public:
                          Stats::Gauge::ImportMode::NeverImport)) {
     if (allow_deprecated_v2_api) {
       Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.reloadable_features.enable_deprecated_v2_api", "true"},
+          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
           {"envoy.features.enable_all_deprecated_features", "true"},
       });
     }
@@ -1204,7 +1204,11 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
   std::string bad_yaml = R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: /dev/null
   address:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
@@ -1247,6 +1251,29 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_EQ(set.size(), 2); // hv1 == hv2
   EXPECT_NE(set.find(hv1), set.end());
   EXPECT_NE(set.find(hv3), set.end());
+}
+
+TEST_F(ProtobufUtilityTest, AnyBytes) {
+  {
+    ProtobufWkt::StringValue source;
+    source.set_value("abc");
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "abc");
+  }
+  {
+    ProtobufWkt::BytesValue source;
+    source.set_value("\x01\x02\x03");
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
+  }
+  {
+    envoy::config::cluster::v3::Filter filter;
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(filter);
+    EXPECT_EQ(MessageUtil::anyToBytes(source_any), source_any.value());
+  }
 }
 
 // MessageUtility::anyConvert() with the wrong type throws.

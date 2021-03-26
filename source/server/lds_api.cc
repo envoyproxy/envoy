@@ -1,8 +1,8 @@
 #include "server/lds_api.h"
 
 #include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/api/v2/listener.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
@@ -31,7 +31,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
     subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
+        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
     subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
         *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_);

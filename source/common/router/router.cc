@@ -39,7 +39,6 @@
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
 #include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -80,8 +79,23 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
   return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
-void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport) {
-  if (use_secure_transport) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+                                      bool upstream_secure) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")) {
+    if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
+      return;
+    }
+    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
+      headers.setScheme(headers.getForwardedProtoValue());
+      return;
+    }
+  }
+  const bool transport_secure =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_scheme")
+          ? downstream_secure
+          : upstream_secure;
+
+  if (transport_secure) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
@@ -417,7 +431,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     config_.stats_.no_cluster_.inc();
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
     callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", modify_headers,
                                absl::nullopt,
                                StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
@@ -592,6 +606,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers,
+                                   callbacks_->streamInfo().downstreamSslConnection() != nullptr,
                                    host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
@@ -1081,7 +1096,10 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   }
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
-  chargeUpstreamAbort(Http::Code::ServiceUnavailable, dropped, upstream_request);
+  const Http::Code error_code = (reset_reason == Http::StreamResetReason::ProtocolError)
+                                    ? Http::Code::BadGateway
+                                    : Http::Code::ServiceUnavailable;
+  chargeUpstreamAbort(error_code, dropped, upstream_request);
   upstream_request.removeFromList(upstream_requests_);
 
   // If there are other in-flight requests that might see an upstream response,
@@ -1108,7 +1126,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string details = absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
       transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
-  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
+  onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 
 void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
@@ -1133,6 +1151,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::ConnectError:
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
+  case Http::StreamResetReason::ProtocolError:
+    return StreamInfo::ResponseFlag::UpstreamProtocolError;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

@@ -9,11 +9,11 @@
 
 namespace Envoy {
 namespace Logger {
-
 FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
                                    AccessLog::AccessLogManager& log_manager,
                                    DelegatingLogSinkSharedPtr log_sink)
-    : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(log_path)) {
+    : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(Filesystem::FilePathAndType{
+                                  Filesystem::DestinationType::File, log_path})) {
   setDelegate();
 }
 
