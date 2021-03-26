@@ -10,12 +10,12 @@ envoy_package()
 
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "medium",
+    size = "large",
     srcs = [
         "quic_protocol_integration_test.cc",
     ],
     data = ["//test/config/integration/certs"],
-    shard_count = 6,
+    shard_count = 8,
     tags = [
         "fails_on_clang_cl",
         "fails_on_windows",
@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//test/integration:protocol_integration_test_lib",
+        "//test/integration/filters:pause_filter_for_quic_lib",
     ],
 )
 
@@ -51,6 +52,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//source/extensions/quic_listeners/quiche:client_connection_factory_lib",
         "//source/extensions/quic_listeners/quiche:codec_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_client_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_client_session_lib",

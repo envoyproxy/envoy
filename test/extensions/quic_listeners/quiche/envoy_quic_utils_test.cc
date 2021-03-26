@@ -50,13 +50,27 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
+  // "value1" and "value2" should be coalesced into one header by QUICHE and split again while
+  // converting to Envoy headers..
+  headers_block.AppendValueOrAddHeader("key", "value1");
+  headers_block.AppendValueOrAddHeader("key", "value2");
   auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
-  EXPECT_EQ(headers_block.size(), envoy_headers->size());
+  // Envoy header block is 1 header larger because QUICHE header block does coalescing.
+  EXPECT_EQ(headers_block.size() + 1u, envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
   EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
   EXPECT_EQ("https", envoy_headers->getSchemeValue());
+  EXPECT_EQ("value1", envoy_headers->get(Http::LowerCaseString("key"))[0]->value().getStringView());
+  EXPECT_EQ("value2", envoy_headers->get(Http::LowerCaseString("key"))[1]->value().getStringView());
 
-  quic::QuicHeaderList quic_headers = quic::test::AsHeaderList(headers_block);
+  quic::QuicHeaderList quic_headers;
+  quic_headers.OnHeaderBlockStart();
+  quic_headers.OnHeader(":authority", "www.google.com");
+  quic_headers.OnHeader(":path", "/index.hml");
+  quic_headers.OnHeader(":scheme", "https");
+  quic_headers.OnHeader("key", "value1");
+  quic_headers.OnHeader("key", "value2");
+  quic_headers.OnHeaderBlockEnd(0, 0);
   auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
 }

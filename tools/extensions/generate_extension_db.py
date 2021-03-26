@@ -34,8 +34,9 @@ if not os.path.exists(ENVOY_SRCDIR):
 # import, so we are forced to do this workaround.
 _extensions_build_config_spec = spec_from_loader(
     'extensions_build_config',
-    SourceFileLoader('extensions_build_config',
-                     os.path.join(ENVOY_SRCDIR, 'source/extensions/extensions_build_config.bzl')))
+    SourceFileLoader(
+        'extensions_build_config',
+        os.path.join(ENVOY_SRCDIR, 'source/extensions/extensions_build_config.bzl')))
 extensions_build_config = module_from_spec(_extensions_build_config_spec)
 _extensions_build_config_spec.loader.exec_module(extensions_build_config)
 
@@ -85,8 +86,8 @@ def get_extension_metadata(target):
             % target)
     # evaluate tuples/lists
     # wrap strings in a list
-    categories = (ast.literal_eval(categories) if
-                  ('[' in categories or '(' in categories) else [categories])
+    categories = (
+        ast.literal_eval(categories) if ('[' in categories or '(' in categories) else [categories])
     return {
         'security_posture': security_posture,
         'undocumented': False if is_missing(undocumented) else bool(undocumented),
@@ -109,9 +110,10 @@ if __name__ == '__main__':
     for extension, target in all_extensions.items():
         extension_db[extension] = get_extension_metadata(target)
     if num_robust_to_downstream_network_filters(extension_db) != num_read_filters_fuzzed():
-        raise ExtensionDbError('Check that all network filters robust against untrusted'
-                               'downstreams are fuzzed by adding them to filterNames() in'
-                               'test/extensions/filters/network/common/uber_per_readfilter.cc')
+        raise ExtensionDbError(
+            'Check that all network filters robust against untrusted'
+            'downstreams are fuzzed by adding them to filterNames() in'
+            'test/extensions/filters/network/common/uber_per_readfilter.cc')
     # The TLS and generic upstream extensions are hard-coded into the build, so
     # not in source/extensions/extensions_build_config.bzl
     # TODO(mattklein123): Read these special keys from all_extensions.bzl or a shared location to
@@ -126,6 +128,10 @@ if __name__ == '__main__':
         '//source/extensions/upstreams/http:config')
     extension_db['envoy.request_id.uuid'] = get_extension_metadata(
         '//source/extensions/request_id/uuid:config')
+    extension_db['envoy.listener.quic'] = get_extension_metadata(
+        '//source/extensions/quic_listeners/quiche:quic_factory_lib')
+    extension_db['envoy.transport_sockets.quic'] = get_extension_metadata(
+        '//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib')
 
     pathlib.Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
     pathlib.Path(output_path).write_text(json.dumps(extension_db))
