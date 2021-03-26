@@ -1478,15 +1478,16 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   filter_manager_.streamInfo().onFirstDownstreamTxByteSent();
   const auto status = response_encoder_->encodeHeaders(headers, end_stream);
   if (!status.ok()) {
-    // We reenter this function after the local reply is sent below, and
-    // we again call `streamInfo().onFirstDownstreamTxByteSent()` above, which results in
-    // ASSERT(first_downstream_tx_byte_sent_ != absl::nullopt) fails.
-    // That's why we need to reset here.
-    // Note that the byte has not been sent if the status != ok.
-    filter_manager_.streamInfo().first_downstream_tx_byte_sent_ = absl::nullopt;
-
     // This branch can happen when a misbehaving filter chain removed critical headers or set
     // malformed header values.
+
+    // We reenter this function after the local reply is sent below and then
+    // we again call `streamInfo().onFirstDownstreamTxByteSent()` above, which results in
+    // ASSERT(first_downstream_tx_byte_sent_ != absl::nullopt) fails.
+    // That's why we need to reset first_downstream_tx_byte_sent_ here.
+    // The byte has not actually been sent at this point.
+    filter_manager_.streamInfo().first_downstream_tx_byte_sent_ = absl::nullopt;
+
     const auto request_headers = requestHeaders();
     sendLocalReply(request_headers.has_value() &&
                        Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
