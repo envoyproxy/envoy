@@ -905,8 +905,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
-    chargeStats(continueHeader());
-    response_encoder_->encode100ContinueHeaders(continueHeader());
+    const auto& continue_headers = continueHeader();
+    ASSERT(response_encoder_->encode100ContinueHeaders(continue_headers).ok());
+    chargeStats(continue_headers);
     // Remove the Expect header so it won't be handled again upstream.
     request_headers_->removeExpect();
   }
@@ -1338,13 +1339,24 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers_.get(),
                                                   connection_manager_.config_, EMPTY_STRING);
 
-  // Count both the 1xx and follow-up response code in stats.
-  chargeStats(response_headers);
-
   ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, response_headers);
 
   // Now actually encode via the codec.
-  response_encoder_->encode100ContinueHeaders(response_headers);
+  const auto status = response_encoder_->encode100ContinueHeaders(response_headers);
+  if (!status.ok()) {
+    // This branch can happen when a misbehaving filter chain removed critical headers or set
+    // malformed header values.
+    const auto request_headers = requestHeaders();
+    sendLocalReply(request_headers.has_value() &&
+                       Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
+                   Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
+                   absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
+                                "{", status.message(), "}"));
+    // TODO(mathetake): which stats to charge?
+    return;
+  }
+  // Count both the 1xx and follow-up response code in stats.
+  chargeStats(response_headers);
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& headers,
@@ -1460,14 +1472,25 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  chargeStats(headers);
-
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
   // Now actually encode via the codec.
   filter_manager_.streamInfo().onFirstDownstreamTxByteSent();
-  response_encoder_->encodeHeaders(headers, end_stream);
+  const auto status = response_encoder_->encodeHeaders(headers, end_stream);
+  if (!status.ok()) {
+    // This branch can happen when a misbehaving filter chain removed critical headers or set
+    // malformed header values.
+    const auto request_headers = requestHeaders();
+    sendLocalReply(request_headers.has_value() &&
+                       Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
+                   Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
+                   absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
+                                "{", status.message(), "}"));
+    // TODO(mathetake): which stats to charge?
+    return;
+  }
+  chargeStats(headers);
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, bool end_stream) {

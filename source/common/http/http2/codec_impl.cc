@@ -24,6 +24,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http2/codec_stats.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -172,9 +173,10 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
   });
 }
 
-void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
+Http::Status
+ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
-  encodeHeaders(headers, false);
+  return encodeHeaders(headers, false);
 }
 
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers,
@@ -231,10 +233,13 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
   return okStatus();
 }
 
-void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
-                                                     bool end_stream) {
-  // The contract is that client codecs must ensure that :status is present.
-  ASSERT(headers.Status() != nullptr);
+Http::Status ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
+                                                             bool end_stream) {
+  // The contract is that client codecs must ensure that required headers are present.
+  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
+  if (!status.ok()) {
+    return status;
+  }
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
@@ -248,6 +253,8 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
     buildHeaders(final_headers, headers);
   }
   encodeHeadersBase(final_headers, end_stream);
+
+  return Http::okStatus();
 }
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {

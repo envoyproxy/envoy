@@ -15,6 +15,8 @@
 
 #include "common/http/status.h"
 
+#include "source/common/http/_virtual_includes/status_lib/common/http/status.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -135,7 +137,7 @@ public:
    * Encode 100-Continue headers.
    * @param headers supplies the 100-Continue header map to encode.
    */
-  virtual void encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
+  virtual Http::Status encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
@@ -143,7 +145,7 @@ public:
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only response.
    */
-  virtual void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Encode trailers. This implicitly ends the stream.

@@ -1,3 +1,5 @@
+#include "common/http/status.h"
+
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
@@ -26,9 +28,10 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   startRequest();
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> Http::Status {
         EXPECT_NE(nullptr, headers.Server());
         EXPECT_EQ("envoy-server-test", headers.getServerValue());
+        return Http::okStatus();
       }));
   EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
@@ -51,10 +54,11 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
   startRequest();
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> Http::Status {
         EXPECT_NE(nullptr, headers.Connection());
         EXPECT_EQ("close", headers.getConnectionValue());
         EXPECT_EQ(nullptr, headers.ProxyConnection());
+        return Http::okStatus();
       }));
   EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
@@ -95,9 +99,10 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // Start the response
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> Http::Status {
         EXPECT_NE(nullptr, headers.Server());
         EXPECT_EQ("", headers.getServerValue());
+        return Http::okStatus();
       }));
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
@@ -1384,14 +1389,14 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   std::string response_body;
   // The 500 goes directly to the encoder.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> Http::Status {
         // Make sure this is a 500
         EXPECT_EQ("500", headers.getStatusValue());
         // Make sure Envoy standard sanitization has been applied.
         EXPECT_TRUE(headers.Date() != nullptr);
         EXPECT_EQ("response_payload_too_large",
                   decoder_filters_[0]->callbacks_->streamInfo().responseCodeDetails().value());
-        return FilterHeadersStatus::Continue;
+        return Http::okStatus();
       }));
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
@@ -2079,8 +2084,9 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
 
   // 503 direct response when overloaded.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ("503", headers.getStatusValue());
+        return Http::okStatus();
       }));
   std::string response_body;
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -2127,8 +2133,9 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
       }));
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ("close", headers.getConnectionValue());
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2316,8 +2323,9 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
       }));
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ("close", headers.getConnectionValue());
+        return Http::okStatus();
       }));
 
   Buffer::OwnedImpl fake_input;

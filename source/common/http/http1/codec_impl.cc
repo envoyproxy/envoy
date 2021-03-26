@@ -110,9 +110,9 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
+Http::Status ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
-  encodeHeaders(headers, false);
+  return encodeHeaders(headers, false);
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
@@ -349,11 +349,15 @@ const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLoc
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
-void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
+Http::Status ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
 
-  // The contract is that client codecs must ensure that :status is present.
-  ASSERT(headers.Status() != nullptr);
+  // The contract is that client codecs must ensure that required headers are present.
+  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
+  if (!status.ok()) {
+    return status;
+  }
+
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
   if (connection_.protocol() == Protocol::Http10 && connection_.supportsHttp10()) {
@@ -377,6 +381,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   }
 
   encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream, false);
+  return Http::okStatus();
 }
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";

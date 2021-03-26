@@ -1014,7 +1014,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   ASSERT(HeaderUtility::checkRequiredResponseHeaders(headers).ok() &&
          (!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
           Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols)));
-  
+
   filter_manager_callbacks_.resetIdleTimer();
   disarmRequestTimeout();
 
@@ -1067,17 +1067,6 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   }
 
   const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-  if (!status.ok()) {
-    // This branch can happen when a misbehaving filter chain removed critical headers or set
-    // malformed header values.
-    const auto request_headers = filter_manager_callbacks_.requestHeaders();
-    sendLocalReply(request_headers.has_value() &&
-                       Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
-                   Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
-                   absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
-                                "{", status.message(), "}"));
-    return;
-  }
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;

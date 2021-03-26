@@ -208,7 +208,7 @@ public:
         auto headers =
             fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
-        state.response_encoder_->encode100ContinueHeaders(headers);
+        (void)state.response_encoder_->encode100ContinueHeaders(headers);
       }
       break;
     }
@@ -222,7 +222,7 @@ public:
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
           }
-          state.response_encoder_->encodeHeaders(headers, end_stream);
+          (void)state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
           state.request_encoder_
               ->encodeHeaders(

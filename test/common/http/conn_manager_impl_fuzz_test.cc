@@ -20,6 +20,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
+#include "common/http/status.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -292,10 +293,12 @@ public:
           }
           // If sendLocalReply is called:
           ON_CALL(encoder_, encodeHeaders(_, true))
-              .WillByDefault(Invoke([this](const ResponseHeaderMap&, bool end_stream) -> void {
-                response_state_ =
-                    end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
-              }));
+              .WillByDefault(
+                  Invoke([this](const ResponseHeaderMap&, bool end_stream) -> Http::Status {
+                    response_state_ =
+                        end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+                    return Http::okStatus();
+                  }));
           decoder_->decodeHeaders(std::move(headers), end_stream);
           return Http::okStatus();
         }));

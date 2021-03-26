@@ -1,6 +1,7 @@
 #include "test/mocks/http/stream_encoder.h"
 
 #include "common/http/header_utility.h"
+#include "common/http/status.h"
 
 using testing::_;
 using testing::Invoke;
@@ -26,9 +27,10 @@ MockRequestEncoder::~MockRequestEncoder() = default;
 MockResponseEncoder::MockResponseEncoder() {
   ON_CALL(*this, getStream()).WillByDefault(ReturnRef(stream_));
   ON_CALL(*this, encodeHeaders(_, _))
-      .WillByDefault(Invoke([](const ResponseHeaderMap& headers, bool) {
+      .WillByDefault(Invoke([](const ResponseHeaderMap& headers, bool) -> Status {
         // Check for passing request headers as response headers in a test.
-        ASSERT_NE(nullptr, headers.Status());
+        ASSERT(HeaderUtility::checkRequiredResponseHeaders(headers).ok());
+        return Http::okStatus();
       }));
 }
 MockResponseEncoder::~MockResponseEncoder() = default;
