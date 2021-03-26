@@ -61,7 +61,7 @@ TEST(RaiiListElementTest, DeleteOnErase) {
 }
 
 TEST(RaiiMapOfListElement, DeleteOnDestruction) {
-  absl::node_hash_map<int, std::list<int>> map;
+  absl::flat_hash_map<int, std::list<int>> map;
   {
     EXPECT_EQ(map.size(), 0);
     RaiiMapOfListElement<int, int> element(map, 1, 1);
@@ -74,7 +74,7 @@ TEST(RaiiMapOfListElement, DeleteOnDestruction) {
 }
 
 TEST(RaiiMapOfListElementTest, CancelDelete) {
-  absl::node_hash_map<int, std::list<int>> map;
+  absl::flat_hash_map<int, std::list<int>> map;
 
   {
     EXPECT_EQ(map.size(), 0);
@@ -92,7 +92,7 @@ TEST(RaiiMapOfListElementTest, CancelDelete) {
 }
 
 TEST(RaiiMapOfListElement, MultipleEntriesSameKey) {
-  absl::node_hash_map<int, std::list<int>> map;
+  absl::flat_hash_map<int, std::list<int>> map;
   {
     EXPECT_EQ(map.size(), 0);
     RaiiMapOfListElement<int, int> element(map, 1, 1);
@@ -115,7 +115,7 @@ TEST(RaiiMapOfListElement, MultipleEntriesSameKey) {
 }
 
 TEST(RaiiMapOfListElement, DeleteAfterMapRehash) {
-  absl::node_hash_map<int, std::list<int>> map;
+  absl::flat_hash_map<int, std::list<int>> map;
   std::list<RaiiMapOfListElement<int, int>> list;
   // According to https://abseil.io/docs/cpp/guides/container the max load factor on
   // absl::flat_hash_map is 87.5%. Using bucket_count and multiplying by 2 should give us enough
