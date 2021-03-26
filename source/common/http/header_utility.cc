@@ -323,14 +323,11 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
 }
 
 Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers) {
+  const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!headers.Status()) {
+  if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
     return absl::InvalidArgumentError(
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
-  } else if (!absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("required header: ", Envoy::Http::Headers::get().Status.get(),
-                     " has invalid value: ", headers.getStatusValue()));
   }
   return Http::okStatus();
 }

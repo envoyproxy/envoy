@@ -1011,8 +1011,10 @@ void FilterManager::maybeContinueEncoding(
 void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
                                   bool end_stream) {
   // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition holds.
-  ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
-         Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
+  ASSERT(HeaderUtility::checkRequiredResponseHeaders(headers).ok() &&
+         (!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
+          Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols)));
+  
   filter_manager_callbacks_.resetIdleTimer();
   disarmRequestTimeout();
 

@@ -751,7 +751,7 @@ TEST(CheckRequiredResponseHeaders, NG) {
   EXPECT_EQ(absl::InvalidArgumentError("missing required header: :status"),
             HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{}));
   EXPECT_EQ(
-      absl::InvalidArgumentError("required header: :status has invalid value: abcd"),
+      absl::InvalidArgumentError("missing required header: :status"),
       HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
