@@ -3210,5 +3210,30 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAlloc
   EXPECT_THAT(ostream.contents(), testing::HasSubstr("Dumping corresponding downstream request:"));
 }
 
+// Verify that encodeHeaders() gracefully returned when invalid headers given.
+TEST_F(Http1ServerConnectionImplTest, StatusResponseHeaderNotPresent) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer{"GET / HTTP/1.1\r\n\r\n"};
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestResponseHeaderMapImpl headers{}; // :status header does not exist.
+  EXPECT_EQ(response_encoder->encodeHeaders(headers, true),
+            absl::InvalidArgumentError("missing required header: :status"));
+}
+
 } // namespace Http
 } // namespace Envoy

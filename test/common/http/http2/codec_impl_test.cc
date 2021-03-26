@@ -391,6 +391,19 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
   EXPECT_TRUE(response_encoder_->encodeHeaders(response_headers, true).ok());
 };
 
+// Codec must return InvalidArgument status when the required request headers not being present.
+TEST_P(Http2CodecImplTest, InvalidResponseHeaders) {
+  initialize();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  TestResponseHeaderMapImpl response_headers;
+  EXPECT_EQ(response_encoder_->encodeHeaders(response_headers, true),
+            absl::InvalidArgumentError("missing required header: :status"));
+};
+
 // nghttp2 rejects trailers with :status.
 TEST_P(Http2CodecImplTest, TrailerStatus) {
   initialize();
