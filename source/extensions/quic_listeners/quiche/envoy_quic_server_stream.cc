@@ -5,6 +5,8 @@
 
 #include <memory>
 
+#include "common/http/status.h"
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -53,12 +55,14 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
+Http::Status
+EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
-  encodeHeaders(headers, false);
+  return encodeHeaders(headers, false);
 }
 
-void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
+Http::Status EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers,
+                                                  bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   // QUICHE guarantees to take all the headers. This could cause infinite data to
   // be buffered on headers stream in Google QUIC implementation because
@@ -80,6 +84,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  return Http::okStatus();
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {

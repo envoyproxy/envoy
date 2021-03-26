@@ -15,8 +15,6 @@
 
 #include "common/http/status.h"
 
-#include "source/common/http/_virtual_includes/status_lib/common/http/status.h"
-
 namespace Envoy {
 namespace Http {
 

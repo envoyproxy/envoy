@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/http/status.h"
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -31,8 +33,8 @@ public:
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
   // Http::StreamEncoder
-  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) override;
-  void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
+  Http::Status encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) override;
+  Http::Status encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;

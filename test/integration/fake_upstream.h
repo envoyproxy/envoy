@@ -111,7 +111,7 @@ public:
         Http::Utility::EncodeFunctions(
             {nullptr, nullptr,
              [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-               encoder_.encodeHeaders(*headers, end_stream);
+               (void)encoder_.encodeHeaders(*headers, end_stream);
              },
              [&](Buffer::Instance& data, bool end_stream) -> void {
                encoder_.encodeData(data, end_stream);

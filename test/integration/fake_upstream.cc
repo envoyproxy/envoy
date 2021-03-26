@@ -80,7 +80,7 @@ void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers
         return;
       }
     }
-    encoder_.encode100ContinueHeaders(*headers_copy);
+    (void)encoder_.encode100ContinueHeaders(*headers_copy);
   });
 }
 
@@ -100,7 +100,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
         return;
       }
     }
-    encoder_.encodeHeaders(*headers_copy, end_stream);
+    (void)encoder_.encodeHeaders(*headers_copy, end_stream);
   });
 }
 

@@ -1066,11 +1066,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
-  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
-  state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
+  state_.non_100_response_headers_encoded_ = true;
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
