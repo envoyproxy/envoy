@@ -461,6 +461,11 @@ public:
   virtual void endStream() PURE;
 
   /**
+   * Called to check if endStream() is called by filter manager.
+   */
+  virtual bool streamEnded() PURE;
+
+  /**
    * Called when the stream write buffer is no longer above the low watermark.
    */
   virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;

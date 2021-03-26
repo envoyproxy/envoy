@@ -1249,7 +1249,10 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
 }
 
 void FilterManager::maybeEndEncode(bool end_stream) {
-  if (end_stream) {
+  // filter_manager_callbacks_.streamEnded() returns True here when the codec failed to encode
+  // headers due to the lack of required response headers and filter_manager_callbacks already sent
+  // the local reply and endeded the stream by itself. So in that case this function must be no-op.
+  if (end_stream && !filter_manager_callbacks_.streamEnded()) {
     filter_manager_callbacks_.endStream();
   }
 }

@@ -250,12 +250,14 @@ private:
     }
 
     void endStream() override {
+      // This assertion must satisfy and be guarded by callers with streamEnded().
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
       filter_manager_.streamInfo().onLastDownstreamTxByteSent();
       request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
+    bool streamEnded() override { return state_.codec_saw_local_complete_; }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void upgradeFilterChainCreated() override {
