@@ -56,13 +56,44 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
   return MaybeMatchResult{result.on_match_->action_cb_(), MatchState::MatchComplete};
 }
 
+template <class DataType> class MatchTreeValidationVisitor {
+public:
+  virtual ~MatchTreeValidationVisitor() = default;
+
+  void validateDataInput(const DataInput<DataType>& data_input, absl::string_view type_url) {
+    auto status = performDataInputValidation(data_input, type_url);
+
+    if (!status.ok()) {
+      errors_.emplace_back(std::move(status));
+    }
+  }
+
+  const std::vector<absl::Status> errors() const { return errors_; }
+
+protected:
+  virtual absl::Status performDataInputValidation(const DataInput<DataType>& data_input,
+                                                  absl::string_view type_url) PURE;
+
+private:
+  std::vector<absl::Status> errors_;
+};
+
+template <class DataType>
+class NullMatchTreeValidationVisitor : MatchTreeValidationVisitor<DataType> {
+protected:
+  absl::Status performDataInputValidation(const DataInput<DataType>&, absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
  */
 template <class DataType> class MatchTreeFactory {
 public:
-  explicit MatchTreeFactory(Server::Configuration::FactoryContext& factory_context)
-      : factory_context_(factory_context) {}
+  MatchTreeFactory(Server::Configuration::FactoryContext& factory_context,
+                   MatchTreeValidationVisitor<DataType>& validation_visitor)
+      : factory_context_(factory_context), validation_visitor_(validation_visitor) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
     switch (config.matcher_type_case()) {
@@ -160,7 +191,9 @@ private:
     auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config.typed_config(), factory_context_.messageValidationVisitor(), factory);
-    return factory.createDataInput(*message, factory_context_);
+    auto data_input = factory.createDataInput(*message, factory_context_);
+    validation_visitor_.validateDataInput(*data_input, config.typed_config().type_url());
+    return data_input;
   }
 
   InputMatcherPtr createInputMatcher(
@@ -185,6 +218,7 @@ private:
   }
 
   Server::Configuration::FactoryContext& factory_context_;
+  MatchTreeValidationVisitor<DataType>& validation_visitor_;
 };
 } // namespace Matcher
 } // namespace Envoy

@@ -155,6 +155,8 @@ public:
 
 using FilterDependenciesPtr =
     std::unique_ptr<envoy::extensions::filters::common::dependency::v3::FilterDependencies>;
+using MatchingRequirementsPtr =
+    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>;
 
 /**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
@@ -214,6 +216,15 @@ public:
   virtual FilterDependenciesPtr dependencies() {
     return std::make_unique<
         envoy::extensions::filters::common::dependency::v3::FilterDependencies>();
+  }
+
+  /**
+   * @return MatchingRequirementsPtr specification of matching requirements
+   * for a match tree that can be used with this filter factory.
+   */
+  virtual MatchingRequirementsPtr matchingRequirements() {
+    return std::make_unique<
+        envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   }
 };
 
