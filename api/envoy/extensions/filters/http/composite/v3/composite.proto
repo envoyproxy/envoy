@@ -19,19 +19,21 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.composite]
 
 // :ref:`Composite filter <config_http_filters_composite>` config. The composite filter config
-// allows delegating filter handling to an another filter as determined by a match result. This
-// makes it possible to use different filters or filter configurations based on the incoming request/response.
+// allows delegating filter handling to another filter as determined by a match result. This makes
+// it possible to use different filters or filter configurations based on the incoming
+// request/response.
 //
-// This is intended to used with :ref:`ExtensionWithMatcher <envoy_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
+// This is intended to used with
+// :ref:`ExtensionWithMatcher <envoy_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
 // where a match tree is specified that indicates (via
-// :ref:`CompositeAction <envoy_api_msg_extensions.filters.http.composite.v3.CompositeAction>`) which filter configuration to
-// create and delegate to.
+// :ref:`CompositeAction <envoy_api_msg_extensions.filters.http.composite.v3.CompositeAction>`)
+// which filter configuration to create and delegate to.
 //
 message Composite {
 }
 
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
-message CompositeAction {
+message ExecuteFilterAction {
   config.core.v3.TypedExtensionConfig typed_config = 1;
 }

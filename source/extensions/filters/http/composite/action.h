@@ -9,8 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-class CompositeAction
-    : public Matcher::ActionBase<envoy::extensions::filters::http::composite::v3::CompositeAction> {
+class CompositeAction : public Matcher::ActionBase<
+                            envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
   explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
 
@@ -27,7 +27,7 @@ public:
   createActionFactoryCb(const Protobuf::Message& config, const std::string& stat_prefix,
                         Server::Configuration::FactoryContext& factory_context) override {
     const auto& composite_action = MessageUtil::downcastAndValidate<
-        const envoy::extensions::filters::http::composite::v3::CompositeAction&>(
+        const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
         config, factory_context.messageValidationVisitor());
 
     auto& factory =
@@ -42,7 +42,7 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::http::composite::v3::CompositeAction>();
+    return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 };
 } // namespace Composite

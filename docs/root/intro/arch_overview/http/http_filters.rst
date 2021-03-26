@@ -48,3 +48,10 @@ decoder/encoder filters):
 The connection manager will invoke decoder filters in the order: ``A``, ``B``, ``C``.
 On the other hand, the connection manager will invoke encoder filters in the **reverse**
 order: ``C``, ``B``, ``A``.
+
+Conditional Filter Configuration
+--------------------------------
+
+There is some support for having the filter configuration used to change based on the incoming
+request. See the :ref:`composite filter <config_http_filters_composite>` for details on how to
+configure a match tree that can resolve filter configuration to use for a given request.

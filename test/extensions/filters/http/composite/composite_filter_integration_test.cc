@@ -36,7 +36,7 @@ public:
               action:
                 name: composite-action
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.CompositeAction
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                   typed_config:
                     name: set-response-code
                     typed_config:

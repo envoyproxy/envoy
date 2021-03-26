@@ -9,6 +9,17 @@ or filter configurations to be selected based on the incoming request/response, 
 dynamic configuration that could become prohibitive when making use of per route configurations
 (e.g. because the cardinality would cause a route table explosion).
 
+The filter does not do any kind of buffering, and as a result it must be able to instantiate the
+filter it will delegate to before it receives any callbacks that it needs to delegate. Since match
+results resolve before the associated data is made available to the filter, this means that the filter
+must inject a stream or decoder filter using only request headers. A stream encoder filter can be
+resolved using request and response headers (and optionally other parts of the request, but if this
+arrives after response headers delegation will fail).
+
+Delegation can fail for a few reasons: the match result was not ready in time for the filter
+to be instantiated at the right time or if the filter factory attempted to use a callback not supported
+by the composite filter. In either case, the `<stat_prefix>.composite.delegation_error` stat will
+be incremented.
 
 Sample Envoy configuration
 --------------------------
@@ -22,3 +33,15 @@ instantiated.
 
 .. literalinclude:: _include/composite.yaml
     :language: yaml
+
+Statistics
+----------
+
+The composite filter outputs statistics in the <stat_prefix>.composite.* namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  delegation_success, Counter, Number of requests that successfully created a delegated filter
+  delegation_error, Counter, Number of requests that attempted to create a delegated filter but failed
