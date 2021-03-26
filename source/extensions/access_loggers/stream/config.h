@@ -35,7 +35,6 @@ public:
   std::string name() const override;
 };
 
-
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions

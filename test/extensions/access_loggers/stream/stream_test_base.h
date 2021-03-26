@@ -22,7 +22,7 @@ namespace AccessLoggers {
 namespace File {
 namespace {
 
-template<class T, Filesystem::DestinationType destination_type>
+template <class T, Filesystem::DestinationType destination_type>
 class StreamAccessLogTest : public testing::Test {
 public:
   StreamAccessLogTest() = default;
