@@ -353,10 +353,7 @@ Http::Status ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers
   started_response_ = true;
 
   // The contract is that client codecs must ensure that required headers are present.
-  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-  if (!status.ok()) {
-    return status;
-  }
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredResponseHeaders(headers));
 
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 

@@ -1352,7 +1352,6 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
                    Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
                    absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
                                 "{", status.message(), "}"));
-    // TODO(mathetake): which stats to charge?
     return;
   }
   // Count both the 1xx and follow-up response code in stats.
@@ -1494,7 +1493,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                    Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
                    absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
                                 "{", status.message(), "}"));
-    // TODO(mathetake): which stats to charge?
     return;
   }
   chargeStats(headers);

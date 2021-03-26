@@ -236,10 +236,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
 Http::Status ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& headers,
                                                              bool end_stream) {
   // The contract is that client codecs must ensure that required headers are present.
-  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-  if (!status.ok()) {
-    return status;
-  }
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredResponseHeaders(headers));
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
