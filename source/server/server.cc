@@ -417,7 +417,7 @@ void InstanceImpl::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options);
+  Configuration::InitialImpl initial_config(bootstrap_, options, *this);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -491,11 +491,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   if (initial_config.admin().address()) {
-    if (initial_config.admin().accessLogPath().empty()) {
-      throw EnvoyException("An admin access log path is required for a listening server.");
-    }
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));

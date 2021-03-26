@@ -41,6 +41,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:tracer_config_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
@@ -53,6 +54,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/access_loggers/common:file_access_log_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
@@ -62,8 +64,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
-        ":active_udp_listener",
-        ":connection_handler_impl",
+        "//source/server:active_tcp_listener",
+        "//source/server:active_udp_listener",
+        "//source/server:connection_handler_impl",
     ],
 )
 
@@ -77,10 +80,40 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/server:active_udp_listener_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/stats:timespan_interface",
+        "//source/common/common:linked_object",
+        "//source/common/common:non_copyable",
+        "//source/common/event:deferred_task",
+        "//source/common/network:connection_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/server:active_tcp_listener_header",
+    ],
+)
+
+envoy_cc_library(
+    # Currently both `active_tcp_listener` and `connection_handler_impl` need below headers
+    # while addressing https://github.com/envoyproxy/envoy/issues/15126
+    # TODO(lambdai): Remove the definition of ActiveTcpListener from dependency of ConnectionHandlerImpl
+    # and delete this target.
+    name = "active_tcp_listener_header",
+    hdrs = [
+        "active_tcp_listener.h",
+        "connection_handler_impl.h",
+    ],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",
-        "//include/envoy/network:exception_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
@@ -93,7 +126,37 @@ envoy_cc_library(
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_tcp_listener",
+    srcs = ["active_tcp_listener.cc"],
+    hdrs = [
+        "active_tcp_listener.h",
+    ],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/network:connection_handler_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/server:active_udp_listener_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//include/envoy/stats:timespan_interface",
+        "//source/common/common:linked_object",
+        "//source/common/common:non_copyable",
+        "//source/common/common:safe_memcpy_lib",
+        "//source/common/event:deferred_task",
+        "//source/common/network:connection_lib",
+        "//source/common/stats:timespan_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/extensions/transport_sockets:well_known_names",
+        "//source/server:active_tcp_listener_header",
     ],
 )
 
