@@ -25,7 +25,7 @@ public:
                        OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
                        absl::string_view type_url, Event::Dispatcher& dispatcher,
                        std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
-                       bool use_namespace_matching);
+                       const SubscriptionOptions& options);
 
   // Config::Subscription
   void start(const absl::flat_hash_set<std::string>& resource_names) override;
@@ -59,7 +59,7 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   const bool is_aggregated_;
-  const bool use_namespace_matching_;
+  const SubscriptionOptions options_;
 
   struct ResourceNameFormatter {
     void operator()(std::string* out, const Config::DecodedResourceRef& resource) {
@@ -77,7 +77,8 @@ public:
                                  GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
                                  OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
                                  Event::Dispatcher& dispatcher,
-                                 std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
+                                 std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
+                                 const SubscriptionOptions& options);
 
   void start(const absl::flat_hash_set<std::string>& resource_names) override;
 
