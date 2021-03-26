@@ -78,7 +78,6 @@ private:
   std::vector<absl::Status> errors_;
 };
 
-
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
  */

@@ -129,7 +129,7 @@ matcher:
       EnvoyException,
       "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
       "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput not permitted "
-      "acording to allowlist");
+      "according to allowlist");
 }
 
 } // namespace

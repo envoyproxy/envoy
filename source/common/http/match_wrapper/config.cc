@@ -38,7 +38,7 @@ public:
     }
 
     return absl::InvalidArgumentError(
-        fmt::format("data input typeUrl {} not permitted acording to allowlist", type_url));
+        fmt::format("data input typeUrl {} not permitted according to allowlist", type_url));
   }
 
 private:
