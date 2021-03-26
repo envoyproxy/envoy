@@ -78,13 +78,6 @@ private:
   std::vector<absl::Status> errors_;
 };
 
-template <class DataType>
-class NullMatchTreeValidationVisitor : MatchTreeValidationVisitor<DataType> {
-protected:
-  absl::Status performDataInputValidation(const DataInput<DataType>&, absl::string_view) override {
-    return absl::OkStatus();
-  }
-};
 
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
