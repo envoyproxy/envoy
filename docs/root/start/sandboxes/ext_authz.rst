@@ -1,28 +1,23 @@
 .. _install_sandboxes_ext_authz:
 
-External Authorization Filter
+外部授权过滤器
 =============================
 
-The External Authorization sandbox demonstrates Envoy's :ref:`ext_authz filter <config_http_filters_ext_authz>`
-capability to delegate authorization of incoming requests through Envoy to an external services.
+外部授权沙箱演示了 Envoy 的 :ref:`ext_authz 过滤器 <config_http_filters_ext_authz>` 功能，该功能可将通过 Envoy 传入请求的授权委派给外部服务。
 
-While ext_authz can also be employed as a network filter, this sandbox is limited to exhibit
-ext_authz HTTP Filter, which supports to call HTTP or gRPC service.
+尽管 ext_authz 也可以用作网络过滤器，但此沙箱仅限于展示 ext_authz HTTP 过滤器，该过滤器支持调用 HTTP 或 gRPC 服务。
 
-The setup of this sandbox is very similar to front-proxy deployment, however calls to upstream
-service behind the proxy will be checked by an external HTTP or gRPC service. In this sandbox,
-for every authorized call, the external authorization service adds additional ``x-current-user``
-header entry to the original request headers to be forwarded to the upstream service.
+此沙箱的设置与 front-proxy 部署非常相似，但是对代理后面上游服务的调用会被外部 HTTP 或 gRPC 服务检查。在此沙箱中，对于每个授权的调用，外部授权服务都会在原始请求头部添加 ``x-current-user``，然后该调用会被转发到上游服务。
 
-Running the Sandbox
+运行沙箱
 ~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Start all of our containers
+步骤 3： 启动所有容器
 ***********************************
 
-To build this sandbox example and start the example services, run the following commands:
+要构建此沙箱示例并启动示例服务，请运行以下命令：
 
 .. code-block:: console
 
@@ -41,17 +36,13 @@ To build this sandbox example and start the example services, run the following 
 
 .. note::
 
-    This sandbox has multiple setup controlled by ``FRONT_ENVOY_YAML`` environment variable which
-    points to the effective Envoy configuration to be used. The default value of ``FRONT_ENVOY_YAML``
-    can be defined in the ``.env`` file or provided inline when running the ``docker-compose up``
-    command. For more information, pease take a look at `environment variables in Compose documentation <https://docs.docker.com/compose/environment-variables>`_.
+    此沙箱具有受 ``FRONT_ENVOY_YAML`` 环境变量控制的多个设置，这些设置指向要使用的有效 Envoy 配置。``FRONT_ENVOY_YAML`` 可以在 ``.env`` 文件中定义默认值，也可以在运行 ``docker-compose up`` 命令时内联提供。更多有关信息，请参阅 `Compose 文档中的环境变量 <https://docs.docker.com/compose/environment-variables>`_。
 
-By default, ``FRONT_ENVOY_YAML`` points to ``config/grpc-service/v3.yaml`` file which bootstraps
-front-envoy with ext_authz HTTP filter with gRPC service ``V3`` (this is specified by :ref:`transport_api_version field<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`).
-The possible values of ``FRONT_ENVOY_YAML`` can be found inside the ``envoy/examples/ext_authz/config``
-directory.
+默认情况下，``FRONT_ENVOY_YAML`` 指向 ``config/grpc-service/v3.yaml`` 文件，该文件使用 ext_authz HTTP 过滤器引导 front-envoy，此 ext_authz HTTP 过滤器使用 gRPC v3 服务（这是在 :ref:`transport_api_version 字段 <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>` 中指定的）。
 
-For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
+``FRONT_ENVOY_YAML`` 的可选值可以在 ``envoy/examples/ext_authz/config`` 目录内找到。
+
+例如，使用带有 HTTP 服务的 ext_authz HTTP 过滤器运行 Envoy 将是：
 
 .. code-block:: console
 
@@ -63,10 +54,10 @@ For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
     $ FRONT_ENVOY_YAML=config/http-service.yaml docker-compose up --build -d
     $ # Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don't have to specify it when running the "up" command.
 
-Step 4: Access the upstream-service behind the Front Envoy
-**********************************************************
+步骤 4： 访问 Front Envoy 后面的上游服务
+*************************************************
 
-You can now try to send a request to upstream-service via the front-envoy as follows:
+现在，你可以尝试通过 front-envoy 向上游服务发送请求，如下所示：
 
 .. code-block:: console
 
@@ -84,16 +75,13 @@ You can now try to send a request to upstream-service via the front-envoy as fol
     < server: envoy
     < content-length: 0
 
-As observed, the request failed with ``403 Forbidden`` status code. This happened since the ext_authz
-filter employed by Envoy rejected the call. To let the request reach the upstream service, you need
-to provide a ``Bearer`` token via the ``Authorization`` header.
+如观察到的，该请求失败了，返回的是 ``403 Forbidden`` 状态码。这是因为 Envoy 使用的 ext_authz 过滤器拒绝了调用。为了使请求到达上游服务，你需要在 ``Authorization`` 头部添加一个 ``Bearer`` 令牌。
 
 .. note::
 
-    A complete list of users is defined in ``envoy/examples/ext_authz/auth/users.json`` file. For
-    example, the ``token1`` used in the below example is corresponding to ``user1``.
+    ``envoy/examples/ext_authz/auth/users.json`` 文件中定义了完整的用户列表。例如，以下示例中使用的 ``token1`` 与 ``user1`` 相对应。
 
-An example of successful requests can be observed as follows:
+下面是一个成功请求的示例：
 
 .. code-block:: console
 
@@ -117,9 +105,7 @@ An example of successful requests can be observed as follows:
     * Connection #0 to host localhost left intact
     Hello user1 from behind Envoy!
 
-We can also employ `Open Policy Agent <https://www.openpolicyagent.org/>`_ server
-(with `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-istio-plugin>`_ plugin enabled)
-as the authorization server. To run this example:
+我们还可以使用 `Open Policy Agent <https://www.openpolicyagent.org/>`_ 服务器（已启用 `envoy_ext_authz_grpc <https://github.com/open-policy-agent/opa-istio-plugin>`_ 插件）作为授权服务器。要运行此示例：
 
 .. code-block:: console
 
@@ -130,7 +116,7 @@ as the authorization server. To run this example:
     $ docker-compose down
     $ FRONT_ENVOY_YAML=config/opa-service/v2.yaml docker-compose up --build -d
 
-And sending a request to the upstream service (via the Front Envoy) gives:
+并向上游服务（通过 Front Envoy）发送请求将得到：
 
 .. code-block:: console
 
@@ -153,8 +139,7 @@ And sending a request to the upstream service (via the Front Envoy) gives:
     * Connection #0 to host localhost left intact
     Hello OPA from behind Envoy!
 
-From the logs, we can observe the policy decision message from the Open Policy Agent server (for
-the above request against the defined policy in ``config/opa-service/policy.rego``):
+从日志中，我们可以观察到来自 Open Policy Agent 服务器的策略决策消息（和上述请求对应的策略在 ``config/opa-service/policy.rego`` 中定义）：
 
 .. code-block:: console
 
@@ -191,7 +176,7 @@ the above request against the defined policy in ``config/opa-service/policy.rego
     ext_authz-opa-service_1   |           "method": "GET",
     ext_authz-opa-service_1   |           "path": "/service",
 
-Trying to send a request with method other than ``GET`` gives a rejection:
+尝试使用除 ``GET`` 之外的方法发送请求，会被拒绝：
 
 .. code-block:: console
 
