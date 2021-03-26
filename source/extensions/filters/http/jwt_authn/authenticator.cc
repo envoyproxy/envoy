@@ -145,7 +145,7 @@ void AuthenticatorImpl::startVerify() {
 
   if (provider_) {
     jwks_data_ = jwks_cache_.findByProvider(provider_.value());
-    jwt_ = jwks_data_->getJwtCache().find(curr_token_->token());
+    jwt_ = jwks_data_->getJwtCache().lookup(curr_token_->token());
     if (jwt_) {
       handleGoodJwt(/*cache_hit=*/true);
       return;
@@ -285,9 +285,9 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   if (set_payload_cb_ && !provider.payload_in_metadata().empty()) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
-  if (provider_ && !cache_hit && jwks_data_->getJwtProvider().enable_jwt_cache()) {
+  if (provider_ && !cache_hit) {
     // move the ownership of "new_jwt_" into the function.
-    jwks_data_->getJwtCache().add(curr_token_->token(), std::move(new_jwt_));
+    jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(new_jwt_));
   }
   doneWithStatus(Status::Ok);
 }

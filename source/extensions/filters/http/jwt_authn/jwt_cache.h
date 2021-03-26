@@ -26,11 +26,14 @@ class JwtCache {
 public:
   virtual ~JwtCache() = default;
 
-  // Find Cache JWT string. If found return parsed JWT struct otherwise no-op.
-  virtual ::google::jwt_verify::Jwt* find(const std::string& token) PURE;
+  // Lookup a JWT token in the cache, if found return the pointer to its parsed jwt struct.
+  // If no found, return nullptr.
+  virtual ::google::jwt_verify::Jwt* lookup(const std::string& token) PURE;
 
-  // Add good JWT string and it's parsed JWT struct in Cache.
-  virtual void add(const std::string& token, std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) PURE;
+  // Insert a JWT token and its parsed JWT struct to the cache.
+  // The function will take over the ownership of jwt object.
+  virtual void insert(const std::string& token,
+                      std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) PURE;
 
   // JwtCache factory function.
   static JwtCachePtr create(bool enable_cache, int cache_size);
