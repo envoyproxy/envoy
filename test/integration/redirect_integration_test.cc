@@ -186,17 +186,20 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
 
   default_request_headers_.setHost("handle.internal.redirect");
   default_request_headers_.setMethod("POST");
+  const std::string& request_body = "foobarbizbaz";
 
   // First request to original upstream.
   IntegrationStreamDecoderPtr response =
-      codec_client_->makeRequestWithBody(default_request_headers_, "foobarbizbaz");
+      codec_client_->makeRequestWithBody(default_request_headers_, request_body);
   waitForNextUpstreamRequest();
+  EXPECT_EQ(request_body, upstream_request_->body().toString());
 
   // Respond with a redirect.
   upstream_request_->encodeHeaders(redirect_response_, true);
 
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
+  EXPECT_EQ(request_body, upstream_request_->body().toString());
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
             upstream_request_->headers().getEnvoyOriginalUrlValue());
