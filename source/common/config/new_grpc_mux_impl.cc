@@ -145,21 +145,21 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
                                          OpaqueResourceDecoder& resource_decoder,
-                                         const bool use_namespace_matching) {
+                                         const SubscriptionOptions& options) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     if (enable_type_url_downgrade_and_upgrade_) {
       registerVersionedTypeUrl(type_url);
     }
-    addSubscription(type_url, use_namespace_matching);
-    return addWatch(type_url, resources, callbacks, resource_decoder, use_namespace_matching);
+    addSubscription(type_url, options.use_namespace_matching_);
+    return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch, resources, use_namespace_matching);
-  return std::make_unique<WatchImpl>(type_url, watch, *this);
+  updateWatch(type_url, watch, resources, options);
+  return std::make_unique<WatchImpl>(type_url, watch, *this, options);
 }
 
 // Updates the list of resource names watched by the given watch. If an added name is new across
@@ -167,36 +167,31 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const absl::flat_hash_set<std::string>& resources,
-                                 const bool creating_namespace_watch) {
+                                 const SubscriptionOptions& options) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
-  // If this is a glob collection subscription, we need to compute actual context parameters.
-  absl::flat_hash_set<std::string> xdstp_resources;
-  // TODO(htuch): add support for resources beyond glob collections, the constraints below around
-  // resource size and ID reflect the progress of the xdstp:// implementation.
-  if (!resources.empty() && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
-    // Callers must be asking for a single resource, the collection.
-    ASSERT(resources.size() == 1);
-    auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
-    // We only know how to deal with glob collections and static context parameters right now.
-    // TODO(htuch): add support for dynamic context params and list collections in the future.
-    if (absl::EndsWith(resource.id(), "/*")) {
-      auto encoded_context = XdsContextParams::encodeResource(
-          local_info_.contextProvider().nodeContext(), resource.context(), {}, {});
-      resource.mutable_context()->CopyFrom(encoded_context);
+  // We need to prepare xdstp:// resources for the transport, by normalizing and adding any extra
+  // context parameters.
+  absl::flat_hash_set<std::string> effective_resources;
+  for (const auto& resource : resources) {
+    if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
+      auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
+      if (options.add_xdstp_node_context_params_) {
+        const auto context = XdsContextParams::encodeResource(
+            local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
+        xdstp_resource.mutable_context()->CopyFrom(context);
+      }
       XdsResourceIdentifier::EncodeOptions encode_options;
       encode_options.sort_context_params_ = true;
-      xdstp_resources.insert(XdsResourceIdentifier::encodeUrn(resource, encode_options));
+      effective_resources.insert(XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options));
     } else {
-      // TODO(htuch): We will handle list collections here in future work.
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      effective_resources.insert(resource);
     }
   }
-  auto added_removed = sub->second->watch_map_.updateWatchInterest(
-      watch, xdstp_resources.empty() ? resources : xdstp_resources);
-  if (creating_namespace_watch && xdstp_resources.empty()) {
+  auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
+  if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub->second->sub_state_.updateSubscriptionInterest({}, {});
   } else {
@@ -222,7 +217,7 @@ void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
 }
 
 void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
-  updateWatch(type_url, watch, {});
+  updateWatch(type_url, watch, {}, {});
   auto entry = subscriptions_.find(type_url);
   ASSERT(entry != subscriptions_.end(),
          fmt::format("removeWatch() called for non-existent subscription {}.", type_url));
