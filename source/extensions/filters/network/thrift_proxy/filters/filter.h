@@ -100,9 +100,9 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
-   * @return Metadata contained in the callbacks.
+   * @return Response decoder created by the connection manager.
    */
-  virtual MessageMetadataSharedPtr metadata() PURE;
+  virtual ResponseDecoderPtr responseDecoder() PURE;
 };
 
 /**

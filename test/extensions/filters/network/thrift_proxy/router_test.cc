@@ -313,7 +313,9 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
-    ON_CALL(callbacks_, metadata()).WillByDefault(Return(metadata));
+    auto* response_decoder = std::make_unique<ResponseDecoder>(callbacks_, transport_, protocol_);
+    response_decoder->metadata_ = metadata;
+    ON_CALL(callbacks_, responseDecoder()).WillByDefault(Return(metadata));
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
@@ -961,6 +963,44 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
                      .value());
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("response_reply")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, Exception) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Exception);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_exception")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Exception);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Call);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_invalid_type")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_invalid_type")
                      .value());
 }
 
