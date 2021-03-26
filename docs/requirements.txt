@@ -95,9 +95,9 @@ sphinx-copybutton==0.3.1 \
 sphinx-rtd-theme==0.5.0 \
     --hash=sha256:22c795ba2832a169ca301cd0a083f7a434e09c538c70beb42782c073651b707d \
     --hash=sha256:373413d0f82425aaa28fb288009bf0d0964711d347763af2f1b65cafcb028c82
-sphinx-tabs==1.3.0 \
-    --hash=sha256:537857f91f1b371f7b45eb8ac83001618b3e3178c78df073d2cc4558a8e66ef5 \
-    --hash=sha256:54132c8a57aa19bba6e17fe26eb94ea9df531708ff3f509b119313b32d0d5aff
+sphinx-tabs==2.1.0 \
+    --hash=sha256:9d8db61afe9499aa84b33bc1c0d891f8a0df88ae513739f5babde15430c1fdaf \
+    --hash=sha256:0b5a8dd71d87197a01eef3b9d1e1a70513f4dd45e8af7783d1ab74c3fb2cbc6c
 sphinxcontrib-applehelp==1.0.2 \
     --hash=sha256:806111e5e962be97c29ec4c1e7fe277bfd19e9652fb1a4392105b43e01af885a \
     --hash=sha256:a072735ec80e7675e3f432fcae8610ecf509c5f1869d17e2eecff44389cdbc58
