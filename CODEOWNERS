@@ -179,3 +179,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/http/ext_authz @esmet @gsagula @dio
 /*/extensions/filters/network/ext_authz @esmet @gsagula @dio
+# Formatters
+/*/extensions/formatter/req_without_query @dio @tsaarni

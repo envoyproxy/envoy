@@ -255,6 +255,12 @@ EXTENSIONS = {
     #
 
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+
+    #
+    # Formatter
+    #
+
+    "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
