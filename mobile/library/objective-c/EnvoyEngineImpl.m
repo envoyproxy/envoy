@@ -413,27 +413,30 @@ static envoy_data ios_get_string(const void *context) {
 }
 
 - (int)recordCounterInc:(NSString *)elements count:(NSUInteger)count {
-  return record_counter_inc(_engineHandle, elements.UTF8String, count);
+  // TODO: update to use real tag array when the API layer change is ready.
+  return record_counter_inc(_engineHandle, elements.UTF8String, envoy_stats_notags, count);
 }
 
 - (int)recordGaugeSet:(NSString *)elements value:(NSUInteger)value {
-  return record_gauge_set(_engineHandle, elements.UTF8String, value);
+  return record_gauge_set(_engineHandle, elements.UTF8String, envoy_stats_notags, value);
 }
 
 - (int)recordGaugeAdd:(NSString *)elements amount:(NSUInteger)amount {
-  return record_gauge_add(_engineHandle, elements.UTF8String, amount);
+  return record_gauge_add(_engineHandle, elements.UTF8String, envoy_stats_notags, amount);
 }
 
 - (int)recordGaugeSub:(NSString *)elements amount:(NSUInteger)amount {
-  return record_gauge_sub(_engineHandle, elements.UTF8String, amount);
+  return record_gauge_sub(_engineHandle, elements.UTF8String, envoy_stats_notags, amount);
 }
 
 - (int)recordHistogramDuration:(NSString *)elements durationMs:(NSUInteger)durationMs {
-  return record_histogram_value(_engineHandle, elements.UTF8String, durationMs, MILLISECONDS);
+  return record_histogram_value(_engineHandle, elements.UTF8String, envoy_stats_notags, durationMs,
+                                MILLISECONDS);
 }
 
 - (int)recordHistogramValue:(NSString *)elements value:(NSUInteger)value {
-  return record_histogram_value(_engineHandle, elements.UTF8String, value, UNSPECIFIED);
+  return record_histogram_value(_engineHandle, elements.UTF8String, envoy_stats_notags, value,
+                                UNSPECIFIED);
 }
 
 #pragma mark - Private

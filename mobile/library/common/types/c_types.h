@@ -112,6 +112,8 @@ typedef struct {
 // Multiple header values for the same header key are supported via a comma-delimited string.
 typedef envoy_map envoy_headers;
 
+typedef envoy_map envoy_stats_tags;
+
 #ifdef __cplusplus
 extern "C" { // utility functions
 #endif
@@ -161,6 +163,9 @@ extern const envoy_data envoy_nodata;
 
 // Convenience constant to pass to function calls with no headers.
 extern const envoy_headers envoy_noheaders;
+
+// Convenience constant to pass to function calls with no tags.
+extern const envoy_stats_tags envoy_stats_notags;
 
 /*
  * Error struct.
