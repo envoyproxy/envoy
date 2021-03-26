@@ -43,7 +43,6 @@ std::string StdoutAccessLogFactory::name() const { return AccessLogNames::get().
 REGISTER_FACTORY(StdoutAccessLogFactory,
                  Server::Configuration::AccessLogInstanceFactory){"envoy.stdout_access_log"};
 
-
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {

@@ -1,7 +1,6 @@
 #include "envoy/extensions/access_loggers/stream/v3/stream.pb.h"
 
 #include "test/extensions/access_loggers/stream/stream_test_base.h"
-
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
