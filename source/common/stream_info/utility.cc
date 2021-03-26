@@ -5,73 +5,48 @@
 namespace Envoy {
 namespace StreamInfo {
 
-const std::string ResponseFlagUtils::NONE = "-";
-const std::string ResponseFlagUtils::DOWNSTREAM_CONNECTION_TERMINATION = "DC";
-const std::string ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK = "LH";
-const std::string ResponseFlagUtils::NO_HEALTHY_UPSTREAM = "UH";
-const std::string ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT = "UT";
-const std::string ResponseFlagUtils::LOCAL_RESET = "LR";
-const std::string ResponseFlagUtils::UPSTREAM_REMOTE_RESET = "UR";
-const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE = "UF";
-const std::string ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION = "UC";
-const std::string ResponseFlagUtils::UPSTREAM_OVERFLOW = "UO";
-const std::string ResponseFlagUtils::UPSTREAM_RETRY_LIMIT_EXCEEDED = "URX";
-const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
-const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
-const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
-const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
-const std::string ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE = "UAEX";
-const std::string ResponseFlagUtils::RATELIMIT_SERVICE_ERROR = "RLSE";
-const std::string ResponseFlagUtils::STREAM_IDLE_TIMEOUT = "SI";
-const std::string ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS = "IH";
-const std::string ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR = "DPE";
-const std::string ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED = "UMSDR";
-const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
-const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
-const std::string ResponseFlagUtils::DURATION_TIMEOUT = "DT";
-const std::string ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR = "UPE";
-const std::string ResponseFlagUtils::NO_CLUSTER_FOUND = "NC";
+// const std::array<std::pair<absl::string_view, ResponseFlag>>
+//     ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS = {
+//         {ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
+//         {ResponseFlagUtils::NO_HEALTHY_UPSTREAM, ResponseFlag::NoHealthyUpstream},
+//         {ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT, ResponseFlag::UpstreamRequestTimeout},
+//         {ResponseFlagUtils::LOCAL_RESET, ResponseFlag::LocalReset},
+//         {ResponseFlagUtils::UPSTREAM_REMOTE_RESET, ResponseFlag::UpstreamRemoteReset},
+//         {ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE,
+//         ResponseFlag::UpstreamConnectionFailure},
+//         {ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION,
+//          ResponseFlag::UpstreamConnectionTermination},
+//         {ResponseFlagUtils::UPSTREAM_OVERFLOW, ResponseFlag::UpstreamOverflow},
+//         {ResponseFlagUtils::NO_ROUTE_FOUND, ResponseFlag::NoRouteFound},
+//         {ResponseFlagUtils::DELAY_INJECTED, ResponseFlag::DelayInjected},
+//         {ResponseFlagUtils::FAULT_INJECTED, ResponseFlag::FaultInjected},
+//         {ResponseFlagUtils::RATE_LIMITED, ResponseFlag::RateLimited},
+//         {ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE,
+//          ResponseFlag::UnauthorizedExternalService},
+//         {ResponseFlagUtils::RATELIMIT_SERVICE_ERROR, ResponseFlag::RateLimitServiceError},
+//         {ResponseFlagUtils::DOWNSTREAM_CONNECTION_TERMINATION,
+//          ResponseFlag::DownstreamConnectionTermination},
+//         {ResponseFlagUtils::UPSTREAM_RETRY_LIMIT_EXCEEDED,
+//          ResponseFlag::UpstreamRetryLimitExceeded},
+//         {ResponseFlagUtils::STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
+//         {ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS,
+//          ResponseFlag::InvalidEnvoyRequestHeaders},
+//         {ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR, ResponseFlag::DownstreamProtocolError},
+//         {ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED,
+//          ResponseFlag::UpstreamMaxStreamDurationReached},
+//         {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
+//         {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
+//         {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
+//         {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
+//         {ResponseFlagUtils::NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
+// };
 
-const std::vector<std::pair<std::string, ResponseFlag>>
-    ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS = {
-        {ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
-        {ResponseFlagUtils::NO_HEALTHY_UPSTREAM, ResponseFlag::NoHealthyUpstream},
-        {ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT, ResponseFlag::UpstreamRequestTimeout},
-        {ResponseFlagUtils::LOCAL_RESET, ResponseFlag::LocalReset},
-        {ResponseFlagUtils::UPSTREAM_REMOTE_RESET, ResponseFlag::UpstreamRemoteReset},
-        {ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE, ResponseFlag::UpstreamConnectionFailure},
-        {ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION,
-         ResponseFlag::UpstreamConnectionTermination},
-        {ResponseFlagUtils::UPSTREAM_OVERFLOW, ResponseFlag::UpstreamOverflow},
-        {ResponseFlagUtils::NO_ROUTE_FOUND, ResponseFlag::NoRouteFound},
-        {ResponseFlagUtils::DELAY_INJECTED, ResponseFlag::DelayInjected},
-        {ResponseFlagUtils::FAULT_INJECTED, ResponseFlag::FaultInjected},
-        {ResponseFlagUtils::RATE_LIMITED, ResponseFlag::RateLimited},
-        {ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE,
-         ResponseFlag::UnauthorizedExternalService},
-        {ResponseFlagUtils::RATELIMIT_SERVICE_ERROR, ResponseFlag::RateLimitServiceError},
-        {ResponseFlagUtils::DOWNSTREAM_CONNECTION_TERMINATION,
-         ResponseFlag::DownstreamConnectionTermination},
-        {ResponseFlagUtils::UPSTREAM_RETRY_LIMIT_EXCEEDED,
-         ResponseFlag::UpstreamRetryLimitExceeded},
-        {ResponseFlagUtils::STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
-        {ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS,
-         ResponseFlag::InvalidEnvoyRequestHeaders},
-        {ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR, ResponseFlag::DownstreamProtocolError},
-        {ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED,
-         ResponseFlag::UpstreamMaxStreamDurationReached},
-        {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
-        {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
-        {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
-        {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
-        {ResponseFlagUtils::NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
-};
-
-void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
+void ResponseFlagUtils::appendString(std::string& result, absl::string_view append) {
   if (result.empty()) {
     result = append;
   } else {
-    result += "," + append;
+    result += ",";
+    result += append;
   }
 }
 
@@ -84,17 +59,19 @@ const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info
     }
   }
 
-  return result.empty() ? NONE : result;
+  return result.empty() ? std::string(NONE) : result;
 }
 
 absl::flat_hash_map<std::string, ResponseFlag> ResponseFlagUtils::getFlagMap() {
   static_assert(ResponseFlag::LastFlag == 0x1000000, "A flag has been added. Fix this code.");
-  return absl::flat_hash_map<std::string, ResponseFlag>(
-      ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS.begin(),
-      ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS.end());
+  absl::flat_hash_map<std::string, ResponseFlag> res;
+  for (auto [str, flag] : ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
+    res.emplace(str, flag);
+  }
+  return res;
 }
 
-absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string& flag) {
+absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(absl::string_view flag) {
   static const absl::flat_hash_map<std::string, ResponseFlag> map = ResponseFlagUtils::getFlagMap();
   const auto& it = map.find(flag);
   if (it != map.end()) {
