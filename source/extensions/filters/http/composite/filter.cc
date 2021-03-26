@@ -10,6 +10,8 @@ namespace HttpFilters {
 namespace Composite {
 
 namespace {
+// Helper that returns `filter->func(args...)` if the filter is not null, returning `rval`
+// otherwise.
 template <class FilterPtrT, class FuncT, class RValT, class... Args>
 RValT delegateFilterAction(FilterPtrT& filter, FuncT func, RValT rval, Args&&... args) {
   if (filter) {
@@ -80,13 +82,15 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
   composite_action.createFilters(wrapper);
 
   if (!wrapper.errors_.empty()) {
-    ENVOY_LOG(error, "failed to create delegated filter {}",
+    stats_.filter_delegation_error_.inc();
+    ENVOY_LOG(debug, "failed to create delegated filter {}",
               accumulateToString<absl::Status>(
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
     return;
   }
 
   if (wrapper.filter_to_inject_) {
+    stats_.filter_delegation_success_.inc();
     if (absl::holds_alternative<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_)) {
       delegated_filter_ = std::make_shared<StreamFilterWrapper>(
           absl::get<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_));

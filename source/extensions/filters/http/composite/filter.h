@@ -17,9 +17,18 @@ namespace Composite {
 
 struct FactoryCallbacksWrapper;
 
+#define ALL_COMPOSITE_FILTER_STATS(COUNTER)                                                        \
+  COUNTER(filter_delegation_error)                                                                 \
+  COUNTER(filter_delegation_success)
+
+struct FilterStats {
+  ALL_COMPOSITE_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter() : decoded_headers_(false), encoded_headers_(false) {}
+  explicit Filter(FilterStats& stats)
+      : decoded_headers_(false), encoded_headers_(false), stats_(stats) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -105,6 +114,7 @@ private:
   Http::StreamFilterSharedPtr delegated_filter_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  FilterStats& stats_;
 };
 
 } // namespace Composite

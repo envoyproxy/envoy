@@ -10,9 +10,9 @@ namespace Composite {
 class Filter;
 
 // A FilterChainFactoryCallbacks that delegates filter creation to the filter callbacks.
-// We make use of exceptions here for error handling since we're implementing a generic
-// interface that doesn't failure. CompositeAction::createFilters catches these exceptions
-// and translate it to an absl::Status, which is further translated into an error log.
+// Since we are unable to handle all the different callbacks, we track errors seen throughout
+// the lifetime of this wrapper by appending them to the errors_ field. This should be checked
+// afterwards to determine whether invalid callbacks were called.
 struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
   explicit FactoryCallbacksWrapper(Filter& filter) : filter_(filter) {}
 

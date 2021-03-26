@@ -16,7 +16,7 @@ namespace {
 
 class FilterTest : public ::testing::Test {
 public:
-  FilterTest() {
+  FilterTest() : filter_(stats_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -73,6 +73,9 @@ public:
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  Stats::MockCounter error_counter_;
+  Stats::MockCounter success_counter_;
+  FilterStats stats_{error_counter_, success_counter_};
   Filter filter_;
 
   Http::TestRequestHeaderMapImpl default_request_headers_{
@@ -92,6 +95,7 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   CompositeAction action(factory_callback);
+  EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -110,6 +114,7 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   CompositeAction action(factory_callback);
+  EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
   expectDelegatedDecoding(*stream_filter);
@@ -128,6 +133,7 @@ TEST_F(FilterTest, StreamFilterDelegation) {
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
   CompositeAction action(factory_callback);
   filter_.onMatchCallback(action);
 
@@ -149,6 +155,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   };
 
   CompositeAction action(factory_callback);
+  EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -166,6 +173,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   };
 
   CompositeAction action(factory_callback);
+  EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -183,6 +191,7 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   };
 
   CompositeAction action(factory_callback);
+  EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -199,6 +208,7 @@ TEST_F(FilterTest, StreamFilterDelegationStreamFilterWithMatchTree) {
   };
 
   CompositeAction action(factory_callback);
+  EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -215,6 +225,7 @@ TEST_F(FilterTest, StreamFilterDelegationDecodeFilterWithMatchTree) {
   };
 
   CompositeAction action(factory_callback);
+  EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -231,6 +242,7 @@ TEST_F(FilterTest, StreamFilterDelegationEncodeFilterWithMatchTree) {
   };
 
   CompositeAction action(factory_callback);
+  EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
   doAllDecodingCallbacks();
@@ -249,9 +261,10 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleEncodeFilterWithMatchTree) {
 
   CompositeAction action(factory_callback);
 
+  EXPECT_CALL(error_counter_, inc());
   // Verify that the log output looks right.
   EXPECT_LOG_CONTAINS(
-      "error",
+      "debug",
       "failed to create delegated filter [INVALID_ARGUMENT: cannot delegate to encoder "
       "filter that instantiates a match tree, INVALID_ARGUMENT: cannot delegate to "
       "encoder filter that instantiates a match tree]",
