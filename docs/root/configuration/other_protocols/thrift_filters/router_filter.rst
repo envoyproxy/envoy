@@ -26,6 +26,6 @@ The filter outputs statistics in the *thrift.<stat_prefix>.* namespace.
   request_call, Counter, Total requests with the "Call" message type.
   request_oneway, Counter, Total requests with the "Oneway" message type.
   request_invalid_type, Counter, Total requests with an unsupported message type.
-  response_reply, Counter, Total responses with the "Reply" message type.
+  response_reply, Counter, Total responses with the "Reply" message type. Includes both successes and errors.
   response_exception, Counter, Total responses with the "Exception" message type.
   response_invalid_type, Counter, Total responses with an unsupported message type.
