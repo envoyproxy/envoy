@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -8,6 +9,7 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/path_utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -1376,6 +1378,12 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 
 // maybeNormalizePath() returns true with an empty path.
 TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(false, false);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
   TestRequestHeaderMapImpl original_headers;
 
@@ -1386,7 +1394,12 @@ TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
 
 // maybeNormalizePath() does nothing by default.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(false, false);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../a");
 
@@ -1397,7 +1410,12 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
 
 // maybeNormalizePath() leaves already normal paths alone.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(true, false);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz");
 
@@ -1408,7 +1426,12 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
 
 // maybeNormalizePath() normalizes relative paths.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(true, false);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../abc");
 
@@ -1419,8 +1442,12 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
 
 // maybeNormalizePath() does not touch adjacent slashes by default.
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(false, false);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
@@ -1431,8 +1458,12 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
 
 // maybeNormalizePath() merges adjacent slashes.
 TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(false, true);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
@@ -1443,8 +1474,12 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
 
 // maybeNormalizePath() merges adjacent slashes if normalization if off.
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
-  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
-  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  std::unique_ptr<PathTransformer> forwarding_path_transformer =
+      std::make_unique<PathTransformer>(false, true);
+  std::unique_ptr<PathTransformer> filter_path_transformer = std::make_unique<PathTransformer>();
+  ON_CALL(config_, forwardingPathTransformer())
+      .WillByDefault(Return(forwarding_path_transformer.get()));
+  ON_CALL(config_, filterPathTransformer()).WillByDefault(Return(filter_path_transformer.get()));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/..//abc");
 

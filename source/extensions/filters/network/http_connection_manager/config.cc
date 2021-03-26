@@ -269,12 +269,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If the path normalization options has been set.
   if (config.has_path_normalization_options()) {
-    normalize_path_ = false;
-    merge_slashes_ = false;
     forwarding_path_transformer_ = std::make_unique<Http::PathTransformer>(
         config.path_normalization_options().forwarding_transformation());
     filter_path_transformer_ = std::make_unique<Http::PathTransformer>(
         config.path_normalization_options().http_filter_transformation());
+  } else {
+    forwarding_path_transformer_ =
+        std::make_unique<Http::PathTransformer>(normalize_path_, merge_slashes_);
+    filter_path_transformer_ = std::make_unique<Http::PathTransformer>();
   }
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {

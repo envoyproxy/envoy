@@ -32,6 +32,8 @@ public:
 
 class PathTransformer {
 public:
+  PathTransformer() = default;
+  PathTransformer(const bool should_normalize_path, const bool should_merge_slashes);
   PathTransformer(envoy::type::http::v3::PathTransformation const& path_transformation);
 
   // Take a string_view as argument and return an optional string.

@@ -435,20 +435,25 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
 
 bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
-  if (!request_headers.Path()) {
+  if (!request_headers.Path() || !config.forwardingPathTransformer()) {
     return true; // It's as valid as it is going to get.
   }
   bool is_valid_path = true;
-  config.normalizePath(request_headers);
-  if (!config.shouldNormalizePath() && !config.shouldMergeSlashes()) {
-    return true;
+  const auto original_path = request_headers.getPathValue();
+  absl::optional<std::string> forwarding_path =
+      config.forwardingPathTransformer()->transform(original_path);
+  absl::optional<std::string> filter_path;
+  if (forwarding_path.has_value()) {
+    request_headers.setForwardingPath(forwarding_path.value());
+    filter_path = config.filterPathTransformer()->transform(forwarding_path.value());
+  } else {
+    return false;
   }
-  if (config.shouldNormalizePath()) {
-    is_valid_path = PathUtil::canonicalPath(request_headers);
-  }
-  // Merge slashes after path normalization to catch potential edge cases with percent encoding.
-  if (is_valid_path && config.shouldMergeSlashes()) {
-    PathUtil::mergeSlashes(request_headers);
+  if (filter_path.has_value()) {
+    request_headers.setPath(filter_path.value());
+    request_headers.setFilterPath(filter_path.value());
+  } else {
+    return false;
   }
   return is_valid_path;
 }

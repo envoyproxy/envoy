@@ -10,6 +10,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"
+#include "common/http/path_utility.h"
 #include "common/local_reply/local_reply.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_impl.h"
@@ -467,7 +468,9 @@ public:
    */
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
-  virtual void normalizePath(Http::RequestHeaderMap&) const PURE;
+  virtual PathTransformer* forwardingPathTransformer() const { return nullptr; }
+
+  virtual PathTransformer* filterPathTransformer() const { return nullptr; }
 };
 } // namespace Http
 } // namespace Envoy

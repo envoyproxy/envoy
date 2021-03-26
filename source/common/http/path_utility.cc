@@ -99,6 +99,16 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
   return normalized_path;
 }
 
+PathTransformer::PathTransformer(const bool should_normalize_path,
+                                 const bool should_merge_slashes) {
+  if (should_normalize_path) {
+    transformations_.emplace_back(PathTransformer::rfcNormalize);
+  }
+  if (should_merge_slashes) {
+    transformations_.emplace_back(PathTransformer::mergeSlashes);
+  }
+}
+
 PathTransformer::PathTransformer(
     envoy::type::http::v3::PathTransformation const& path_transformation) {
   const auto& operations = path_transformation.operations();

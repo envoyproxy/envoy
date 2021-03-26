@@ -19,15 +19,8 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
-namespace HttpConnectionManager {
-
-class HttpConnectionManagerConfig;
-}
-} // namespace NetworkFilters
-} // namespace Extensions
 namespace Http {
+class ConnectionManagerUtility;
 // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
 // never contain embedded NULLs.
 static inline bool validHeaderString(absl::string_view s) {
@@ -818,8 +811,7 @@ public:
   virtual absl::string_view getFilterPath() PURE;
 
 private:
-  friend class Envoy::Extensions::NetworkFilters::HttpConnectionManager::
-      HttpConnectionManagerConfig;
+  friend class ConnectionManagerUtility;
   virtual void setForwardingPath(absl::string_view path) PURE;
   virtual void setFilterPath(absl::string_view path) PURE;
 };

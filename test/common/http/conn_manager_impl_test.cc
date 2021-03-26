@@ -401,7 +401,8 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   InSequence s;
   setup(false, "");
   // Enable path sanitizer
-  normalize_path_ = true;
+  forwarding_path_transformer_ = std::make_unique<PathTransformer>(true, false);
+  filter_path_transformer_ = std::make_unique<PathTransformer>();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -442,7 +443,8 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   setup(false, "");
   // Enable path sanitizer
-  normalize_path_ = true;
+  forwarding_path_transformer_ = std::make_unique<PathTransformer>(true, false);
+  filter_path_transformer_ = std::make_unique<PathTransformer>();
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
 
@@ -483,7 +485,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
 TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   setup(false, "");
   // Enable path sanitizer
-  normalize_path_ = true;
+  forwarding_path_transformer_ = std::make_unique<PathTransformer>(true, false);
+  filter_path_transformer_ = std::make_unique<PathTransformer>();
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
 

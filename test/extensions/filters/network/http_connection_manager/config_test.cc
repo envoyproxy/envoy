@@ -8,6 +8,7 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/http/conn_manager_utility.h"
 #include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
@@ -963,32 +964,6 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
   EXPECT_FALSE(config.shouldMergeSlashes());
 }
 
-// Validated that old api is ignored when new api is configured.
-TEST_F(HttpConnectionManagerConfigTest, IgnoreOldApiWhenNewApiConfigured) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  route_config:
-    name: local_route
-  path_normalization_options:
-    forwarding_transformation:
-      operations:
-      - normalize_path_rfc_3986: {}
-    http_filter_transformation:
-      operations:
-  merge_slashes: true
-  normalize_path: true
-  http_filters:
-  - name: envoy.filters.http.router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldMergeSlashes());
-  EXPECT_FALSE(config.shouldNormalizePath());
-}
-
 // Validated that forwarding transformation is applied to both forwarding path and filter path.
 TEST_F(HttpConnectionManagerConfigTest, ForwadingTransformation) {
   const std::string yaml_string = R"EOF(
@@ -1012,11 +987,9 @@ TEST_F(HttpConnectionManagerConfigTest, ForwadingTransformation) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldMergeSlashes());
-  EXPECT_FALSE(config.shouldNormalizePath());
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "GET"}, {":path", "/foo//bar"}, {":authority", "host"}, {":scheme", "http"}};
-  config.normalizePath(header_map);
+  Http::ConnectionManagerUtility::maybeNormalizePath(header_map, config);
   EXPECT_EQ(header_map.getForwardingPath(), "/foo/bar");
   EXPECT_EQ(header_map.getFilterPath(), "/foo/bar");
 }
@@ -1044,11 +1017,9 @@ TEST_F(HttpConnectionManagerConfigTest, FilterTransformation) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldMergeSlashes());
-  EXPECT_FALSE(config.shouldNormalizePath());
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "GET"}, {":path", "/foo//bar"}, {":authority", "host"}, {":scheme", "http"}};
-  config.normalizePath(header_map);
+  Http::ConnectionManagerUtility::maybeNormalizePath(header_map, config);
   EXPECT_EQ(header_map.getForwardingPath(), "/foo//bar");
   EXPECT_EQ(header_map.getFilterPath(), "/foo/bar");
 }
@@ -1062,7 +1033,7 @@ TEST_F(HttpConnectionManagerConfigTest, DuplicatePathTransformation) {
   path_normalization_options:
     forwarding_transformation:
       operations:
-      - normalize_path_rfc_3986: {}\
+      - normalize_path_rfc_3986: {}
       - normalize_path_rfc_3986: {}
     http_filter_transformation:
       operations:

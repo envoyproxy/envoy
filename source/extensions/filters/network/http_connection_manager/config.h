@@ -180,22 +180,11 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  void normalizePath(Http::RequestHeaderMap& request_headers) const override {
-    if (forwarding_path_transformer_ == nullptr) {
-      return;
-    }
-    const auto original_path = request_headers.getPathValue();
-    absl::optional<std::string> forwarding_path =
-        forwarding_path_transformer_->transform(original_path);
-    absl::optional<std::string> filter_path;
-    if (forwarding_path.has_value()) {
-      request_headers.setForwardingPath(forwarding_path.value());
-      filter_path = filter_path_transformer_->transform(forwarding_path.value());
-    }
-    if (filter_path.has_value()) {
-      request_headers.setPath(filter_path.value());
-      request_headers.setFilterPath(filter_path.value());
-    }
+  Http::PathTransformer* filterPathTransformer() const override {
+    return filter_path_transformer_.get();
+  }
+  Http::PathTransformer* forwardingPathTransformer() const override {
+    return forwarding_path_transformer_.get();
   }
 
 private:
@@ -269,8 +258,8 @@ private:
   const bool proxy_100_continue_;
   const bool stream_error_on_invalid_http_messaging_;
   std::chrono::milliseconds delayed_close_timeout_;
-  bool normalize_path_;
-  bool merge_slashes_;
+  const bool normalize_path_;
+  const bool merge_slashes_;
   Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;

@@ -5,6 +5,8 @@
 #include "common/http/date_provider_impl.h"
 #include "common/network/address_impl.h"
 
+#include "source/common/http/_virtual_includes/path_utility_lib/common/http/path_utility.h"
+
 #include "extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -133,7 +135,6 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
-  void normalizePath(Http::RequestHeaderMap&) const override {}
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -141,7 +142,10 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-
+  PathTransformer* forwardingPathTransformer() const override {
+    return forwarding_path_transformer_.get();
+  }
+  PathTransformer* filterPathTransformer() const override { return filter_path_transformer_.get(); }
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
@@ -213,6 +217,8 @@ public:
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
+  std::unique_ptr<PathTransformer> forwarding_path_transformer_;
+  std::unique_ptr<PathTransformer> filter_path_transformer_;
 };
 
 } // namespace Http

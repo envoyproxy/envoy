@@ -26,6 +26,7 @@ envoy_extension_cc_test_library(
     deps = [
         ":config_cc_proto",
         "//source/common/filter/http:filter_config_discovery_lib",
+        "//source/common/http:conn_manager_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
