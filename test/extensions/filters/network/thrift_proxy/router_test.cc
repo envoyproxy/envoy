@@ -964,6 +964,44 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
                      .value());
 }
 
+TEST_P(ThriftRouterFieldTypeTest, Exception) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Exception);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_call")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_exception")
+                     .value());
+}
+
+TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Exception);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+  returnResponse(MessageType::Call);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("request_invalid_type")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("response_invalid_type")
+                     .value());
+}
+
 // Ensure the service name gets stripped when strip_service_name = true.
 TEST_P(ThriftRouterFieldTypeTest, StripServiceNameEnabled) {
   FieldType field_type = GetParam();
