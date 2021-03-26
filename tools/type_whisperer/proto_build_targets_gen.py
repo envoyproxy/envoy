@@ -2,7 +2,6 @@
 # and all API protos. This is not the ideal way to be generating docs, see
 # https://github.com/envoyproxy/envoy/issues/10311#issuecomment-603518498.
 
-import os
 import re
 import string
 import sys
@@ -12,14 +11,15 @@ from tools.type_whisperer.api_type_db_pb2 import TypeDb
 from google.protobuf import text_format
 
 V2_REGEXES = list(
-    map(re.compile, [
-        r'envoy[\w\.]*\.(v1alpha\d?|v1)',
-        r'envoy[\w\.]*\.(v2alpha\d?|v2)',
-        r'envoy\.type\.matcher$',
-        r'envoy\.type$',
-        r'envoy\.config\.cluster\.redis',
-        r'envoy\.config\.retry\.previous_priorities',
-    ]))
+    map(
+        re.compile, [
+            r'envoy[\w\.]*\.(v1alpha\d?|v1)',
+            r'envoy[\w\.]*\.(v2alpha\d?|v2)',
+            r'envoy\.type\.matcher$',
+            r'envoy\.type$',
+            r'envoy\.config\.cluster\.redis',
+            r'envoy\.config\.retry\.previous_priorities',
+        ]))
 
 V3_REGEX = re.compile(r'envoy[\w\.]*\.(v3alpha|v3)')
 
@@ -91,8 +91,9 @@ def filter_pkgs(pkgs):
 
 
 def deps_format(pkgs):
-    return '\n'.join('        "//%s:pkg",' % p.replace('.', '/')
-                     for p in sorted(filter_pkgs(pkgs), key=build_order_key))
+    return '\n'.join(
+        '        "//%s:pkg",' % p.replace('.', '/')
+        for p in sorted(filter_pkgs(pkgs), key=build_order_key))
 
 
 def is_v2_package(pkg):
@@ -127,7 +128,7 @@ if __name__ == '__main__':
             if accidental_v3_package(pkg):
                 v3_packages.add(pkg)
     # Generate BUILD file.
-    build_file_contents = API_BUILD_FILE_TEMPLATE.substitute(v2_deps=deps_format(v2_packages),
-                                                             v3_deps=deps_format(v3_packages))
+    build_file_contents = API_BUILD_FILE_TEMPLATE.substitute(
+        v2_deps=deps_format(v2_packages), v3_deps=deps_format(v3_packages))
     with open(output_path, 'w') as f:
         f.write(build_file_contents)

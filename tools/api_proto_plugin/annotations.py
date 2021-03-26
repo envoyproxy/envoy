@@ -1,7 +1,5 @@
 """Envoy API annotations."""
 
-from collections import namedtuple
-
 import re
 
 # Key-value annotation regex.
@@ -65,7 +63,9 @@ def extract_annotations(s, inherited_annotations=None):
         Annotation map.
     """
     annotations = {
-        k: v for k, v in (inherited_annotations or {}).items() if k in INHERITED_ANNOTATIONS
+        k: v
+        for k, v in (inherited_annotations or {}).items()
+        if k in INHERITED_ANNOTATIONS
     }
     # Extract annotations.
     groups = re.findall(ANNOTATION_REGEX, s)
