@@ -5,42 +5,6 @@
 namespace Envoy {
 namespace StreamInfo {
 
-// const std::array<std::pair<absl::string_view, ResponseFlag>>
-//     ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS = {
-//         {ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
-//         {ResponseFlagUtils::NO_HEALTHY_UPSTREAM, ResponseFlag::NoHealthyUpstream},
-//         {ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT, ResponseFlag::UpstreamRequestTimeout},
-//         {ResponseFlagUtils::LOCAL_RESET, ResponseFlag::LocalReset},
-//         {ResponseFlagUtils::UPSTREAM_REMOTE_RESET, ResponseFlag::UpstreamRemoteReset},
-//         {ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE,
-//         ResponseFlag::UpstreamConnectionFailure},
-//         {ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION,
-//          ResponseFlag::UpstreamConnectionTermination},
-//         {ResponseFlagUtils::UPSTREAM_OVERFLOW, ResponseFlag::UpstreamOverflow},
-//         {ResponseFlagUtils::NO_ROUTE_FOUND, ResponseFlag::NoRouteFound},
-//         {ResponseFlagUtils::DELAY_INJECTED, ResponseFlag::DelayInjected},
-//         {ResponseFlagUtils::FAULT_INJECTED, ResponseFlag::FaultInjected},
-//         {ResponseFlagUtils::RATE_LIMITED, ResponseFlag::RateLimited},
-//         {ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE,
-//          ResponseFlag::UnauthorizedExternalService},
-//         {ResponseFlagUtils::RATELIMIT_SERVICE_ERROR, ResponseFlag::RateLimitServiceError},
-//         {ResponseFlagUtils::DOWNSTREAM_CONNECTION_TERMINATION,
-//          ResponseFlag::DownstreamConnectionTermination},
-//         {ResponseFlagUtils::UPSTREAM_RETRY_LIMIT_EXCEEDED,
-//          ResponseFlag::UpstreamRetryLimitExceeded},
-//         {ResponseFlagUtils::STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
-//         {ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS,
-//          ResponseFlag::InvalidEnvoyRequestHeaders},
-//         {ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR, ResponseFlag::DownstreamProtocolError},
-//         {ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED,
-//          ResponseFlag::UpstreamMaxStreamDurationReached},
-//         {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
-//         {ResponseFlagUtils::NO_FILTER_CONFIG_FOUND, ResponseFlag::NoFilterConfigFound},
-//         {ResponseFlagUtils::DURATION_TIMEOUT, ResponseFlag::DurationTimeout},
-//         {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
-//         {ResponseFlagUtils::NO_CLUSTER_FOUND, ResponseFlag::NoClusterFound},
-// };
-
 void ResponseFlagUtils::appendString(std::string& result, absl::string_view append) {
   if (result.empty()) {
     result = append;
