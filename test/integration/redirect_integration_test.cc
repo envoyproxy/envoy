@@ -178,8 +178,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.internal_redirects_with_body", "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.internal_redirects_with_body",
+                                    "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -222,6 +222,45 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
               HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.set_via("via_value");
+
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
+        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+      });
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.internal_redirects_with_body",
+                                    "true");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("POST");
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  // Send more data than what we can buffer.
+  std::string data(2048, 'a');
+  Buffer::OwnedImpl send1(data);
+  encoder.encodeData(send1, true);
+
+  // Wait for a redirect response.
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(data, upstream_request_->body().toString());
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  // Ensure the redirect was returned to the client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("302", response->headers().getStatusValue());
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {

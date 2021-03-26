@@ -698,6 +698,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     retry_state_.reset();
     buffering = false;
     active_shadow_policies_.clear();
+    request_buffer_overflowed_ = true;
 
     // If we had to abandon buffering and there's no request in progress, abort the request and
     // clean up. This happens if the initial upstream request failed, and we are currently waiting
@@ -1489,7 +1490,8 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 
   // Redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
-      (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body") ||
+      ((Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_redirects_with_body") &&
+        !request_buffer_overflowed_) ||
        !callbacks_->decodingBuffer()) &&
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location) &&
