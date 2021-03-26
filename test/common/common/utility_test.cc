@@ -562,6 +562,7 @@ TEST(AccessLogDateTimeFormatter, fromTime) {
 }
 
 TEST(Primes, isPrime) {
+  EXPECT_FALSE(Primes::isPrime(0));
   EXPECT_TRUE(Primes::isPrime(67));
   EXPECT_FALSE(Primes::isPrime(49));
   EXPECT_FALSE(Primes::isPrime(102));
@@ -569,6 +570,7 @@ TEST(Primes, isPrime) {
 }
 
 TEST(Primes, findPrimeLargerThan) {
+  EXPECT_EQ(1, Primes::findPrimeLargerThan(0));
   EXPECT_EQ(67, Primes::findPrimeLargerThan(62));
   EXPECT_EQ(107, Primes::findPrimeLargerThan(103));
   EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));

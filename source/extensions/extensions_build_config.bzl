@@ -7,6 +7,9 @@ EXTENSIONS = {
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
+    "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
+    "envoy.access_loggers.stderror":                    "//source/extensions/access_loggers/stderror:config",
+    "envoy.access_loggers.stdoutput":                   "//source/extensions/access_loggers/stdoutput:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
@@ -178,12 +181,6 @@ EXTENSIONS = {
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
 
     #
-    # Listener
-    #
-
-    "envoy.udp_listeners.quiche_quic_listener":         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
-
-    #
     # Transport sockets
     #
 
@@ -191,7 +188,6 @@ EXTENSIONS = {
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
 
     #

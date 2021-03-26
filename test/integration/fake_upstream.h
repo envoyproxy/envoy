@@ -206,6 +206,10 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    RELEASE_ASSERT(false, "initialize if this is needed");
+    return *stream_info_;
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -239,6 +243,7 @@ private:
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool received_data_{false};
 };
 
