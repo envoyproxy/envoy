@@ -26,7 +26,11 @@ template <class T> class MemBlockBuilder {
 public:
   // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
   explicit MemBlockBuilder(uint64_t capacity)
-      : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity){};
+      : owned_data_(std::make_unique<T[]>(capacity)), data_(owned_data_.get()),
+        write_span_(owned_data_.get(), capacity){};
+  // Constructs a MemBlockBuilder allowing for the client to manage its own storage.
+  explicit MemBlockBuilder(T* data, uint64_t capacity)
+      : owned_data_(nullptr), data_(data), write_span_(data, capacity){};
   MemBlockBuilder() = default;
 
   /**
@@ -43,7 +47,7 @@ public:
   /**
    * @return the capacity.
    */
-  uint64_t capacity() const { return write_span_.size() + write_span_.data() - data_.get(); }
+  uint64_t capacity() const { return write_span_.size() + write_span_.data() - data_; }
 
   /**
    * Appends a single object of type T, moving an internal write-pointer
@@ -99,7 +103,7 @@ public:
    */
   std::unique_ptr<T[]> release() {
     write_span_ = absl::MakeSpan(static_cast<T*>(nullptr), 0);
-    return std::move(data_);
+    return std::move(owned_data_);
   }
 
   /**
@@ -107,25 +111,32 @@ public:
    *
    * @return the transferred storage.
    */
-  T* releasePointer() { return this->release().release(); }
+  T* releasePointer() {
+    if (owned_data_)
+      return this->release().release();
+    else
+      return data_;
+  }
 
   /**
    * @return the populated data as an absl::Span.
    */
-  absl::Span<T> span() const { return absl::MakeSpan(data_.get(), write_span_.data()); }
+  absl::Span<T> span() const { return absl::MakeSpan(data_, write_span_.data()); }
 
   /**
    * @return The number of elements the have been added to the builder.
    */
-  uint64_t size() const { return write_span_.data() - data_.get(); }
+  uint64_t size() const { return write_span_.data() - data_; }
 
 private:
   void setCapacityHelper(uint64_t capacity, std::unique_ptr<T[]> data) {
-    data_ = std::move(data);
-    write_span_ = absl::MakeSpan(data_.get(), capacity);
+    owned_data_ = std::move(data);
+    data_ = owned_data_.get();
+    write_span_ = absl::MakeSpan(owned_data_.get(), capacity);
   }
 
-  std::unique_ptr<T[]> data_;
+  std::unique_ptr<T[]> owned_data_;
+  T* data_;
   absl::Span<T> write_span_;
 };
 
