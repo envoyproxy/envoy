@@ -12,6 +12,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/hash.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
@@ -2399,7 +2400,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    headers.addCopy("foo_header", "bar");
+    headers.addCopy("foo_header", "bar,");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
                                                                 nullptr));
@@ -2409,10 +2410,34 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
     headers.addCopy("foo_header", "bar");
     headers.addCopy("foo_header", "foo");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    // ensure multiple values streams as single string
-    auto expected_hash_value = HashUtil::xxHash64("barfoo");
+    auto expected_hash_value = HashUtil::xxHash64("bar,foo,");
     EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
                                        nullptr, headers, add_cookie_nop_, nullptr));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("foo_header", "foo");
+    headers.addCopy("foo_header", "bar");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    auto expected_hash_value = HashUtil::xxHash64("bar,foo,");
+    EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
+                                       nullptr, headers, add_cookie_nop_, nullptr));
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers1 = genHeaders("www.lyft.com", "/foo", "GET");
+    headers1.addCopy("foo_header", "abc");
+    headers1.addCopy("foo_header", "def");
+    Router::RouteConstSharedPtr route1 = config().route(headers1, 0);
+
+    Http::TestRequestHeaderMapImpl headers2 = genHeaders("www.lyft.com", "/foo", "GET");
+    headers2.addCopy("foo_header", "abcd");
+    headers2.addCopy("foo_header", "ef");
+    Router::RouteConstSharedPtr route2 = config().route(headers2, 0);
+
+    EXPECT_NE(route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers1, add_cookie_nop_,
+                                                               nullptr),
+              route2->routeEntry()->hashPolicy()->generateHash(nullptr, headers2, add_cookie_nop_,
+                                                               nullptr));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
@@ -2433,7 +2458,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    const auto foo_hash_value = 3728699739546630719;
+    const uint64_t foo_hash_value = 0xd05e705b8ebfe7cb;
     EXPECT_EQ(route->routeEntry()
                   ->hashPolicy()
                   ->generateHash(nullptr, headers, add_cookie_nop_, nullptr)

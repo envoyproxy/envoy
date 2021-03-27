@@ -36,6 +36,8 @@ public:
     }
   }
 
+  const std::string HEADER_VALUE_SEPARATOR = ",";
+
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback,
@@ -44,14 +46,23 @@ public:
 
     const auto header = headers.get(header_name_);
     if (!header.empty()) {
-      auto values_str = HeaderUtility::getAllOfHeaderAsString(header, "");
-
-      if (regex_rewrite_ != nullptr) {
-        hash = HashUtil::xxHash64(
-            regex_rewrite_->replaceAll(values_str.result().value(), regex_rewrite_substitution_));
-      } else {
-        hash = HashUtil::xxHash64(values_str.result().value());
+      std::vector<std::string> header_values;
+      header_values.reserve(header.size());
+      for (size_t i = 0; i < header.size(); i++) {
+        std::string value(header[i]->value().getStringView());
+        // Add a separator for the generate different hash value for {"abc", "def"} and {"abcd",
+        // "ef"}
+        value += HEADER_VALUE_SEPARATOR;
+        if (regex_rewrite_ != nullptr) {
+          header_values.push_back(regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
+        } else {
+          header_values.push_back(value);
+        }
       }
+      // Ensure generating same hash value for different order header values.
+      // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
+      std::sort(header_values.begin(), header_values.end());
+      hash = HashUtil::xxHash64(header_values);
     }
     return hash;
   }
