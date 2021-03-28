@@ -314,7 +314,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
           Invoke([&](Upstream::ResourcePriority, auto,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             // this is the hash of :path header value "/"
-            EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
+            EXPECT_EQ(14501180235126567738UL, context->computeHashKey().value());
             return &cm_.thread_local_cluster_.conn_pool_;
           }));
 
