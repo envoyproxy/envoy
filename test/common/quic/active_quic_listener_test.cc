@@ -24,6 +24,7 @@
 #include "common/common/logger.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/quic/active_quic_listener.h"
 #include "test/common/quic/test_utils.h"

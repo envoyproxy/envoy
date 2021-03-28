@@ -168,6 +168,7 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",

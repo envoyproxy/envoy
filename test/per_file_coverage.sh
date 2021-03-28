@@ -3,6 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
+"source/common:96.3" # Raise when QUIC coverage goes up
 "source/common/api:74.5"
 "source/common/api/posix:73.0"
 "source/common/common:96.3"
