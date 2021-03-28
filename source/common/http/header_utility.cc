@@ -183,6 +183,19 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
                                     header_value.size()) != 0;
 }
 
+bool HeaderUtility::headerValueContainsIgnoreCase(const absl::string_view header_value,
+                                                  const absl::string_view value,
+                                                  absl::string_view delimiter) {
+  std::vector<absl::string_view> sub_values =
+      StringUtil::splitToken(header_value, delimiter, true, true);
+  for (auto& sub_val : sub_values) {
+    if (absl::EqualsIgnoreCase(sub_val, value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
   return header_name.find('_') != absl::string_view::npos;
 }

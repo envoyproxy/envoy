@@ -742,7 +742,8 @@ StatusOr<ParserStatus> ConnectionImpl::onHeadersComplete() {
   // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if (!absl::EqualsIgnoreCase(encoding, header_values.TransferEncodingValues.Chunked) ||
+    if (!HeaderUtility::headerValueContainsIgnoreCase(
+            encoding, header_values.TransferEncodingValues.Chunked) ||
         parser_->methodName() == header_values.MethodValues.Connect) {
       error_code_ = Http::Code::NotImplemented;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));

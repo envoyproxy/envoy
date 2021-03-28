@@ -125,6 +125,15 @@ public:
   static bool headerValueIsValid(const absl::string_view header_value);
 
   /**
+   * Checks if a header value str with multiple sub-values separated by a delimiter contains
+   * a specified one, ignoring case.
+   * @return bool true if the header values contains the value, false otherwise.
+   */
+  static bool headerValueContainsIgnoreCase(const absl::string_view header_value,
+                                            const absl::string_view value,
+                                            absl::string_view delimiter = ",");
+
+  /**
    * Checks if header name contains underscore characters.
    * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
    * as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by
