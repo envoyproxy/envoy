@@ -121,7 +121,7 @@ public:
   /**
    * @return the populated data as an absl::Span.
    */
-  absl::Span<T> span() const { return absl::MakeSpan(data_, write_span_.data()); }
+  absl::Span<T> span() const { return absl::MakeSpan(owned_data_.get(), write_span_.data()); }
 
   /**
    * @return The number of elements the have been added to the builder.
