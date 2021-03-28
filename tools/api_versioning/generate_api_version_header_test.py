@@ -68,29 +68,6 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
         self.successful_test_template(
             '3.2.1\n', utils.ApiVersion(3, 2, 1), utils.ApiVersion(3, 1, 0))
 
-    def test_invalid_version_string(self):
-        self.failed_test_template('1.2.abc3', ValueError)
-
-    def test_invalid_version_partial(self):
-        self.failed_test_template('1.2.', ValueError)
-
-    def test_empty_file(self):
-        # Not writing anything to the file
-        self.failed_test_template('', AssertionError)
-
-    def test_invalid_multiple_lines(self):
-        self.failed_test_template('1.2.3\n1.2.3', AssertionError)
-
-    def test_valid_oldest_api_version(self):
-        expected_latest_oldest_pairs = [(utils.ApiVersion(3, 2, 2), utils.ApiVersion(3, 1, 0)),
-                                        (utils.ApiVersion(4, 5, 30), utils.ApiVersion(4, 4, 0)),
-                                        (utils.ApiVersion(1, 1, 5), utils.ApiVersion(1, 0, 0)),
-                                        (utils.ApiVersion(2, 0, 3), utils.ApiVersion(2, 0, 0))]
-
-        for latest_version, expected_oldest_version in expected_latest_oldest_pairs:
-            self.assertEqual(
-                expected_oldest_version, utils.compute_oldest_api_version(latest_version))
-
 
 if __name__ == '__main__':
     unittest.main()

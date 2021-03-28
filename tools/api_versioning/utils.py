@@ -17,7 +17,8 @@ def get_api_version(input_path):
       a namedtuple containing the major, minor, patch versions.
     """
     lines = pathlib.Path(input_path).read_text().splitlines()
-    assert len(lines) == 1
+    assert len(lines) == 1, \
+        "Api version file must have a single line of format X.Y.Z, where X, Y, and Z are non-negative integers."
 
     # Mapping each field to int verifies it is a valid version
     return ApiVersion(*map(int, lines[0].split('.')))
@@ -39,3 +40,27 @@ def compute_oldest_api_version(current_version: ApiVersion):
       the oldest supported API version.
     """
     return ApiVersion(current_version.major, max(current_version.minor - 1, 0), 0)
+
+
+def is_deprecated_annotation_version(version: str):
+    """Validates that a given version string is of format X.Y, where X and Y are
+    integers, X>0, and Y>=0.
+
+    Args:
+      version: a minor version deprecation annotation value (see api/envoy/annotations/deprecation.proto)
+
+    Returns:
+      True iff the given string represents a valid X.Y version.
+    """
+    if version.count('.') != 1:
+        return False
+    # Validate major and minor parts.
+    try:
+        major, minor = [int(x) for x in version.split('.')]
+        if major <= 0:
+            return False
+        if minor < 0:
+            return False
+    except ValueError:
+        return False
+    return True

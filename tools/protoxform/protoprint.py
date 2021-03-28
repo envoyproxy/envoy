@@ -168,15 +168,15 @@ def format_type_context_comments(type_context, annotation_xforms=None):
 
 
 def format_header_from_file(
-        source_code_info, file_proto, empty_file, import_deprecation_proto, frozen_proto):
+        source_code_info, file_proto, empty_file, requires_deprecation_annotation):
     """Format proto header.
 
     Args:
         source_code_info: SourceCodeInfo object.
         file_proto: FileDescriptorProto for file.
         empty_file: are there no message/enum/service defs in file?
-        import_deprecation_proto: should the "envoy/annotation/deprecation.proto" be imported?
-        frozen_proto: is the proto file frozen?
+        requires_deprecation_annotation: does the proto have the deprecated version annotation or
+                                         disallowed annotation.
 
     Returns:
         Formatted proto header as a string.
@@ -238,6 +238,10 @@ def format_header_from_file(
         options.Extensions[status_pb2.file_status].CopyFrom(
             file_proto.options.Extensions[status_pb2.file_status])
 
+    frozen_proto = file_proto.options.HasExtension(
+        status_pb2.file_status) and file_proto.options.Extensions[
+            status_pb2.file_status].package_version_status == status_pb2.FROZEN
+
     if not empty_file:
         options.Extensions[
             status_pb2.file_status].package_version_status = file_proto.options.Extensions[
@@ -261,7 +265,7 @@ def format_header_from_file(
         elif d.startswith('envoy/annotations') or d.startswith('udpa/annotations'):
             if d == 'envoy/annotations/deprecation.proto' and not frozen_proto:
                 # Skip adding, as deprecation proto should be added if
-                # import_deprecation_proto is True or the proto if frozen.
+                # import_deprecation_proto is True or the proto is frozen.
                 continue
             infra_imports.append(d)
         elif d.startswith('envoy/'):
@@ -278,7 +282,7 @@ def format_header_from_file(
         else:
             misc_imports.append(d)
 
-    if import_deprecation_proto:
+    if requires_deprecation_annotation:
         infra_imports.append('envoy/annotations/deprecation.proto')
 
     if options.HasExtension(status_pb2.file_status):
@@ -572,30 +576,6 @@ def format_reserved(enum_or_msg_proto):
     return reserved_fields
 
 
-def validate_deprecation_version(version: str):
-    """Validates that a given version string is of format X.Y, where X and Y are
-  integers, X>0, and Y>=0.
-
-  Args:
-    version: a minor version deprecation annotation value (see api/envoy/annotations/deprecation.proto)
-
-  Returns:
-    True iff the given string represents a valid X.Y version.
-  """
-    if version.count('.') != 1:
-        return False
-    # Validate major and minor parts.
-    try:
-        major, minor = [int(x) for x in version.split('.')]
-        if major <= 0:
-            return False
-        if minor < 0:
-            return False
-    except ValueError:
-        return False
-    return True
-
-
 class ProtoFormatVisitor(visitor.Visitor):
     """Visitor to generate a proto representation from a FileDescriptor proto.
 
@@ -606,7 +586,7 @@ class ProtoFormatVisitor(visitor.Visitor):
         current_api_version = api_version_utils.get_api_version(api_version_file_path)
         self._deprecated_annotation_version_value = '{}.{}'.format(
             current_api_version.major, current_api_version.minor)
-        self._needs_deprecation_annotation_import = False
+        self._requires_deprecation_annotation_import = False
         self._frozen_proto = frozen_proto
 
     def _add_deprecation_version(self, field_or_evalue, deprecation_tag, disallowed_tag):
@@ -618,7 +598,7 @@ class ProtoFormatVisitor(visitor.Visitor):
         - The field or enum value do not already have a version annotation.
         - The field or enum value name is not ENVOY_DEPRECATED_UNAVIALABLE_NAME.
         If a field or enum value are marked with an annotation, the
-        _needs_deprecation_annotation_import flag is set.
+        _requires_deprecation_annotation_import flag is set.
         The function also validates that if a field or enum value already have the deprecated
         annotation value, then this value is a valid one ("X.Y" where X and Y are valid major,
         and minor versions, respectively).
@@ -626,14 +606,14 @@ class ProtoFormatVisitor(visitor.Visitor):
         if field_or_evalue.options.deprecated and not self._frozen_proto and \
                 not protoxform_options.has_hide_option(field_or_evalue.options):
             # If the field or enum value has annotation from deprecation.proto, need to import it.
-            self._needs_deprecation_annotation_import = (
-                self._needs_deprecation_annotation_import
+            self._requires_deprecation_annotation_import = (
+                self._requires_deprecation_annotation_import
                 or field_or_evalue.options.HasExtension(deprecation_tag)
                 or field_or_evalue.options.HasExtension(disallowed_tag))
             if field_or_evalue.name != ENVOY_DEPRECATED_UNAVIALABLE_NAME:
                 # If there's a deprecated version annotation, ensure it is valid.
                 if field_or_evalue.options.HasExtension(deprecation_tag):
-                    if not validate_deprecation_version(
+                    if not api_version_utils.is_deprecated_annotation_version(
                             field_or_evalue.options.Extensions[deprecation_tag]):
                         raise ProtoPrintError(
                             'Error while parsing "deprecated_at_minor_version_enum" annotation "%s" value for enum value %s.'
@@ -642,7 +622,7 @@ class ProtoFormatVisitor(visitor.Visitor):
                                 field_or_evalue.name))
                 else:
                     # Add the current version as a deprecated version annotation.
-                    self._needs_deprecation_annotation_import = True
+                    self._requires_deprecation_annotation_import = True
                     field_or_evalue.options.Extensions[
                         deprecation_tag] = self._deprecated_annotation_version_value
 
@@ -727,7 +707,7 @@ class ProtoFormatVisitor(visitor.Visitor):
         empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
         header = format_header_from_file(
             type_context.source_code_info, file_proto, empty_file,
-            self._needs_deprecation_annotation_import, self._frozen_proto)
+            self._requires_deprecation_annotation_import)
         formatted_services = format_block('\n'.join(services))
         formatted_enums = format_block('\n'.join(enums))
         formatted_msgs = format_block('\n'.join(msgs))

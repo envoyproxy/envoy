@@ -13,6 +13,14 @@ py_library(
     srcs = ["utils.py"],
 )
 
+py_test(
+    name = "utils_test",
+    srcs = ["utils_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
+    deps = [":utils"],
+)
 py_binary(
     name = "generate_api_version_header_bin",
     srcs = ["generate_api_version_header.py"],
