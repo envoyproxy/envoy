@@ -221,13 +221,13 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
                                      request_headers);
   }
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true).ok());
 }
 
 TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false).ok());
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
@@ -301,7 +301,7 @@ TEST_P(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
 TEST_P(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
   // Write response headers with FIN before finish receiving request.
-  quic_stream_->encodeHeaders(response_headers_, true);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, true).ok());
   // Resetting the stream now means stop reading and sending QUIC_STREAM_NO_ERROR or STOP_SENDING.
   if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
@@ -404,7 +404,7 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
 
   // 32KB + 2 byte. The initial stream flow control window is 16k.
   response_headers_.addCopy(":content-length", "32770");
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false).ok());
 
   // Encode 32kB response body. first 16KB should be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
@@ -471,7 +471,7 @@ TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
                     quic::StreamSendingState state, bool, absl::optional<quic::EncryptionLevel>) {
             return quic::QuicConsumedData{0u, state != quic::NO_FIN};
           }));
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false).ok());
 
   // Encode 16kB -10 bytes request body. Because the high watermark is 16KB, with previously
   // buffered headers, this call should make the send buffers reach their high watermark.

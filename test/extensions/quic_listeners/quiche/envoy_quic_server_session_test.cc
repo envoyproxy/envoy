@@ -505,7 +505,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {":content-length", "32770"}}; // 32KB + 2 bytes
 
-  stream->encodeHeaders(response_headers, false);
+  EXPECT_TRUE(stream->encodeHeaders(response_headers, false).ok());
   std::string response(32 * 1024 + 1, 'a');
   Buffer::OwnedImpl buffer(response);
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
@@ -599,7 +599,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {":content-length", "32770"}}; // 32KB + 2 bytes
 
-  stream->encodeHeaders(response_headers, false);
+  EXPECT_TRUE(stream->encodeHeaders(response_headers, false).ok());
   std::string response(32 * 1024 + 1, 'a');
   Buffer::OwnedImpl buffer(response);
   stream->encodeData(buffer, true);
@@ -881,7 +881,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {":content-length", "32770"}}; // 32KB + 2 bytes
 
-  stream1->encodeHeaders(response_headers, false);
+  EXPECT_TRUE(stream1->encodeHeaders(response_headers, false).ok());
   std::string response(32 * 1024 + 1, 'a');
   Buffer::OwnedImpl buffer(response);
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
@@ -909,7 +909,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
       }));
   stream2->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
-  stream2->encodeHeaders(response_headers, false);
+  EXPECT_TRUE(stream2->encodeHeaders(response_headers, false).ok());
   // This response will trigger both stream and connection's send buffer watermark upper limits.
   Buffer::OwnedImpl buffer2(response);
   EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark)
@@ -1068,7 +1068,7 @@ TEST_P(EnvoyQuicServerSessionTest, HeadersContributeToWatermarkGquic) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   // Make connection congestion control blocked so headers are buffered.
   EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(false));
-  stream1->encodeHeaders(response_headers, false);
+  EXPECT_TRUE(stream1->encodeHeaders(response_headers, false).ok());
   // Buffer a response slightly smaller than connection level watermark, but
   // with the previously buffered headers, this write should reach high
   // watermark.

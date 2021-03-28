@@ -1661,4 +1661,49 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   }
 }
 
+static std::string remove_response_headers_filter = R"EOF(
+name: remove-response-headers-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
+)EOF";
+
+TEST_P(Http2IntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
+  addFilters({remove_response_headers_filter});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+
+  // If a filter removes :status from the response headers, then Envoy must reply with
+  // InternalServerError and must not crash.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
+
+TEST_P(Http2IntegrationTest, RemoveResponseHeadersFilter) {
+  addFilters({remove_response_headers_filter});
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}},
+      "body");
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+
+  // If a filter removes :status from the response headers, then Envoy must reply with
+  // InternalServerError and must not crash.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
+
 } // namespace Envoy

@@ -906,7 +906,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
     const auto& continue_headers = continueHeader();
-    ASSERT(response_encoder_->encode100ContinueHeaders(continue_headers).ok());
+    const auto status = response_encoder_->encode100ContinueHeaders(continue_headers);
+    ASSERT(status.ok());
     chargeStats(continue_headers);
     // Remove the Expect header so it won't be handled again upstream.
     request_headers_->removeExpect();
@@ -1483,7 +1484,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
     // We reenter this function after the local reply is sent below and then
     // we again call `streamInfo().onFirstDownstreamTxByteSent()` above, which results in
-    // ASSERT(first_downstream_tx_byte_sent_ != absl::nullopt) fails.
+    // ASSERT(first_downstream_tx_byte_sent_ != absl::nullopt) failure.
     // That's why we need to reset first_downstream_tx_byte_sent_ here.
     // The byte has not actually been sent at this point.
     filter_manager_.streamInfo().first_downstream_tx_byte_sent_ = absl::nullopt;
