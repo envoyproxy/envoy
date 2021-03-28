@@ -490,7 +490,7 @@ verifySignature()
 
 .. code-block:: lua
 
-  local ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+  local ok, error = handle:verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
 Verify signature using provided parameters. *hashFunction* is the variable for the hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
@@ -511,6 +511,17 @@ base64Escape()
 Encodes the input string as base64. This can be useful for escaping binary data.
 
 .. _config_http_filters_lua_header_wrapper:
+
+timestamp()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  timestamp = handle:timestamp(format)
+
+High resolution timestamp function. *format* is an optional enum parameter to indicate the format of the timestamp.
+*EnvoyTimestampResolution.MILLISECOND* is supported
+The function returns timestamp in milliseconds since epoch by default if format is not set.
 
 Header object API
 -----------------
