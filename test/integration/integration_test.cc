@@ -1977,4 +1977,51 @@ TEST_P(IntegrationTest, RandomPreconnect) {
   }
 }
 
+TEST_P(IntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: remove-response-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                          {":path", "/healthcheck"},
+                                                                          {":authority", "host"},
+                                                                          {"connection", "close"}});
+  response->waitForEndStream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  // If a filter removes :status from the response headers, then Envoy must reply with
+  // InternalServerError and must not crash.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
+
+TEST_P(IntegrationTest, WithRemoveResponseHeadersFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: remove-response-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/healthcheck"},
+                                                                        {":authority", "host"},
+                                                                        {"connection", "close"}},
+                                         10);
+  response->waitForEndStream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  // If a filter removes :status from the response headers, then Envoy must reply with
+  // InternalServerError and must not crash.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
+
 } // namespace Envoy

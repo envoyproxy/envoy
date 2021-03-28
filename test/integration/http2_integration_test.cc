@@ -1694,7 +1694,7 @@ TEST_P(Http2IntegrationTest, RemoveResponseHeadersFilter) {
   IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}},
-      "body");
+      10);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
