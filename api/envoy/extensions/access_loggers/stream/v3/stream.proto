@@ -28,7 +28,7 @@ message StdoutAccessLog {
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`
 // that writes log entries directly to the operating system's standard error.
-message StdErrAccessLog {
+message StderrAccessLog {
   oneof access_log_format {
     // Configuration to form access log data and format.
     // If not specified, use :ref:`default format <config_access_log_default_format>`.

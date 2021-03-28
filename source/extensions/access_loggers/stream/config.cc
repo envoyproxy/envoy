@@ -47,13 +47,13 @@ AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   return createStreamAccessLogInstance<
-      envoy::extensions::access_loggers::stream::v3::StdErrAccessLog,
+      envoy::extensions::access_loggers::stream::v3::StderrAccessLog,
       Filesystem::DestinationType::Stderr>(config, std::move(filter), context);
 }
 
 ProtobufTypes::MessagePtr StderrAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{
-      new envoy::extensions::access_loggers::stream::v3::StdErrAccessLog()};
+      new envoy::extensions::access_loggers::stream::v3::StderrAccessLog()};
 }
 
 std::string StderrAccessLogFactory::name() const { return AccessLogNames::get().Stderr; }

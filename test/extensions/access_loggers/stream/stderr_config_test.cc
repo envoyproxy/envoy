@@ -13,7 +13,7 @@ namespace File {
 namespace {
 
 class StderrAccessLogTest
-    : public StreamAccessLogTest<envoy::extensions::access_loggers::stream::v3::StdErrAccessLog,
+    : public StreamAccessLogTest<envoy::extensions::access_loggers::stream::v3::StderrAccessLog,
                                  Filesystem::DestinationType::Stderr> {
 public:
   StderrAccessLogTest() = default;
