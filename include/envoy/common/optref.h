@@ -18,6 +18,26 @@ template <class T> struct OptRef : public absl::optional<std::reference_wrapper<
   OptRef() = default;
 
   /**
+   * Copy constructor that allows conversion.
+   */
+  template <class From> explicit OptRef(OptRef<From> rhs) {
+    if (rhs.has_value()) {
+      *this = rhs.ref();
+    }
+  }
+
+  /**
+   * Assignment that allows conversion.
+   */
+  template <class From> OptRef<T>& operator=(OptRef<From> rhs) {
+    this->reset();
+    if (rhs.has_value()) {
+      *this = rhs.ref();
+    }
+    return *this;
+  }
+
+  /**
    * Helper to call a method on T. The caller is responsible for ensuring
    * has_value() is true.
    */

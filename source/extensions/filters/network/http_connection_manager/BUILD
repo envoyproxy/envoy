@@ -41,6 +41,7 @@ envoy_cc_extension(
         "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http1:settings_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/local_reply:local_reply_lib",

@@ -467,43 +467,6 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config) {
-  Http1Settings ret;
-  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
-  ret.accept_http_10_ = config.accept_http_10();
-  ret.default_host_for_http_10_ = config.default_host_for_http_10();
-  ret.enable_trailers_ = config.enable_trailers();
-  ret.allow_chunked_length_ = config.allow_chunked_length();
-
-  if (config.header_key_format().has_proper_case_words()) {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
-  } else {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
-  }
-
-  return ret;
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme) {
-  Http1Settings ret = parseHttp1Settings(config);
-  ret.validate_scheme_ = validate_scheme;
-
-  if (config.has_override_stream_error_on_invalid_http_message()) {
-    // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
-    // stream_error_on_invalid_http_message
-    ret.stream_error_on_invalid_http_message_ =
-        config.override_stream_error_on_invalid_http_message().value();
-  } else {
-    // fallback to HCM value
-    ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
-  }
-
-  return ret;
-}
-
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
   absl::string_view details;

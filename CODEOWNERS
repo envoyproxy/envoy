@@ -171,6 +171,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/io_socket/user_space @lambdai @antoniovicente
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
+# HTTP header formatters
+/*/extensions/http/header_formatters/preserve_case @mattklein123 @jmarantz
 # External Rate Limit
 /*/extensions/filters/common/ratelimit @esmet @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
