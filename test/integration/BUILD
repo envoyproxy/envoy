@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
     "envoy_select_hot_restart",
     "envoy_sh_test",
 )
@@ -668,7 +669,7 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
-        "//source/common/network:udp_default_writer_config",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/server:active_raw_udp_listener_config",
@@ -678,7 +679,9 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:active_quic_listener_lib",
+    ]),
 )
 
 envoy_cc_test_library(
@@ -764,10 +767,10 @@ envoy_cc_test_library(
         "//source/common/http/http3:quic_client_connection_factory_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/thread_local:thread_local_lib",
-        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/server:drain_manager_lib",
@@ -850,7 +853,7 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/access_loggers/stdoutput:config",
+        "//source/extensions/access_loggers/stream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/server:connection_handler_lib",

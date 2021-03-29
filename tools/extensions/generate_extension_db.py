@@ -128,10 +128,6 @@ if __name__ == '__main__':
         '//source/extensions/upstreams/http:config')
     extension_db['envoy.request_id.uuid'] = get_extension_metadata(
         '//source/extensions/request_id/uuid:config')
-    extension_db['envoy.listener.quic'] = get_extension_metadata(
-        '//source/extensions/quic_listeners/quiche:quic_factory_lib')
-    extension_db['envoy.transport_sockets.quic'] = get_extension_metadata(
-        '//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib')
 
     pathlib.Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
     pathlib.Path(output_path).write_text(json.dumps(extension_db))

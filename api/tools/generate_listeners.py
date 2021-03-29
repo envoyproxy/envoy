@@ -10,6 +10,7 @@ import sys
 # in sys.path first.
 from pkgutil import extend_path
 import google
+
 google.__path__ = extend_path(google.__path__, google.__name__)
 
 from google.protobuf import json_format

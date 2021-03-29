@@ -32,9 +32,13 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/udp_default_writer_config.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/stats/isolated_store_impl.h"
+
+#if defined(ENVOY_ENABLE_QUIC)
+#include "common/quic/active_quic_listener.h"
+#endif
 
 #include "server/active_raw_udp_listener_config.h"
 
@@ -721,12 +725,12 @@ private:
     FakeListener(FakeUpstream& parent, bool is_quic = false)
         : parent_(parent), name_("fake_upstream"), init_manager_(nullptr) {
       if (is_quic) {
-        envoy::config::listener::v3::QuicProtocolOptions config;
-        auto& config_factory =
-            Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
-                "quiche_quic_listener");
-        udp_listener_config_.listener_factory_ =
-            config_factory.createActiveUdpListenerFactory(config, 1);
+#if defined(ENVOY_ENABLE_QUIC)
+        udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
+            envoy::config::listener::v3::QuicProtocolOptions(), 1);
+#else
+        ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
+#endif
       } else {
         udp_listener_config_.listener_factory_ =
             std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
