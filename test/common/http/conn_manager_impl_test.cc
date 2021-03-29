@@ -722,7 +722,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 // The router observes the cached route as a DelegatingRoute (with upstream cluster foo), not the
 // original route returned by route config (upstream cluster default), when the setRoute filter
 // callback is applied.
-TEST_F(HttpConnectionManagerImplTest, FilterSetDelegatingRouteWithClusterOverride) {
+TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithClusterOverride) {
   setup(false, "");
   setupFilterChain(2, 0);
 
