@@ -33,7 +33,9 @@ as the new tcmalloc code is not guaranteed to compile with lower versions of Cla
 Windows Requirements
 --------------------
 
-Envoy has been ported and is now expected to work on Windows.
+Envoy now suports Windows as a target platform. The requirements below only apply if you want to build the Windows
+native executable. If you want to build the Linux version of Envoy on Windows either with WSL or Linux containers
+please see the Linux requirements.
 
 Building Envoy has the following requirements:
 
