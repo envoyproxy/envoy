@@ -27,6 +27,7 @@ Minor Behavior Changes
   logging, :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`, etc.
   Setting the hostname manually allows overriding the internal hostname used for such features while
   still allowing the original DNS resolution name to be used.
+* ext_authz: routes that contain a redirect or a direct response action are now properly subject to external authorization checks by default. To restore the original behavior and skip authorization checks, disable ext_authz on the :ref:`per-route config <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute>`.
 * grpc_json_transcoder: filter now adheres to encoder and decoder buffer limits. Requests and responses
   that require buffering over the limits will be directly rejected. The behavior can be reverted by
   disabling runtime feature `envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits`.
@@ -79,7 +80,6 @@ Bug Fixes
 * active http health checks: properly handles HTTP/2 GOAWAY frames from the upstream. Previously a GOAWAY frame due to a graceful listener drain could cause improper failed health checks due to streams being refused by the upstream on a connection that is going away. To revert to old GOAWAY handling behavior, set the runtime feature `envoy.reloadable_features.health_check.graceful_goaway_handling` to false.
 * adaptive concurrency: fixed a bug where concurrent requests on different worker threads could update minRTT back-to-back.
 * buffer: tighten network connection read and write buffer high watermarks in preparation to more careful enforcement of read limits. Buffer high-watermark is now set to the exact configured value; previously it was set to value + 1.
-* ext_authz: fix a bug that skipped external authorization checks for routes that contained only a direct response.
 * cdn_loop: check that the entirety of the :ref:`cdn_id <envoy_v3_api_field_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig.cdn_id>` field is a valid CDN identifier.
 * cds: fix blocking the update for a warming cluster when the update is the same as the active version.
 * ext_authz: emit :ref:`CheckResponse.dynamic_metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` when the external authorization response has "Denied" check status.
