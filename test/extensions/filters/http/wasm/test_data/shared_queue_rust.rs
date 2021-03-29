@@ -8,7 +8,6 @@ pub fn _start() {
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> {
         Box::new(TestRoot { queue_id: None })
     });
-    proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestStream) });
 }
 
 struct TestRoot {
@@ -38,24 +37,50 @@ impl RootContext for TestRoot {
             }
         }
     }
+
+    fn get_type(&self) -> Option<ContextType> {
+        Some(ContextType::HttpContext)
+    }
+
+    fn create_http_context(&self, _: u32) -> Option<Box<dyn HttpContext>> {
+        Some(Box::new(TestStream {
+            queue_id: self.queue_id,
+        }))
+    }
 }
 
-struct TestStream;
+struct TestStream {
+    queue_id: Option<u32>,
+}
 
 impl Context for TestStream {}
 
 impl HttpContext for TestStream {
     fn on_http_request_headers(&mut self, _: usize) -> Action {
+        if self.resolve_shared_queue("", "bad_shared_queue").is_none() {
+            warn!("onRequestHeaders not found self/bad_shared_queue");
+        }
         if self
             .resolve_shared_queue("vm_id", "bad_shared_queue")
             .is_none()
         {
-            warn!("onRequestHeaders not found bad_shared_queue");
+            warn!("onRequestHeaders not found vm_id/bad_shared_queue");
         }
-        if let Some(queue_id) = self.resolve_shared_queue("vm_id", "my_shared_queue") {
-            self.enqueue_shared_queue(queue_id, Some(b"data1")).unwrap();
-            warn!("onRequestHeaders enqueue Ok");
+        if self
+            .resolve_shared_queue("bad_vm_id", "bad_shared_queue")
+            .is_none()
+        {
+            warn!("onRequestHeaders not found bad_vm_id/bad_shared_queue");
         }
+        if Some(self.resolve_shared_queue("", "my_shared_queue")) == Some(self.queue_id) {
+            warn!("onRequestHeaders found self/my_shared_queue");
+        }
+        if Some(self.resolve_shared_queue("vm_id", "my_shared_queue")) == Some(self.queue_id) {
+            warn!("onRequestHeaders found vm_id/my_shared_queue");
+        }
+        self.enqueue_shared_queue(self.queue_id.unwrap(), Some(b"data1"))
+            .unwrap();
+        warn!("onRequestHeaders enqueue Ok");
         Action::Continue
     }
 }
