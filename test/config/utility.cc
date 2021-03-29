@@ -224,10 +224,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
               domains: "*"
             name: route_config_0
     udp_listener_config:
-      listener_config:
-        name: quic_listener_config
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions
+      quic_options: {{}}
 )EOF",
                                                            Platform::null_device_path));
 }
@@ -1087,8 +1084,7 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
   ConfigHelper::initializeTls(ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true),
                               *tls_context->mutable_common_tls_context());
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
-    if (listener.udp_listener_config().listener_config().typed_config().type_url() ==
-        "type.googleapis.com/envoy.config.listener.v3.QuicProtocolOptions") {
+    if (listener.udp_listener_config().has_quic_options()) {
       ASSERT(listener.filter_chains_size() > 0);
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();

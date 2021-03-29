@@ -114,7 +114,7 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
-           envoy_select_enable_http3(["-DENVOY_ENABLE_QUICHE"], repository) + \
+           envoy_select_enable_http3(["-DENVOY_ENABLE_QUIC"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
            _envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
