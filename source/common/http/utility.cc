@@ -634,8 +634,8 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   // practice, we are working with a view at the end of the owning string, and could pass the
   // raw pointer.
   // TODO(mattklein123) PERF: Avoid the copy here.
-  Network::Address::InstanceConstSharedPtr address = Network::Utility::parseInternetAddressNoThrow(
-      std::string(xff_string.data(), xff_string.size()));
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressNoThrow(std::string(xff_string));
   if (address != nullptr) {
     return {address, last_comma == std::string::npos && num_to_skip == 0};
   }
