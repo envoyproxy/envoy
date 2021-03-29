@@ -1,6 +1,11 @@
 .. _faq_why_is_envoy_sending_413:
 
-Why is Envoy sending 413s?
-==========================
+为什么 Envoy 会发送 413 ？
+================================
 
-Envoy by default imposes limits to how much it will buffer for a given request. Generally, Envoy filters are designed to be streaming, and will pass data from downstream to upstream, or will simply pause processing while waiting for an external event (e.g. doing auth checks). Some filters, for example the buffer filter, require buffering the full request or response. If a request body is too large to buffer, but buffering is required by the filter, Envoy will send a 413. The buffer limits can be increased at the risk of making OOMs more possible. Please see the ref:`flow control docs <faq_flow_control>` for details.
+默认情况下，Envoy 会对给定的请求限制使用缓冲大小。
+一般来说，Envoy 过滤器被设计为流式，将数据从下游传递到上游，或者在等待外部事件时暂停处理（例如，执行认证检查）。
+一些过滤器，例如缓冲过滤器，需要缓冲完整的请求或响应。
+如果一个请求体太大而无法缓冲，但过滤器仍然需要缓存，那么 Envoy 就会发送 413。
+缓存区限制可以加大，但这也会增加 OOM 的可能性。
+更多详细信息，请参阅 ref:`流控制文档 <faq_flow_control>` 。
