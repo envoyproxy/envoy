@@ -151,6 +151,10 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (!headers_decompressed() || header_list.empty()) {
+    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    return;
+  }
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
@@ -164,7 +168,6 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
-  ASSERT(headers_decompressed() && !header_list.empty());
   const uint64_t status = optional_status.value();
   if (Http::CodeUtility::is1xx(status)) {
     if (status == enumToInt(Http::Code::SwitchingProtocols)) {
