@@ -13,7 +13,7 @@ In order to build without using the Docker container, follow the instructions at
 
 .. _install_requirements:
 
-Posix Requirements
+Linux/Mac Requirements
 ------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
@@ -42,10 +42,11 @@ Building Envoy has the following requirements:
 * `Build Tools for Visual Studio 2019 <https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019>`_
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
+Detailed instructions
+---------------------
 
-.. note::
-   Please see :repo:`developer use of CI Docker images <ci/README.md>` and :repo:`building Envoy with Bazel <bazel/README.md>`
-   documentation for more information on performing manual builds.
+Please see :repo:`developer use of CI Docker images <ci/README.md>` and :repo:`building Envoy with Bazel <bazel/README.md>`
+documentation for more information on performing manual builds.
 
 Modifying Envoy
 ---------------
