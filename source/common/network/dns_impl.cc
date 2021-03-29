@@ -170,8 +170,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (completed_) {
     if (!cancelled_) {
       // TODO(chaoqin-li1123): remove this exception catching by refactoring.
-      //  We can add a main thread assertion here because both this code is reused by dns filter and
-      //  executed in both main thread and worker thread.
+      //  We can't add a main thread assertion here because both this code is reused by dns filter
+      //  and executed in both main thread and worker thread. Maybe split the code for filter and
+      //  main thread.
       TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
