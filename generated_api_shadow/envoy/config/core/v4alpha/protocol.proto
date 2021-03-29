@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -121,6 +122,7 @@ message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http1ProtocolOptions";
 
+  // [#next-free-field: 9]
   message HeaderKeyFormat {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.core.v3.Http1ProtocolOptions.HeaderKeyFormat";
@@ -139,6 +141,11 @@ message Http1ProtocolOptions {
       // Note that while this results in most headers following conventional casing, certain headers
       // are not covered. For example, the "TE" header will be formatted as "Te".
       ProperCaseWords proper_case_words = 1;
+
+      // Configuration for stateful formatter extensions that allow using received headers to
+      // affect the output of encoding headers. E.g., preserving case during proxying.
+      // [#extension-category: envoy.http.stateful_header_formatters]
+      TypedExtensionConfig stateful_formatter = 8;
     }
   }
 

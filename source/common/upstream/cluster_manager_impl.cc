@@ -23,6 +23,7 @@
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
@@ -389,8 +390,13 @@ ClusterManagerImpl::ClusterManagerImpl(
   });
 
   // We can now potentially create the CDS API once the backing cluster exists.
-  if (dyn_resources.has_cds_config()) {
-    cds_api_ = factory_.createCds(dyn_resources.cds_config(), *this);
+  if (dyn_resources.has_cds_config() || !dyn_resources.cds_resources_locator().empty()) {
+    std::unique_ptr<xds::core::v3::ResourceLocator> cds_resources_locator;
+    if (!dyn_resources.cds_resources_locator().empty()) {
+      cds_resources_locator = std::make_unique<xds::core::v3::ResourceLocator>(
+          Config::XdsResourceIdentifier::decodeUrl(dyn_resources.cds_resources_locator()));
+    }
+    cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1547,9 +1553,11 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
 
 CdsApiPtr
 ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                     const xds::core::v3::ResourceLocator* cds_resources_locator,
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cm, stats_, validation_context_.dynamicValidationVisitor());
+  return CdsApiImpl::create(cds_config, cds_resources_locator, cm, stats_,
+                            validation_context_.dynamicValidationVisitor());
 }
 
 } // namespace Upstream

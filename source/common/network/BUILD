@@ -272,7 +272,6 @@ envoy_cc_library(
         ":address_lib",
         ":default_socket_interface_lib",
         ":listen_socket_lib",
-        ":udp_default_writer_config",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:exception_interface",
@@ -469,21 +468,8 @@ envoy_cc_library(
         ":io_socket_error_lib",
         ":utility_lib",
         "//include/envoy/network:socket_interface",
-        "//include/envoy/network:udp_packet_writer_config_interface",
         "//include/envoy/network:udp_packet_writer_handler_interface",
         "//source/common/buffer:buffer_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "udp_default_writer_config",
-    srcs = ["udp_default_writer_config.cc"],
-    hdrs = ["udp_default_writer_config.h"],
-    deps = [
-        ":udp_packet_writer_handler_lib",
-        "//include/envoy/network:udp_packet_writer_config_interface",
-        "//include/envoy/registry",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

@@ -28,17 +28,18 @@ import sys
 import exports
 import utils
 
-Scorecard = namedtuple('Scorecard', [
-    'name',
-    'contributors',
-    'active',
-    'ci_tests',
-    'pull_requests',
-    'code_review',
-    'fuzzing',
-    'security_policy',
-    'releases',
-])
+Scorecard = namedtuple(
+    'Scorecard', [
+        'name',
+        'contributors',
+        'active',
+        'ci_tests',
+        'pull_requests',
+        'code_review',
+        'fuzzing',
+        'security_policy',
+        'releases',
+    ])
 
 
 # Thrown on errors related to release date.
@@ -65,15 +66,16 @@ def score(scorecard_path, repository_locations):
         github_project_url = utils.get_github_project_url(metadata['urls'])
         if not github_project_url:
             na = 'Not Scorecard compatible'
-            results[results_key] = Scorecard(name=formatted_name,
-                                             contributors=na,
-                                             active=na,
-                                             ci_tests=na,
-                                             pull_requests=na,
-                                             code_review=na,
-                                             fuzzing=na,
-                                             security_policy=na,
-                                             releases=na)
+            results[results_key] = Scorecard(
+                name=formatted_name,
+                contributors=na,
+                active=na,
+                ci_tests=na,
+                pull_requests=na,
+                code_review=na,
+                fuzzing=na,
+                security_policy=na,
+                releases=na)
             continue
         raw_scorecard = json.loads(
             sp.check_output(
@@ -100,15 +102,16 @@ def score(scorecard_path, repository_locations):
             else:
                 return 'False (10)'
 
-        results[results_key] = Scorecard(name=formatted_name,
-                                         contributors=_format('Contributors'),
-                                         active=_format('Active'),
-                                         ci_tests=_format('CI-Tests'),
-                                         pull_requests=_format('Pull-Requests'),
-                                         code_review=_format('Code-Review'),
-                                         fuzzing=_format('Fuzzing'),
-                                         security_policy=_format('Security-Policy'),
-                                         releases=release_format())
+        results[results_key] = Scorecard(
+            name=formatted_name,
+            contributors=_format('Contributors'),
+            active=_format('Active'),
+            ci_tests=_format('CI-Tests'),
+            pull_requests=_format('Pull-Requests'),
+            code_review=_format('Code-Review'),
+            fuzzing=_format('Fuzzing'),
+            security_policy=_format('Security-Policy'),
+            releases=release_format())
         print(raw_scorecard)
         print(results[results_key])
     return results
@@ -142,5 +145,6 @@ if __name__ == '__main__':
         results = score(scorecard_path, spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC))
         print_csv_results(csv_output_path, results)
     except OssfScorecardError as e:
-        print(f'An error occurred while processing {path}, please verify the correctness of the '
-              f'metadata: {e}')
+        print(
+            f'An error occurred while processing {path}, please verify the correctness of the '
+            f'metadata: {e}')

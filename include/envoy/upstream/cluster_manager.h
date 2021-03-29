@@ -385,6 +385,7 @@ public:
    * Create a CDS API provider from configuration proto.
    */
   virtual CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                              const xds::core::v3::ResourceLocator* cds_resources_locator,
                               ClusterManager& cm) PURE;
 
   /**
