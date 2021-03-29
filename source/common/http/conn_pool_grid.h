@@ -29,10 +29,12 @@ public:
   // TODO(#15649) currently this tries one connection at a time.
   // It should instead have a timer of its own and start the second connection
   // in parallel after a suitable delay.
-  class WrapperCallbacks : public ConnectionPool::Callbacks, public ConnectionPool::Cancellable {
+  class WrapperCallbacks : public ConnectionPool::Callbacks,
+                           public ConnectionPool::Cancellable,
+                           public LinkedObject<WrapperCallbacks> {
   public:
     WrapperCallbacks(ConnectivityGrid& grid, Http::ResponseDecoder& decoder, PoolIterator pool_it,
-                     ConnectionPool::Callbacks& callbacks, uint32_t index);
+                     ConnectionPool::Callbacks& callbacks);
 
     // ConnectionPool::Callbacks
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -44,6 +46,9 @@ public:
 
     // ConnectionPool::Cancellable
     void cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) override;
+
+    // Removes this from the owning list, deleting it.
+    void deleteThis();
 
     ConnectionPool::Instance& pool() { return **pool_it_; }
     // The owning grid.
@@ -58,9 +63,8 @@ public:
     // The handle to cancel the request to the current pool.
     // This is owned by the pool which created it.
     Cancellable* cancellable_;
-    // The index in the grid's wrapped_callbacks_ for easy deletion.
-    uint32_t index_;
   };
+  using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
   ConnectivityGrid(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
@@ -117,11 +121,8 @@ private:
   // callbacks on deletion.
   bool destroying_{};
 
-  // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership and
-  // are removed either on cancellation or pool success/failure.
-  // TODO(#15649) consider LinkedObject equivalent.
-  absl::flat_hash_map<uint32_t, std::unique_ptr<WrapperCallbacks>> wrapped_callbacks_;
-  uint32_t wrapped_callbacks_index_{};
+  // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
+  std::list<WrapperCallbacksPtr> wrapped_callbacks_;
 };
 
 } // namespace Http

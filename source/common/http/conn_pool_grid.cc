@@ -21,10 +21,8 @@ bool contains(const std::vector<Http::Protocol>& protocols,
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      PoolIterator pool_it,
-                                                     ConnectionPool::Callbacks& callbacks,
-                                                     uint32_t index)
-    : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks), pool_it_(pool_it),
-      index_(index) {
+                                                     ConnectionPool::Callbacks& callbacks)
+    : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks), pool_it_(pool_it) {
   // TODO(#15649) add trace logging.
   cancellable_ = pool().newStream(decoder_, *this);
 }
@@ -44,8 +42,12 @@ void ConnectivityGrid::WrapperCallbacks::onPoolFailure(
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller.
   ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this".
   callbacks.onPoolFailure(reason, transport_failure_reason, host);
+}
+
+void ConnectivityGrid::WrapperCallbacks::deleteThis() {
+  // By removing the entry from the list, it will be deleted.
+  removeFromList(grid_.wrapped_callbacks_);
 }
 
 void ConnectivityGrid::WrapperCallbacks::onPoolReady(RequestEncoder& encoder,
@@ -55,7 +57,7 @@ void ConnectivityGrid::WrapperCallbacks::onPoolReady(RequestEncoder& encoder,
   // Right now, connections are tried serially, so any successful stream
   // creation should be passed up to the original caller.
   ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this".
+  deleteThis();
   return callbacks.onPoolReady(encoder, host, info, protocol);
 }
 
@@ -63,7 +65,7 @@ void ConnectivityGrid::WrapperCallbacks::cancel(Envoy::ConnectionPool::CancelPol
   // If the newStream caller cancels the stream request, pass the cancellation on
   // to the active pool.
   cancellable_->cancel(cancel_policy);
-  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this".
+  deleteThis();
 }
 
 ConnectivityGrid::ConnectivityGrid(
@@ -127,12 +129,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
 
   // TODO(#15649) track pools with successful connections: don't always start at
   // the front of the list.
-  wrapped_callbacks_.emplace(wrapped_callbacks_index_, std::make_unique<WrapperCallbacks>(
-                                                           *this, decoder, pools_.begin(),
-                                                           callbacks, wrapped_callbacks_index_));
-  wrapped_callbacks_index_++;
-
-  return wrapped_callbacks_[wrapped_callbacks_index_ - 1].get();
+  auto wrapped_callback =
+      std::make_unique<WrapperCallbacks>(*this, decoder, pools_.begin(), callbacks);
+  ConnectionPool::Cancellable* ret = wrapped_callback.get();
+  LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
+  return ret;
 }
 
 void ConnectivityGrid::addDrainedCallback(DrainedCb cb) {
