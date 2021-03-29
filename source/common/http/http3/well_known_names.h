@@ -7,6 +7,7 @@
 namespace Envoy {
 namespace Http {
 
+// TODO(mattklein123): Remove this as part of #12829
 class QuicCodecNameValues {
 public:
   // QUICHE is the only QUIC implementation for now.
