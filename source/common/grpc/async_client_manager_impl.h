@@ -93,7 +93,7 @@ private:
     RawAsyncClientSharedPtr getOrCreate(const envoy::config::core::v3::GrpcService& config,
                                         Stats::Scope& scope, bool skip_cluster_check) {
       RawAsyncClientSharedPtr client;
-      // client = thread_local_cache_->getCache(config);
+      client = thread_local_cache_->getCache(config);
       if (client != nullptr) {
         return client;
       }
