@@ -49,6 +49,9 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff
 CURRENT=extensions
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check
 
+CURRENT=yamllint
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:yaml_check "$(pwd)"
+
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do

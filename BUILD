@@ -6,6 +6,7 @@ exports_files([
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
+    ".yamllint",
 ])
 
 # These two definitions exist to help reduce Envoy upstream core code depending on extensions.

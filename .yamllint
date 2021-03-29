@@ -1,0 +1,26 @@
+
+extends: default
+
+ignore: |
+  tmp/**/*
+  **/*.template.yaml
+  test/config/integration/server_xds.cds.with_unknown_field.yaml
+
+rules:
+  document-start: disable
+  empty-lines:
+    max: 2
+    max-start: 1
+    max-end: 0
+  line-length: disable
+  indentation:
+    spaces: 2
+    indent-sequences: false
+    check-multi-line-strings: false
+  truthy:
+    allowed-values:
+    - 'true'
+    - 'false'
+    - 'yes'
+    - 'no'
+    check-keys: false

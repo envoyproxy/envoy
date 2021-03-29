@@ -22,3 +22,13 @@ envoy_py_binary(
         requirement("yapf"),
     ],
 )
+
+envoy_py_binary(
+    name = "tools.code_format.yaml_check",
+    data = ["//:.yamllint"],
+    deps = [
+        requirement("yamllint"),
+        "//tools/base:checker",
+        "//tools/base:utils",
+    ],
+)
