@@ -1070,7 +1070,7 @@ TEST_F(AccessLogImplTest, Stdout) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
   )EOF";
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
@@ -1086,11 +1086,11 @@ typed_config:
   EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
 }
 
-TEST_F(AccessLogImplTest, Stderror) {
+TEST_F(AccessLogImplTest, Stderr) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stderror.v3.StdErrorAccessLog
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog
   )EOF";
 
   ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));

@@ -12,9 +12,9 @@ static_resources:
           codec_type: AUTO
           add_user_agent: true
           access_log:
-          - name: envoy.access_loggers.stdoutput
+          - name: envoy.access_loggers.stdout
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
           stat_prefix: egress_http
           common_http_protocol_options:
             idle_timeout: 0.840s

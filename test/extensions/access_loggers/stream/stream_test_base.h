@@ -1,12 +1,11 @@
-#include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/stdoutput/v3/stdoutput.pb.h"
+#include "envoy/extensions/access_loggers/stream/v3/stream.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/common/file_access_log_impl.h"
-#include "extensions/access_loggers/stdoutput/config.h"
+#include "extensions/access_loggers/stream/config.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -23,19 +22,21 @@ namespace AccessLoggers {
 namespace File {
 namespace {
 
-class StdoutputAccessLogTest : public testing::Test {
+template <class T, Filesystem::DestinationType destination_type>
+class StreamAccessLogTest : public testing::Test {
 public:
-  StdoutputAccessLogTest() = default;
+  StreamAccessLogTest() = default;
 
-  void runTest(const std::string& yaml, absl::string_view expected, bool is_json) {
-    envoy::extensions::access_loggers::stdoutput::v3::StdoutputAccessLog fal_config;
+protected:
+  virtual void runTest(const std::string& yaml, absl::string_view expected, bool is_json) {
+    T fal_config;
     TestUtility::loadFromYaml(yaml, fal_config);
 
     envoy::config::accesslog::v3::AccessLog config;
     config.mutable_typed_config()->PackFrom(fal_config);
 
     auto file = std::make_shared<AccessLog::MockAccessLogFile>();
-    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::Stdout, ""};
+    Filesystem::FilePathAndType file_info{destination_type, ""};
     EXPECT_CALL(context_.access_log_manager_, createAccessLog(file_info)).WillOnce(Return(file));
 
     AccessLog::InstanceSharedPtr logger = AccessLog::AccessLogFactory::fromProto(config, context_);
@@ -63,40 +64,6 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
-
-TEST_F(StdoutputAccessLogTest, EmptyFormat) {
-  runTest(
-      "{}",
-      "[2018-12-18T01:50:34.000Z] \"GET /bar/foo -\" 200 - 0 0 - - \"-\" \"-\" \"-\" \"-\" \"-\"\n",
-      false);
-}
-
-TEST_F(StdoutputAccessLogTest, LogFormatText) {
-  runTest(
-      R"(
-  log_format:
-    text_format_source:
-      inline_string: "plain_text - %REQ(:path)% - %RESPONSE_CODE%"
-)",
-      "plain_text - /bar/foo - 200", false);
-}
-
-TEST_F(StdoutputAccessLogTest, LogFormatJson) {
-  runTest(
-      R"(
-  log_format:
-    json_format:
-      text: "plain text"
-      path: "%REQ(:path)%"
-      code: "%RESPONSE_CODE%"
-)",
-      R"({
-    "text": "plain text",
-    "path": "/bar/foo",
-    "code": 200
-})",
-      true);
-}
 
 } // namespace
 } // namespace File
