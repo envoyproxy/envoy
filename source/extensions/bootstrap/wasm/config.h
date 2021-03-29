@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/extensions/wasm/v3/service.pb.h"
 #include "envoy/extensions/wasm/v3/service.pb.validate.h"
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
