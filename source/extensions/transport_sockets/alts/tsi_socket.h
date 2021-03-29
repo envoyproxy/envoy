@@ -82,6 +82,8 @@ private:
 
   // Helper function to perform repeated read and unprotect operations.
   Network::IoResult repeatReadAndUnprotect(Buffer::Instance& buffer, Network::IoResult prev_result);
+  // Helper function to read from a raw socket and update status.
+  Network::IoResult readFromRawSocket();
 
   HandshakerFactory handshaker_factory_;
   HandshakeValidator handshake_validator_;
@@ -100,7 +102,7 @@ private:
   std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
   Network::TransportSocketPtr raw_buffer_socket_;
 
-  Buffer::WatermarkBuffer raw_read_buffer_{[]() -> void {}, []() -> void {}, []() -> void {}};
+  Buffer::WatermarkBuffer raw_read_buffer_{[]() {}, []() {}, []() {}};
   Envoy::Buffer::OwnedImpl raw_write_buffer_;
   bool handshake_complete_{};
   bool end_stream_read_{};
