@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <typeinfo>
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
