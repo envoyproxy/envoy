@@ -119,6 +119,7 @@ private:
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership and
   // are removed either on cancellation or pool success/failure.
+  // TODO(#15649) consider LinkedObject equivalent.
   absl::flat_hash_map<uint32_t, std::unique_ptr<WrapperCallbacks>> wrapped_callbacks_;
   uint32_t wrapped_callbacks_index_{};
 };
