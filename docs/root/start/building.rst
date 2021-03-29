@@ -14,7 +14,7 @@ In order to build without using the Docker container, follow the instructions at
 .. _install_requirements:
 
 Linux/Mac Requirements
-------------------
+----------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
 recent Linux including Ubuntu 18.04 LTS.
