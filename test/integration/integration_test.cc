@@ -2024,4 +2024,45 @@ TEST_P(IntegrationTest, WithRemoveResponseHeadersFilter) {
   EXPECT_EQ(response->body(), "missing required header: :status");
 }
 
+TEST_P(IntegrationTest, 100ContinueWithRemoveResponseHeadersFilter) {
+  config_helper_.addFilter(R"EOF(
+  name: remove-response-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"expect", "100-continue"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Send :100 from the upstream, and should be passed back to the client since the filter is not
+  // executed on the continue header.
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  response->waitForContinueHeaders();
+
+  // Send the request & reply with the default header.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Since the response headers are removed by the filter, 500 must be returned gracefully.
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
 } // namespace Envoy

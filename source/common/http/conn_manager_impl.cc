@@ -1344,17 +1344,9 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Now actually encode via the codec.
   const auto status = response_encoder_->encode100ContinueHeaders(response_headers);
-  if (!status.ok()) {
-    // This branch can happen when a misbehaving filter chain removed critical headers or set
-    // malformed header values.
-    const auto request_headers = requestHeaders();
-    sendLocalReply(request_headers.has_value() &&
-                       Grpc::Common::isGrpcRequestHeaders(request_headers.ref()),
-                   Http::Code::InternalServerError, status.message(), nullptr, absl::nullopt,
-                   absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders,
-                                "{", status.message(), "}"));
-    return;
-  }
+  // encode100ContinueHeaders is always called with valid headers so the code here must return OK.
+  ASSERT(status.ok());
+
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(response_headers);
 }
