@@ -170,9 +170,19 @@ private:
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
-  std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
-  StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
-  StructFormatListWrapper toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+  class FormatBuilder {
+  public:
+    FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
+    FormatBuilder() : commands_(absl::nullopt) {}
+    std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+    StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
+    StructFormatListWrapper
+    toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+
+  private:
+    using CommandsRef = std::reference_wrapper<const std::vector<CommandParserPtr>>;
+    const absl::optional<CommandsRef> commands_;
+  };
 
   // Methods for doing the actual formatting.
   ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
@@ -191,10 +201,6 @@ private:
   const bool omit_empty_values_;
   const bool preserve_types_;
   const std::string empty_value_;
-
-  // Note: this ref becomes invalid outside of the constructor, so we unset it after that.
-  using CommandsRef = std::reference_wrapper<const std::vector<CommandParserPtr>>;
-  absl::optional<CommandsRef> commands_;
 
   const StructFormatMapWrapper struct_output_format_;
 };

@@ -153,21 +153,16 @@ StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool
                                  const std::vector<CommandParserPtr>& commands)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      commands_(commands), struct_output_format_(toFormatMapValue(format_mapping)) {
-  // Note: to avoid copying commands we save the ref in an optional for toFormatMapValue and related
-  // methods to use. Once those are done we need to unset the optional to avoid accidentally
-  // accessing a dangling reference.
-  commands_ = absl::nullopt;
-}
+      struct_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
 
 StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                                  bool omit_empty_values)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      commands_(absl::nullopt), struct_output_format_(toFormatMapValue(format_mapping)) {}
+      struct_output_format_(FormatBuilder().toFormatMapValue(format_mapping)) {}
 
 StructFormatter::StructFormatMapWrapper
-StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
+StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
   for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
@@ -191,8 +186,8 @@ StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) cons
   return {std::move(output)};
 }
 
-StructFormatter::StructFormatListWrapper
-StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const {
+StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toFormatListValue(
+    const ProtobufWkt::ListValue& list_value_format) const {
   auto output = std::make_unique<StructFormatList>();
   for (const auto& value : list_value_format.values()) {
     switch (value.kind_case()) {
@@ -216,7 +211,7 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 }
 
 std::vector<FormatterProviderPtr>
-StructFormatter::toFormatStringValue(const std::string& string_format) const {
+StructFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
   std::vector<CommandParserPtr> commands;
   return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
 }
