@@ -24,7 +24,7 @@ namespace OpenTelemetry {
 SINGLETON_MANAGER_REGISTRATION(open_telemetry_access_logger_cache);
 
 GrpcAccessLoggerCacheSharedPtr
-getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
+getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context) {
   return context.singletonManager().getTyped<GrpcAccessLoggerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_access_logger_cache), [&context] {
         return std::make_shared<GrpcAccessLoggerCacheImpl>(
@@ -36,7 +36,7 @@ getAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
 ::Envoy::AccessLog::InstanceSharedPtr
 AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                           ::Envoy::AccessLog::FilterPtr&& filter,
-                                          Server::Configuration::FactoryContext& context) {
+                                          Server::Configuration::CommonFactoryContext& context) {
   validateProtoDescriptors();
 
   const auto& proto_config =
