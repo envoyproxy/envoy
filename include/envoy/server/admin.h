@@ -122,12 +122,12 @@ public:
 
   /**
    * Expose this Admin console as an HTTP server.
-   * @param access_log_path file path to write the HTTP request log to.
+   * @param access_logs access_logs list of file loggers to write the HTTP request log to.
    * @param address_out_path file path to write the listening socket's address to.
    * @param address network address to bind and listen on.
    * @param listener_scope stats scope for the listener being started,
    */
-  virtual void startHttpListener(const std::string& access_log_path,
+  virtual void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
                                  const std::string& address_out_path,
                                  Network::Address::InstanceConstSharedPtr address,
                                  const Network::Socket::OptionsSharedPtr& socket_options,

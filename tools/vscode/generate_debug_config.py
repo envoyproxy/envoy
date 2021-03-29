@@ -12,8 +12,8 @@ BAZEL_OPTIONS = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", ""))
 
 
 def bazel_info(name, bazel_extra_options=[]):
-    return subprocess.check_output(["bazel", "info", name] + BAZEL_OPTIONS +
-                                   bazel_extra_options).decode().strip()
+    return subprocess.check_output(["bazel", "info", name] + BAZEL_OPTIONS
+                                   + bazel_extra_options).decode().strip()
 
 
 def get_workspace():
@@ -120,5 +120,5 @@ if __name__ == "__main__":
     workspace = get_workspace()
     execution_root = get_execution_root(workspace)
     debug_binary = build_binary_with_debug_info(args.target)
-    add_to_launch_json(args.target, debug_binary, workspace, execution_root, args.args,
-                       args.debugger)
+    add_to_launch_json(
+        args.target, debug_binary, workspace, execution_root, args.args, args.debugger)

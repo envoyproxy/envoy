@@ -11,13 +11,6 @@
 
 START_WASM_PLUGIN(HttpWasmTestCpp)
 
-class SharedQueueContext : public Context {
-public:
-  explicit SharedQueueContext(uint32_t id, RootContext* root) : Context(id, root) {}
-
-  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
-};
-
 class SharedQueueRootContext : public RootContext {
 public:
   explicit SharedQueueRootContext(uint32_t id, std::string_view root_id)
@@ -27,6 +20,17 @@ public:
   void onQueueReady(uint32_t) override;
 
   uint32_t shared_queue_token_;
+};
+
+class SharedQueueContext : public Context {
+public:
+  explicit SharedQueueContext(uint32_t id, RootContext* root) : Context(id, root) {}
+
+  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
+
+private:                                                                                            
+  SharedQueueRootContext* root() { return static_cast<SharedQueueRootContext*>(Context::root()); }
+
 };
 
 static RegisterContextFactory register_SharedQueueContext(CONTEXT_FACTORY(SharedQueueContext),
@@ -40,10 +44,23 @@ bool SharedQueueRootContext::onStart(size_t) {
 
 FilterHeadersStatus SharedQueueContext::onRequestHeaders(uint32_t, bool) {
   uint32_t token;
-  if (resolveSharedQueue("vm_id", "bad_shared_queue", &token) == WasmResult::NotFound) {
-    logWarn("onRequestHeaders not found bad_shared_queue");
+  if (resolveSharedQueue("", "bad_shared_queue", &token) == WasmResult::NotFound) {
+    logWarn("onRequestHeaders not found self/bad_shared_queue");
   }
-  CHECK_RESULT(resolveSharedQueue("vm_id", "my_shared_queue", &token));
+  if (resolveSharedQueue("vm_id", "bad_shared_queue", &token) == WasmResult::NotFound) {
+    logWarn("onRequestHeaders not found vm_id/bad_shared_queue");
+  }
+  if (resolveSharedQueue("bad_vm_id", "bad_shared_queue", &token) == WasmResult::NotFound) {
+    logWarn("onRequestHeaders not found bad_vm_id/bad_shared_queue");
+  }
+  if (resolveSharedQueue("", "my_shared_queue", &token) == WasmResult::Ok &&
+      token == root()->shared_queue_token_) {
+    logWarn("onRequestHeaders found self/my_shared_queue");
+  }
+  if (resolveSharedQueue("vm_id", "my_shared_queue", &token) == WasmResult::Ok &&
+      token == root()->shared_queue_token_) {
+    logWarn("onRequestHeaders found vm_id/my_shared_queue");
+  }
   if (enqueueSharedQueue(token, "data1") == WasmResult::Ok) {
     logWarn("onRequestHeaders enqueue Ok");
   }

@@ -58,8 +58,8 @@ def fix_file_helper(filename, extra_input_files=None):
 # If the fix was successful, the diff is returned as a string-array. If the file
 # was not fixable, the error-messages are returned as a string-array.
 def fix_file_expecting_success(file, extra_input_files=None):
-    command, infile, outfile, status, stdout = fix_file_helper(file,
-                                                               extra_input_files=extra_input_files)
+    command, infile, outfile, status, stdout = fix_file_helper(
+        file, extra_input_files=extra_input_files)
     if status != 0:
         print("FAILED: " + infile)
         emit_stdout_as_error(stdout)
@@ -111,9 +111,8 @@ def check_file_expecting_error(filename, expected_substring, extra_input_files=N
 
 
 def check_and_fix_error(filename, expected_substring, extra_input_files=None):
-    errors = check_file_expecting_error(filename,
-                                        expected_substring,
-                                        extra_input_files=extra_input_files)
+    errors = check_file_expecting_error(
+        filename, expected_substring, extra_input_files=extra_input_files)
     errors += fix_file_expecting_success(filename, extra_input_files=extra_input_files)
     return errors
 
@@ -127,8 +126,8 @@ def check_tool_not_found_error():
     if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
         os.environ["PATH"] = oldPath
         return 0
-    errors = check_file_expecting_error("no_namespace_envoy.cc",
-                                        "Command %s not found." % clang_format)
+    errors = check_file_expecting_error(
+        "no_namespace_envoy.cc", "Command %s not found." % clang_format)
     os.environ["PATH"] = oldPath
     return errors
 
@@ -154,13 +153,13 @@ def run_checks():
     errors += check_tool_not_found_error()
 
     # The following errors can be detected but not fixed automatically.
-    errors += check_unfixable_error("no_namespace_envoy.cc",
-                                    "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+    errors += check_unfixable_error(
+        "no_namespace_envoy.cc", "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
     errors += check_unfixable_error("mutex.cc", "Don't use <mutex> or <condition_variable*>")
-    errors += check_unfixable_error("condition_variable.cc",
-                                    "Don't use <mutex> or <condition_variable*>")
-    errors += check_unfixable_error("condition_variable_any.cc",
-                                    "Don't use <mutex> or <condition_variable*>")
+    errors += check_unfixable_error(
+        "condition_variable.cc", "Don't use <mutex> or <condition_variable*>")
+    errors += check_unfixable_error(
+        "condition_variable_any.cc", "Don't use <mutex> or <condition_variable*>")
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     real_time_inject_error = (
@@ -179,19 +178,19 @@ def run_checks():
     errors += check_unfixable_error("sleep.cc", real_time_inject_error)
     errors += check_unfixable_error("std_atomic_free_functions.cc", "std::atomic_*")
     errors += check_unfixable_error("std_get_time.cc", "std::get_time")
-    errors += check_unfixable_error("no_namespace_envoy.cc",
-                                    "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+    errors += check_unfixable_error(
+        "no_namespace_envoy.cc", "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
     errors += check_unfixable_error("bazel_tools.BUILD", "unexpected @bazel_tools reference")
-    errors += check_unfixable_error("proto.BUILD",
-                                    "unexpected direct external dependency on protobuf")
-    errors += check_unfixable_error("proto_deps.cc",
-                                    "unexpected direct dependency on google.protobuf")
+    errors += check_unfixable_error(
+        "proto.BUILD", "unexpected direct external dependency on protobuf")
+    errors += check_unfixable_error(
+        "proto_deps.cc", "unexpected direct dependency on google.protobuf")
     errors += check_unfixable_error("attribute_packed.cc", "Don't use __attribute__((packed))")
-    errors += check_unfixable_error("designated_initializers.cc",
-                                    "Don't use designated initializers")
+    errors += check_unfixable_error(
+        "designated_initializers.cc", "Don't use designated initializers")
     errors += check_unfixable_error("elvis_operator.cc", "Don't use the '?:' operator")
-    errors += check_unfixable_error("testing_test.cc",
-                                    "Don't use 'using testing::Test;, elaborate the type instead")
+    errors += check_unfixable_error(
+        "testing_test.cc", "Don't use 'using testing::Test;, elaborate the type instead")
     errors += check_unfixable_error(
         "serialize_as_string.cc",
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
@@ -231,8 +230,8 @@ def run_checks():
     errors += fix_file_expecting_failure(
         "api/missing_package.proto",
         "Unable to find package name for proto file: ./api/missing_package.proto")
-    errors += check_unfixable_error("proto_enum_mangling.cc",
-                                    "Don't use mangled Protobuf names for enum constants")
+    errors += check_unfixable_error(
+        "proto_enum_mangling.cc", "Don't use mangled Protobuf names for enum constants")
     errors += check_unfixable_error(
         "test_naming.cc", "Test names should be CamelCase, starting with a capital letter")
     errors += check_unfixable_error("mock_method_n.cc", "use MOCK_METHOD() instead")
@@ -241,52 +240,53 @@ def run_checks():
         "test/register_factory.cc",
         "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
         "Registry::InjectFactory instead.")
-    errors += check_unfixable_error("strerror.cc",
-                                    "Don't use strerror; use Envoy::errorDetails instead")
     errors += check_unfixable_error(
-        "std_unordered_map.cc", "Don't use std::unordered_map; use absl::flat_hash_map instead " +
-        "or absl::node_hash_map if pointer stability of keys/values is required")
+        "strerror.cc", "Don't use strerror; use Envoy::errorDetails instead")
     errors += check_unfixable_error(
-        "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
-        "or absl::node_hash_set if pointer stability of keys/values is required")
+        "std_unordered_map.cc", "Don't use std::unordered_map; use absl::flat_hash_map instead "
+        + "or absl::node_hash_map if pointer stability of keys/values is required")
+    errors += check_unfixable_error(
+        "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead "
+        + "or absl::node_hash_set if pointer stability of keys/values is required")
     errors += check_unfixable_error("std_any.cc", "Don't use std::any; use absl::any instead")
-    errors += check_unfixable_error("std_get_if.cc",
-                                    "Don't use std::get_if; use absl::get_if instead")
+    errors += check_unfixable_error(
+        "std_get_if.cc", "Don't use std::get_if; use absl::get_if instead")
     errors += check_unfixable_error(
         "std_holds_alternative.cc",
         "Don't use std::holds_alternative; use absl::holds_alternative instead")
     errors += check_unfixable_error(
         "std_make_optional.cc", "Don't use std::make_optional; use absl::make_optional instead")
-    errors += check_unfixable_error("std_monostate.cc",
-                                    "Don't use std::monostate; use absl::monostate instead")
-    errors += check_unfixable_error("std_optional.cc",
-                                    "Don't use std::optional; use absl::optional instead")
-    errors += check_unfixable_error("std_string_view.cc",
-                                    "Don't use std::string_view; use absl::string_view instead")
-    errors += check_unfixable_error("std_variant.cc",
-                                    "Don't use std::variant; use absl::variant instead")
+    errors += check_unfixable_error(
+        "std_monostate.cc", "Don't use std::monostate; use absl::monostate instead")
+    errors += check_unfixable_error(
+        "std_optional.cc", "Don't use std::optional; use absl::optional instead")
+    errors += check_unfixable_error(
+        "std_string_view.cc", "Don't use std::string_view; use absl::string_view instead")
+    errors += check_unfixable_error(
+        "std_variant.cc", "Don't use std::variant; use absl::variant instead")
     errors += check_unfixable_error("std_visit.cc", "Don't use std::visit; use absl::visit instead")
     errors += check_unfixable_error(
         "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
     errors += check_unfixable_error("pgv_string.proto", "min_bytes is DEPRECATED, Use min_len.")
     errors += check_file_expecting_ok("commented_throw.cc")
-    errors += check_unfixable_error("repository_url.bzl",
-                                    "Only repository_locations.bzl may contains URL references")
-    errors += check_unfixable_error("repository_urls.bzl",
-                                    "Only repository_locations.bzl may contains URL references")
+    errors += check_unfixable_error(
+        "repository_url.bzl", "Only repository_locations.bzl may contains URL references")
+    errors += check_unfixable_error(
+        "repository_urls.bzl", "Only repository_locations.bzl may contains URL references")
 
     # The following files have errors that can be automatically fixed.
-    errors += check_and_fix_error("over_enthusiastic_spaces.cc",
-                                  "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
-    errors += check_and_fix_error("extra_enthusiastic_spaces.cc",
-                                  "./extra_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
-    errors += check_and_fix_error("angle_bracket_include.cc",
-                                  "envoy includes should not have angle brackets")
+    errors += check_and_fix_error(
+        "over_enthusiastic_spaces.cc", "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
+    errors += check_and_fix_error(
+        "extra_enthusiastic_spaces.cc",
+        "./extra_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
+    errors += check_and_fix_error(
+        "angle_bracket_include.cc", "envoy includes should not have angle brackets")
     errors += check_and_fix_error("proto_style.cc", "incorrect protobuf type reference")
     errors += check_and_fix_error("long_line.cc", "clang-format check failed")
     errors += check_and_fix_error("header_order.cc", "header_order.py check failed")
-    errors += check_and_fix_error("clang_format_on.cc",
-                                  "./clang_format_on.cc:7: over-enthusiastic spaces")
+    errors += check_and_fix_error(
+        "clang_format_on.cc", "./clang_format_on.cc:7: over-enthusiastic spaces")
     # Validate that a missing license is added.
     errors += check_and_fix_error("license.BUILD", "envoy_build_fixer check failed")
     # Validate that an incorrect license is replaced and reordered.
@@ -300,19 +300,19 @@ def run_checks():
     # Validate that unused loads are removed.
     errors += check_and_fix_error("remove_unused_loads.BUILD", "envoy_build_fixer check failed")
     # Validate that API proto package deps are computed automagically.
-    errors += check_and_fix_error("canonical_api_deps.BUILD",
-                                  "envoy_build_fixer check failed",
-                                  extra_input_files=[
-                                      "canonical_api_deps.cc", "canonical_api_deps.h",
-                                      "canonical_api_deps.other.cc"
-                                  ])
+    errors += check_and_fix_error(
+        "canonical_api_deps.BUILD",
+        "envoy_build_fixer check failed",
+        extra_input_files=[
+            "canonical_api_deps.cc", "canonical_api_deps.h", "canonical_api_deps.other.cc"
+        ])
     errors += check_and_fix_error("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
     errors += check_and_fix_error("proto_format.proto", "clang-format check failed")
     errors += check_and_fix_error(
         "cpp_std.cc",
         "term absl::make_unique< should be replaced with standard library term std::make_unique<")
-    errors += check_and_fix_error("code_conventions.cc",
-                                  "term .Times(1); should be replaced with preferred term ;")
+    errors += check_and_fix_error(
+        "code_conventions.cc", "term .Times(1); should be replaced with preferred term ;")
 
     errors += check_file_expecting_ok("real_time_source_override.cc")
     errors += check_file_expecting_ok("duration_value_zero.cc")
