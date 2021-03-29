@@ -224,6 +224,7 @@ private:
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   Filter::Http::FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{

@@ -37,19 +37,40 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
 quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip);
 
+enum class HeaderValidationResult {
+  ACCEPT = 0,
+  DROP,
+  INVALID,
+};
+
+class HeaderValidator {
+public:
+  virtual ~HeaderValidator() = default;
+  virtual HeaderValidationResult validateHeader(const std::string& header_name,
+                                                absl::string_view header_value) = 0;
+};
+
 // The returned header map has all keys in lower case.
 template <class T>
-std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
+std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list,
+                                             HeaderValidator& validator) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
-    auto key = Http::LowerCaseString(entry.first);
-    if (key != Http::Headers::get().Cookie) {
-      // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
-      headers->addCopy(key, entry.second);
-    } else {
-      // QUICHE breaks "cookie" header into crumbs. Coalesce them by appending current one to
-      // existing one if there is any.
-      headers->appendCopy(key, entry.second);
+    HeaderValidationResult result = validator.validateHeader(entry.first, entry.second);
+    if (result == HeaderValidationResult::INVALID) {
+      return nullptr;
+    }
+
+    if (result == HeaderValidationResult::ACCEPT) {
+      auto key = Http::LowerCaseString(entry.first);
+      if (key != Http::Headers::get().Cookie) {
+        // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
+        headers->addCopy(key, entry.second);
+      } else {
+        // QUICHE breaks "cookie" header into crumbs. Coalesce them by appending current one to
+        // existing one if there is any.
+        headers->appendCopy(key, entry.second);
+      }
     }
   }
   return headers;

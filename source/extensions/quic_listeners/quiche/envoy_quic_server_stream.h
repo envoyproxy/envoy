@@ -23,10 +23,16 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public Http::ResponseEncoder {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
-                        quic::StreamType type);
+                        quic::StreamType type,
+                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                            headers_with_underscores_action);
 
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
-                        quic::StreamType type);
+                        quic::StreamType type,
+                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                            headers_with_underscores_action);
 
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
@@ -39,7 +45,9 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
-  bool streamErrorOnInvalidHttpMessage() const override { return false; }
+  bool streamErrorOnInvalidHttpMessage() const override {
+    return http3_options_.override_stream_error_on_invalid_http_message().value();
+  }
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
@@ -55,6 +63,12 @@ public:
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+
+  void clearWatermarkBuffer();
+
+  // EnvoyQuicStream
+  HeaderValidationResult validateHeader(const std::string& header_name,
+                                        absl::string_view header_value) override;
 
 protected:
   // EnvoyQuicStream
@@ -75,7 +89,11 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
+  HeaderValidationResult checkHeaderNameForUnderscores(const std::string& header_name);
+
   Http::RequestDecoder* request_decoder_{nullptr};
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 } // namespace Quic

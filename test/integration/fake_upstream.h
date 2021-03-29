@@ -549,6 +549,7 @@ struct FakeUpstreamConfig {
   bool enable_half_close_{};
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -657,6 +658,7 @@ public:
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
@@ -783,6 +785,7 @@ private:
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;
   ConditionalInitializer server_initialized_;

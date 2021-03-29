@@ -84,8 +84,9 @@ void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
+  ASSERT(http3_options_.has_value());
   return std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(), this,
-                                                 quic::BIDIRECTIONAL);
+                                                 quic::BIDIRECTIONAL, http3_options_.value());
 }
 
 quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {

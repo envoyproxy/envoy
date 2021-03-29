@@ -223,6 +223,24 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 } // namespace Utility
 } // namespace Http2
+namespace Http3 {
+namespace Utility {
+envoy::config::core::v3::Http3ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  }
+  return options_clone;
+}
+
+} // namespace Utility
+} // namespace Http3
 
 namespace Http {
 

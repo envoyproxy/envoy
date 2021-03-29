@@ -29,9 +29,9 @@
 namespace Envoy {
 namespace Quic {
 
-EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
-                                             quic::QuicSpdyClientSession* client_session,
-                                             quic::StreamType type)
+EnvoyQuicClientStream::EnvoyQuicClientStream(
+    quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session, quic::StreamType type,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
           // This should be larger than 8k to fully utilize congestion control
@@ -40,15 +40,15 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
           // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }) {}
+          [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
 
-EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
-                                             quic::QuicSpdyClientSession* client_session,
-                                             quic::StreamType type)
+EnvoyQuicClientStream::EnvoyQuicClientStream(
+    quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
+    quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(pending, client_session, type),
       EnvoyQuicStream(
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }) {}
+          [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
@@ -158,7 +158,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
-      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list, *this);
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
   if (Http::CodeUtility::is1xx(status)) {
     if (status == enumToInt(Http::Code::SwitchingProtocols)) {

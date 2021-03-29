@@ -185,7 +185,8 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     codec_ = std::unique_ptr<ClientConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicClientConnection(*connection_, *this));
+            .createQuicClientConnection(*connection_, *this, host->cluster().http3Options(),
+                                        Http::DEFAULT_MAX_REQUEST_HEADERS_KB));
     break;
   }
   }

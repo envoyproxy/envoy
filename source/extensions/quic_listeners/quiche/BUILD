@@ -127,10 +127,12 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
+        ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -191,6 +193,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

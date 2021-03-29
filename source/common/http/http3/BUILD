@@ -28,6 +28,7 @@ envoy_cc_library(
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

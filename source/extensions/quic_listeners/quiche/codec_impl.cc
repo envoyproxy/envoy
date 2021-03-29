@@ -19,8 +19,14 @@ EnvoyQuicClientStream* quicStreamToEnvoyClientStream(quic::QuicStream* stream) {
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
 QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
-    EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks)
+    EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t /*max_request_headers_kb*/,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action)
     : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
+  quic_session.setHttp3Options(http3_options);
+  quic_session.setHeadersWithUnderscoreAction(headers_with_underscores_action);
   quic_session.setHttpConnectionCallbacks(callbacks);
 }
 
@@ -56,9 +62,12 @@ void QuicHttpServerConnectionImpl::goAway() {
   }
 }
 
-QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                                                           Http::ConnectionCallbacks& callbacks)
+QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
+    EnvoyQuicClientSession& session, Http::ConnectionCallbacks& callbacks,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t /*max_request_headers_kb*/)
     : QuicHttpConnectionImplBase(session), quic_client_session_(session) {
+  session.setHttp3Options(http3_options);
   session.setHttpConnectionCallbacks(callbacks);
 }
 
@@ -95,17 +104,25 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
 
 std::unique_ptr<Http::ClientConnection>
 QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t max_request_headers_kb) {
   return std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-      dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks);
+      dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks, http3_options,
+      max_request_headers_kb);
 }
 
 std::unique_ptr<Http::ServerConnection>
 QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
-    Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+    const uint32_t max_request_headers_kb,
+    envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+        headers_with_underscores_action) {
   return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
       dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),
-      dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));
+      dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks), http3_options,
+      max_request_headers_kb, headers_with_underscores_action);
 }
 
 REGISTER_FACTORY(QuicHttpClientConnectionFactoryImpl, Http::QuicHttpClientConnectionFactory);

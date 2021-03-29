@@ -338,11 +338,12 @@ FakeHttpConnection::FakeHttpConnection(
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     ASSERT(type == Type::HTTP3);
-    envoy::config::core::v3::Http3ProtocolOptions http3_options;
     codec_ = std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this));
+            .createQuicServerConnection(shared_connection_.connection(), *this,
+                                        fake_upstream.http3Options(), max_request_headers_kb,
+                                        headers_with_underscores_action));
   }
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
@@ -513,6 +514,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
     : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
+      http3_options_(config.http3_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),

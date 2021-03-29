@@ -204,6 +204,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
+      http3_options_(Http3::Utility::initializeAndValidateOptions(
+          config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+          config.stream_error_on_invalid_http_message())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
@@ -582,7 +585,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(connection, callbacks));
+            .createQuicServerConnection(connection, callbacks, http3_options_,
+                                        maxRequestHeadersKb(), headersWithUnderscoresAction()));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
