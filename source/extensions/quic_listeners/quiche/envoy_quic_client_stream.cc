@@ -31,6 +31,7 @@ namespace Quic {
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(
     quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session, quic::StreamType type,
+    Http::Http3::CodecStats& stats,
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
@@ -40,15 +41,16 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
+          [this]() { runHighWatermarkCallbacks(); }, stats, http3_options) {}
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(
     quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
-    quic::StreamType type, const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
+    quic::StreamType type, Http::Http3::CodecStats& stats,
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(pending, client_session, type),
       EnvoyQuicStream(
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }, http3_options) {}
+          [this]() { runHighWatermarkCallbacks(); }, stats, http3_options) {}
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {

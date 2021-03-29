@@ -25,6 +25,7 @@ envoy_cc_library(
     name = "quic_codec_factory_lib",
     hdrs = ["quic_codec_factory.h"],
     deps = [
+        ":codec_stats_lib",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
@@ -47,4 +48,14 @@ envoy_cc_library(
     name = "well_known_names",
     hdrs = ["well_known_names.h"],
     deps = ["//source/common/singleton:const_singleton"],
+)
+
+envoy_cc_library(
+    name = "codec_stats_lib",
+    hdrs = ["codec_stats.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:thread_lib",
+    ],
 )

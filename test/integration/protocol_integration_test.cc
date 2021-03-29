@@ -1117,9 +1117,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
   default:
     RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
   };
-  if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
-    EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
-  }
+  EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
 }
 
 // Verify that by default headers with underscores in their names remain in both requests and

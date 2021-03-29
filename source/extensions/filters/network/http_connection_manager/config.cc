@@ -585,8 +585,10 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(connection, callbacks, http3_options_,
-                                        maxRequestHeadersKb(), headersWithUnderscoresAction()));
+            .createQuicServerConnection(
+                connection, callbacks,
+                Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
+                http3_options_, maxRequestHeadersKb(), headersWithUnderscoresAction()));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),

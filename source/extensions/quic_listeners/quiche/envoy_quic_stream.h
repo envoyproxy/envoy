@@ -23,9 +23,9 @@ public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
   EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark,
+                  std::function<void()> above_high_watermark, Http::Http3::CodecStats& stats,
                   const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
-      : http3_options_(http3_options),
+      : stats_(stats), http3_options_(http3_options),
         send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark), ENVOY_LOGGER()) {}
 
@@ -163,6 +163,7 @@ protected:
   // becomes false.
   bool in_decode_data_callstack_{false};
 
+  Http::Http3::CodecStats& stats_;
   const envoy::config::core::v3::Http3ProtocolOptions& http3_options_;
   bool close_connection_upon_invalid_header_{false};
 

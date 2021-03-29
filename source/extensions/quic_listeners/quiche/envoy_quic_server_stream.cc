@@ -33,6 +33,7 @@ namespace Quic {
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(
     quic::QuicStreamId id, quic::QuicSpdySession* session, quic::StreamType type,
+    Http::Http3::CodecStats& stats,
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
@@ -44,11 +45,12 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }, http3_options),
+          [this]() { runHighWatermarkCallbacks(); }, stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(
     quic::PendingStream* pending, quic::QuicSpdySession* session, quic::StreamType type,
+    Http::Http3::CodecStats& stats,
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
@@ -58,7 +60,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           // window. And no larger than the max stream flow control window for
           // the stream to buffer all the data.
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }, http3_options),
+          [this]() { runHighWatermarkCallbacks(); }, stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
@@ -341,13 +343,12 @@ EnvoyQuicServerStream::checkHeaderNameForUnderscores(const std::string& header_n
       envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
     ENVOY_STREAM_LOG(debug, "Dropping header with invalid characters in its name: {}", *this,
                      header_name);
-    // TODO(danzh) Increment dropped_headers_with_underscores_ once http3 stats is propogated;
+    stats_.dropped_headers_with_underscores_.inc();
     return HeaderValidationResult::DROP;
   }
   ENVOY_STREAM_LOG(debug, "Rejecting request due to header name with underscores: {}", *this,
                    header_name);
-  // TODO(danzh) Increment requests_rejected_with_underscores_in_headers_ once http3 stats is
-  // propogated;
+  stats_.requests_rejected_with_underscores_in_headers_.inc();
   return HeaderValidationResult::INVALID;
 }
 

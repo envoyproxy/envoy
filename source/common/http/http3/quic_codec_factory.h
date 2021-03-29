@@ -7,6 +7,8 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
+#include "common/http/http3/codec_stats.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -17,6 +19,7 @@ public:
 
   virtual std::unique_ptr<ServerConnection> createQuicServerConnection(
       Network::Connection& connection, ConnectionCallbacks& callbacks,
+      Http::Http3::CodecStats& stats,
       const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
       const uint32_t max_request_headers_kb,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -32,6 +35,7 @@ public:
 
   virtual std::unique_ptr<ClientConnection>
   createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks,
+                             Http::Http3::CodecStats& stats,
                              const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                              const uint32_t max_request_headers_kb) PURE;
 

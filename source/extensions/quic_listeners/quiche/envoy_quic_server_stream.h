@@ -23,13 +23,13 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public Http::ResponseEncoder {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
-                        quic::StreamType type,
+                        quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
-                        quic::StreamType type,
+                        quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);

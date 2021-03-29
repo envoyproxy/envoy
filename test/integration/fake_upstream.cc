@@ -338,10 +338,11 @@ FakeHttpConnection::FakeHttpConnection(
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
   } else {
     ASSERT(type == Type::HTTP3);
+    Http::Http3::CodecStats& stats = fake_upstream.http3CodecStats();
     codec_ = std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
-            .createQuicServerConnection(shared_connection_.connection(), *this,
+            .createQuicServerConnection(shared_connection_.connection(), *this, stats,
                                         fake_upstream.http3Options(), max_request_headers_kb,
                                         headers_with_underscores_action));
   }

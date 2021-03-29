@@ -27,6 +27,7 @@
 #include "common/grpc/common.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/codec_stats.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/network/connection_balancer_impl.h"
@@ -650,6 +651,10 @@ public:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
 
+  Http::Http3::CodecStats& http3CodecStats() {
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, stats_store_);
+  }
+
   // Write into the outbound buffer of the network connection at the specified index.
   // Note: that this write bypasses any processing by the upstream codec.
   ABSL_MUST_USE_RESULT
@@ -812,6 +817,7 @@ private:
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

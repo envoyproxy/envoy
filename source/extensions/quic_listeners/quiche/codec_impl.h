@@ -20,8 +20,9 @@ namespace Quic {
 class QuicHttpConnectionImplBase : public virtual Http::Connection,
                                    protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicHttpConnectionImplBase(QuicFilterManagerConnectionImpl& quic_session)
-      : quic_session_(quic_session) {}
+  QuicHttpConnectionImplBase(QuicFilterManagerConnectionImpl& quic_session,
+                             Http::Http3::CodecStats& stats)
+      : quic_session_(quic_session), stats_(stats) {}
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& /*data*/) override {
@@ -35,6 +36,7 @@ public:
 
 protected:
   QuicFilterManagerConnectionImpl& quic_session_;
+  Http::Http3::CodecStats& stats_;
 };
 
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
@@ -42,6 +44,7 @@ class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
 public:
   QuicHttpServerConnectionImpl(
       EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks,
+      Http::Http3::CodecStats& stats,
       const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
       const uint32_t max_request_headers_kb,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -61,7 +64,7 @@ class QuicHttpClientConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ClientConnection {
 public:
   QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                               Http::ConnectionCallbacks& callbacks,
+                               Http::ConnectionCallbacks& callbacks, Http::Http3::CodecStats& stats,
                                const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                                const uint32_t max_request_headers_kb);
 
@@ -83,6 +86,7 @@ class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectio
 public:
   std::unique_ptr<Http::ClientConnection>
   createQuicClientConnection(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+                             Http::Http3::CodecStats& stats,
                              const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                              const uint32_t max_request_headers_kb) override;
 
@@ -94,6 +98,7 @@ class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectio
 public:
   std::unique_ptr<Http::ServerConnection> createQuicServerConnection(
       Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+      Http::Http3::CodecStats& stats,
       const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
       const uint32_t max_request_headers_kb,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

@@ -191,6 +191,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",
+        "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -162,7 +162,10 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             listener_config_),
-        read_filter_(new Network::MockReadFilter()) {
+        read_filter_(new Network::MockReadFilter()),
+        stats_({ALL_HTTP3_CODEC_STATS(
+            POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
+            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
 
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
@@ -221,8 +224,9 @@ public:
     EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
     EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Invoke([this]() {
       // Create ServerConnection instance and setup callbacks for it.
-      http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
-                                                                        http_connection_callbacks_);
+      http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(
+          envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024,
+          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
       EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
@@ -279,6 +283,8 @@ protected:
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::ServerConnectionPtr http_connection_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest,
