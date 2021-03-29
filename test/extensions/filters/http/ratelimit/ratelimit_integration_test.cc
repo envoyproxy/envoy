@@ -178,7 +178,6 @@ public:
       AssertionResult result = fake_ratelimit_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
       */
-
     }
     cleanupUpstreamAndDownstream();
   }

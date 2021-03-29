@@ -48,7 +48,8 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls, TimeSource& time_source,
                                                Api::Api& api, const StatNames& stat_names)
-    : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names), async_client_cache_(*this, tls) {
+    : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
+      async_client_cache_(*this, tls) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(

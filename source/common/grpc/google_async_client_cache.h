@@ -29,11 +29,12 @@ private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCache(AsyncClientManager& async_client_manager, Stats::Scope& scope,
                      const ::envoy::config::core::v3::GrpcService& grpc_proto_config) {
-                       /*
-      const AsyncClientFactoryPtr factory =
-          async_client_manager.factoryForGrpcService(grpc_proto_config, scope, true);
-          */
-      async_client_ = async_client_manager.getOrCreateRawAsyncClient(grpc_proto_config, scope, true);
+      /*
+const AsyncClientFactoryPtr factory =
+async_client_manager.factoryForGrpcService(grpc_proto_config, scope, true);
+*/
+      async_client_ =
+          async_client_manager.getOrCreateRawAsyncClient(grpc_proto_config, scope, true);
     }
     RawAsyncClientSharedPtr async_client_;
   };

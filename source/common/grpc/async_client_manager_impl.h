@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -9,7 +11,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/grpc/stat_names.h"
-#include <unordered_map>
 
 namespace Envoy {
 namespace Grpc {

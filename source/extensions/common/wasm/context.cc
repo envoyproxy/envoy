@@ -1006,7 +1006,8 @@ WasmResult Context::grpcCall(absl::string_view grpc_service, absl::string_view s
   auto grpc_client =
       clusterManager()
           .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)->create();
+          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
+          ->create();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1063,7 +1064,8 @@ WasmResult Context::grpcStream(absl::string_view grpc_service, absl::string_view
   auto grpc_client =
       clusterManager()
           .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)->create();
+          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
+          ->create();
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
