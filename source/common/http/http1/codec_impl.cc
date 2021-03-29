@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
@@ -64,24 +65,31 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
                          Http::Headers::get().ConnectionValues.Http2Settings);
 }
 
-HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
+HeaderKeyFormatterConstPtr encodeOnlyFormatterFromSettings(const Http::Http1Settings& settings) {
   if (settings.header_key_format_ == Http1Settings::HeaderKeyFormat::ProperCase) {
     return std::make_unique<ProperCaseHeaderKeyFormatter>();
   }
 
   return nullptr;
 }
+
+StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Settings& settings) {
+  if (settings.header_key_format_ == Http1Settings::HeaderKeyFormat::StatefulFormatter) {
+    return settings.stateful_header_key_formatter_->create();
+  }
+  return nullptr;
+}
+
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 // Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
-StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
-                                     HeaderKeyFormatter* header_key_formatter)
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), header_key_formatter_(header_key_formatter) {
+      is_response_to_connect_request_(false) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -102,9 +110,10 @@ void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view va
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
 }
 
-void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value) {
-  if (header_key_formatter_ != nullptr) {
-    encodeHeader(header_key_formatter_->format(key), value);
+void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value,
+                                              HeaderKeyFormatterOptConstRef formatter) {
+  if (formatter.has_value()) {
+    encodeHeader(formatter->format(key), value);
   } else {
     encodeHeader(key, value);
   }
@@ -118,26 +127,32 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream,
                                           bool bodiless_request) {
+  HeaderKeyFormatterOptConstRef formatter(headers.formatter());
+  if (!formatter.has_value()) {
+    formatter = connection_.formatter();
+  }
+
   const Http::HeaderValues& header_values = Http::Headers::get();
   bool saw_content_length = false;
-  headers.iterate([this, &header_values](const HeaderEntry& header) -> HeaderMap::Iterate {
-    absl::string_view key_to_use = header.key().getStringView();
-    uint32_t key_size_to_use = header.key().size();
-    // Translate :authority -> host so that upper layers do not need to deal with this.
-    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-      key_to_use = absl::string_view(header_values.HostLegacy.get());
-      key_size_to_use = header_values.HostLegacy.get().size();
-    }
+  headers.iterate(
+      [this, &header_values, formatter](const HeaderEntry& header) -> HeaderMap::Iterate {
+        absl::string_view key_to_use = header.key().getStringView();
+        uint32_t key_size_to_use = header.key().size();
+        // Translate :authority -> host so that upper layers do not need to deal with this.
+        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+          key_to_use = absl::string_view(header_values.HostLegacy.get());
+          key_size_to_use = header_values.HostLegacy.get().size();
+        }
 
-    // Skip all headers starting with ':' that make it here.
-    if (key_to_use[0] == ':') {
-      return HeaderMap::Iterate::Continue;
-    }
+        // Skip all headers starting with ':' that make it here.
+        if (key_to_use[0] == ':') {
+          return HeaderMap::Iterate::Continue;
+        }
 
-    encodeFormattedHeader(key_to_use, header.value().getStringView());
+        encodeFormattedHeader(key_to_use, header.value().getStringView(), formatter);
 
-    return HeaderMap::Iterate::Continue;
-  });
+        return HeaderMap::Iterate::Continue;
+      });
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -173,7 +188,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
         if (!bodiless_request ||
             !Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests")) {
-          encodeFormattedHeader(header_values.ContentLength.get(), "0");
+          encodeFormattedHeader(header_values.ContentLength.get(), "0", formatter);
         }
       }
       chunk_encoding_ = false;
@@ -192,7 +207,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
       if (!is_response_to_connect_request_) {
         encodeFormattedHeader(header_values.TransferEncoding.get(),
-                              header_values.TransferEncodingValues.Chunked);
+                              header_values.TransferEncodingValues.Chunked, formatter);
       }
       // We do not apply chunk encoding for HTTP upgrades, including CONNECT style upgrades.
       // If there is a body in a response on the upgrade path, the chunks will be
@@ -247,8 +262,10 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
+    // TODO(mattklein123): Wire up the formatter if someone actually asks for this (very unlikely).
     trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
-      encodeFormattedHeader(header.key().getStringView(), header.value().getStringView());
+      encodeFormattedHeader(header.key().getStringView(), header.value().getStringView(),
+                            HeaderKeyFormatterOptConstRef());
       return HeaderMap::Iterate::Continue;
     });
 
@@ -436,11 +453,11 @@ int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& 
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                const Http1Settings& settings, MessageType type,
-                               uint32_t max_headers_kb, const uint32_t max_headers_count,
-                               HeaderKeyFormatterPtr&& header_key_formatter)
+                               uint32_t max_headers_kb, const uint32_t max_headers_count)
     : connection_(connection), stats_(stats), codec_settings_(settings),
-      header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
-      handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
+      encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
+      processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
+      deferred_end_stream_headers_(false),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
@@ -460,11 +477,19 @@ Status ConnectionImpl::completeLastHeader() {
   RETURN_IF_ERROR(checkHeaderNameForUnderscores());
   auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
-    current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
     // Strip trailing whitespace of the current header value if any. Leading whitespace was trimmed
     // in ConnectionImpl::onHeaderValue. http_parser does not strip leading or trailing whitespace
     // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
     current_header_value_.rtrim();
+
+    // If there is a stateful formatter installed, remember the original header key before
+    // converting to lower case.
+    auto formatter = headers_or_trailers.formatter();
+    if (formatter.has_value()) {
+      formatter->processKey(current_header_field_.getStringView());
+    }
+    current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
+
     headers_or_trailers.addViaMove(std::move(current_header_field_),
                                    std::move(current_header_value_));
   }
@@ -820,7 +845,7 @@ Status ConnectionImpl::onMessageBegin() {
   protocol_ = Protocol::Http11;
   processing_trailers_ = false;
   header_parsing_state_ = HeaderParsingState::Field;
-  allocHeaders();
+  allocHeaders(statefulFormatterFromSettings(codec_settings_));
   return onMessageBeginBase();
 }
 
@@ -914,7 +939,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
-                     max_request_headers_count, formatter(settings)),
+                     max_request_headers_count),
       callbacks_(callbacks),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
@@ -1076,7 +1101,7 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
 Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, header_key_formatter_.get());
+    active_request_.emplace(*this);
     auto& active_request = active_request_.value();
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
@@ -1213,7 +1238,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings)) {}
+                     max_response_headers_count) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
@@ -1236,7 +1261,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 
   ASSERT(!pending_response_.has_value());
   ASSERT(pending_response_done_);
-  pending_response_.emplace(*this, header_key_formatter_.get(), &response_decoder);
+  pending_response_.emplace(*this, &response_decoder);
   pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
