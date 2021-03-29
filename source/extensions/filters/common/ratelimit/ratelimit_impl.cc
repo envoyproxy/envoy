@@ -128,11 +128,6 @@ ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           envoy::config::core::v3::ApiVersion transport_api_version) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
-  /*
-  const auto async_client_factory =
-      context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-          grpc_service, context.scope(), true);
-          */
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
       context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
           grpc_service, context.scope(), true),
