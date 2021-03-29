@@ -39,6 +39,12 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // the "foo.pem" x.509 certificate. All the trust bundles are isolated from each other, so no trust domain can mint
 // a SVID belonging to another trust domain. That means, in this example, a SVID signed by `envoy.com`'s CA with `spiffe//foo.com/**`
 // SAN would be rejected since Envoy selects the trust bundle according to the presented SAN before validate the certificate.
+//
+// Note that SPIFFE validator inherits and uses the following options from :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
+//
+// - :ref:`allow_expired_certificate <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.allow_expired_certificate>` to allow expired certificates.
+// - :ref:`match_subject_alt_names <envoy_api_field_extensions.transport_sockets.tls.v4alpha.CertificateValidationContext.match_subject_alt_names>` to match **URI** SAN of certificates. Unlike the default validator, SPIFFE validator only matches **URI** SAN (which equals to SVID in SPIFFE terminology) and ignore other SAN types.
+//
 message SPIFFECertValidatorConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig";
