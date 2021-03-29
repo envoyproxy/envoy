@@ -8,15 +8,15 @@ namespace Envoy {
 
 uint64_t HashUtil::xxHash64(const std::vector<std::string>& input, uint64_t seed) {
   XXH64_state_t* const state = XXH64_createState();
-  if (state == NULL) {
+  if (state == nullptr) {
     throw EnvoyException("create XXH64 state failed");
   };
   if (XXH64_reset(state, seed) == XXH_ERROR) {
     XXH64_freeState(state);
     throw EnvoyException("XH64 reset seed failed");
   }
-  for (size_t i = 0; i < input.size(); i++) {
-    if (XXH64_update(state, input[i].c_str(), input[i].size()) == XXH_ERROR) {
+  for (const auto& i : input) {
+    if (XXH64_update(state, i.c_str(), i.size()) == XXH_ERROR) {
       XXH64_freeState(state);
       throw EnvoyException("XH64 hash update failed");
     };
