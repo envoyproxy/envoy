@@ -2,7 +2,6 @@
 """
 import os
 import pathlib
-import string
 import tempfile
 import unittest
 
