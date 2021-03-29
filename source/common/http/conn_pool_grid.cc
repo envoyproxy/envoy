@@ -44,7 +44,7 @@ void ConnectivityGrid::WrapperCallbacks::onPoolFailure(
   // If this point is reached, all pools have been tried. Pass the pool failure up to the
   // original caller.
   ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this"
+  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this".
   callbacks.onPoolFailure(reason, transport_failure_reason, host);
 }
 
@@ -55,7 +55,7 @@ void ConnectivityGrid::WrapperCallbacks::onPoolReady(RequestEncoder& encoder,
   // Right now, connections are tried serially, so any successful stream
   // creation should be passed up to the original caller.
   ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this"
+  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this".
   return callbacks.onPoolReady(encoder, host, info, protocol);
 }
 
@@ -63,7 +63,7 @@ void ConnectivityGrid::WrapperCallbacks::cancel(Envoy::ConnectionPool::CancelPol
   // If the newStream caller cancels the stream request, pass the cancellation on
   // to the active pool.
   cancellable_->cancel(cancel_policy);
-  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this"
+  grid_.wrapped_callbacks_.erase(index_); // Functionally "delete this".
 }
 
 ConnectivityGrid::ConnectivityGrid(
