@@ -50,13 +50,13 @@ public:
   }
 
   ConnectionPool::MockInstance* first() {
-    if (pools_.size() == 0) {
+    if (pools_.empty()) {
       return nullptr;
     }
     return static_cast<ConnectionPool::MockInstance*>(&*pools_.front());
   }
   ConnectionPool::MockInstance* second() {
-    if (pools_.size() == 0) {
+    if (pools_.size() < 2) {
       return nullptr;
     }
     return static_cast<ConnectionPool::MockInstance*>(&**(++pools_.begin()));
