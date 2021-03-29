@@ -6,15 +6,15 @@ Building
 
 The Envoy build system uses `Bazel <https://bazel.build/>`_.
 
-In order to ease initial building and for a quick start, we provide an Ubuntu 16 based docker container that
-has everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
+In order to ease initial building and for a quick start, we provide an Ubuntu 16 and a Windows based docker container
+that has everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
 
 In order to build without using the Docker container, follow the instructions at :repo:`bazel/README.md`.
 
 .. _install_requirements:
 
-Requirements
-------------
+Posix Requirements
+------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
 recent Linux including Ubuntu 18.04 LTS.
@@ -26,11 +26,26 @@ Building Envoy has the following requirements:
   :ref:`this FAQ entry <faq_build_speed>` for more information on build performance.
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
-Please see the linked :repo:`CI <ci/README.md>` and :repo:`Bazel <bazel/README.md>` documentation
-for more information on performing manual builds.
 Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with `--define tcmalloc=gperftools`
 as the new tcmalloc code is not guaranteed to compile with lower versions of Clang.
 
+
+Windows Requirements
+--------------------
+
+Envoy has been ported and is now expected to work on Windows.
+
+Building Envoy has the following requirements:
+
+* A Windows (virtual) machine running on version 1903 (10.0.18362.1) and above.
+* The Windows 10 SDK, version 1803 (10.0.17134.12). Some features may require a newer SDK.
+* `Build Tools for Visual Studio 2019 <https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019>`_
+* These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
+
+
+.. note::
+   Please see :repo:`developer use of CI Docker images <ci/README.md>` and :repo:`building Envoy with Bazel <bazel/README.md>`
+   documentation for more information on performing manual builds.
 
 Modifying Envoy
 ---------------
