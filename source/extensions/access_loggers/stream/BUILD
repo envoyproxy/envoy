@@ -25,6 +25,6 @@ envoy_cc_extension(
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/access_loggers/common:stream_access_log_common_impl_lib",
-        "@envoy_api//envoy/extensions/access_loggers/stdoutput/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",
     ],
 )

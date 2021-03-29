@@ -19,9 +19,9 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           access_log:
-          - name: envoy.access_loggers.stdoutput
+          - name: envoy.access_loggers.stdout
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.stdoutput.v3.StdoutputAccessLog
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
           route_config:
             name: local_route
             virtual_hosts:
