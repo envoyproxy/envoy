@@ -33,6 +33,8 @@ message UdpListenerConfig {
 
   // Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
   // to the default object to enable QUIC without modifying any additional options.
+  // [#not-implemented-hide:]
+  // [#comment:Unhide when QUIC alpha is announced with other docs.]
   QuicProtocolOptions quic_options = 7;
 
   oneof config_type {

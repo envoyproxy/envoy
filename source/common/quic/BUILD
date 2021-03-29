@@ -6,6 +6,9 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+# TODO(mattklein123): Default visibility for this package should not be public. We should have
+# default by private to within this package and package tests, and then only expose the libraries
+# that are required to be selected into the build for http3 to work.
 envoy_package()
 
 envoy_cc_library(

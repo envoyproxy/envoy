@@ -1009,11 +1009,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
-#if defined(ENVOY_ENABLE_QUIC)
   // The only connection oriented UDP transport protocol right now is QUIC.
   const bool is_quic =
       listener_.udpListenerConfig().has_value() &&
       !listener_.udpListenerConfig()->listenerFactory().isTransportConnectionless();
+#if defined(ENVOY_ENABLE_QUIC)
   if (is_quic &&
       dynamic_cast<Quic::QuicServerTransportSocketConfigFactory*>(&config_factory) == nullptr) {
     throw EnvoyException(fmt::format("error building filter chain for quic listener: wrong "
@@ -1022,7 +1022,9 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                      transport_socket.DebugString()));
   }
 #else
-  UNREFERENCED_PARAMETER(listener_);
+  // When QUIC is compiled out it should not be possible to configure either the QUIC transport
+  // socket or the QUIC listener and get to this point.
+  ASSERT(!is_quic);
 #endif
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);

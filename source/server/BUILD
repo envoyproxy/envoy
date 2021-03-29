@@ -438,6 +438,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
+        "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
