@@ -21,10 +21,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // a network filter which understands protocol exchange and a state machine to signal to the StartTls
 // transport socket when a switch to TLS is required.
 
-// Configuration for StartTls transport socket.
+// Configuration for a downstream StartTls transport socket.
 // StartTls transport socket wraps two sockets:
-// - raw_buffer socket which is used at the beginning of the session
-// - TLS socket used when a protocol negotiates a switch to encrypted traffic.
+// * raw_buffer socket which is used at the beginning of the session
+// * TLS socket used when a protocol negotiates a switch to encrypted traffic.
 message StartTlsConfig {
   // (optional) Configuration for clear-text socket used at the beginning of the session.
   raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
@@ -34,10 +34,10 @@ message StartTlsConfig {
       [(validate.rules).message = {required: true}];
 }
 
-// Configuration for StartTls transport socket.
+// Configuration for an upstream StartTls transport socket.
 // StartTls transport socket wraps two sockets:
-// - raw_buffer socket which is used at the beginning of the session
-// - TLS socket used when a protocol negotiates a switch to encrypted traffic.
+// * raw_buffer socket which is used at the beginning of the session
+// * TLS socket used when a protocol negotiates a switch to encrypted traffic.
 message UpstreamStartTlsConfig {
   // (optional) Configuration for clear-text socket used at the beginning of the session.
   raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
