@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.extensions.wasm.v3;
+
+import "envoy/extensions/wasm/v3/common.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.wasm.v3";
+option java_outer_classname = "ServiceProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Wasm Service]
+// [#extension: envoy.bootstrap.wasm]
+
+// WasmService is configured as a built-in *envoy.wasm_service* :ref:`WasmService
+// <config_wasm_service>` This opaque configuration will be used to create a Wasm Service.
+message WasmService {
+  // General plugin configuration.
+  PluginConfig config = 1;
+
+  // If true, create a single VM rather than creating one VM per worker. Such a singleton can
+  // not be used with filters.
+  bool singleton = 2;
+}

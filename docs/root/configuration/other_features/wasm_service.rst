@@ -1,6 +1,6 @@
 .. _config_wasm_service:
 
-Wasm service
+Wasm Service
 ============
 
 The :ref:`WasmService <envoy_v3_api_msg_extensions.wasm.v3.WasmService>` configuration specifies a

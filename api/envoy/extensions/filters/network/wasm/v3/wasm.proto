@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.wasm.v3;
 
-import "envoy/extensions/wasm/v3/wasm.proto";
+import "envoy/extensions/wasm/v3/common.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -11,7 +11,7 @@ option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Wasm]
+// [#protodoc-title: Wasm Network filter]
 // [#extension: envoy.filters.network.wasm]
 // Wasm :ref:`configuration overview <config_network_filters_wasm>`.
 

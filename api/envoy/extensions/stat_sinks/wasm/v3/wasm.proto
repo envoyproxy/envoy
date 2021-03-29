@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.stat_sinks.wasm.v3;
 
-import "envoy/extensions/wasm/v3/wasm.proto";
+import "envoy/extensions/wasm/v3/common.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -11,7 +11,7 @@ option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Wasm]
+// [#protodoc-title: Wasm Stat Sink]
 // Wasm :ref:`configuration overview <config_stat_sinks_wasm>`.
 // [#extension: envoy.stat_sinks.wasm]
 
