@@ -1,7 +1,10 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
+
+#include "common/config/utility.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
@@ -10,17 +13,37 @@ namespace Extensions {
 namespace TransportSockets {
 namespace StartTls {
 
-class BaseStartTlsSocketFactory
-    : public virtual Server::Configuration::TransportSocketConfigFactory {
+template <typename ConfigFactory, typename ConfigMessage>
+class BaseStartTlsSocketFactory : public ConfigFactory {
 public:
   std::string name() const override { return TransportSocketNames::get().StartTls; }
+
+  const ConfigMessage& castConfig(const Protobuf::Message& message,
+                                  ProtobufMessage::ValidationVisitor& validator) {
+    return MessageUtil::downcastAndValidate<const ConfigMessage&>(message, validator);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ConfigMessage>();
+  }
+
+protected:
+  ConfigFactory& rawSocketConfigFactory() {
+    return Config::Utility::getAndCheckFactoryByName<ConfigFactory>(
+        TransportSocketNames::get().RawBuffer);
+  }
+
+  ConfigFactory& tlsSocketConfigFactory() {
+    return Config::Utility::getAndCheckFactoryByName<ConfigFactory>(
+        TransportSocketNames::get().Tls);
+  }
 };
 
 class DownstreamStartTlsSocketFactory
-    : public Server::Configuration::DownstreamTransportSocketConfigFactory,
-      public BaseStartTlsSocketFactory {
+    : public BaseStartTlsSocketFactory<
+          Server::Configuration::DownstreamTransportSocketConfigFactory,
+          envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig> {
 public:
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
@@ -28,10 +51,10 @@ public:
 };
 
 class UpstreamStartTlsSocketFactory
-    : public Server::Configuration::UpstreamTransportSocketConfigFactory,
-      public BaseStartTlsSocketFactory {
+    : public BaseStartTlsSocketFactory<
+          Server::Configuration::UpstreamTransportSocketConfigFactory,
+          envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig> {
 public:
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
