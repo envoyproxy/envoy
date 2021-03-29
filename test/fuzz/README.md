@@ -43,7 +43,7 @@ The fuzz test will be executed in three environments:
 1. Under Envoy's fuzz test driver when run in the Envoy repository with `bazel test
    //test/path/to/some_fuzz_test`. This provides a litmus test indicating that the test passes CI
    and basic sanitizers just on the supplied corpus.
-   
+
 1. Using the libFuzzer fuzzing engine and ASAN when run in the Envoy repository with `bazel run
    //test/path/to/some_fuzz_test --config asan-fuzzer`. This is where real fuzzing
    takes place locally. The built binary can take libFuzzer command-line flags, including the number
@@ -65,10 +65,10 @@ The fuzz test will be executed in three environments:
 
 4. Run the `envoy_cc_fuzz_test` target to test against the seed corpus. E.g. `bazel test
    //test/common/common:base64_fuzz_test`.
-   
+
 5. Run the `*_fuzz_test` target against libFuzzer. E.g. `bazel run
    //test/common/common:base64_fuzz_test --config asan-fuzzer`.
-   
+
 ## Protobuf fuzz tests
 
 We also have integration with [libprotobuf-mutator](https://github.com/google/libprotobuf-mutator),
@@ -102,7 +102,7 @@ The fuzzer prints information to stderr:
 
 ```
 INFO: Seed: 774517650
-INFO: Loaded 1 modules   (1090433 guards): 1090433 [0x8875600, 0x8c9e404), 
+INFO: Loaded 1 modules   (1090433 guards): 1090433 [0x8875600, 0x8c9e404),
 INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
 INFO: A corpus is not provided, starting from an empty corpus
 #2	INITED cov: 47488 ft: 30 corp: 1/1b lim: 4 exec/s: 0 rss: 139Mb
@@ -136,7 +136,7 @@ provide fuzzing against other fuzzing engines.
 3. `python infra/helper.py build_image envoy`
 4. `python infra/helper.py build_fuzzers --sanitizer=address envoy <path to envoy source tree>`. The
    path to the Envoy source tree can be omitted if you want to consume Envoy from GitHub at
-   HEAD/master.
+   HEAD/main.
 5. `python infra/helper.py run_fuzzer envoy <fuzz test target>`. The fuzz test target will be the
    test name, e.g. `server_fuzz_test`.
 

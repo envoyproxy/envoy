@@ -83,6 +83,7 @@ message Compressor {
   // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
   // This field is ignored if used in the context of the gzip http-filter, but is mandatory otherwise.
+  // [#extension-category: envoy.compression.compressor]
   config.core.v4alpha.TypedExtensionConfig compressor_library = 6;
 
   // Configuration for request compression. Compression is disabled by default if left empty.

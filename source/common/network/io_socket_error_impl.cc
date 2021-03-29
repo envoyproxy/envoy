@@ -1,5 +1,7 @@
 #include "common/network/io_socket_error_impl.h"
 
+#include "envoy/common/platform.h"
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 
@@ -26,6 +28,8 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::Interrupt;
   case SOCKET_ERROR_ADDR_NOT_AVAIL:
     return IoErrorCode::AddressNotAvailable;
+  case SOCKET_ERROR_BADF:
+    return IoErrorCode::BadFd;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", errno_, getErrorDetails());
     return IoErrorCode::UnknownError;

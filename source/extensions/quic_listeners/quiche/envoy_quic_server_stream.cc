@@ -26,6 +26,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/common/assert.h"
+#include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -130,6 +131,7 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // of propagating original reset reason. In QUICHE if a stream stops reading
     // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
     StopReading();
+    runResetCallbacks(Http::StreamResetReason::LocalReset);
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
   }
@@ -159,9 +161,14 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
-  request_decoder_->decodeHeaders(
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list),
-      /*end_stream=*/fin);
+  std::unique_ptr<Http::RequestHeaderMapImpl> headers =
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list);
+  if (!Http::HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+    return;
+  }
+  request_decoder_->decodeHeaders(std::move(headers),
+                                  /*end_stream=*/fin);
   ConsumeHeaderList();
 }
 
@@ -244,6 +251,15 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
+}
+
+bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
+  bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
+  if (read_side_closed()) {
+    // Treat this as a remote reset, since the stream will be closed in both directions.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
+  }
+  return ret;
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {

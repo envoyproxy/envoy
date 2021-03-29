@@ -12,6 +12,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
 
 namespace Envoy {
+
+class TestPauseFilterForQuic;
+
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
@@ -42,8 +45,10 @@ public:
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
-  void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  // TODO(#14829) both readDisable and detectEarlyCloseWhenReadDisabled are used for upstream QUIC
+  // and needs to be hooked up before it is production-safe.
+  void readDisable(bool /*disable*/) override {}
+  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {}
   bool readEnabled() const override { return true; }
   const Network::SocketAddressSetter& addressProvider() const override {
     return quic_connection_->connectionSocket()->addressProvider();
@@ -121,6 +126,8 @@ protected:
   EnvoyQuicConnection* quic_connection_{nullptr};
 
 private:
+  friend class Envoy::TestPauseFilterForQuic;
+
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();
   // Called when aggregated buffered bytes across all the streams declines to low watermark.

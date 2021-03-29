@@ -87,6 +87,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "safe_memcpy_test",
+    srcs = ["safe_memcpy_test.cc"],
+    deps = ["//source/common/common:safe_memcpy_lib"],
+)
+
+envoy_cc_test(
     name = "phantom_test",
     srcs = ["phantom_test.cc"],
     deps = ["//source/common/common:phantom"],
@@ -277,6 +283,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "shared_token_bucket_impl_test",
+    srcs = ["shared_token_bucket_impl_test.cc"],
+    deps = [
+        "//source/common/common:shared_token_bucket_impl_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
@@ -357,6 +373,12 @@ envoy_cc_test(
     deps = [
         "//source/common/version:version_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "api_version_test",
+    srcs = ["api_version_test.cc"],
+    deps = ["//source/common/version:api_version_lib"],
 )
 
 envoy_cc_test(

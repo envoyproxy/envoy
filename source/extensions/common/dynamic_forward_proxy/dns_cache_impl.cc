@@ -56,30 +56,31 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
 
-  auto [cache_hit, is_overflow] = [&]() {
-    // TODO(chradcliffe): Consider returning the looked-up host
+  auto [is_overflow, host_info] = [&]() {
     absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
     auto tls_host = primary_hosts_.find(host);
-    bool cache_hit =
-        tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete();
-    bool is_overflow = primary_hosts_.size() >= max_hosts_;
-    return std::make_tuple(cache_hit, is_overflow);
+    return std::make_tuple(
+        primary_hosts_.size() >= max_hosts_,
+        (tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete())
+            ? absl::optional<DnsHostInfoSharedPtr>(tls_host->second->host_info_)
+            : absl::nullopt);
   }();
 
-  if (cache_hit) {
+  if (host_info) {
     ENVOY_LOG(debug, "cache hit for host '{}'", host);
-    return {LoadDnsCacheEntryStatus::InCache, nullptr};
+    return {LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
   } else if (is_overflow) {
     ENVOY_LOG(debug, "DNS cache overflow for host '{}'", host);
     stats_.host_overflow_.inc();
-    return {LoadDnsCacheEntryStatus::Overflow, nullptr};
+    return {LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt};
   } else {
     ENVOY_LOG(debug, "cache miss for host '{}', posting to main thread", host);
     main_thread_dispatcher_.post(
         [this, host = std::string(host), default_port]() { startCacheLoad(host, default_port); });
     return {LoadDnsCacheEntryStatus::Loading,
             std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                          callbacks)};
+                                                          callbacks),
+            absl::nullopt};
   }
 }
 
@@ -199,7 +200,7 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
       host_to_erase = std::move(host_it->second);
       primary_hosts_.erase(host_it);
     }
-    notifyThreads(host);
+    notifyThreads(host, primary_host->host_info_);
   } else {
     startResolve(host, *primary_host);
   }
@@ -271,7 +272,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   if (first_resolve || address_changed) {
     primary_host_info->host_info_->setFirstResolveComplete();
-    notifyThreads(host);
+    notifyThreads(host, primary_host_info->host_info_);
   }
 
   // Kick off the refresh timer.
@@ -303,10 +304,11 @@ void DnsCacheImpl::runRemoveCallbacks(const std::string& host) {
   }
 }
 
-void DnsCacheImpl::notifyThreads(const std::string& host) {
-  auto host_ptr = std::make_shared<const std::string>(host);
-  tls_slot_.runOnAllThreads([host_ptr](OptRef<ThreadLocalHostInfo> local_host_info) {
-    local_host_info->onHostMapUpdate(host_ptr);
+void DnsCacheImpl::notifyThreads(const std::string& host,
+                                 const DnsHostInfoImplSharedPtr& resolved_info) {
+  auto shared_info = std::make_shared<HostMapUpdateInfo>(host, resolved_info);
+  tls_slot_.runOnAllThreads([shared_info](OptRef<ThreadLocalHostInfo> local_host_info) {
+    local_host_info->onHostMapUpdate(shared_info);
   });
 }
 
@@ -320,13 +322,13 @@ DnsCacheImpl::ThreadLocalHostInfo::~ThreadLocalHostInfo() {
 }
 
 void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
-    std::shared_ptr<const std::string> resolved_host) {
-  auto host_it = pending_resolutions_.find(*resolved_host);
+    const HostMapUpdateInfoSharedPtr& resolved_host) {
+  auto host_it = pending_resolutions_.find(resolved_host->host_);
   if (host_it != pending_resolutions_.end()) {
     for (auto* resolution : host_it->second) {
       auto& callbacks = resolution->callbacks_;
       resolution->cancel();
-      callbacks.onLoadDnsCacheComplete();
+      callbacks.onLoadDnsCacheComplete(resolved_host->info_);
     }
     pending_resolutions_.erase(host_it);
   }

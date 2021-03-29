@@ -19,8 +19,10 @@
 #include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_socket_options_filter_state.h"
 #include "common/network/upstream_subject_alt_names.h"
 #include "common/network/utility.h"
+#include "common/network/win32_redirect_records_option_impl.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
@@ -179,7 +181,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
 }
 
 TEST_F(RouterTest, ClusterNotFound) {
-  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
+  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -2931,11 +2933,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  // Now trigger a 502 in response to the first request.
+  // Now trigger a 503 in response to the first request.
   Http::ResponseHeaderMapPtr bad_response_headers2(
-      new Http::TestResponseHeaderMapImpl{{":status", "502"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(502));
+              putHttpResponseCode(503));
 
   // We should not call shouldRetryHeaders() because you never retry the same
   // request twice.
@@ -2943,7 +2945,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value(), "502");
+        EXPECT_EQ(headers.Status()->value(), "503");
       }));
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
@@ -4686,8 +4688,8 @@ private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
 };
 
-// Verifies that we propagate the upstream connection filter state to the upstream request filter
-// state.
+// Verifies that we propagate the upstream connection filter state to the upstream and downstream
+// request filter state.
 TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -4719,10 +4721,12 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   EXPECT_TRUE(filter_state_verified);
+  EXPECT_TRUE(callbacks_.streamInfo().upstreamFilterState()->hasDataWithName("upstream data"));
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {
@@ -5422,14 +5426,58 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 }
 
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
+  TestScopedRuntime scoped_runtime;
+
+  // With no scheme and x-forwarded-proto, set scheme based on encryption level
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, false);
+    FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
     Http::TestRequestHeaderMapImpl headers;
-    FilterUtility::setUpstreamScheme(headers, true);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // With invalid x-forwarded-proto, still use scheme.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto("foo");
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // Use valid x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, true, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Trust scheme over x-forwarded-proto.
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    headers.setScheme(Http::Headers::get().SchemeValues.Https);
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    FilterUtility::setUpstreamScheme(headers, false, false);
+    EXPECT_EQ("https", headers.get_(":scheme"));
+  }
+
+  // New logic uses downstream crypto
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
+    EXPECT_EQ("http", headers.get_(":scheme"));
+  }
+
+  // Legacy logic uses upstream crypto
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.preserve_downstream_scheme", "false"}});
+  {
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::setUpstreamScheme(headers, false, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }
@@ -5629,22 +5677,64 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
 }
 
 TEST_F(RouterTest, UpstreamSocketOptionsReturnedEmpty) {
-  EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
-      .WillOnce(Return(Network::Socket::OptionsSharedPtr()));
-
   auto options = router_.upstreamSocketOptions();
-
   EXPECT_EQ(options.get(), nullptr);
 }
 
-TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
-  Network::Socket::OptionsSharedPtr to_return =
+TEST_F(RouterTest, IpTransparentOptions) {
+  Network::Socket::OptionsSharedPtr expected_options =
       Network::SocketOptionFactory::buildIpTransparentOptions();
-  EXPECT_CALL(callbacks_, getUpstreamSocketOptions()).WillOnce(Return(to_return));
+  EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
+      .Times(1)
+      .WillRepeatedly(Return(expected_options));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
 
   auto options = router_.upstreamSocketOptions();
+  EXPECT_EQ(expected_options->size(), options->size());
 
-  EXPECT_EQ(to_return, options);
+  for (size_t i = 0; i < 2; i++) {
+    NiceMock<Network::MockConnectionSocket> dummy_socket;
+    auto state = envoy::config::core::v3::SocketOption::STATE_PREBIND;
+    auto expected_details = expected_options->at(i)->getOptionDetails(dummy_socket, state);
+    auto returned_details = options->at(i)->getOptionDetails(dummy_socket, state);
+    EXPECT_TRUE(expected_details == returned_details);
+  }
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, RedirectRecords) {
+  auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
+  memcpy(redirect_records->buf_, reinterpret_cast<void*>(redirect_records_data_.data()),
+         redirect_records_data_.size());
+  redirect_records->buf_size_ = redirect_records_data_.size();
+  router_.downstream_connection_.stream_info_.filterState()->setData(
+      Network::UpstreamSocketOptionsFilterState::key(),
+      std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  router_.downstream_connection_.stream_info_.filterState()
+      ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
+          Network::UpstreamSocketOptionsFilterState::key())
+      .addOption(Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
+
+  Network::Socket::OptionsSharedPtr expected_options =
+      Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
+  auto options = router_.upstreamSocketOptions();
+  EXPECT_EQ(1, options->size());
+
+  NiceMock<Network::MockConnectionSocket> dummy_socket;
+  auto state = envoy::config::core::v3::SocketOption::STATE_PREBIND;
+  auto expected_details = expected_options->at(0)->getOptionDetails(dummy_socket, state);
+  auto returned_details = options->at(0)->getOptionDetails(dummy_socket, state);
+  EXPECT_TRUE(expected_details == returned_details);
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, ApplicationProtocols) {

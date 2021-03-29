@@ -12,7 +12,7 @@
 #include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+#include "extensions/quic_listeners/quiche/platform/quiche_flags_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stats/stat_test_utility.h"
@@ -31,7 +31,6 @@
 #include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
-#include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
@@ -75,13 +74,13 @@ namespace {
 class QuicPlatformTest : public testing::Test {
 protected:
   QuicPlatformTest()
-      : log_level_(GetLogger().level()), verbosity_log_threshold_(GetVerbosityLogThreshold()) {
-    SetVerbosityLogThreshold(0);
-    GetLogger().set_level(ERROR);
+      : log_level_(GetLogger().level()), verbosity_log_threshold_(getVerbosityLogThreshold()) {
+    setVerbosityLogThreshold(0);
+    GetLogger().set_level(spdlog::level::err);
   }
 
   ~QuicPlatformTest() override {
-    SetVerbosityLogThreshold(verbosity_log_threshold_);
+    setVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }
 
@@ -195,7 +194,7 @@ TEST_F(QuicPlatformTest, QuicMapUtil) {
 }
 
 TEST_F(QuicPlatformTest, QuicMockLog) {
-  ASSERT_EQ(ERROR, GetLogger().level());
+  ASSERT_EQ(spdlog::level::err, GetLogger().level());
 
   {
     // Test a mock log that is not capturing logs.
@@ -292,7 +291,7 @@ TEST_F(QuicPlatformTest, QuicPtrUtil) {
 
 TEST_F(QuicPlatformTest, QuicLog) {
   // By default, tests emit logs at level ERROR or higher.
-  ASSERT_EQ(ERROR, GetLogger().level());
+  ASSERT_EQ(spdlog::level::err, GetLogger().level());
 
   int i = 0;
 
@@ -311,14 +310,14 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_EQ(12, i);
 
   // Set QUIC log level to INFO, since VLOG is emitted at the INFO level.
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
-  ASSERT_EQ(0, GetVerbosityLogThreshold());
+  ASSERT_EQ(0, getVerbosityLogThreshold());
 
   QUIC_VLOG(1) << (i = 1);
   EXPECT_EQ(12, i);
 
-  SetVerbosityLogThreshold(1);
+  setVerbosityLogThreshold(1);
 
   EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
@@ -335,7 +334,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
 #endif
 
 TEST_F(QuicPlatformTest, LogIoManipulators) {
-  GetLogger().set_level(ERROR);
+  GetLogger().set_level(spdlog::level::err);
   QUIC_DLOG(ERROR) << "aaaa" << std::endl;
   EXPECT_LOG_CONTAINS("error", "aaaa\n\n", QUIC_LOG(ERROR) << "aaaa" << std::endl << std::endl);
   EXPECT_LOG_NOT_CONTAINS("error", "aaaa\n\n\n",
@@ -349,14 +348,14 @@ TEST_F(QuicPlatformTest, LogIoManipulators) {
 TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
 
-  GetLogger().set_level(ERROR);
+  GetLogger().set_level(spdlog::level::err);
 
   QUIC_DLOG(INFO) << (i = 10);
   QUIC_DLOG_IF(INFO, false) << i++;
   QUIC_DLOG_IF(INFO, true) << i++;
   EXPECT_EQ(0, i);
 
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   QUIC_DLOG(INFO) << (i = 10);
   QUIC_DLOG_IF(INFO, false) << i++;
@@ -365,12 +364,12 @@ TEST_F(QuicPlatformTest, QuicDLog) {
   QUIC_DLOG_IF(INFO, true) << (i = 11);
   EXPECT_EQ(VALUE_BY_COMPILE_MODE(11, 0), i);
 
-  ASSERT_EQ(0, GetVerbosityLogThreshold());
+  ASSERT_EQ(0, getVerbosityLogThreshold());
 
   QUIC_DVLOG(1) << (i = 1);
   EXPECT_EQ(VALUE_BY_COMPILE_MODE(11, 0), i);
 
-  SetVerbosityLogThreshold(1);
+  setVerbosityLogThreshold(1);
 
   QUIC_DVLOG(1) << (i = 1);
   EXPECT_EQ(VALUE_BY_COMPILE_MODE(1, 0), i);
@@ -384,17 +383,20 @@ TEST_F(QuicPlatformTest, QuicDLog) {
 
 #undef VALUE_BY_COMPILE_MODE
 
-TEST_F(QuicPlatformTest, QuicCHECK) {
-  CHECK(1 == 1);
-  CHECK(1 == 1) << " 1 == 1 is forever true.";
+TEST_F(QuicPlatformTest, QuicheCheck) {
+  QUICHE_CHECK(1 == 1);
+  QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
-  EXPECT_DEBUG_DEATH({ DCHECK(false) << " Supposed to fail in debug mode."; },
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
                      "CHECK failed:.* Supposed to fail in debug mode.");
-  EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "CHECK failed");
 
-  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
+  EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
                "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ QUICHE_CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
+                     "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
 }
 
 // Test the behaviors of the cross products of
@@ -417,7 +419,7 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 }
 
 TEST_F(QuicPlatformTest, QuicBranchPrediction) {
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
     QUIC_LOG(INFO) << "Go buy some lottery tickets.";
@@ -455,32 +457,11 @@ TEST_F(QuicPlatformTest, QuicNotification) {
   EXPECT_TRUE(notification.HasBeenNotified());
 }
 
-TEST_F(QuicPlatformTest, QuicCertUtils) {
-  bssl::UniquePtr<X509> x509_cert =
-      Envoy::Extensions::TransportSockets::Tls::readCertFromFile(Envoy::TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  // Encode X509 cert with DER encoding.
-  unsigned char* der = nullptr;
-  int len = i2d_X509(x509_cert.get(), &der);
-  ASSERT_GT(len, 0);
-  absl::string_view out;
-  QuicCertUtils::ExtractSubjectNameFromDERCert(
-      absl::string_view(reinterpret_cast<const char*>(der), len), &out);
-  EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
-            "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
-            "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
-            "0\v\x6\x3U\x4\n\f\x4Lyft1\x19"
-            "0\x17\x6\x3U\x4\v\f\x10Lyft Engineering1\x14"
-            "0\x12\x6\x3U\x4\x3\f\vTest Server",
-            out);
-  OPENSSL_free(static_cast<void*>(der));
-}
-
 TEST_F(QuicPlatformTest, QuicTestOutput) {
   Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
-  GetLogger().set_level(INFO);
+  GetLogger().set_level(spdlog::level::info);
 
   EXPECT_LOG_NOT_CONTAINS("warn", "", QuicRecordTrace("quic_test_output.1", "output 1 content\n"));
   EXPECT_LOG_NOT_CONTAINS("error", "", QuicRecordTrace("quic_test_output.2", "output 2 content\n"));

@@ -21,7 +21,7 @@ namespace Quic {
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::ConnectionHandler& parent, Network::ListenerConfig& listener_config,
+    Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
     bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
@@ -30,16 +30,24 @@ ActiveQuicListener::ActiveQuicListener(
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
-    Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+    Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : Server::ActiveUdpListenerBase(worker_index, concurrency, parent, *listen_socket,
-                                    dispatcher.createUdpListener(listen_socket, *this),
-                                    &listener_config),
+    : Server::ActiveUdpListenerBase(
+          worker_index, concurrency, parent, *listen_socket,
+          dispatcher.createUdpListener(
+              listen_socket, *this,
+              listener_config.udpListenerConfig()->config().downstream_socket_config()),
+          &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      kernel_worker_routing_(kernel_worker_routing),
-      enabled_(enabled, Runtime::LoaderSingleton::get()) {
+      kernel_worker_routing_(kernel_worker_routing) {
+  // This flag fix a QUICHE issue which may crash Envoy during connection close.
+  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
+
+  if (Runtime::LoaderSingleton::getExisting()) {
+    enabled_.emplace(Runtime::FeatureFlag(enabled, Runtime::LoaderSingleton::get()));
+  }
   if (options != nullptr) {
     const bool ok = Network::Socket::applyOptions(
         options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
@@ -72,7 +80,7 @@ ActiveQuicListener::ActiveQuicListener(
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
-      listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+      listener_config.udpListenerConfig()->packetWriterFactory().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
   udp_packet_writer_ = udp_packet_writer.get();
 
@@ -97,7 +105,7 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
-  if (!enabled_.enabled()) {
+  if (enabled_.has_value() && !enabled_.value().enabled()) {
     return;
   }
 
@@ -127,7 +135,7 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
 }
 
 void ActiveQuicListener::onReadReady() {
-  if (!enabled_.enabled()) {
+  if (enabled_.has_value() && !enabled_.value().enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_->name());
     return;
   }
@@ -215,13 +223,14 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           : 20000;
   quic_config_.set_max_time_before_crypto_handshake(
       quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  int32_t max_streams =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
   quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
-    uint32_t worker_index, Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
+    uint32_t worker_index, Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
     Network::ListenerConfig& config) {
   bool kernel_worker_routing = false;
   std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();

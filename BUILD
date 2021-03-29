@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 exports_files([
     "VERSION",
+    "API_VERSION",
     ".clang-format",
 ])
 
@@ -19,6 +20,7 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
+        "//tools/extensions/...",
     ],
 )
 

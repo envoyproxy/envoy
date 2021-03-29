@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
@@ -23,6 +24,7 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/settings.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
@@ -206,8 +208,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http1_settings_(Http::Utility::parseHttp1Settings(
-          config.http_protocol_options(), config.stream_error_on_invalid_http_message())),
+      http1_settings_(Http::Http1::parseHttp1Settings(
+          config.http_protocol_options(), context.messageValidationVisitor(),
+          config.stream_error_on_invalid_http_message(),
+          xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -279,13 +283,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If we are provided a different request_id_extension implementation to use try and create a
   // new instance of it, otherwise use default one.
-  if (config.request_id_extension().has_typed_config()) {
-    request_id_extension_ =
-        Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
-  } else {
-    request_id_extension_ =
-        Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
+      final_rid_config = config.request_id_extension();
+  if (!final_rid_config.has_typed_config()) {
+    // This creates a default version of the UUID extension which is a required extension in the
+    // build.
+    final_rid_config.mutable_typed_config()->PackFrom(
+        envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
+  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
@@ -535,10 +541,8 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
     throw EnvoyException(fmt::format(
         "Error: filter config {} applied without warming but has no default config.", name));
   }
-  std::set<std::string> require_type_urls;
   for (const auto& type_url : config_discovery.type_urls()) {
     auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
-    require_type_urls.emplace(factory_type_url);
     auto* factory = Registry::FactoryRegistry<
         Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(factory_type_url);
     if (factory == nullptr) {
@@ -550,24 +554,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                              last_filter_in_current_config);
   }
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery.config_source(), name, require_type_urls, context_, stats_prefix_,
-      config_discovery.apply_default_config_without_warming());
-  if (config_discovery.has_default_config()) {
-    auto* default_factory =
-        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-            config_discovery.default_config());
-    if (default_factory == nullptr) {
-      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                       "configuration with type URL {}.",
-                                       name, config_discovery.default_config().type_url()));
-    }
-    filter_config_provider->validateConfig(config_discovery.default_config(), *default_factory);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
-    Http::FilterFactoryCb default_config =
-        default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
-    filter_config_provider->onConfigUpdate(default_config, "", nullptr);
-  }
+      config_discovery, name, context_, stats_prefix_);
   filter_factories.push_back(std::move(filter_config_provider));
 }
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
