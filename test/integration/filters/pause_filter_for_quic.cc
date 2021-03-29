@@ -2,8 +2,9 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/quic/quic_filter_manager_connection_impl.h"
+
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 

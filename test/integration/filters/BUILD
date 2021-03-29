@@ -223,8 +223,8 @@ envoy_cc_test_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/registry",
+        "//source/common/quic:quic_filter_manager_connection_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/quic_listeners/quiche:quic_filter_manager_connection_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )

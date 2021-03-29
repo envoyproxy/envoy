@@ -14,7 +14,7 @@ fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
-export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}" 
+export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
 if [[ -z "$NO_BUILD_SETUP" ]]; then
@@ -302,18 +302,17 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
   # changes, this build type may need to be broken up.
-  # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS=(
     "--define" "signal_trace=disabled"
     "--define" "hot_restart=disabled"
     "--define" "google_grpc=disabled"
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
-    "--define" "quiche=enabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
     "--define" "tcmalloc=gperftools"
     "--define" "zlib=ng"
+    "--@envoy//bazel:http3=False"
     "--@envoy//source/extensions/filters/http/kill_request:enabled"
     "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
 

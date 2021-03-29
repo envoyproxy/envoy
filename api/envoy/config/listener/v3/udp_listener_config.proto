@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
-import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
+import "envoy/config/listener/v3/quic_config.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -16,21 +16,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: UDP listener config]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message UdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.UdpListenerConfig";
 
-  reserved 1, 2, 3;
+  reserved 1, 2, 3, 4, 6;
 
   reserved "config";
-
-  // Used to create a specific UDP listener factory. If not specified the default UDP listener is
-  // used.
-  // [#comment:#extension-category: envoy.udp_listeners]
-  // [#not-implemented-hide:]
-  // [#comment:TODO(#12829): Remove this as an extension point.]
-  core.v3.TypedExtensionConfig listener_config = 4;
 
   // UDP socket configuration for the listener. The default for
   // :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is false for
@@ -38,14 +31,11 @@ message UdpListenerConfig {
   // may be worthwhile to enable this option after performance testing.
   core.v3.UdpSocketConfig downstream_socket_config = 5;
 
-  // If the protocol in the listener socket address in :ref:`protocol
-  // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the
-  // actual UDP writer to create. If not specified the default UDP writer is used.
-  // [#comment:#extension-category: envoy.udp_packet_writers]
+  // Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
+  // to the default object to enable QUIC without modifying any additional options.
   // [#not-implemented-hide:]
-  // [#comment:TODO(#12829): Remove this as an extension point.]
-  core.v3.TypedExtensionConfig writer_config = 6;
+  // [#comment:Unhide when QUIC alpha is announced with other docs.]
+  QuicProtocolOptions quic_options = 7;
 }
 
 message ActiveRawUdpListenerConfig {

@@ -626,7 +626,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ] + envoy_select_enable_http3([
-        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
     ]),
 )
 

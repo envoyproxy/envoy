@@ -7,9 +7,6 @@ _required_extensions = {
     "envoy.common.crypto.utility_lib": "//source/extensions/common/crypto:utility_lib",
     "envoy.request_id.uuid": "//source/extensions/request_id/uuid:config",
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
-    #TODO(#12829) remove these.
-    "envoy.listener.quic": "//source/extensions/quic_listeners/quiche:quic_factory_lib",
-    "envoy.transport_sockets.quic": "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
 }
 
 # Return the extension cc_library target after select

@@ -9,7 +9,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
