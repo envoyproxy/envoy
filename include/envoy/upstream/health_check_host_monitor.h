@@ -32,6 +32,7 @@ public:
    * @param type specifies the reason the host is being marked unhealthy.
    */
   virtual void setUnhealthy(UnhealthyType type) PURE;
+  virtual bool isNull() PURE;
 };
 
 using HealthCheckHostMonitorPtr = std::unique_ptr<HealthCheckHostMonitor>;

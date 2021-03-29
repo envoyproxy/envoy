@@ -139,6 +139,7 @@ private:
 
     // Upstream::HealthCheckHostMonitor
     void setUnhealthy(UnhealthyType type) override;
+    bool isNull() override;
 
     std::weak_ptr<HealthCheckerImplBase> health_checker_;
     std::weak_ptr<Host> host_;

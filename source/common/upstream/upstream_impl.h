@@ -71,6 +71,7 @@ class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
 public:
   // Upstream::HealthCheckHostMonitor
   void setUnhealthy(UnhealthyType) override {}
+  bool isNull() override { return true; }
 };
 
 /**

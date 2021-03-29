@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -700,10 +701,6 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()),
-      endpoint_warming_policy_(
-          common_config.has_slow_start_config()
-              ? common_config.slow_start_config().endpoint_warming_policy()
-              : envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT),
       slow_start_window_(
           std::chrono::milliseconds(common_config.has_slow_start_config()
                                         ? common_config.slow_start_config().slow_start_window()
@@ -807,7 +804,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
-    // Cycle through hosts to achieve the intended offset behavior.
     // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
     // refreshes for the weighted case.
     if (!hosts.empty()) {
@@ -842,19 +838,14 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
-  switch (endpoint_warming_policy_) {
-  case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT:
-    // Host enters slow start immediately.
+  // Enter slow start innediately.
+  if (host.healthChecker().isNull()) {
     return true;
-  case envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
-      WAIT_FOR_FIRST_PASSING_HC:
-    if (host.health() == Upstream::Host::Health::Healthy) {
-      return true;
-    } else {
-      return false;
-    }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    // Enter slow start upon passing an active health check.
+  } else if (!host.healthChecker().isNull() && host.health() == Upstream::Host::Health::Healthy) {
+    return true;
+  } else {
+    return false;
   }
 }
 

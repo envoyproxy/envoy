@@ -190,6 +190,10 @@ void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy(UnhealthyTy
   }
 }
 
+bool HealthCheckerImplBase::HealthCheckHostMonitorImpl::isNull() {
+  return health_checker_.lock() != nullptr;
+}
+
 void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
                                                     HealthCheckHostMonitor::UnhealthyType type) {
   if (type == HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail) {

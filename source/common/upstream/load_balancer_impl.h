@@ -429,8 +429,6 @@ private:
 
 protected:
   // Slow start related configs
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::EndpointWarmingPolicy
-      endpoint_warming_policy_;
   const std::chrono::milliseconds slow_start_window_;
   double time_bias_{1.0};
   const std::unique_ptr<Runtime::Double> time_bias_runtime_;

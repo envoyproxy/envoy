@@ -18,17 +18,17 @@ Whenever a slow start window duration elapses, upstream endpoint exits slow star
 Endpoint could also exit slow start mode in case it leaves the cluster.
 
 To reiterate, endpoint enters slow start mode when:
-  * For :ref:`NO_WAIT<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.NO_WAIT>` endpoint warming policy, immediately if it's cluster membership duration is within slow start window.
-  * For :ref:`WAIT_FOR_FIRST_PASSING_HC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.WAIT_FOR_FIRST_PASSING_HC>` endpoint warming policy, if it's cluster membership duration is within slow start window and endpoint has passed an active healthcheck. 
-    If endpoint does not pass an active healcheck during entire slow start window (since it has been added to upstream cluster), then it never enter slow start mode.
+  * If no active healthcheck is configured per cluster, immediately if its cluster membership duration is within slow start window.
+  * In case an active healthcheck is configured per cluster, when its cluster membership duration is within slow start window and endpoint has passed an active healthcheck. 
+    If endpoint does not pass an active healcheck during entire slow start window (since it has been added to upstream cluster), then it never enters slow start mode.
 
 Endpoint exits slow start mode when:
   * It leaves the cluster.
-  * It's cluster membership duration is greater than slow start window.
-  * For :ref:`WAIT_FOR_FIRST_PASSING_HC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.WAIT_FOR_FIRST_PASSING_HC>` endpoint warming policy, if endpoint health status changes to anything rather than `Healthy`.
-    Endpoint could further re-enter slow start, if it passes an active healtcheck and it's creation time is within slow start window.
+  * Its cluster membership duration is greater than slow start window.
+  * It does not pass an active healcheck configured per cluster.
+    Endpoint could further re-enter slow start, if it passes an active healtcheck and its creation time is within slow start window.
 
-Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, `NO_WAIT` ednpoint warming policy and 0.5 time bias.
+Below is example of how requests would be distributed across endpoints with Round Robin Loadbalancer, slow start window of 10 seconds, no active healcheck and 0.5 time bias.
 Endpoint E1 has statically configured initial weight of X and endpoint E2 weight of Y, the actual numerical values are of no significance for this example.
 
 +-------------+--------------------+------------+------------+-----------+----------+-------------+

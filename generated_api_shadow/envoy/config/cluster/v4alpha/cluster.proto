@@ -517,26 +517,10 @@ message Cluster {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
 
-      // Endpoint warming policy defines additional condition (apart from condition that endpoint creation duration should be within slow start window)
-      // for endpoint to enter slow start mode.
-      enum EndpointWarmingPolicy {
-        // Endpoint would enter slow start immediately.
-        NO_WAIT = 0;
-
-        // Endpoint would enter slow start upon passing first active healthcheck.
-        WAIT_FOR_FIRST_PASSING_HC = 1;
-      }
-
       // Size of slow start window in seconds, defaults to 0.
       // If set to value greater than 0, the newly created host remains in slow start mode starting from its creation time
       // for the duration of slow start window.
       uint32 slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
-
-      // This :ref:`endpoint warming policy type <arch_overview_load_balancing_slow_start_endpoint_warming_policy_types>` defines condition
-      // to be satisfied for host to enter slow start mode. The value defaults to
-      // :ref:`NO_WAIT<envoy_api_enum_value_config.cluster.v4alpha.Cluster.CommonLbConfig.SlowStartConfig.EndpointWarmingPolicy.NO_WAIT>`.
-      EndpointWarmingPolicy endpoint_warming_policy = 2
-          [(validate.rules).enum = {defined_only: true}];
 
       // This parameter linearly affects load balancing weight of an endpoint. Defaults to 1.0.
       // The smaller the time bias is, the less traffic would be sent to endpoint that is within slow start window.
