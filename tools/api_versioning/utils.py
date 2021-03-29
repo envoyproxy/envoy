@@ -7,6 +7,11 @@ import pathlib
 ApiVersion = namedtuple('ApiVersion', ['major', 'minor', 'patch'])
 
 
+# Errors that happen during API version parsing.
+class ApiVersionParsingError(Exception):
+    pass
+
+
 def get_api_version(input_path):
     """Returns the API version from a given API version input file.
 
@@ -17,8 +22,10 @@ def get_api_version(input_path):
       a namedtuple containing the major, minor, patch versions.
     """
     lines = pathlib.Path(input_path).read_text().splitlines()
-    assert len(lines) == 1, \
-        "Api version file must have a single line of format X.Y.Z, where X, Y, and Z are non-negative integers."
+    if len(lines) != 1 or lines[0].count('.') != 2:
+        raise ApiVersionParsingError(
+            'Api version file must have a single line of format X.Y.Z, where X, Y, and Z are non-negative integers.'
+        )
 
     # Mapping each field to int verifies it is a valid version
     return ApiVersion(*map(int, lines[0].split('.')))

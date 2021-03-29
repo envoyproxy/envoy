@@ -51,16 +51,6 @@ constexpr ApiVersion oldest_api_version = {$oldest_major, $oldest_minor, $oldest
         })
         self.assertEqual(expected_output, output)
 
-    # General failure pattern when invalid file contents is detected.
-    def failed_test_template(self, output_string, assertion_error_type):
-        pathlib.Path(self._temp_fname).write_text(output_string)
-
-        # Read the string from the file, and expect version parsing to fail.
-        with self.assertRaises(
-                assertion_error_type,
-                msg='The call to generate_header_file should have thrown an exception'):
-            generate_api_version_header.generate_header_file(self._temp_fname)
-
     def test_valid_version(self):
         self.successful_test_template('1.2.3', utils.ApiVersion(1, 2, 3), utils.ApiVersion(1, 1, 0))
 

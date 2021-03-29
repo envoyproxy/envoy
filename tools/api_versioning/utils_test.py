@@ -34,9 +34,8 @@ class UtilsTest(unittest.TestCase):
         pathlib.Path(self._temp_fname).write_text(output_string)
 
         # Read the string from the file, and expect version parsing to fail.
-        with self.assertRaises(
-                assertion_error_type,
-                msg='The call to generate_header_file should have thrown an exception'):
+        with self.assertRaises(assertion_error_type,
+                               msg='The call to get_api_version should have thrown an exception'):
             utils.get_api_version(self._temp_fname)
 
     def test_valid_version(self):
@@ -51,12 +50,15 @@ class UtilsTest(unittest.TestCase):
     def test_invalid_version_partial(self):
         self.failed_test_template('1.2.', ValueError)
 
+    def test_invalid_version_partial2(self):
+        self.failed_test_template('1.2', utils.ApiVersionParsingError)
+
     def test_empty_file(self):
         # Not writing anything to the file
-        self.failed_test_template('', AssertionError)
+        self.failed_test_template('', utils.ApiVersionParsingError)
 
     def test_invalid_multiple_lines(self):
-        self.failed_test_template('1.2.3\n1.2.3', AssertionError)
+        self.failed_test_template('1.2.3\n1.2.3', utils.ApiVersionParsingError)
 
     def test_valid_oldest_api_version(self):
         expected_latest_oldest_pairs = [(utils.ApiVersion(3, 2, 2), utils.ApiVersion(3, 1, 0)),
