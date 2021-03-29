@@ -21,6 +21,7 @@ py_test(
     visibility = ["//visibility:public"],
     deps = [":utils"],
 )
+
 py_binary(
     name = "generate_api_version_header_bin",
     srcs = ["generate_api_version_header.py"],
