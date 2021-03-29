@@ -356,6 +356,9 @@ ClusterManagerImpl::ClusterManagerImpl(
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
   } else {
+    // if an ads is configured with no dynamic resource declared a nullptr leads to inconsistency in the
+    // SubscriptionFactoryImpl case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds
+    // TODO can this condition be caught here?
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 

@@ -29,6 +29,10 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
+  // An alternative to RELEASE_ASSERT here is to test for a null and generate warning error.
+  // This could potentially lead to an envoy instance with unintended configuration being 
+  // created with opaque security issues. It is probably best to fail.
+  RELEASE_ASSERT(grpc_mux_ != nullptr, "grpc_mux_ initialized with null value");
   watch_ =
       grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, use_namespace_matching);
 
