@@ -239,7 +239,7 @@ public:
    * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
    * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
    * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
-   * absl::optional ptrs instead of nullptrs.
+   * absl::optional ptrs instead of null ptrs.
    */
   virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
