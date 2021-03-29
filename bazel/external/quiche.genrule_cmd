@@ -34,7 +34,7 @@ cat <<EOF >sed_commands
 /^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/common/quic/platform/spdy_test_impl.h!
 
 # Rewrite include directives for platform impl files.
-/^#include/ s!net/(http2|spdy|quic|quiche/common)/platform/impl/!common/quiche/platform/!
+/^#include/ s!net/(http2|spdy|quic|quiche/common)/platform/impl/!common/quic/platform/!
 
 # Rewrite include directives for epoll_server platform impl files.
 /^#include/ s!net/tools/epoll_server/platform/impl!test/common/quic/platform/!
@@ -47,7 +47,7 @@ cat <<EOF >sed_commands
 /^#include/ s!"epoll_server/!"quiche/epoll_server/!
 
 # The above global substitutions will prepend "quiche" to the platform code which we want to undo.
-/^#include/ s!"quiche/common/quiche/platform/!"common/quic/platform/!
+/^#include/ s!"quiche/common/quic/platform/!"common/quic/platform/!
 
 # Use envoy specific implementations for below platform APIs.
 /^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"common/quic/platform/quiche_logging_impl.h!
