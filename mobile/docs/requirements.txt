@@ -1,7 +1,7 @@
 GitPython==2.0.8
 Jinja2==2.11.3
 MarkupSafe==1.1.0
-Pygments==2.2.0
+Pygments==2.7.4
 alabaster==0.7.10
 babel==2.4.0
 docutils==0.14
