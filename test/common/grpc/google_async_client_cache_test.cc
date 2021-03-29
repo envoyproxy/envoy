@@ -14,7 +14,6 @@ public:
   AsyncClientCacheTest() {
     client_cache_singleton_ = std::make_unique<AsyncClientCacheSingleton>();
   }
-
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
     async_client_ = new Grpc::MockAsyncClient;
