@@ -89,6 +89,7 @@ public:
   Server::MockOptions options_;
 };
 
+#ifdef ENVOY_ENABLE_QUIC
 TEST_F(ClusterInfoImplTest, Http3) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
@@ -162,6 +163,7 @@ TEST_F(ClusterInfoImplTest, Http3) {
   EXPECT_FALSE(
       downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
 }
+#endif
 
 TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -204,8 +206,13 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
+#ifdef ENVOY_ENABLE_QUIC
   EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
-                          "HTTP3 requires a QuicUpstreamTransport tranport socket: name.*");
+                          "HTTP3 requires a QuicUpstreamTransport transport socket: name.*");
+#else
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
+                          "HTTP3 configured but not enabled in the build.");
+#endif
 }
 
 } // namespace

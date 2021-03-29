@@ -281,3 +281,26 @@ envoy_cc_test_library(
         "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "quic_upstream_test",
+    srcs = ["quic_upstream_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//source/common/upstream:static_cluster_lib",
+        "//source/common/upstream:strict_dns_cluster_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)

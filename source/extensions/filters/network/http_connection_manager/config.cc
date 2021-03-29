@@ -460,7 +460,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       HTTP3:
+#ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
+#else
+    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+#endif
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
