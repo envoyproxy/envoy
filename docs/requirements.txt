@@ -1,9 +1,9 @@
 alabaster==0.7.12 \
     --hash=sha256:446438bdcca0e05bd45ea2de1668c1d9b032e1a9154c2c259092d77031ddd359 \
     --hash=sha256:a661d72d58e6ea8a57f7a86e37d86716863ee5e92788398526d58b26a4e4dc02
-Babel==2.8.0 \
-    --hash=sha256:1aac2ae2d0d8ea368fa90906567f5c08463d98ade155c0c4bfedd6a0f7160e38 \
-    --hash=sha256:d670ea0b10f8b723672d3a6abeb87b565b244da220d76b4dba1b66269ec152d4
+Babel==2.9.0 \
+    --hash=sha256:9d35c22fcc79893c3ecc85ac4a56cde1ecf3f19c540bba0922308a6c06ca6fa5 \
+    --hash=sha256:da031ab54472314f210b0adcff1588ee5d1d1d0ba4dbd07b94dba82bde791e05
 certifi==2020.6.20 \
     --hash=sha256:5930595817496dd21bb8dc35dad090f1c2cd0adfaf21204bf6732ca5d8ee34d3 \
     --hash=sha256:8fc0819f1f30ba15bdb34cceffb9ef04d99f420f68eb75d901e9560b8749fc41
@@ -71,9 +71,9 @@ Pygments==2.7.1 \
 pyparsing==2.4.7 \
     --hash=sha256:c203ec8783bf771a155b207279b9bccb8dea02d8f0c9e5f8ead507bc3246ecc1 \
     --hash=sha256:ef9d7589ef3c200abe66653d3f1ab1033c3c419ae9b9bdb1240a85b024efc88b
-pytz==2020.1 \
-    --hash=sha256:a494d53b6d39c3c6e44c3bec237336e14305e4f29bbf800b599253057fbb79ed \
-    --hash=sha256:c35965d010ce31b23eeb663ed3cc8c906275d6be1a34393a1d73a41febf4a048
+pytz==2021.1 \
+    --hash=sha256:eb10ce3e7736052ed3623d49975ce333bcd712c7bb19a58b9e2089d4057d0798 \
+    --hash=sha256:83a4a90894bf38e243cf052c8b58f381bfe9a7a483f6a9cab140bc7f702ac4da
 requests==2.25.1 \
     --hash=sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e \
     --hash=sha256:27973dd4a904a4f13b263a19c866c13b92a39ed1c964655f025f3f8d3d75b804
@@ -92,9 +92,9 @@ Sphinx==3.2.1 \
 sphinx-copybutton==0.3.1 \
     --hash=sha256:5125c718e763596e6e52d92e15ee0d6f4800ad3817939be6dee51218870b3e3d \
     --hash=sha256:0e0461df394515284e3907e3f418a0c60ef6ab6c9a27a800c8552772d0a402a2
-sphinx-rtd-theme==0.5.0 \
-    --hash=sha256:22c795ba2832a169ca301cd0a083f7a434e09c538c70beb42782c073651b707d \
-    --hash=sha256:373413d0f82425aaa28fb288009bf0d0964711d347763af2f1b65cafcb028c82
+sphinx-rtd-theme==0.5.1 \
+    --hash=sha256:fa6bebd5ab9a73da8e102509a86f3fcc36dec04a0b52ea80e5a033b2aba00113 \
+    --hash=sha256:eda689eda0c7301a80cf122dad28b1861e5605cbf455558f3775e1e8200e83a5
 sphinx-tabs==2.1.0 \
     --hash=sha256:9d8db61afe9499aa84b33bc1c0d891f8a0df88ae513739f5babde15430c1fdaf \
     --hash=sha256:0b5a8dd71d87197a01eef3b9d1e1a70513f4dd45e8af7783d1ab74c3fb2cbc6c
@@ -116,9 +116,9 @@ sphinxcontrib-jsmath==1.0.1 \
 sphinxcontrib-qthelp==1.0.3 \
     --hash=sha256:4c33767ee058b70dba89a6fc5c1892c0d57a54be67ddd3e7875a18d14cba5a72 \
     --hash=sha256:bd9fc24bcb748a8d51fd4ecaade681350aa63009a347a8c14e637895444dfab6
-sphinxext-rediraffe==0.2.5 \
-    --hash=sha256:7b706284d20602acecc1783cc58c8d0543937af1ee53f912bfdc4b258a7e649a \
-    --hash=sha256:a17287cdee7763341b91762879e042b33a4916d6a2fc6d2f97a18107325bd2cc
+sphinxext-rediraffe==0.2.6 \
+    --hash=sha256:e09ca25cf7d5e86f94389eedd48cf915fe6a46e89362dd07b0d17f2be8c122fd \
+    --hash=sha256:dc8bbe6b3334a3bfc8ed0d1d6b2e831de9c06f123fa7d635cfb8192141ca4140
 sphinxcontrib-serializinghtml==1.1.4 \
     --hash=sha256:eaa0eccc86e982a9b939b2b82d12cc5d013385ba5eadcc7e4fed23f4405f77bc \
     --hash=sha256:f242a81d423f59617a8e5cf16f5d4d74e28ee9a66f9e5b637a18082991db5a9a
