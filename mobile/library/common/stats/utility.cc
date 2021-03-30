@@ -17,6 +17,8 @@ Stats::StatNameTagVector transformToStatNameTagVector(envoy_stats_tags tags,
 
     transformed_tags.push_back({stat_name_set->add(key), stat_name_set->add(val)});
   }
+  // The C envoy_stats_tags struct can be released now because the tags have been copied.
+  release_envoy_stats_tags(tags);
   return transformed_tags;
 }
 } // namespace Utility
