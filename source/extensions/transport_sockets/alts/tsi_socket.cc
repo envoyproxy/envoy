@@ -185,6 +185,8 @@ Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
                      raw_read_buffer_.length());
       tsi_result status = frame_protector_->unprotect(raw_read_buffer_, buffer);
       if (status != TSI_OK) {
+        ENVOY_CONN_LOG(debug, "TSI: unprotect failed: status: {}", callbacks_->connection(),
+                       status);
         result.action_ = Network::PostIoAction::Close;
         break;
       }
@@ -214,16 +216,16 @@ Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
       break;
     }
     // Do another read.
-    result = raw_buffer_socket_->doRead(raw_read_buffer_);
-    end_stream_read_ = result.end_stream_read_;
-    read_error_ = result.action_ == Network::PostIoAction::Close;
+    result = readFromRawSocket();
     // No data is read.
     if (result.bytes_processed_ == 0) {
       break;
     }
   };
-
   result.bytes_processed_ = total_bytes_processed;
+  ENVOY_CONN_LOG(debug, "TSI: do read result action {} bytes {} end_stream {}",
+                 callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
+                 result.end_stream_read_);
   return result;
 }
 
