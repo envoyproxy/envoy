@@ -12,7 +12,7 @@ namespace Common {
  * Invokes a function for all elements in a container and executes a done_cb once processing
  * is done for each element.
  *
- * To support cross-thread asyncronous work done for each element, the update_cb can extend
+ * To support cross-thread asynchronous work done for each element, the update_cb can extend
  * the lifetime of the provided Cleanup object until processing is done.
  */
 template <class ElementT, class ContainerT>
