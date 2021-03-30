@@ -8,10 +8,10 @@ Transport layer security (``TLS``)
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
    :ref:`jq <start_sandboxes_setup_jq>`
-	Parse ``json`` output from the upstream echo servers.
+        Parse ``json`` output from the upstream echo servers.
 
 This example walks through some of the ways that Envoy can be configured to make
 use of encrypted connections using ``HTTP`` over ``TLS``.

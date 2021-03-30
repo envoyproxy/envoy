@@ -64,7 +64,7 @@ can be used to modify this behavior, and they fall into two categories:
     Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
     See :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` for more details.
 
-  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
+  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria.
     See the configuration example below for more details.
 
 * :ref:`Priority Predicates<envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`: These predicates can
@@ -201,7 +201,7 @@ Specifically, the *allow listed routes* predicate defines edges of individual no
 and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
 if so desired.
 
-A third predicate :ref:`safe_cross_scheme                                      
+A third predicate :ref:`safe_cross_scheme
 <envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
 can be used to prevent HTTP -> HTTPS redirect.
 

@@ -72,8 +72,8 @@ hashing some property of the request, and finding the nearest corresponding host
 the ring. This technique is also commonly known as `"Ketama" <https://github.com/RJ/ketama>`_
 hashing, and like all hash-based load balancers, it is only effective when protocol routing is used
 that specifies a value to hash on. If you want something other than the host's address to be used
-as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it 
-in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: 
+as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it
+in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.:
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.core.v3.Metadata
@@ -112,9 +112,9 @@ with a fixed table size of 65537 (see section 5.3 of the same paper). Maglev can
 in replacement for the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`
 any place in which consistent hashing is desired. Like the ring hash load balancer, a consistent
 hashing load balancer is only effective when protocol routing is used that specifies a value to
-hash on. If you want something other than the host's address to be used as the hash key (e.g. the 
+hash on. If you want something other than the host's address to be used as the hash key (e.g. the
 semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the ``"envoy.lb"``
-:ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: 
+:ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.:
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.core.v3.Metadata
@@ -153,4 +153,3 @@ Random
 The random load balancer selects a random available host. The random load balancer generally performs
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
-

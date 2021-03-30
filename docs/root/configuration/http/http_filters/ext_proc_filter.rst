@@ -11,9 +11,9 @@ the filter to make decisions in real time about what parts of the HTTP request /
 are sent to the filter for processing.
 
 The protocol itself is based on a bidirectional gRPC stream. Envoy will send the
-server 
+server
 :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingRequest>`
-messages, and the server must reply with 
+messages, and the server must reply with
 :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`.
 
 This filter is a work in progress. In its current state, it actually does nothing.

@@ -61,7 +61,7 @@ changed to microseconds by setting the configuration parameter :ref:`latency_in_
   latency, Histogram, Command execution time in milliseconds (including delay faults)
   error_fault, Counter, Number of commands that had an error fault injected
   delay_fault, Counter, Number of commands that had a delay fault injected
-  
+
 .. _config_network_filters_redis_proxy_per_command_stats:
 
 Runtime
@@ -84,14 +84,14 @@ Delay faults delay a request, and Error faults respond with an error. Moreover, 
 Note that the Redis filter does not check for correctness in your configuration - it is the user's
 responsibility to make sure both the default and runtime percentages are correct! This is because
 percentages can be changed during runtime, and validating correctness at request time is expensive.
-If multiple faults are specified, the fault injection percentage should not exceed 100% for a given 
+If multiple faults are specified, the fault injection percentage should not exceed 100% for a given
 fault and Redis command combination. For example, if two faults are specified; one applying to GET at 60
 %, and one applying to all commands at 50%, that is a bad configuration as GET now has 110% chance of
 applying a fault. This means that every request will have a fault.
 
 If a delay is injected, the delay is additive - if the request took 400ms and a delay of 100ms
 is injected, then the total request latency is 500ms. Also, due to implementation of the redis protocol,
-a delayed request will delay everything that comes in after it, due to the proxy's need to respect the 
+a delayed request will delay everything that comes in after it, due to the proxy's need to respect the
 order of commands it receives.
 
 Note that faults must have a `fault_enabled` field, and are not enabled by default (if no default value

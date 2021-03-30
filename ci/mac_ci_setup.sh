@@ -31,13 +31,13 @@ function install {
 function retry () {
     local returns=1 i=1
     while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
-	if "$@"; then
-	    returns=0
-	    break
-	else
-	    sleep "$HOMEBREW_RETRY_INTERVAL";
-	    ((i++))
-	fi
+        if "$@"; then
+            returns=0
+            break
+        else
+            sleep "$HOMEBREW_RETRY_INTERVAL";
+            ((i++))
+        fi
     done
     return "$returns"
 }

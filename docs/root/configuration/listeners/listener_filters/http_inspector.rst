@@ -3,7 +3,7 @@
 HTTP Inspector
 ==============
 
-HTTP Inspector listener filter allows detecting whether the application protocol appears to be HTTP, 
+HTTP Inspector listener filter allows detecting whether the application protocol appears to be HTTP,
 and if it is HTTP, it detects the HTTP protocol (HTTP/1.x or HTTP/2) further. This can be used to select a
 :ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>` via the :ref:`application_protocols <envoy_v3_api_field_config.listener.v3.FilterChainMatch.application_protocols>`
 of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`.
@@ -25,7 +25,7 @@ A sample filter configuration could be:
 Statistics
 ----------
 
-This filter has a statistics tree rooted at *http_inspector* with the following statistics: 
+This filter has a statistics tree rooted at *http_inspector* with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description

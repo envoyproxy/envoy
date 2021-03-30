@@ -15,11 +15,11 @@ touch ~/.rnd
 
 interact_ws () {
     local port="$1" \
-	  protocol="$2" \
-	  backend="$3" \
-	  insecure=""
+          protocol="$2" \
+          backend="$3" \
+          insecure=""
     if [ "$protocol" == "wss" ]; then
-       insecure="--insecure"
+        insecure="--insecure"
     fi
     expect <<EOF
 set timeout 1

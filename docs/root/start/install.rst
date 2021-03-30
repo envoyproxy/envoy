@@ -119,14 +119,14 @@ You can install Envoy on Mac OSX using the official brew repositories, or from
 
       .. code-block:: console
 
-	 $ brew tap tetratelabs/getenvoy
-	 $ brew install envoy
+         $ brew tap tetratelabs/getenvoy
+         $ brew install envoy
 
       .. tip::
 
-	 You can install the ``nightly`` version from
-	 `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
-	 the install command.
+         You can install the ``nightly`` version from
+         `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
+         the install command.
 
 .. _start_install_docker:
 
@@ -144,20 +144,20 @@ The following commands will pull and show the Envoy version of current images.
 
       .. substitution-code-block:: console
 
-	 $ docker pull envoyproxy/|envoy_docker_image|
-	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
+         $ docker pull envoyproxy/|envoy_docker_image|
+         $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
    .. tab:: Get Envoy
 
       .. code-block:: console
 
-	 $ docker pull getenvoy/envoy:stable
-	 $ docker run --rm getenvoy/envoy:stable --version
+         $ docker pull getenvoy/envoy:stable
+         $ docker run --rm getenvoy/envoy:stable --version
 
       .. tip::
 
-	 To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
-	 replace the word ``stable`` with ``nightly`` in the above commands.
+         To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
+         replace the word ``stable`` with ``nightly`` in the above commands.
 
 .. _install_binaries:
 

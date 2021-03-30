@@ -7,20 +7,23 @@ set -e
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
 
-[[ "$1" == "check" || "$1" == "fix" || "$1" == "freeze" ]] || \
-  (echo "Usage: $0 <check|fix|freeze>"; exit 1)
+[[ "$1" == "check" || "$1" == "fix" || "$1" == "freeze" ]] || {
+    echo "Usage: $0 <check|fix|freeze>"
+    exit 1
+}
 
 # Developers working on protoxform and other proto format tooling changes will need to override the
 # following check by setting FORCE_PROTO_FORMAT=yes in the environment.
 ./tools/git/modified_since_last_github_commit.sh ./api/envoy proto || \
-  [[ "${FORCE_PROTO_FORMAT}" == "yes" ]] || \
-  { echo "Skipping proto_format.sh due to no API change"; exit 0; }
+    [[ "${FORCE_PROTO_FORMAT}" == "yes" ]] || {
+        echo "Skipping proto_format.sh due to no API change"
+        exit 0
+    }
 
-if [[ "$2" == "--test" ]]
-then
-  echo "protoxform_test..."
-  ./tools/protoxform/protoxform_test.sh
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
+if [[ "$2" == "--test" ]]; then
+    echo "protoxform_test..."
+    ./tools/protoxform/protoxform_test.sh
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
 fi
 
 # Generate //versioning:active_protos.
@@ -32,10 +35,9 @@ BAZEL_BUILD_OPTIONS+=("--remote_download_outputs=all")
 # If the specified command is 'freeze', we tell protoxform to adjust package version status to
 # reflect a major version freeze and then do a regular 'fix'.
 PROTO_SYNC_CMD="$1"
-if [[ "$1" == "freeze" ]]
-then
-  declare -r FREEZE_ARG="--//tools/api_proto_plugin:extra_args=freeze"
-  PROTO_SYNC_CMD="fix"
+if [[ "$1" == "freeze" ]]; then
+    declare -r FREEZE_ARG="--//tools/api_proto_plugin:extra_args=freeze"
+    PROTO_SYNC_CMD="fix"
 fi
 
 # Invoke protoxform aspect.
@@ -47,7 +49,7 @@ PROTO_TARGETS=()
 for proto_type in active frozen; do
     protos=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:${proto_type}_protos))")
     while read -r line; do PROTO_TARGETS+=("$line"); done \
-	<<< "$protos"
+        <<< "$protos"
 done
 
 # Setup for proto_sync.py.
@@ -63,9 +65,8 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint //tools/pr
 ./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}"
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
-if [[ "$1" == "freeze" ]]
-then
- ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
+if [[ "$1" == "freeze" ]]; then
+    ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 fi
 
 # Generate api/BUILD file based on updated type database.

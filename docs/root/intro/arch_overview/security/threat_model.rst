@@ -20,20 +20,20 @@ We will activate the security release process for disclosures that meet the foll
 * All issues that lead to loss of data confidentiality or integrity trigger the security release process.
 * An availability issue, such as Query-of-Death (QoD) or resource exhaustion needs to meet all of the
   following criteria to trigger the security release process:
-  
+
   - A component tagged as hardened is affected (see `Core and extensions`_ for the list of hardened components).
-    
+
   - The type of traffic (upstream or downstream) that exhibits the issue matches the component's hardening tag.
     I.e. component tagged as “hardened to untrusted downstream” is affected by downstream request.
-    
+
   - A resource exhaustion issue needs to meet these additional criteria:
-    
+
     + Not covered by an existing timeout or where applying short timeout values is impractical and either
-      
+
       + Memory exhaustion, including out of memory conditions, where per-request memory use 100x or more above
-	the configured header or high watermark limit. I.e. 10 KiB client request leading to 1 MiB bytes of
-	memory consumed by Envoy;
-      
+        the configured header or high watermark limit. I.e. 10 KiB client request leading to 1 MiB bytes of
+        memory consumed by Envoy;
+
       + Highly asymmetric CPU utilization where Envoy uses 100x or more CPU compared to client.
 
 

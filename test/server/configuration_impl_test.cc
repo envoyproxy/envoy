@@ -99,7 +99,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -133,7 +133,7 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -166,7 +166,7 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -197,7 +197,7 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -257,7 +257,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -309,7 +309,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -357,7 +357,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -417,7 +417,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -451,7 +451,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -491,7 +491,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -529,7 +529,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -566,7 +566,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -726,7 +726,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -780,7 +780,7 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -868,7 +868,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -982,7 +982,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }
@@ -1102,7 +1102,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
       "access_log": [
         {
           "name": "envoy.access_loggers.file",
-          "typed_config": { 
+          "typed_config": {
             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
             "path": "/dev/null"
           }

@@ -31,6 +31,10 @@ trap_errors () {
 trap trap_errors ERR
 trap exit 1 INT
 
+# TODO: move these to bazel
+CURRENT=glint
+./tools/code_format/glint.sh
+
 CURRENT=shellcheck
 ./tools/code_format/check_shellcheck_format.sh check
 

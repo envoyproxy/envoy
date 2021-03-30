@@ -32,7 +32,7 @@ The OAuth filter's flow involves:
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if
 :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.forward_bearer_token>`
-is set to true the filter will send over a 
+is set to true the filter will send over a
 cookie named `BearerToken` to the upstream. Additionally, the `Authorization` header will be populated
 with the same value.
 

@@ -8,7 +8,7 @@ Redis filter
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`redis <start_sandboxes_setup_redis>`
-	Redis client to query the server.
+        Redis client to query the server.
 
 In this example, we show how a :ref:`Redis filter <config_network_filters_redis_proxy>` can be used with the Envoy proxy.
 

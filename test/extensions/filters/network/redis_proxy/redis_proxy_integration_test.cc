@@ -81,8 +81,8 @@ const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
 
 // This is a configuration with batching enabled.
 const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
-            max_buffer_size_before_flush: 1024 
-            buffer_flush_timeout: 0.003s 
+            max_buffer_size_before_flush: 1024
+            buffer_flush_timeout: 0.003s
 )EOF";
 
 const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(

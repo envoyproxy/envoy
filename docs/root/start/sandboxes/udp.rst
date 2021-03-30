@@ -8,10 +8,10 @@ User Datagram Protocol (``UDP``)
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
    :ref:`netcat <start_sandboxes_setup_netcat>`
-	Used to send ``UDP`` packets.
+        Used to send ``UDP`` packets.
 
 This sandbox provides a very simple example of Envoy proxying ``UDP``.
 

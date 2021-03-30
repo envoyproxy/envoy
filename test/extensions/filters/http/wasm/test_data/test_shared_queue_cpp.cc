@@ -28,7 +28,7 @@ public:
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
 
-private:                                                                                            
+private:
   SharedQueueRootContext* root() { return static_cast<SharedQueueRootContext*>(Context::root()); }
 
 };
