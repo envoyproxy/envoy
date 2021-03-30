@@ -442,10 +442,18 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
+  auto status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    throw CodecClientException(":status must be specified and a valid unsigned long");
+  }
+  return status.value();
+}
+
+absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    return absl::nullopt;
   }
   return response_code;
 }
