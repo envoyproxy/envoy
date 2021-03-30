@@ -20,6 +20,10 @@ def get_api_version(input_path):
 
     Returns:
       a namedtuple containing the major, minor, patch versions.
+
+    Raises:
+      ApiVersionParsingError: If the given file has no lines or more than one line, or if
+          the line doesn't include exactly two dots ('.').
     """
     lines = pathlib.Path(input_path).read_text().splitlines()
     if len(lines) != 1 or lines[0].count('.') != 2:
