@@ -25,10 +25,12 @@ def envoy_select_google_grpc(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values if http3 is enabled in the current build.
+# Selects the given values if http3 is enabled in the current build. Also disable if fips is
+# enabled until the fips build supports http3.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({
         repository + "//bazel:disable_http3": [],
+        repository + "//bazel:boringssl_fips": [],
         "//conditions:default": xs,
     })
 
