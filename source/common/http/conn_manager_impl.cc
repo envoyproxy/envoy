@@ -1646,6 +1646,9 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
 
   new_stream.decodeHeaders(std::move(request_headers_), !proxy_body);
   if (proxy_body) {
+    // This functionality is currently only used for internal redirects, which the router only allows
+    // if the full request has been read (end_stream = true) so we don't need to handle the case of
+    // upstream sending an early response mid-request.
     new_stream.decodeData(*request_data, true);
   }
 }

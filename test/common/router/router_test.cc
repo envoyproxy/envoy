@@ -4291,6 +4291,10 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_redirects_with_body", "false"}});
+
   enableRedirects();
 
   sendRequest();
@@ -4308,10 +4312,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
 }
 
 TEST_F(RouterTest, InternalRedirectAcceptedWithBodyAndRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_redirects_with_body", "true"}});
-
   enableRedirects();
 
   sendRequest(false);

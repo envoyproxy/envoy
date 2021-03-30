@@ -178,8 +178,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.internal_redirects_with_body",
-                                    "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -235,8 +233,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
         route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
       });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.internal_redirects_with_body",
-                                    "true");
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

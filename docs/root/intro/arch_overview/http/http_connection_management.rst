@@ -169,9 +169,8 @@ For a redirect to be handled successfully it must pass the following checks:
    either 302 (by default), or a set of 3xx codes (301, 302, 303, 307, 308).
 2. Have a *location* header with a valid, fully qualified URL.
 3. The request must have been fully processed by Envoy.
-4. The request must not have a body unless the `envoy.reloadable_features.internal_redirects_with_body` runtime guard
-   is enabled, in which case the request must be smaller than the :ref:`per_request_buffer_limit_bytes
-   <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>` setting.
+4. The request must be smaller than the :ref:`per_request_buffer_limit_bytes
+   <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>` limit.
 5. :ref:`allow_cross_scheme_redirect
    <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true (default to false),
    or the scheme of the downstream request and the *location* header are the same.
