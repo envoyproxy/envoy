@@ -225,6 +225,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
+  return nullptr;
 #endif
 }
 
