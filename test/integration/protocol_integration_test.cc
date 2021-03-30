@@ -1324,6 +1324,7 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
     waitForNextUpstreamRequest();
     default_response_headers_.removeStatus();
     upstream_request_->encodeHeaders(default_response_headers_, false);
+    // TODO(#14829) QUIC won't disconnect on invalid messaging.
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
