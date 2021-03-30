@@ -6,7 +6,6 @@
 #include "common/config/datasource.h"
 
 #include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {

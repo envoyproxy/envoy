@@ -135,7 +135,7 @@ private:
   RouterSharedPtr router_;
   ClientFactory& client_factory_;
   DecoderFactory& decoder_factory_;
-  ConnectionPool::Cancellable* canceler_{nullptr};
+  Tcp::ConnectionPool::Cancellable* canceler_{nullptr};
   ClientPtr client_;
   std::vector<uint8_t> seed_;
   bool authed_{false};

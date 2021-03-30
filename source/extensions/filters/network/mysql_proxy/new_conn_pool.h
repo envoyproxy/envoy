@@ -1,5 +1,8 @@
 #include "common/conn_pool/conn_pool_base.h"
+#include "envoy/api/api.h"
 #include "envoy/upstream/upstream.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,10 +68,22 @@ class ConnectionPoolManager {
 public:
   virtual ~ConnectionPoolManager() = default;
   // now use defualt lb to choose host.
-  virtual ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) PURE;
+  virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
+using ConnectionPoolManagerSharedPtr = std::shared_ptr<ConnectionPoolManager>;
+
+class ConnectionPoolManagerFactory {
+public:
+  virtual ~ConnectionPoolManagerFactory() = default;
+  // now use defualt lb to choose host.
+  virtual ConnectionPoolManagerSharedPtr
+  create(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
+         const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
+         DecoderFactory& decoder_factory) PURE;
+};
+
 } // namespace ConnPool
 } // namespace MySQLProxy
 } // namespace NetworkFilters

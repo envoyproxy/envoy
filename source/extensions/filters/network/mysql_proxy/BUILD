@@ -109,6 +109,7 @@ envoy_cc_library(
     hdrs = ["route.h"],
     deps = [
         ":conn_pool_interface",
+        ":new_conn_pool_interface",
         "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
@@ -122,7 +123,7 @@ envoy_cc_library(
         "route_impl.h",
     ],
     deps = [
-        ":conn_pool_manager_lib",
+        ":new_conn_pool_lib",
         ":route_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
@@ -142,25 +143,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "conn_pool_manager_interface",
-    hdrs = [
-        "conn_pool_manager.h",
-    ],
+    name = "config_interface",
+    hdrs = ["mysql_config.h"],
     deps = [
-        ":new_conn_pool_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "conn_pool_manager_lib",
-    srcs = [
-        "conn_pool_manager_impl.cc",
-    ],
-    hdrs = [
-        "conn_pool_manager_impl.h",
-    ],
-    deps = [
-        ":conn_pool_manager_interface",
+        "//source/extensions/filters/network:well_known_names",
+        "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -186,6 +175,7 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":codec_lib",
+        ":config_interface",
         ":decoder_lib",
         ":message_helper_lib",
         ":new_conn_pool_interface",

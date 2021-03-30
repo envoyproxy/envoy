@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
@@ -9,12 +10,17 @@
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 #include "extensions/filters/network/mysql_proxy/message_helper.h"
+#include "extensions/filters/network/mysql_proxy/mysql_config.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 namespace ConnPool {
+
+ActiveMySQLClient::Auther::Auther(ActiveMySQLClient& parent)
+    : parent_(parent), decoder_(parent_.parent_.parent_.decoder_factory_.create(*this)) {}
 
 std::string ActiveMySQLClient::Auther::username() const {
   return parent_.parent_.parent_.username_;
@@ -228,24 +234,24 @@ void ConnPoolImpl::onMySQLFailure(MySQLPoolFailureReason reason) {
 }
 
 ConnectionPoolManagerImpl::ConnectionPoolManagerImpl(Upstream::ClusterManager* cm,
-                                                     ThreadLocal::SlotAllocator& tls)
-    : cm_(cm), tls_(tls.allocateSlot()) {}
+                                                     ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                                                     DecoderFactory& decoder_factory)
+    : cm_(cm), tls_(tls.allocateSlot()), api_(api), decoder_factory_(decoder_factory) {}
 
-ConnectionPool::Cancellable*
+Tcp::ConnectionPool::Cancellable*
 ConnectionPoolManagerImpl::newConnection(ClientPoolCallBack& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().newConnection(callbacks);
 }
 
 void ConnectionPoolManagerImpl::init(
-    const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
-    const std::string& username, const std::string& password) {
+    const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route) {
   std::weak_ptr<ConnectionPoolManagerImpl> this_weak_ptr = shared_from_this();
   auto cm = cm_;
-  tls_->set([this_weak_ptr, route, username, password,
+  tls_->set([&, this_weak_ptr, route,
              cm](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     if (auto this_shared_ptr = this_weak_ptr.lock()) {
       auto pool = std::make_shared<ThreadLocalPool>(this_shared_ptr, dispatcher, cm, route,
-                                                    username, password);
+                                                    decoder_factory_);
       return pool;
     }
     return nullptr;
@@ -254,18 +260,15 @@ void ConnectionPoolManagerImpl::init(
 
 ThreadLocalPool::ThreadLocalPool(
     std::weak_ptr<ConnectionPoolManagerImpl> parent, Event::Dispatcher& dispatcher,
-    Upstream::ClusterManager* cm,
     const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
-    const std::string& username, const std::string& password)
-    : parent_(parent), dispatcher_(dispatcher), username_(username), password_(password),
+    DecoderFactory& decoder_factory)
+    : parent_(parent), dispatcher_(dispatcher), decoder_factory_(decoder_factory),
       cluster_name_(route.cluster()), database_(route.database()) {
   auto _parent = parent.lock();
   ASSERT(_parent != nullptr);
   cluster_update_handle_ = _parent->cm_->addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = _parent->cm_->getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
-    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent->api_);
-    auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent->api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
@@ -285,6 +288,8 @@ void ThreadLocalPool::onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluste
     ThreadLocalPool::onClusterRemoval(cluster_name_);
   }
 
+  username_ = ProtocolOptionsConfigImpl::authUsername(cluster.info(), shared_parent->api_);
+  password_ = ProtocolOptionsConfigImpl::authPassword(cluster.info(), shared_parent->api_);
   ASSERT(cluster_ == nullptr);
   cluster_ = &cluster;
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
@@ -346,7 +351,7 @@ void ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
   host_address_map_.clear();
 }
 
-ConnectionPool::Cancellable* ThreadLocalPool::newConnection(ClientPoolCallBack& callbacks) {
+Tcp::ConnectionPool::Cancellable* ThreadLocalPool::newConnection(ClientPoolCallBack& callbacks) {
   if (cluster_ == nullptr) {
     ASSERT(pools_.empty());
     ASSERT(pools_to_drain_.empty());
@@ -374,6 +379,17 @@ ConnectionPool::Cancellable* ThreadLocalPool::newConnection(ClientPoolCallBack& 
   }
 
   return pools_[host]->newConnection(callbacks);
+}
+
+ConnectionPoolManagerFactoryImpl ConnectionPoolManagerFactoryImpl::instance;
+
+ConnectionPoolManagerSharedPtr ConnectionPoolManagerFactoryImpl::create(
+    Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
+    const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
+    DecoderFactory& decoder_factory) {
+  auto pool_manager = std::make_shared<ConnectionPoolManagerImpl>(cm, tls, api, decoder_factory);
+  pool_manager->init(route);
+  return pool_manager;
 }
 
 } // namespace ConnPool

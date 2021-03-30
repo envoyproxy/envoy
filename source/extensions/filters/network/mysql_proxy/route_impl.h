@@ -6,7 +6,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/route.h"
 
 namespace Envoy {
@@ -16,11 +15,11 @@ namespace MySQLProxy {
 
 class RouteImpl : public Route {
 public:
-  RouteImpl(ConnectionPool::ClientPoolSharedPtr pool);
-  ConnectionPool::Instance& upstream() override { return *pool_; }
+  RouteImpl(ConnPool::ConnectionPoolManagerSharedPtr pool);
+  ConnPool::ConnectionPoolManager& upstream() override { return *pool_; }
 
 private:
-  ConnectionPool::ClientPoolSharedPtr pool_;
+  ConnPool::ConnectionPoolManagerSharedPtr pool_;
 };
 
 class RouterImpl : public Router {
@@ -35,13 +34,10 @@ private:
 class RouteFactoryImpl : public RouteFactory {
 public:
   RouteSharedPtr
-  create(ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager* cm,
+  create(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
          const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
-         const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::
-             ConnectionPoolSettings& setting,
-         DecoderFactory& decoder_factory, ConnectionPool::InstanceFactory& factory,
-         const std::string& auth_username, const std::string& auth_password) override;
-  static RouteFactoryImpl instance_;
+         DecoderFactory& decoder_factory, ConnPool::ConnectionPoolManagerFactory& factory) override;
+  static RouteFactoryImpl instance;
 };
 
 } // namespace MySQLProxy

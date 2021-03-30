@@ -48,7 +48,7 @@ void MySQLFilter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (canceler_) {
-      canceler_->cancel();
+      canceler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
       canceler_ = nullptr;
     }
     if (client_) {
@@ -207,7 +207,7 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
     return;
   }
   auto& pool = route->upstream();
-  canceler_ = pool.newMySQLClient(*this);
+  canceler_ = pool.newConnection(*this);
   onAuthOk();
 }
 

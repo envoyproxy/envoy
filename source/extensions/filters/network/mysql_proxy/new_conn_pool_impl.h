@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "common/buffer/buffer_impl.h"
+#include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
@@ -51,8 +52,8 @@ public:
 class ActiveMySQLClient : public Envoy::ConnectionPool::ActiveClient {
 public:
   struct Auther : public Network::ReadFilterBaseImpl, public DecoderCallbacks {
-    Auther(ActiveMySQLClient& parent) : parent_(parent) {}
     // Network::ReadFilter
+    Auther(ActiveMySQLClient&);
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       if (decoder_) {
         decode_buffer_.move(data);
@@ -77,11 +78,11 @@ public:
     std::string password() const;
     std::string database() const;
 
+    ActiveMySQLClient& parent_;
     DecoderPtr decoder_;
     AuthMethod auth_method_{AuthMethod::Unknown};
     std::vector<uint8_t> seed_;
     Buffer::OwnedImpl decode_buffer_;
-    ActiveMySQLClient& parent_;
   };
 
   // This acts as the bridge between the ActiveMySQLClient and an individual TCP connection.
@@ -193,7 +194,7 @@ public:
     }
   }
 
-  ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) override {
+  Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) override {
     MySQLAttachContext context(&callbacks);
     return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
   }
@@ -251,10 +252,9 @@ class ThreadLocalPool : public Upstream::ClusterUpdateCallbacks,
 public:
   ThreadLocalPool(
       std::weak_ptr<ConnectionPoolManagerImpl> parent, Event::Dispatcher&,
-      Upstream::ClusterManager*,
       const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
-      const std::string& username, const std::string& password);
-  ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks);
+      DecoderFactory& decoder_factory);
+  Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks);
 
   void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
   void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
@@ -277,6 +277,7 @@ private:
   absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
   absl::node_hash_map<Upstream::HostConstSharedPtr, InstancePtr> pools_;
   std::list<InstancePtr> pools_to_drain_;
+  DecoderFactory& decoder_factory_;
   std::string username_;
   std::string password_;
   std::string cluster_name_;
@@ -285,19 +286,34 @@ private:
 
 using ConnectionPoolPtr = std::unique_ptr<ConnPoolImpl>;
 
+/**
+ * Implemnation of ConnectionPoolManager, maintain connection pools of hosts of cluster.
+ */
 class ConnectionPoolManagerImpl : public ConnectionPoolManager,
                                   public std::enable_shared_from_this<ConnectionPoolManagerImpl> {
 public:
-  ConnectionPoolManagerImpl(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls);
-  ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) override;
-  void init(const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
-            const std::string& username, const std::string& password);
+  ConnectionPoolManagerImpl(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls,
+                            Api::Api& api, DecoderFactory& decoder_factory);
+  Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) override;
+  void init(const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route);
 
 private:
   friend class ThreadLocalPool;
   Upstream::ClusterConnectivityState cluster_manager_state_;
   Upstream::ClusterManager* cm_;
   ThreadLocal::SlotPtr tls_;
+  Api::Api& api_;
+  DecoderFactory& decoder_factory_;
+};
+
+class ConnectionPoolManagerFactoryImpl : public ConnectionPoolManagerFactory {
+public:
+  // now use defualt lb to choose host.
+  ConnectionPoolManagerSharedPtr
+  create(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
+         const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
+         DecoderFactory& decoder_factory) override;
+  static ConnectionPoolManagerFactoryImpl instance;
 };
 
 } // namespace ConnPool
