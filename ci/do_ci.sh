@@ -14,7 +14,7 @@ fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
-export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}" 
+export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
 if [[ -z "$NO_BUILD_SETUP" ]]; then

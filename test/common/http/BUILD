@@ -432,9 +432,9 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
     ] + envoy_select_enable_http3([
-        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
-        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
-        "//source/extensions/quic_listeners/quiche:client_connection_factory_lib",
+        "//source/common/quic:quic_factory_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//source/common/quic:client_connection_factory_lib",
     ]),
 )
 

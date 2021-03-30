@@ -17,6 +17,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/config/api_version.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
@@ -93,6 +94,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
+  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;

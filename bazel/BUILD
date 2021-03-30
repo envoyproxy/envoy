@@ -380,11 +380,6 @@ config_setting(
     values = {"define": "zlib=ng"},
 )
 
-config_setting(
-    name = "enable_quiche",
-    values = {"define": "quiche=enabled"},
-)
-
 # TODO: consider converting WAVM VM support to an extension (https://github.com/envoyproxy/envoy/issues/12574)
 config_setting(
     name = "wasm_wavm",
