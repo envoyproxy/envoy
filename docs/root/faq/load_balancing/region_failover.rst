@@ -1,13 +1,7 @@
-How do I make Envoy fail over to another region during service degradation?
-===========================================================================
+服务降级期间如何使 Envoy 故障转移到另一个区域？
+===============================================
 
-Envoy uses the concept of
-`priorities <arch_overview_load_balancing_priority_levels>` to express
-the idea that a certain set of endpoints should be preferred over others.
+Envoy 使用 `优先级 <arch_overview_load_balancing_priority_levels>` 的概念来表达这样一种想法，即某一组端点应该优先于其他端点。
 
-By putting the preferred endpoints into the lower priority, Envoy will
-always select one of these endpoints as long as that priority is sufficiently
-available. This means that common failover scenarios can be expressed by
-putting the fallback endpoints in a different priority. See the
-`priority <arch_overview_load_balancing_priority_levels>` for more information
-about this.
+通过将首选端点设置为较低的优先级，只要该优先级足够可用，Envoy 将始终选择这些端点之一。这意味着可以通过将备用端点置于不同的优先级来表示常见的故障转移场景。有关更多信息参见
+`优先级 <arch_overview_load_balancing_priority_levels>`。
