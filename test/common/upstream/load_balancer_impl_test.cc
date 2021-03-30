@@ -35,11 +35,6 @@ namespace Upstream {
 
 class EdfLoadBalancerBasePeer {
 public:
-  static const envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
-      EndpointWarmingPolicy&
-      endpointWarmingPolicy(EdfLoadBalancerBase& edf_lb) {
-    return edf_lb.endpoint_warming_policy_;
-  }
   static const std::chrono::milliseconds& slowStartWindow(EdfLoadBalancerBase& edf_lb) {
     return edf_lb.slow_start_window_;
   }
@@ -96,6 +91,12 @@ public:
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+};
+
+class TestHealthCheckHostMonitor : public HealthCheckHostMonitor {
+public:
+  void setUnhealthy(UnhealthyType) override {}
+  bool isNull() override { return false; }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
@@ -1485,10 +1486,6 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   init(false);
-  const auto endpoint_warming_policy =
-      EdfLoadBalancerBasePeer::endpointWarmingPolicy(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT,
-            endpoint_warming_policy);
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
@@ -1500,8 +1497,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
-  common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
-      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::NO_WAIT);
   // Set slow start window to 60 seconds.
   common_config_.mutable_slow_start_config()->set_slow_start_window(60);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
@@ -1512,6 +1507,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
   init(true);
 
+  // As no healthcheck is configured, hosts would enter slow start immediately.
   HostVector empty;
   HostVector hosts_added;
   hosts_added.push_back(host1);
@@ -1527,6 +1523,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
   hosts_added.clear();
   auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+  host2->setHealthChecker(std::move(std::make_unique<HealthCheckHostMonitorNullImpl>()));
 
   hosts_added.push_back(host2);
 
@@ -1563,17 +1560,18 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
-TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
-  common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
-      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
-          WAIT_FOR_FIRST_PASSING_HC);
+TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
   // Set slow start window to 10 seconds.
   common_config_.mutable_slow_start_config()->set_slow_start_window(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_default_value(0.5);
   simTime().advanceTimeWait(std::chrono::seconds(1));
   auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
+  host1->setHealthChecker(std::move(std::make_unique<TestHealthCheckHostMonitor>()));
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  auto health_checker = std::make_unique<TestHealthCheckHostMonitor>();
+  host1->setHealthChecker(std::move(health_checker));
+
   host_set_.hosts_ = {host1};
 
   init(true);
@@ -1592,6 +1590,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
 
   hosts_added.clear();
   auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+  host2->setHealthChecker(std::move(std::make_unique<TestHealthCheckHostMonitor>()));
   hosts_added.push_back(host2);
 
   hostSet().hosts_ = {host1, host2};
@@ -1637,9 +1636,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForFirstPassingHC) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
-  common_config_.mutable_slow_start_config()->set_endpoint_warming_policy(
-      envoy::config::cluster::v3::Cluster::CommonLbConfig::SlowStartConfig::
-          WAIT_FOR_FIRST_PASSING_HC);
   // Set slow start window to 10 seconds.
   common_config_.mutable_slow_start_config()->set_slow_start_window(10);
   common_config_.mutable_slow_start_config()->mutable_time_bias()->set_runtime_key("time_bias");
@@ -1656,6 +1652,12 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeTimeBias) {
                               makeTestHost(info_, "tcp://127.0.0.1:100", simTime(), 1)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().healthy_hosts_[0]->setHealthChecker(
+      std::move(std::make_unique<TestHealthCheckHostMonitor>()));
+  hostSet().healthy_hosts_[1]->setHealthChecker(
+      std::move(std::make_unique<TestHealthCheckHostMonitor>()));
+  hostSet().healthy_hosts_[2]->setHealthChecker(
+      std::move(std::make_unique<TestHealthCheckHostMonitor>()));
   hostSet().runCallbacks({}, {});
   const auto hosts_in_slow_start =
       EdfLoadBalancerBasePeer::hostsInSlowStart(static_cast<EdfLoadBalancerBase&>(*lb_));

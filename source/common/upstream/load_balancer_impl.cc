@@ -837,7 +837,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 bool EdfLoadBalancerBase::adheresToEndpointWarmingPolicy(const Host& host) {
-  // Enter slow start innediately.
+  // Enter slow start immediately.
   if (host.healthChecker().isNull()) {
     return true;
     // Enter slow start upon passing an active health check.
@@ -880,6 +880,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   if (!hosts_source) {
     return nullptr;
   }
+
   auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
@@ -906,7 +907,6 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   if (!hosts_source) {
     return nullptr;
   }
-
   auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
