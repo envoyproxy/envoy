@@ -540,13 +540,13 @@ TEST_F(FilterManagerTest, MaybeEndEncode) {
   // endStream must not be called.
   filter_manager_->maybeEndEncode(false);
 
-  // endStream Must be called since end_stream = true && streamEnded returns false.
+  // endStream must be called since end_stream = true && streamEnded returns false.
   EXPECT_CALL(filter_manager_callbacks_, streamEnded()).WillOnce(Invoke([]() -> bool {
     return false;
   }));
   filter_manager_->maybeEndEncode(true);
 
-  // endStream Must not be called since streamEnded returns true.
+  // endStream must not be called since streamEnded returns true.
   EXPECT_CALL(filter_manager_callbacks_, streamEnded()).WillOnce(Invoke([]() -> bool {
     return true;
   }));
