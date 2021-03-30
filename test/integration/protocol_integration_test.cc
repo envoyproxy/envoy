@@ -2327,4 +2327,49 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
   }
 }
 
+static std::string remove_response_headers_filter = R"EOF(
+name: remove-response-headers-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
+)EOF";
+
+TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
+  config_helper_.addFilter(remove_response_headers_filter);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+
+  // If a filter chain removes :status from the response headers, then Envoy must reply with
+  // InternalServerError and must not crash.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
+
+TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
+  config_helper_.addFilter(remove_response_headers_filter);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/test/"}, {":scheme", "http"}, {":authority", "host"}},
+      10);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+
+  // If a filter chain removes :status from the response headers, then Envoy must reply with
+  // InternalServerError and not crash.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "missing required header: :status");
+}
+
 } // namespace Envoy
