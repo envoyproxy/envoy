@@ -1,7 +1,6 @@
 # This will proxy CONNECT requests from a downstream connecting on 127.0.0.1:10001
 # to an upstream listening on 127.0.0.1:10002
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       protocol: TCP

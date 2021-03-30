@@ -1,24 +1,10 @@
 #pragma once
 
-#include <cctype>
-#include <memory>
-
-#include "envoy/common/pure.h"
-
-#include "absl/strings/string_view.h"
+#include "envoy/http/header_formatter.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http1 {
-
-class HeaderKeyFormatter {
-public:
-  virtual ~HeaderKeyFormatter() = default;
-
-  virtual std::string format(absl::string_view key) const PURE;
-};
-
-using HeaderKeyFormatterPtr = std::unique_ptr<HeaderKeyFormatter>;
 
 /**
  * A HeaderKeyFormatter that upper cases the first character in each word: The

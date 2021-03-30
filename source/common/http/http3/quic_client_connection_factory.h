@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/listener/v3/quic_config.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/network/connection.h"
 #include "envoy/ssl/context_config.h"
