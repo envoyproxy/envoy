@@ -228,8 +228,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
-        hcm.set_via("via_value");
-
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
         route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
       });
@@ -257,6 +255,48 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
   // Ensure the redirect was returned to the client.
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+  EXPECT_EQ("302", response->headers().getStatusValue());
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToEarlyResponse) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("POST");
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto& response = encoder_decoder.second;
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Respond with a redirect before the request is complete.
+  upstream_request_->encodeHeaders(redirect_response_, true);
+  response->waitForEndStream();
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+
+  // Ensure the redirect was returned to the client and not handled internally.
+  EXPECT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
 }
 
