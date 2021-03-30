@@ -26,6 +26,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "validation_visitor_lib",
+    hdrs = ["validation_visitor.h"],
+    deps = [
+        "//include/envoy/matcher:matcher_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "list_matcher_lib",
     hdrs = ["list_matcher.h"],
     deps = [
@@ -49,6 +57,7 @@ envoy_cc_library(
     deps = [
         ":exact_map_matcher_lib",
         ":field_matcher_lib",
+        ":validation_visitor_lib",
         ":list_matcher_lib",
         ":value_input_matcher_lib",
         "//include/envoy/config:typed_config_interface",

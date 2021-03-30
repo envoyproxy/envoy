@@ -219,6 +219,11 @@ public:
   }
 
   /**
+   * Match requirements for the filters created by this filter factory. These requirements informs
+   * the validator what input/outputs are valid for a match tree specified via the
+   * ExtensionWithMatcher wrapper, allowing us to reject the match tree at configuration time if
+   * there are any violations.
+   *
    * @return MatchingRequirementsPtr specification of matching requirements
    * for a match tree that can be used with this filter factory.
    */

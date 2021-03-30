@@ -12,6 +12,7 @@
 #include "common/config/utility.h"
 #include "common/matcher/exact_map_matcher.h"
 #include "common/matcher/field_matcher.h"
+#include "common/matcher/validation_visitor.h"
 #include "common/matcher/list_matcher.h"
 #include "common/matcher/value_input_matcher.h"
 
@@ -55,28 +56,6 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
 
   return MaybeMatchResult{result.on_match_->action_cb_(), MatchState::MatchComplete};
 }
-
-template <class DataType> class MatchTreeValidationVisitor {
-public:
-  virtual ~MatchTreeValidationVisitor() = default;
-
-  void validateDataInput(const DataInput<DataType>& data_input, absl::string_view type_url) {
-    auto status = performDataInputValidation(data_input, type_url);
-
-    if (!status.ok()) {
-      errors_.emplace_back(std::move(status));
-    }
-  }
-
-  const std::vector<absl::Status> errors() const { return errors_; }
-
-protected:
-  virtual absl::Status performDataInputValidation(const DataInput<DataType>& data_input,
-                                                  absl::string_view type_url) PURE;
-
-private:
-  std::vector<absl::Status> errors_;
-};
 
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
