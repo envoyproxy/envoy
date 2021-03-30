@@ -12,8 +12,8 @@
 #include "common/config/utility.h"
 #include "common/matcher/exact_map_matcher.h"
 #include "common/matcher/field_matcher.h"
-#include "common/matcher/validation_visitor.h"
 #include "common/matcher/list_matcher.h"
+#include "common/matcher/validation_visitor.h"
 #include "common/matcher/value_input_matcher.h"
 
 #include "absl/strings/string_view.h"

@@ -57,8 +57,8 @@ envoy_cc_library(
     deps = [
         ":exact_map_matcher_lib",
         ":field_matcher_lib",
-        ":validation_visitor_lib",
         ":list_matcher_lib",
+        ":validation_visitor_lib",
         ":value_input_matcher_lib",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/matcher:matcher_interface",
