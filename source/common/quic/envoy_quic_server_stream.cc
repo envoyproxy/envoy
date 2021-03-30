@@ -63,6 +63,7 @@ EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& h
 
 Http::Status EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers,
                                                   bool end_stream) {
+  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredResponseHeaders(headers));
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   // QUICHE guarantees to take all the headers. This could cause infinite data to
   // be buffered on headers stream in Google QUIC implementation because
