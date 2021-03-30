@@ -646,13 +646,7 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   connection_.close(Network::ConnectionCloseType::NoFlush);
 }
 
-Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
+Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) { return innerDispatch(data); }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
@@ -1709,13 +1703,7 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
       is_outbound_flood_monitored_control_frame);
 }
 
-Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
+Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) { return innerDispatch(data); }
 
 Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
