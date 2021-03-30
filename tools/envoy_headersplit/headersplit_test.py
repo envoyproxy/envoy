@@ -24,12 +24,13 @@ class HeadersplitTest(unittest.TestCase):
         self.assertEqual(headersplit.to_filename("MockAdminStream"), "admin_stream")
 
         # Test class name with two "Mock"
-        self.assertEqual(headersplit.to_filename("MockClusterMockPrioritySet"),
-                         "cluster_mock_priority_set")
+        self.assertEqual(
+            headersplit.to_filename("MockClusterMockPrioritySet"), "cluster_mock_priority_set")
 
         # Test class name with no "Mock"
-        self.assertEqual(headersplit.to_filename("TestRetryHostPredicateFactory"),
-                         "test_retry_host_predicate_factory")
+        self.assertEqual(
+            headersplit.to_filename("TestRetryHostPredicateFactory"),
+            "test_retry_host_predicate_factory")
 
     def test_get_directives(self):
         includes = """// your first c++ program
@@ -48,8 +49,8 @@ class HeadersplitTest(unittest.TestCase):
 
     def test_class_definitions(self):
         idx = Index.create()
-        translation_unit_class_defn = idx.parse("tools/envoy_headersplit/code_corpus/class_defn.h",
-                                                ["-x", "c++"])
+        translation_unit_class_defn = idx.parse(
+            "tools/envoy_headersplit/code_corpus/class_defn.h", ["-x", "c++"])
         defns_cursors = headersplit.class_definitions(translation_unit_class_defn.cursor)
         defns_names = [cursor.spelling for cursor in defns_cursors]
         self.assertEqual(defns_names, ["Foo", "Bar", "FooBar", "DeadBeaf"])

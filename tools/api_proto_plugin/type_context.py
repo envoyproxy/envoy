@@ -20,8 +20,8 @@ class Comment(object):
         Returns:
             transformed Comment object.
         """
-        return Comment(annotations.xform_annotation(self.raw, annotation_xforms),
-                       self.file_level_annotations)
+        return Comment(
+            annotations.xform_annotation(self.raw, annotation_xforms), self.file_level_annotations)
 
 
 class SourceCodeInfo(object):

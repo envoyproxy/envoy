@@ -89,13 +89,6 @@ using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
-  // TODO(jmarantz): Remove this once
-  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
-  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr,
-                      const std::string& config = ConfigHelper::httpProxyConfig())
-      : HttpIntegrationTest(downstream_protocol, version, config) {}
-
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());

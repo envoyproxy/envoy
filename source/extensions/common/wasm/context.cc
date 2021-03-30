@@ -1536,6 +1536,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
       wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
+  case WasmStreamType::Downstream:
+    if (network_read_filter_callbacks_) {
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { network_read_filter_callbacks_->continueReading(); });
+    }
+    return WasmResult::Ok;
+  case WasmStreamType::Upstream:
+    return WasmResult::Unimplemented;
   default:
     return WasmResult::BadArgument;
   }
@@ -1571,8 +1579,10 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
-    network_write_filter_callbacks_->connection().close(
-        Envoy::Network::ConnectionCloseType::FlushWrite);
+    if (network_write_filter_callbacks_) {
+      network_write_filter_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
+    }
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
