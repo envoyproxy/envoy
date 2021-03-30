@@ -117,14 +117,14 @@ std::string ConfigHelper::tcpProxyConfig() {
 )EOF");
 }
 
-std::string ConfigHelper::startTlsConfig() {
+std::string ConfigHelper::startTlsConfig(bool downstream) {
   return absl::StrCat(
       tcpProxyConfig(),
       fmt::format(R"EOF(
       transport_socket:
         name: "starttls"
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.{}
           cleartext_socket_config:
           tls_socket_config:
             common_tls_context:
@@ -134,6 +134,7 @@ std::string ConfigHelper::startTlsConfig() {
                 private_key:
                   filename: {}
 )EOF",
+                  downstream ? "StartTlsConfig" : "UpstreamStartTlsConfig",
                   TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }

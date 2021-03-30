@@ -7,7 +7,6 @@
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/transport_sockets/raw_buffer/config.h"
-#include "extensions/transport_sockets/starttls/starttls_socket.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
@@ -127,11 +126,36 @@ private:
   const std::string name_;
 };
 
+// ClientTestConnection is used for simulating a client
+// which initiates a connection to Envoy in clear-text and then switches to TLS
+// without closing the socket.
+class ClientTestConnection : public Network::ClientConnectionImpl {
+public:
+  ClientTestConnection(Event::Dispatcher& dispatcher,
+                       const Network::Address::InstanceConstSharedPtr& remote_address,
+                       const Network::Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options)
+      : ClientConnectionImpl(dispatcher, remote_address, source_address,
+                             std::move(transport_socket), options) {}
+
+  void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
+    transport_socket_ = std::move(transport_socket);
+    transport_socket_->setTransportSocketCallbacks(*this);
+
+    // Reset connection's state machine.
+    connecting_ = true;
+
+    // Issue event which will trigger TLS handshake.
+    ioHandle().activateFileEvents(Event::FileReadyType::Write);
+  }
+};
+
 // Fixture class for integration tests.
 class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
-  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig()) {}
+  StartTlsIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::startTlsConfig(true)) {}
   void initialize() override;
   void addStartTlsSwitchFilter(ConfigHelper& config_helper);
 
@@ -148,7 +172,7 @@ public:
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>
       registered_config_factory_{config_factory_};
 
-  std::unique_ptr<Network::ClientConnectionImpl> conn_;
+  std::unique_ptr<ClientTestConnection> conn_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
 };
 
@@ -193,12 +217,10 @@ void StartTlsIntegrationTest::initialize() {
 
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-
-  conn_ = std::make_unique<Network::ClientConnectionImpl>(
+  conn_ = std::make_unique<ClientTestConnection>(
       *dispatcher_, address, Network::Address::InstanceConstSharedPtr(),
-      Extensions::TransportSockets::StartTls::StartTlsSocketFactory(move(cleartext_context_),
-                                                                    move(tls_context_))
-          .createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+      cleartext_context_->createTransportSocket(
+          std::make_shared<Network::TransportSocketOptionsImpl>(
               absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())),
       nullptr);
 
@@ -260,7 +282,11 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  ASSERT_TRUE(conn_->startSecureTransport());
+  conn_->setTransportSocket(
+      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(),
+          std::vector<std::string>{"envoyalpn"})));
+  connect_callbacks_.reset();
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -324,7 +350,11 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  ASSERT_TRUE(conn_->startSecureTransport());
+  conn_->setTransportSocket(
+      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(),
+          std::vector<std::string>{"envoyalpn"})));
+  connect_callbacks_.reset();
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
