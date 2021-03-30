@@ -46,13 +46,13 @@ protected:
   }
 
   void initialize(HandshakeValidator server_validator, HandshakeValidator client_validator) {
-    server_.raw_socket_ = new StrictMock<Network::MockTransportSocket>();
+    server_.raw_socket_ = new Network::MockTransportSocket();
 
     server_.tsi_socket_ =
         std::make_unique<TsiSocket>(server_.handshaker_factory_, server_validator,
                                     Network::TransportSocketPtr{server_.raw_socket_});
 
-    client_.raw_socket_ = new StrictMock<Network::MockTransportSocket>();
+    client_.raw_socket_ = new Network::MockTransportSocket();
 
     client_.tsi_socket_ =
         std::make_unique<TsiSocket>(client_.handshaker_factory_, client_validator,
@@ -184,7 +184,7 @@ protected:
   struct SocketForTest {
     HandshakerFactory handshaker_factory_;
     std::unique_ptr<TsiSocket> tsi_socket_;
-    StrictMock<Network::MockTransportSocket>* raw_socket_{};
+    Network::MockTransportSocket* raw_socket_{};
     NiceMock<Network::MockTransportSocketCallbacks> callbacks_;
     Buffer::OwnedImpl read_buffer_;
     Buffer::OwnedImpl write_buffer_;
