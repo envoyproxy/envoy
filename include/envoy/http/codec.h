@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
@@ -439,10 +440,15 @@ struct Http1Settings {
     // Performs proper casing of header keys: the first and all alpha characters following a
     // non-alphanumeric character is capitalized.
     ProperCase,
+    // A stateful formatter extension has been configured.
+    StatefulFormatter,
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+
+  // Non-null IFF header_key_format_ is configured to StatefulFormatter.
+  StatefulHeaderKeyFormatterFactorySharedPtr stateful_header_key_formatter_;
 
   // Behaviour on invalid HTTP messaging:
   // - if true, the HTTP/1.1 connection is left open (where possible)
