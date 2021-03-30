@@ -60,7 +60,14 @@ public:
   RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
                             bool skip_cluster_check) override {
-    return async_client_cache_.getOrCreate(config, scope, skip_cluster_check);
+    RawAsyncClientSharedPtr client;
+    client = thread_local_cache_->getCache(config);
+    if (client != nullptr) {
+      return client;
+    }
+    client = factoryForGrpcService(config, scope, skip_cluster_check)->create();
+    thread_local_cache_->setCache(config, client);
+    return client;
   }
 
 private:
@@ -69,43 +76,19 @@ private:
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   RawAsyncClientSharedPtr client) {
       const std::uint64_t key = MessageUtil::hash(config.google_grpc());
-      cache[key] = client;
+      cache_[key] = client;
     }
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) {
       const std::uint64_t key = MessageUtil::hash(config.google_grpc());
-      if (cache.find(key) == cache.end()) {
+      auto it = cache_.find(key);
+      if (it == cache_.end()) {
         return nullptr;
       }
-      return cache[key];
+      return cache_[key];
     }
 
   private:
-    absl::flat_hash_map<uint64_t, RawAsyncClientSharedPtr> cache;
-  };
-  class AsyncClientCache {
-  public:
-    AsyncClientCache(Grpc::AsyncClientManager& async_client_manager,
-                     ThreadLocal::SlotAllocator& tls)
-        : async_client_manager_(async_client_manager), thread_local_cache_(tls) {
-      thread_local_cache_.set(
-          [](Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
-    }
-    RawAsyncClientSharedPtr getOrCreate(const envoy::config::core::v3::GrpcService& config,
-                                        Stats::Scope& scope, bool skip_cluster_check) {
-      RawAsyncClientSharedPtr client;
-      client = thread_local_cache_->getCache(config);
-      if (client != nullptr) {
-        return client;
-      }
-      client =
-          async_client_manager_.factoryForGrpcService(config, scope, skip_cluster_check)->create();
-      thread_local_cache_->setCache(config, client);
-      return client;
-    }
-
-  private:
-    Grpc::AsyncClientManager& async_client_manager_;
-    ThreadLocal::TypedSlot<ThreadLocalCache> thread_local_cache_;
+    absl::flat_hash_map<uint64_t, RawAsyncClientSharedPtr> cache_;
   };
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
@@ -113,7 +96,7 @@ private:
   TimeSource& time_source_;
   Api::Api& api_;
   const StatNames& stat_names_;
-  AsyncClientCache async_client_cache_;
+  ThreadLocal::TypedSlot<ThreadLocalCache> thread_local_cache_;
 };
 
 } // namespace Grpc
