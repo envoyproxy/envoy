@@ -37,6 +37,8 @@ void release_envoy_data_map(envoy_map map) {
 
 void release_envoy_headers(envoy_headers headers) { release_envoy_data_map(headers); }
 
+void release_envoy_stats_tags(envoy_stats_tags stats_tags) { release_envoy_data_map(stats_tags); }
+
 envoy_map copy_envoy_data_map(envoy_map src) {
   envoy_map_entry* dst_entries =
       static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * src.length));
