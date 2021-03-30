@@ -28,7 +28,7 @@ struct FilterStats {
 class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   explicit Filter(FilterStats& stats)
-      : decoded_headers_(false), encoded_headers_(false), stats_(stats) {}
+      : decoded_headers_(false), stats_(stats) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -73,7 +73,6 @@ private:
   // TODO(snowp): Instead of validating this via ASSERTs, we should be able to validate that the
   // match tree is only going to fire when we can actually inject a filter.
   bool decoded_headers_ : 1;
-  bool encoded_headers_ : 1;
 
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to
   // delegate calls.

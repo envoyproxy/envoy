@@ -22,7 +22,7 @@ void FactoryCallbacksWrapper::addStreamDecoderFilter(
       "cannot delegate to decoder filter that instantiates a match tree"));
 }
 void FactoryCallbacksWrapper::addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) {
-  ASSERT(!filter_.encoded_headers_);
+  ASSERT(!filter_.decoded_headers_);
   if (filter_to_inject_) {
     errors_.push_back(absl::InvalidArgumentError(
         "cannot delegate to encoder filter that instantiates multiple filters"));
