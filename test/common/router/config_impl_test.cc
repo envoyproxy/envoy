@@ -2460,12 +2460,12 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    const uint64_t foo_hash_value = 7185483484025192322;
+    absl::Hash<const std::vector<absl::string_view>> hasher;
     EXPECT_EQ(route->routeEntry()
                   ->hashPolicy()
                   ->generateHash(nullptr, headers, add_cookie_nop_, nullptr)
                   .value(),
-              foo_hash_value);
+              hasher(std::vector<absl::string_view>{"foo"}));
   }
 }
 
