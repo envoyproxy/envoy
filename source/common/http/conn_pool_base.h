@@ -8,6 +8,7 @@
 #include "common/common/linked_object.h"
 #include "common/conn_pool/conn_pool_base.h"
 #include "common/http/codec_client.h"
+#include "common/http/utility.h"
 
 #include "absl/strings/string_view.h"
 
@@ -151,7 +152,9 @@ public:
                         CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocol),
-        codec_fn_(codec_fn), client_fn_(client_fn) {}
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocol[0]) {
+    ASSERT(protocol.size() == 1);
+  }
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     return codec_fn_(data, this);
@@ -161,9 +164,14 @@ public:
     return client_fn_(this);
   }
 
+  absl::string_view protocolDescription() const override {
+    return Utility::getProtocolString(protocol_);
+  }
+
 protected:
   const CreateCodecFn codec_fn_;
   const CreateClientFn client_fn_;
+  const Http::Protocol protocol_;
 };
 
 /**
