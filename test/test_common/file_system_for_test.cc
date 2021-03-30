@@ -40,7 +40,6 @@ void MemfileInstanceImpl::renameFile(const std::string& old_name, const std::str
   const int rc = ::rename(old_name.c_str(), new_name.c_str());
   RELEASE_ASSERT(rc == 0, "failed to rename file");
 #endif
-  return;
 }
 
 } // namespace Filesystem

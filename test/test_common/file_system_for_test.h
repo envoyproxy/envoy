@@ -20,11 +20,12 @@ public:
   MemfileImpl(const std::string& path, std::shared_ptr<MemFileInfo>& info)
       : FileSharedImpl(path), info_(info) {}
 
+  bool isOpen() const override { return open_; }
 protected:
   Api::IoCallBoolResult open(FlagSet flag) override {
     ASSERT(!isOpen());
     flags_ = flag;
-    fd_++;
+    open_ = true;
     return resultSuccess(true);
   }
 
@@ -40,13 +41,14 @@ protected:
 
   Api::IoCallBoolResult close() override {
     ASSERT(isOpen());
-    fd_--;
+    open_ = false;
     return resultSuccess(true);
   }
 
 private:
   FlagSet flags_;
   std::shared_ptr<MemFileInfo> info_;
+  bool open_{false};
 };
 
 class MemfileInstanceImpl : public Instance {
