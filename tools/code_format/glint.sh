@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# This script checks all files in the repo for basic format "hygiene", specifically
+#
+# - must have ending line
+# - no trailing whitespace
+# - no lines indented with a mixture of tabs and spaces
+#
+
 NOLINT_RE="\.patch$|^test/.*_corpus/|^tools/.*_corpus/|password_protected_password.txt"
 ERRORS=
 MISSING_NEWLINE=0
@@ -7,6 +14,7 @@ MIXED_TABS_AND_SPACES=0
 TRAILING_WHITESPACE=0
 
 
+# Checks whether a file has a mixture of indents starting with tabs and spaces
 check_mixed_tabs_spaces () {
     local spaced tabbed
     tabbed=$(grep -cP "^\t" "$1")
@@ -18,6 +26,7 @@ check_mixed_tabs_spaces () {
     fi
 }
 
+# Checks whether a file has a terminating newline
 check_new_line () {
     test "$(tail -c 1 "$1" | wc -l)" -eq 0 && {
         echo "no newline at eof: ${1}" >&2
@@ -26,6 +35,7 @@ check_new_line () {
     }
 }
 
+# Checks whether a file contains lines ending in whitespace
 check_trailing_whitespace () {
     if grep -r '[[:blank:]]$' "$1" > /dev/null; then
         echo "trailing whitespace: ${1}" >&2
@@ -34,10 +44,18 @@ check_trailing_whitespace () {
     fi
 }
 
+# Uses git grep to search for non-"binary" files from git's pov
+#
+# TODO(phlax): add hash/diff only filter for faster change linting
+#      this would also make it feasible to add as a commit/push hook
 find_text_files () {
     git grep --cached -Il '' | grep -vE "$NOLINT_RE"
 }
 
+# Recurse text files linting language-independent checks
+#
+# note: we may want to use python if this grows in complexity
+#
 for file in $(find_text_files); do
     check_new_line "$file"
     check_mixed_tabs_spaces "$file"
