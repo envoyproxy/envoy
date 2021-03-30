@@ -5,8 +5,8 @@
 #include "envoy/http/codec.h"
 
 #include "common/http/codec_helper.h"
-#include "common/quic/envoy_quic_utils.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
@@ -146,6 +146,8 @@ public:
     return HeaderValidationResult::ACCEPT;
   }
 
+  absl::string_view responseDetails() override { return details_; }
+
 protected:
   virtual void switchStreamBlockState(bool should_block) PURE;
 
@@ -165,6 +167,7 @@ protected:
   Http::Http3::CodecStats& stats_;
   const envoy::config::core::v3::Http3ProtocolOptions& http3_options_;
   bool close_connection_upon_invalid_header_{false};
+  absl::string_view details_;
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts

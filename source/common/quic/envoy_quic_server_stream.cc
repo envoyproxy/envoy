@@ -31,6 +31,23 @@
 namespace Envoy {
 namespace Quic {
 
+// Changes or additions to details should be reflected in
+// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
+class Http3ResponseCodeDetailValues {
+public:
+  // Invalid HTTP header field was received and stream is going to be
+  // closed.
+  static constexpr absl::string_view invalid_http_header = "http3.invalid_header_field";
+  // The size of headers (or trailers) exceeded the configured limits.
+  static constexpr absl::string_view headers_too_large = "http3.headers.too.large";
+  // Envoy was configured to drop requests with header keys beginning with underscores.
+  static constexpr absl::string_view invalid_underscore = "http3.unexpected_underscore";
+  // The peer refused the stream.
+  static constexpr absl::string_view remote_refused = "http3.remote_refuse";
+  // The peer reset the stream.
+  static constexpr absl::string_view remote_reset = "http3.remote_reset";
+};
+
 EnvoyQuicServerStream::EnvoyQuicServerStream(
     quic::QuicStreamId id, quic::QuicSpdySession* session, quic::StreamType type,
     Http::Http3::CodecStats& stats,
@@ -175,6 +192,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
   if (headers == nullptr) {
     if (close_connection_upon_invalid_header_) {
+      details_ = Http3ResponseCodeDetailValues::invalid_http_header;
       stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
     } else {
       Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -182,6 +200,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   if (!Http::HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+    details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
     return;
   }
@@ -257,6 +276,7 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 
 void EnvoyQuicServerStream::OnHeadersTooLarge() {
   ENVOY_STREAM_LOG(debug, "Headers too large.", *this);
+  details_ = Http3ResponseCodeDetailValues::headers_too_large;
   quic::QuicSpdyServerStreamBase::OnHeadersTooLarge();
 }
 
@@ -339,6 +359,7 @@ EnvoyQuicServerStream::checkHeaderNameForUnderscores(const std::string& header_n
       !Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
     return HeaderValidationResult::ACCEPT;
   }
+  details_ = Http3ResponseCodeDetailValues::invalid_underscore;
   if (headers_with_underscores_action_ ==
       envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
     ENVOY_STREAM_LOG(debug, "Dropping header with invalid characters in its name: {}", *this,

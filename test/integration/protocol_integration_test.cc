@@ -1098,8 +1098,6 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
-  // TODO(danzh) treat underscore in headers according to the config.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1133,7 +1131,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     stat_name = "http2.dropped_headers_with_underscores";
     break;
   case Http::CodecClient::Type::HTTP3:
-    // TODO(danzh) add stats for H3.
+    stat_name = "http3.dropped_headers_with_underscores";
     break;
   default:
     RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}", downstream_protocol_));
@@ -1165,8 +1163,6 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
-  // TODO(danzh) pass headers_with_underscores_action config into QUIC stream.
-  EXCLUDE_DOWNSTREAM_HTTP3
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1384,8 +1380,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
-  // TODO(danzh) Add content length validation.
-  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1410,8 +1404,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
-  // TODO(danzh) Add override_stream_error_on_invalid_http_message to http3 protocol options.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -1454,8 +1446,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
-  // TODO(danzh) Add content length validation.
-  EXCLUDE_DOWNSTREAM_HTTP3
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1478,8 +1468,6 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
-  // override_stream_error_on_invalid_http_message not supported yet.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {

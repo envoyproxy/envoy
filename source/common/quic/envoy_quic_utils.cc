@@ -99,10 +99,12 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
 }
 
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error) {
-  if (error == quic::QUIC_NO_ERROR) {
-    return Http::StreamResetReason::ConnectionTermination;
-  } else {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
   }
 }
 
