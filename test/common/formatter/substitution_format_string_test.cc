@@ -119,6 +119,26 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
                                                           response_trailers_, stream_info_, body_));
 }
 
+TEST_F(SubstitutionFormatStringUtilsTest,
+       TestFromProtoConfigFormatterExtensionFailsToCreateParser) {
+  FailCommandFactory fail_factory;
+  Registry::InjectFactory<CommandParserFactory> command_register(fail_factory);
+
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "plain text"
+  formatters:
+    - name: envoy.formatter.FailFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.UInt64Value
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+                            EnvoyException,
+                            "Failed to create command parser: envoy.formatter.FailFormatter");
+}
+
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionUnknown) {
   const std::string yaml = R"EOF(
   text_format_source:
@@ -133,6 +153,72 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionU
   EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
                             EnvoyException,
                             "Formatter not found: envoy.formatter.TestFormatterUnknown");
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) {
+  TestCommandFactory factory;
+  Registry::InjectFactory<CommandParserFactory> command_register(factory);
+
+  const std::string yaml = R"EOF(
+  json_format:
+    text: "plain text %COMMAND_EXTENSION()%"
+    path: "%REQ(:path)% %COMMAND_EXTENSION()%"
+    code: "%RESPONSE_CODE% %COMMAND_EXTENSION()%"
+    headers:
+      content-type: "%REQ(CONTENT-TYPE)% %COMMAND_EXTENSION()%"
+  formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
+                                          stream_info_, body_);
+
+  const std::string expected = R"EOF({
+    "text": "plain text TestFormatter",
+    "path": "/bar/foo TestFormatter",
+    "code": "200 TestFormatter",
+    "headers": {
+      "content-type": "application/json TestFormatter"
+    }
+})EOF";
+
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithMultipleExtensions) {
+  TestCommandFactory test_factory;
+  Registry::InjectFactory<CommandParserFactory> test_command_register(test_factory);
+  AdditionalCommandFactory additional_factory;
+  Registry::InjectFactory<CommandParserFactory> additional_command_register(additional_factory);
+
+  const std::string yaml = R"EOF(
+  json_format:
+    text: "plain text %COMMAND_EXTENSION()%"
+    path: "%REQ(:path)% %ADDITIONAL_EXTENSION()%"
+  formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+    - name: envoy.formatter.AdditionalFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.UInt32Value
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
+                                          stream_info_, body_);
+
+  const std::string expected = R"EOF({
+    "text": "plain text TestFormatter",
+    "path": "/bar/foo AdditionalFormatter",
+})EOF";
+
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 
 } // namespace Formatter
