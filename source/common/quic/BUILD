@@ -140,7 +140,6 @@ envoy_cc_library(
     srcs = ["client_connection_factory_impl.cc"],
     hdrs = ["client_connection_factory_impl.h"],
     tags = ["nofips"],
-    visibility = ["//test:__subpackages__"],
     deps = [
         ":active_quic_listener_lib",
         ":envoy_quic_alarm_factory_lib",
