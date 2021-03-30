@@ -8,6 +8,7 @@
 #include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
 
 #include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
@@ -39,9 +40,11 @@ AccessLog::AccessLog(
     : Common::ImplBase(std::move(filter)), scope_(scope), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 
-  tls_slot_->set([this, config](Event::Dispatcher&) {
+  tls_slot_->set([this, config,
+                  transport_version = Envoy::Config::Utility::getAndCheckTransportVersion(
+                      config.common_config())](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
+        config.common_config(), transport_version, Common::GrpcAccessLoggerType::HTTP, scope_));
   });
 
   ProtobufWkt::Struct body_format;
