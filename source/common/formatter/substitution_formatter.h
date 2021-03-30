@@ -172,8 +172,8 @@ private:
   // Methods for building the format map.
   class FormatBuilder {
   public:
-    FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
-    FormatBuilder() : commands_(absl::nullopt) {}
+    explicit FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
+    explicit FormatBuilder() : commands_(absl::nullopt) {}
     std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
     StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
     StructFormatListWrapper
