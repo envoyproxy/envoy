@@ -34,8 +34,8 @@ public:
         auto quic_connection = const_cast<Quic::QuicFilterManagerConnectionImpl*>(
             dynamic_cast<const Quic::QuicFilterManagerConnectionImpl*>(
                 decoder_callbacks_->connection()));
-        quic_connection->write_buffer_watermark_simulation_.checkHighWatermark(
-            quic_connection->write_buffer_watermark_simulation_.highWatermark() + 1u);
+        quic_connection->write_buffer_watermark_simulation_.checkLowWatermark(
+            quic_connection->write_buffer_watermark_simulation_.lowWatermark() - 1u);
       }
     }
     return PassThroughFilter::decodeData(buf, end_stream);

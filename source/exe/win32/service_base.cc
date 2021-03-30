@@ -3,6 +3,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/thread.h"
 #include "common/event/signal_impl.h"
 
 #include "exe/main_common.h"
@@ -65,7 +66,7 @@ DWORD ServiceBase::Start(std::vector<std::string> args) {
   // Initialize the server's main context under a try/catch loop and simply return `EXIT_FAILURE`
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     main_common = std::make_shared<Envoy::MainCommon>(args);
     Envoy::Server::Instance* server = main_common->server();
     if (!server->options().signalHandlingEnabled()) {
@@ -77,11 +78,15 @@ DWORD ServiceBase::Start(std::vector<std::string> args) {
         server->shutdown();
       });
     }
-  } catch (const Envoy::NoServingException& e) {
+  }
+  END_TRY
+  catch (const Envoy::NoServingException& e) {
     return S_OK;
-  } catch (const Envoy::MalformedArgvException& e) {
+  }
+  catch (const Envoy::MalformedArgvException& e) {
     return E_INVALIDARG;
-  } catch (const Envoy::EnvoyException& e) {
+  }
+  catch (const Envoy::EnvoyException& e) {
     ENVOY_LOG_MISC(warn, "Envoy failed to start with {}", e.what());
     return E_FAIL;
   }

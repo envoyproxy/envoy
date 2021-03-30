@@ -35,13 +35,12 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSp
                                              quic::StreamType type)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
-          // This should be larger than 8k to fully utilize congestion control
-          // window. And no larger than the max stream flow control window for
-          // the stream to buffer all the data.
-          // Ideally this limit should also correlate to peer's receive window
-          // but not fully depends on that.
-          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }) {}
+          // Flow control receive window should be larger than 8k to fully utilize congestion
+          // control window before it reaches the high watermark.
+          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {
+  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+}
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
                                              quic::QuicSpdySession* session, quic::StreamType type)
@@ -50,8 +49,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
           // This should be larger than 8k to fully utilize congestion control
           // window. And no larger than the max stream flow control window for
           // the stream to buffer all the data.
-          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
-          [this]() { runHighWatermarkCallbacks(); }) {}
+          static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -69,17 +68,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   // if handshake implementation goes wrong.
   // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
   // This is counting not serialized bytes in the send buffer.
-  quic::QuicStream* writing_stream =
-      quic::VersionUsesHttp3(transport_version())
-          ? static_cast<quic::QuicStream*>(this)
-          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
-
-  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
-  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
-  ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -90,8 +81,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
-  // This is counting not serialized bytes in the send buffer.
-  const uint64_t bytes_to_send_old = BufferedDataBytes();
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   // QUIC stream must take all.
   WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
   if (data.length() > 0) {
@@ -99,25 +89,14 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
-
-  const uint64_t bytes_to_send_new = BufferedDataBytes();
-  ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  quic::QuicStream* writing_stream =
-      quic::VersionUsesHttp3(transport_version())
-          ? static_cast<quic::QuicStream*>(this)
-          : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
-  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
-  ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
@@ -194,6 +173,8 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   }
 
   bool fin_read_and_no_trailers = IsDoneReading();
+  ENVOY_STREAM_LOG(debug, "Received {} bytes of data {} FIN.", *this, buffer->length(),
+                   fin_read_and_no_trailers ? "with" : "without");
   // If this call is triggered by an empty frame with FIN which is not from peer
   // but synthesized by stream itself upon receiving HEADERS with FIN or
   // TRAILERS, do not deliver end of stream here. Because either decodeHeaders
@@ -275,27 +256,34 @@ void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
 
 void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
+  // Run reset callback before closing the stream so that the watermark change will not trigger
+  // callbacks.
+  if (!local_end_stream_) {
+    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
-  runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
 }
 
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
+  if (isDoingWatermarkAccounting()) {
+    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
+    return;
+  }
+  clearWatermarkBuffer();
+}
+
+void EnvoyQuicServerStream::clearWatermarkBuffer() {
   if (BufferedDataBytes() > 0) {
     // If the stream is closed without sending out all buffered data, regard
     // them as sent now and adjust connection buffer book keeping.
-    filterManagerConnection()->adjustBytesToSend(0 - BufferedDataBytes());
+    updateBytesBuffered(BufferedDataBytes(), 0);
   }
 }
 
 void EnvoyQuicServerStream::OnCanWrite() {
-  const uint64_t buffered_data_old = BufferedDataBytes();
+  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyServerStreamBase::OnCanWrite();
-  const uint64_t buffered_data_new = BufferedDataBytes();
-  // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
-  // increase.
-  ASSERT(buffered_data_new <= buffered_data_old);
-  maybeCheckWatermark(buffered_data_old, buffered_data_new, *filterManagerConnection());
 }
 
 uint32_t EnvoyQuicServerStream::streamId() { return id(); }
