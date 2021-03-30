@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -412,6 +413,29 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
+)
+
+envoy_cc_test(
+    name = "conn_pool_grid_test",
+    srcs = ["conn_pool_grid_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:conn_pool_grid",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_factory_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//source/common/quic:client_connection_factory_lib",
+    ]),
 )
 
 envoy_proto_library(

@@ -101,8 +101,10 @@ public:
 
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
     auto schedulable_cb = Event::SchedulableCallbackPtr{createSchedulableCallback_(cb)};
-    // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
-    ASSERT(schedulable_cb != nullptr);
+    if (!allow_null_callback_) {
+      // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
+      ASSERT(schedulable_cb != nullptr);
+    }
     return schedulable_cb;
   }
 
@@ -162,6 +164,7 @@ public:
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
+  bool allow_null_callback_{};
 
 private:
   const std::string name_;
