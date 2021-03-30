@@ -293,9 +293,9 @@ void HdsDelegate::onReceiveMessage(
   }
 
   // Validate message fields
-  try {
-    MessageUtil::validate(*message, validation_visitor_);
-  } catch (const ProtoValidationException& ex) {
+  TRY_ASSERT_MAIN_THREAD { MessageUtil::validate(*message, validation_visitor_); }
+  END_TRY
+  catch (const ProtoValidationException& ex) {
     // Increment error count
     stats_.errors_.inc();
     ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());

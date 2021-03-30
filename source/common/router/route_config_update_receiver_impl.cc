@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 

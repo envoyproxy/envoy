@@ -67,9 +67,9 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(message.nonce(), type_url_);
-  try {
-    handleGoodResponse(message);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { handleGoodResponse(message); }
+  END_TRY
+  catch (const EnvoyException& e) {
     handleBadResponse(e, ack);
   }
   return ack;

@@ -117,6 +117,12 @@ MEMCPY_WHITELIST = (
 EXCEPTION_DENYLIST = (
     "./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl.cc")
 
+RAW_TRY_ALLOWLIST = (
+    "./source/common/common/regex.cc",
+    "./source/common/common/thread.h",
+    "./source/common/network/utility.cc",
+)
+
 # Header files that can throw exceptions. These should be limited; the only
 # valid situation identified so far is template functions used for config
 # processing.
@@ -435,6 +441,10 @@ class FormatChecker:
         return file_path.startswith("./test") or file_path in [
             "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
         ]
+
+    def allow_listed_for_raw_try(self, file_path):
+        # TODO(chaoqin-li1123): Exclude some important extensions from ALLOWLIST.
+        return file_path in RAW_TRY_ALLOWLIST or file_path.startswith("./source/extensions")
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
@@ -780,6 +790,11 @@ class FormatChecker:
             report_error("Don't use std::variant; use absl::variant instead")
         if self.token_in_line("std::visit", line):
             report_error("Don't use std::visit; use absl::visit instead")
+        if " try {" in line and file_path.startswith(
+                "./source") and not self.allow_listed_for_raw_try(file_path):
+            report_error(
+                "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
+            )
         if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
             # can be used instead

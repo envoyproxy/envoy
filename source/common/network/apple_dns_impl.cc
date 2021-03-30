@@ -148,7 +148,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
 
   Address::InstanceConstSharedPtr address{};
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
     // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
     // resolver implements a similar resolution path to avoid making improper DNS queries for
@@ -156,7 +156,9 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     address = Utility::parseInternetAddress(dns_name);
     ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
               dns_name, address->asString());
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     // Resolution via Apple APIs
     ENVOY_LOG(trace, "DNS resolver local resolution failed with: {}", e.what());
 

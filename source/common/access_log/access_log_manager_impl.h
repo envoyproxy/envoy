@@ -84,7 +84,7 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  void open();
+  Api::IoCallBoolResult open();
   void createFlushStructures();
 
   // return default flags set which used by open

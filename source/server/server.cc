@@ -90,12 +90,14 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), server_contexts_(*this) {
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
-      try {
+      TRY_ASSERT_MAIN_THREAD {
         file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
             options.logPath(), access_log_manager_, Logger::Registry::getSink());
-      } catch (const EnvoyException& e) {
+      }
+      END_TRY
+      catch (const EnvoyException& e) {
         throw EnvoyException(
             fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
       }
@@ -104,16 +106,20 @@ InstanceImpl::InstanceImpl(
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
     initialize(options, std::move(local_address), component_factory, hooks);
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     terminate();
     throw;
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
     terminate();
     throw;
-  } catch (...) {
+  }
+  catch (...) {
     ENVOY_LOG(critical, "error initializing due to unknown exception");
     terminate();
     throw;
@@ -597,9 +603,9 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
   // Initializing can throw exceptions, so catch these.
-  try {
-    clusterManager().initializeSecondaryClusters(bootstrap_);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { clusterManager().initializeSecondaryClusters(bootstrap_); }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
     shutdown();
   }
@@ -608,7 +614,7 @@ void InstanceImpl::onRuntimeReady() {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    try {
+    TRY_ASSERT_MAIN_THREAD {
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
@@ -619,7 +625,9 @@ void InstanceImpl::onRuntimeReady() {
           access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
-    } catch (const EnvoyException& e) {
+    }
+    END_TRY
+    catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
       shutdown();
     }

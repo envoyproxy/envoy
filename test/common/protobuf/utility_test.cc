@@ -1201,7 +1201,7 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
             "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
 }
 
-TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
+TEST(LoadFromYamlExceptionTest, BadConversion) {
   std::string bad_yaml = R"EOF(
 admin:
   access_log:
@@ -1216,6 +1216,20 @@ admin:
 )EOF";
 
   EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "bad conversion");
+  EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
+                             "Unexpected YAML exception");
+}
+
+TEST(LoadFromYamlExceptionTest, ParserException) {
+  std::string bad_yaml = R"EOF(
+systemLog:
+    destination: file
+    path:"G:\file\path"
+storage:
+    dbPath:"G:\db\data"
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "illegal map value");
   EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
                              "Unexpected YAML exception");
 }

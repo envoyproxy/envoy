@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -168,15 +169,20 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (completed_) {
     if (!cancelled_) {
-      try {
-        callback_(resolution_status, std::move(address_list));
-      } catch (const EnvoyException& e) {
+      // TODO(chaoqin-li1123): remove this exception catching by refactoring.
+      //  We can't add a main thread assertion here because both this code is reused by dns filter
+      //  and executed in both main thread and worker thread. Maybe split the code for filter and
+      //  main thread.
+      TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
+      catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (const std::exception& e) {
+      }
+      catch (const std::exception& e) {
         ENVOY_LOG(critical, "std::exception in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (...) {
+      }
+      catch (...) {
         ENVOY_LOG(critical, "Unknown exception in c-ares callback");
         dispatcher_.post([] { throw EnvoyException("unknown"); });
       }
