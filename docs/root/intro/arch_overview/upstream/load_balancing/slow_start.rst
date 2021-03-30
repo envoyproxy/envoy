@@ -10,12 +10,13 @@ This could be undesirable for services that require warm up time to serve full p
 Slow start mode is a mechanism that affects load balancing weight of upstream endpoints and can be configured per upstream cluster. 
 Currently, slow start is supported in Round Robin and Least Request load balancer types.
 
-Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode, given that the endpoint satisfies endpoint warming policy. 
+Users can specify a :ref:`slow start window parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.slow_start_window>` (in seconds), so that if endpoint “cluster membership duration" (amount of time since it has joined the cluster) is within the configured window, it enters slow start mode. 
 During slow start window, load balancing weight of a particular endpoint will be scaled with :ref:`time bias parameter<envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig.time_bias>`, e.g.:
 `weight = load_balancing_weight * time_bias`.
+The longer slow start window is the less traffic would be sent to endpoint as time advances within slow start window.
 
 Whenever a slow start window duration elapses, upstream endpoint exits slow start mode and gets regular amount of traffic acccording to load balanacing algorithm.
-Endpoint could also exit slow start mode in case it leaves the cluster.
+Its load balancing weight will no longer be scaled with runtime bias. Endpoint could also exit slow start mode in case it leaves the cluster.
 
 To reiterate, endpoint enters slow start mode when:
   * If no active healthcheck is configured per cluster, immediately if its cluster membership duration is within slow start window.
