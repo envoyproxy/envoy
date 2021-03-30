@@ -1173,19 +1173,54 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
   }
   auto& route = filter_manager_.streamInfo().route_entry_;
 
-  auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
   std::chrono::milliseconds timeout;
   bool disable_timer = false;
-  if (route->usingNewTimeouts()) {
-    // If we are using new timeouts and MaxStreamDuration is not set, use the route's timeout
-    // value. This is the case when route's MaxStreamDuration is specified without inner
-    // MaxStreamDuration i.e. only grpc_timeout_header_max is set.
-    if (!route->maxStreamDuration()) {
-      timeout = route->timeout();
+  auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
+  if (Grpc::Common::isGrpcRequestHeaders(*request_headers_)) {
+    if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
+      // Either there is no grpc-timeout header or special timeouts for it are not
+      // configured. Use stream duration.
+      if (route->maxStreamDuration()) {
+        timeout = route->maxStreamDuration().value();
+        if (timeout == std::chrono::milliseconds(0)) {
+          // Explicitly configured 0 means no timeout.
+          disable_timer = true;
+        }
+      } else {
+        // Fall back to HCM config. If no HCM duration limit exists, disable
+        // timers set by any prior route configuration.
+        const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+        if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
+          timeout = max_stream_duration.value();
+          std::cout << "setting max timeout::" << std::to_string(timeout.count()) << "\n";
+        } else {
+          disable_timer = true;
+        }
+      }
+    } else {
+      if (route->grpcTimeoutHeaderMax()) {
+        // Start with the timeout equal to the gRPC timeout header.
+        timeout = grpc_timeout.value();
+        // If there's a valid cap, apply it.
+        if (timeout > route->grpcTimeoutHeaderMax().value() &&
+            route->grpcTimeoutHeaderMax().value() != std::chrono::milliseconds(0)) {
+          timeout = route->grpcTimeoutHeaderMax().value();
+        }
+
+        // Apply the configured offset.
+        if (timeout != std::chrono::milliseconds(0) && route->grpcTimeoutHeaderOffset()) {
+          const auto offset = route->grpcTimeoutHeaderOffset().value();
+          if (offset < timeout) {
+            timeout -= offset;
+          } else {
+            timeout = std::chrono::milliseconds(0);
+          }
+        }
+      } else {
+        timeout = route->timeout();
+      }
     }
-  } else if (!grpc_timeout || !route->grpcTimeoutHeaderMax()) {
-    // Either there is no grpc-timeout header or special timeouts for it are not
-    // configured. Use stream duration.
+  } else {
     if (route->maxStreamDuration()) {
       timeout = route->maxStreamDuration().value();
       if (timeout == std::chrono::milliseconds(0)) {
@@ -1193,31 +1228,11 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
         disable_timer = true;
       }
     } else {
-      // Fall back to HCM config. If no HCM duration limit exists, disable
-      // timers set by any prior route configuration.
       const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
       if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
         timeout = max_stream_duration.value();
       } else {
-        disable_timer = true;
-      }
-    }
-  } else {
-    // Start with the timeout equal to the gRPC timeout header.
-    timeout = grpc_timeout.value();
-    // If there's a valid cap, apply it.
-    if (timeout > route->grpcTimeoutHeaderMax().value() &&
-        route->grpcTimeoutHeaderMax().value() != std::chrono::milliseconds(0)) {
-      timeout = route->grpcTimeoutHeaderMax().value();
-    }
-
-    // Apply the configured offset.
-    if (timeout != std::chrono::milliseconds(0) && route->grpcTimeoutHeaderOffset()) {
-      const auto offset = route->grpcTimeoutHeaderOffset().value();
-      if (offset < timeout) {
-        timeout -= offset;
-      } else {
-        timeout = std::chrono::milliseconds(0);
+        timeout = route->timeout();
       }
     }
   }
