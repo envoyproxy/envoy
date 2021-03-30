@@ -17,7 +17,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -270,8 +269,8 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))
-      .WillRepeatedly(
-          Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
+      .WillRepeatedly(testing::Return(
+          Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(dispatcher_, random_,
                         Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
