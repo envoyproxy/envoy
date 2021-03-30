@@ -8,6 +8,7 @@
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
+#include "common/quic/send_buffer_monitor.h"
 
 namespace Envoy {
 namespace Quic {
@@ -16,17 +17,22 @@ namespace Quic {
 class EnvoyQuicStream : public virtual Http::StreamEncoder,
                         public Http::Stream,
                         public Http::StreamCallbackHelper,
+                        public SendBufferMonitor,
                         public HeaderValidator,
                         protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
-  EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
+  EnvoyQuicStream(uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
+                  std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark, Http::Http3::CodecStats& stats,
                   const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
       : stats_(stats), http3_options_(http3_options),
         send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
-                                std::move(above_high_watermark), ENVOY_LOGGER()) {}
+                                std::move(above_high_watermark), ENVOY_LOGGER()),
+        filter_manager_connection_(filter_manager_connection) {}
+
+  ~EnvoyQuicStream() override = default;
 
   // Http::StreamEncoder
   Stream& getStream() override { return *this; }
@@ -86,19 +92,19 @@ public:
     return connection()->addressProvider().localAddress();
   }
 
-  void maybeCheckWatermark(uint64_t buffered_data_old, uint64_t buffered_data_new,
-                           QuicFilterManagerConnectionImpl& connection) {
-    if (buffered_data_new == buffered_data_old) {
+  // SendBufferMonitor
+  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
+    if (new_buffered_bytes == old_buffered_bytes) {
       return;
     }
     // If buffered bytes changed, update stream and session's watermark book
     // keeping.
-    if (buffered_data_new > buffered_data_old) {
-      send_buffer_simulation_.checkHighWatermark(buffered_data_new);
+    if (new_buffered_bytes > old_buffered_bytes) {
+      send_buffer_simulation_.checkHighWatermark(new_buffered_bytes);
     } else {
-      send_buffer_simulation_.checkLowWatermark(buffered_data_new);
+      send_buffer_simulation_.checkLowWatermark(new_buffered_bytes);
     }
-    connection.adjustBytesToSend(buffered_data_new - buffered_data_old);
+    filter_manager_connection_.updateBytesBuffered(old_buffered_bytes, new_buffered_bytes);
   }
 
   HeaderValidationResult validateHeader(const std::string& header_name,
@@ -187,6 +193,8 @@ private:
   // executed, the stream might be unblocked and blocked several times. Only the
   // latest desired state should be considered by the callback.
   bool should_block_{false};
+
+  QuicFilterManagerConnectionImpl& filter_manager_connection_;
 };
 
 } // namespace Quic
