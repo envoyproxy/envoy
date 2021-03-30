@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
@@ -295,13 +296,19 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
+// [#next-free-field: 6]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the administration server.
+  repeated accesslog.v3.AccessLog access_log = 5;
 
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
   // :ref:`address <envoy_api_field_config.bootstrap.v3.Admin.address>` is set.
-  string access_log_path = 1;
+  // Deprecated in favor of *access_log* which offers more options.
+  string access_log_path = 1 [deprecated = true];
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.

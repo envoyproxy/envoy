@@ -19,25 +19,25 @@ src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constant
 # sed commands to apply to each source file.
 cat <<EOF >sed_commands
 # Rewrite include directives for testonly platform impl files.
-/^#include/ s!net/http2/platform/impl/http2_reconstruct_object_impl.h!test/extensions/quic_listeners/quiche/platform/http2_reconstruct_object_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_expect_bug_impl.h!test/extensions/quic_listeners/quiche/platform/quic_expect_bug_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_mock_log_impl.h!test/extensions/quic_listeners/quiche/platform/quic_mock_log_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_port_utils_impl.h!test/extensions/quic_listeners/quiche/platform/quic_port_utils_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_sleep_impl.h!test/extensions/quic_listeners/quiche/platform/quic_sleep_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_system_event_loop_impl.h!test/extensions/quic_listeners/quiche/platform/quic_system_event_loop_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_test_mem_slice_vector_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_mem_slice_vector_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_output_impl.h!
-/^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/extensions/quic_listeners/quiche/platform/quic_thread_impl.h!
-/^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/extensions/quic_listeners/quiche/platform/quiche_test_impl.h!
-/^#include/ s!net/spdy/platform/impl/spdy_test_helpers_impl.h!test/extensions/quic_listeners/quiche/platform/spdy_test_helpers_impl.h!
-/^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/extensions/quic_listeners/quiche/platform/spdy_test_impl.h!
+/^#include/ s!net/http2/platform/impl/http2_reconstruct_object_impl.h!test/common/quic/platform/http2_reconstruct_object_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_expect_bug_impl.h!test/common/quic/platform/quic_expect_bug_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_mock_log_impl.h!test/common/quic/platform/quic_mock_log_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_port_utils_impl.h!test/common/quic/platform/quic_port_utils_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_sleep_impl.h!test/common/quic/platform/quic_sleep_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_system_event_loop_impl.h!test/common/quic/platform/quic_system_event_loop_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/common/quic/platform/quic_test_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_mem_slice_vector_impl.h!test/common/quic/platform/quic_test_mem_slice_vector_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/common/quic/platform/quic_test_output_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/common/quic/platform/quic_thread_impl.h!
+/^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/common/quic/platform/quiche_test_impl.h!
+/^#include/ s!net/spdy/platform/impl/spdy_test_helpers_impl.h!test/common/quic/platform/spdy_test_helpers_impl.h!
+/^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/common/quic/platform/spdy_test_impl.h!
 
 # Rewrite include directives for platform impl files.
-/^#include/ s!net/(http2|spdy|quic|quiche/common)/platform/impl/!extensions/quic_listeners/quiche/platform/!
+/^#include/ s!net/(http2|spdy|quic|quiche/common)/platform/impl/!common/quic/platform/!
 
 # Rewrite include directives for epoll_server platform impl files.
-/^#include/ s!net/tools/epoll_server/platform/impl!test/extensions/quic_listeners/quiche/platform/!
+/^#include/ s!net/tools/epoll_server/platform/impl!test/common/quic/platform/!
 
 # Append "quiche/" to include directives to other QUICHE files.
 /^#include/ s!"quic/!"quiche/quic/!
@@ -46,8 +46,11 @@ cat <<EOF >sed_commands
 /^#include/ s!"common/!"quiche/common/!
 /^#include/ s!"epoll_server/!"quiche/epoll_server/!
 
+# The above global substitutions will prepend "quiche" to the platform code which we want to undo.
+/^#include/ s!"quiche/common/quic/platform/!"common/quic/platform/!
+
 # Use envoy specific implementations for below platform APIs.
-/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"extensions/quic_listeners/quiche/platform/quiche_logging_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"common/quic/platform/quiche_logging_impl.h!
 /^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!
 
 # Rewrite gmock & gtest includes.

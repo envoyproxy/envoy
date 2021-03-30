@@ -119,10 +119,8 @@ if __name__ == "__main__":
         decode_stacktrace_log(sys.argv[2], ignore_decoding_errors(sys.stdin))
         sys.exit(0)
     elif len(sys.argv) > 1:
-        rununder = subprocess.Popen(sys.argv[1:],
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT,
-                                    universal_newlines=True)
+        rununder = subprocess.Popen(
+            sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         offset = find_address_offset(rununder.pid)
         decode_stacktrace_log(sys.argv[1], ignore_decoding_errors(rununder.stdout), offset)
         rununder.wait()
