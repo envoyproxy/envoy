@@ -11,7 +11,7 @@ TEST(ApplyToAllWithCompletionCallbackTest, BasicUsage) {
     std::vector<int> cb_invoked_with;
     bool done_cb_called = false;
 
-    applyToAllWithCleanup(
+    applyToAllWithCleanup<int>(
         container,
         [&cb_invoked_with, &done_cb_called](int i, std::shared_ptr<Cleanup>) {
           cb_invoked_with.emplace_back(i);
@@ -28,7 +28,7 @@ TEST(ApplyToAllWithCompletionCallbackTest, BasicUsage) {
 
   std::shared_ptr<Cleanup> delayed_cleanup;
 
-  applyToAllWithCleanup(
+  applyToAllWithCleanup<int>(
       container,
       [&cb_invoked_with, &done_cb_called, &delayed_cleanup](int i,
                                                             std::shared_ptr<Cleanup> cleanup) {

@@ -9,21 +9,23 @@ namespace Envoy {
 namespace Common {
 
 /**
- * Invokes a function for all elements in a container, providing a cleanup function that will be
- * executed after all the elements have been processed. The Cleanup object is provided to allow each
- * update callback to delay cleanup until some arbitrary time: the completion callback will be
- * invoked once no more references to the provided shared pointer exists.
+ * Invokes a function for all elements in a container and executes a done_cb once processing
+ * is done for each element.
  *
- * This provides a thread safe way of tracking the completion of callbacks based on a the elements
- * of a container that may require asynchronous processing.
+ * To support cross-thread asyncronous work done for each element, the update_cb can extend
+ * the lifetime of the provided Cleanup object until processing is done.
  */
-template <class ContainerT, class UpdateCbT>
-void applyToAllWithCleanup(const ContainerT& container, UpdateCbT update_cb,
+template <class ElementT, class ContainerT>
+void applyToAllWithCleanup(const ContainerT& container,
+                           std::function<void(ElementT, std::shared_ptr<Cleanup>)> update_cb,
                            std::function<void()> done_cb) {
+  // The Cleanup object is provided to allow each update callback to delay cleanup until some
+  // arbitrary time the completion callback will be invoked once no more references to the provided
+  // shared pointer exists.
   auto cleanup = std::make_shared<Cleanup>(done_cb);
   for (auto element : container) {
     update_cb(element, cleanup);
   }
-}
+} // namespace Common
 } // namespace Common
 } // namespace Envoy
