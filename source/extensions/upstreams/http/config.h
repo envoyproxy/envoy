@@ -25,14 +25,16 @@ namespace Http {
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
-      const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options);
+      const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
-      bool use_downstream_protocol, bool use_http2);
+      bool use_downstream_protocol, bool use_http2,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
@@ -60,7 +62,8 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
-    return std::make_shared<ProtocolOptionsConfigImpl>(typed_config);
+    return std::make_shared<ProtocolOptionsConfigImpl>(typed_config,
+                                                       context.messageValidationVisitor());
   }
   std::string category() const override { return "envoy.upstream_options"; }
   std::string name() const override {

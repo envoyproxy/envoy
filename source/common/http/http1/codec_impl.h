@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
@@ -75,7 +76,7 @@ public:
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
+  StreamEncoderImpl(ConnectionImpl& connection);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
@@ -114,9 +115,9 @@ private:
    */
   void endEncode();
 
-  void encodeFormattedHeader(absl::string_view key, absl::string_view value);
+  void encodeFormattedHeader(absl::string_view key, absl::string_view value,
+                             HeaderKeyFormatterOptConstRef formatter);
 
-  const HeaderKeyFormatter* const header_key_formatter_;
   absl::string_view details_;
 };
 
@@ -125,9 +126,8 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                      bool stream_error_on_invalid_http_message)
-      : StreamEncoderImpl(connection, header_key_formatter),
+  ResponseEncoderImpl(ConnectionImpl& connection, bool stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection),
         stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
   bool startedResponse() { return started_response_; }
@@ -151,8 +151,7 @@ private:
  */
 class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
-  RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+  RequestEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
   bool upgradeRequest() const { return upgrade_request_; }
   bool headRequest() const { return head_request_; }
   bool connectRequest() const { return connect_request_; }
@@ -217,6 +216,9 @@ public:
   virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
+  HeaderKeyFormatterOptConstRef formatter() const {
+    return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
+  }
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& data) override;
@@ -238,8 +240,7 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
-                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter);
+                 MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -269,7 +270,7 @@ protected:
   std::unique_ptr<Parser> parser_;
   Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};
-  const HeaderKeyFormatterPtr header_key_formatter_;
+  const HeaderKeyFormatterConstPtr encode_only_header_key_formatter_;
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   bool processing_trailers_ : 1;
@@ -299,7 +300,7 @@ private:
 
   virtual HeaderMap& headersOrTrailers() PURE;
   virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
-  virtual void allocHeaders() PURE;
+  virtual void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) PURE;
   virtual void allocTrailers() PURE;
 
   /**
@@ -436,8 +437,8 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ServerConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter,
+    ActiveRequest(ServerConnectionImpl& connection)
+        : response_encoder_(connection,
                             connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
     HeaderString request_url_;
@@ -486,10 +487,12 @@ private:
   RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
     return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   }
-  void allocHeaders() override {
+  void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    headers_or_trailers_.emplace<RequestHeaderMapPtr>(RequestHeaderMapImpl::create());
+    auto headers = RequestHeaderMapImpl::create();
+    headers->setFormatter(std::move(formatter));
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
@@ -536,9 +539,8 @@ public:
 
 private:
   struct PendingResponse {
-    PendingResponse(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
-                    ResponseDecoder* decoder)
-        : encoder_(connection, header_key_formatter), decoder_(decoder) {}
+    PendingResponse(ConnectionImpl& connection, ResponseDecoder* decoder)
+        : encoder_(connection), decoder_(decoder) {}
 
     RequestEncoderImpl encoder_;
     ResponseDecoder* decoder_;
@@ -570,10 +572,12 @@ private:
   RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
     return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   }
-  void allocHeaders() override {
+  void allocHeaders(StatefulHeaderKeyFormatterPtr&& formatter) override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
     ASSERT(!processing_trailers_);
-    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
+    auto headers = ResponseHeaderMapImpl::create();
+    headers->setFormatter(std::move(formatter));
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::move(headers));
   }
   void allocTrailers() override {
     ASSERT(processing_trailers_);
