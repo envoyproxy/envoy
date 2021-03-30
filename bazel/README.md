@@ -844,7 +844,7 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [clangd](https://clangd.llvm.org/) with supported editors.
 
-For example, use following command to prepare a compilation database:
+This requires Python 3.8.0+, download from [here](https://www.python.org/downloads/) if you do not have one. Then, use following command to prepare a compilation database:
 
 ```
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py
