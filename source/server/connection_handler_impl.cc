@@ -132,9 +132,6 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
-<<<<<<< HEAD
-ActiveTcpListenerOptRef ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
-=======
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr&) {
   return absl::nullopt;
@@ -142,7 +139,6 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
 ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
->>>>>>> 6f96215207... initial internal listener
   auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }

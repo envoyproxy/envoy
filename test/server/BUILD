@@ -93,22 +93,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-<<<<<<< HEAD
     name = "active_tcp_listener_test",
     srcs = ["active_tcp_listener_test.cc"],
-=======
-    name = "active_internal_listener_test",
-    srcs = ["active_internal_listener_test.cc"],
->>>>>>> e9a9881559 (adding active internal listener test)
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
-<<<<<<< HEAD
-=======
         "//source/common/network:udp_default_writer_config",
->>>>>>> e9a9881559 (adding active internal listener test)
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
@@ -117,11 +109,30 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-<<<<<<< HEAD
-=======
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
->>>>>>> e9a9881559 (adding active internal listener test)
+    ],
+)
+
+envoy_cc_test(
+    name = "active_internal_listener_test",
+    srcs = ["active_internal_listener_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:connection_balancer_lib",
+        "//source/common/network:udp_default_writer_config",
+        "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
+        "//source/server:connection_handler_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

@@ -65,6 +65,7 @@ envoy_cc_library(
     name = "connection_handler_lib",
     deps = [
         ":active_internal_listener",
+        ":active_tcp_listener",
         ":active_udp_listener",
         ":connection_handler_impl",
     ],
@@ -173,7 +174,6 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
-        "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan_interface",
         "//source/common/common:linked_object",

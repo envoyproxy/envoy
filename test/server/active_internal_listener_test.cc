@@ -1,11 +1,9 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
@@ -14,8 +12,6 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/network/udp_default_writer_config.h"
-#include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "server/active_internal_listener.h"
