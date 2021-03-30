@@ -20,9 +20,9 @@ def load_module(name, path):
 api_path = os.getenv("API_PATH", "external/envoy_api_canonical")
 
 # Modules
-envoy_repository_locations = load_module('envoy_repository_locations',
-                                         'bazel/repository_locations.bzl')
+envoy_repository_locations = load_module(
+    'envoy_repository_locations', 'bazel/repository_locations.bzl')
 repository_locations_utils = load_module(
     'repository_locations_utils', os.path.join(api_path, 'bazel/repository_locations_utils.bzl'))
-api_repository_locations = load_module('api_repository_locations',
-                                       os.path.join(api_path, 'bazel/repository_locations.bzl'))
+api_repository_locations = load_module(
+    'api_repository_locations', os.path.join(api_path, 'bazel/repository_locations.bzl'))

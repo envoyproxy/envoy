@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/common/exception.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
@@ -50,7 +52,11 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
       })),
       thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
   flush_timer_->enableTimer(flush_interval_msec_);
-  open();
+  auto open_result = open();
+  if (!open_result.rc_) {
+    throw EnvoyException(fmt::format("unable to open file '{}': {}", file_->path(),
+                                     open_result.err_->getErrorDetails()));
+  }
 }
 
 Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
@@ -61,12 +67,9 @@ Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
   return default_flags;
 }
 
-void AccessLogFileImpl::open() {
-  const Api::IoCallBoolResult result = file_->open(defaultFlags());
-  if (!result.rc_) {
-    throw EnvoyException(
-        fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));
-  }
+Api::IoCallBoolResult AccessLogFileImpl::open() {
+  Api::IoCallBoolResult result = file_->open(defaultFlags());
+  return result;
 }
 
 void AccessLogFileImpl::reopen() { reopen_file_ = true; }
@@ -87,7 +90,6 @@ AccessLogFileImpl::~AccessLogFileImpl() {
     if (flush_buffer_.length() > 0) {
       doWrite(flush_buffer_);
     }
-
     const Api::IoCallBoolResult result = file_->close();
     ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
                                    result.err_->getErrorDetails()));
@@ -149,19 +151,18 @@ void AccessLogFileImpl::flushThreadFunc() {
 
     // if we failed to open file before, then simply ignore
     if (file_->isOpen()) {
-      try {
-        if (reopen_file_) {
-          reopen_file_ = false;
-          const Api::IoCallBoolResult result = file_->close();
-          ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                         result.err_->getErrorDetails()));
-          open();
+      if (reopen_file_) {
+        reopen_file_ = false;
+        const Api::IoCallBoolResult result = file_->close();
+        ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
+                                       result.err_->getErrorDetails()));
+        const Api::IoCallBoolResult open_result = open();
+        if (!open_result.rc_) {
+          stats_.reopen_failed_.inc();
+          return;
         }
-
-        doWrite(about_to_write_buffer_);
-      } catch (const EnvoyException&) {
-        stats_.reopen_failed_.inc();
       }
+      doWrite(about_to_write_buffer_);
     }
   }
 }
