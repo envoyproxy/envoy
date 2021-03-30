@@ -1,9 +1,5 @@
-from typing import List
-from docutils import nodes
-from docutils.parsers.rst import Directive
 from docutils.parsers.rst import directives
-from sphinx.application import Sphinx
-from sphinx.util.docutils import SphinxDirective
+
 from sphinx.directives.code import CodeBlock
 from sphinx.errors import ExtensionError
 
@@ -39,10 +35,8 @@ class ValidatingCodeBlock(CodeBlock):
                 'bazel-bin/tools/config_validation/validate_fragment',
                 self.options.get('type-name'), '-s', '\n'.join(self.content)
             ]
-            completed = subprocess.run(args,
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       encoding='utf-8')
+            completed = subprocess.run(
+                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
             if completed.returncode != 0:
                 raise ExtensionError(
                     "Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(

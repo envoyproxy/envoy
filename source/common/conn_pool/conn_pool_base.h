@@ -210,7 +210,8 @@ public:
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
        << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
-       << DUMP_MEMBER(pending_streams_.size());
+       << DUMP_MEMBER(pending_streams_.size())
+       << " per upstream preconnect ratio: " << perUpstreamPreconnectRatio();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const ConnPoolImplBase& s) {

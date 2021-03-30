@@ -381,6 +381,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
+        "//source/extensions/access_loggers/file:config",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/stats:stats_mocks",

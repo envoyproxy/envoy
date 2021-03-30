@@ -1188,13 +1188,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   server_->admin().addListenerToHandler(/*handler=*/nullptr);
 }
 
-// Validate that an admin config with a server address but no access log path is rejected.
-TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/node_bootstrap_without_access_log.yaml"),
-      EnvoyException, "An admin access log path is required for a listening server.");
-}
-
 namespace {
 void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& address,
                             const Network::Socket::OptionsSharedPtr& options) {

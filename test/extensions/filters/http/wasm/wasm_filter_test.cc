@@ -1492,9 +1492,21 @@ TEST_P(WasmHttpFilterTest, SharedQueue) {
   setupTest("shared_queue");
   setupFilter();
   EXPECT_CALL(filter(),
-              log_(spdlog::level::warn, Eq(absl::string_view("onRequestHeaders enqueue Ok"))));
+              log_(spdlog::level::warn,
+                   Eq(absl::string_view("onRequestHeaders not found self/bad_shared_queue"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn,
+                   Eq(absl::string_view("onRequestHeaders not found vm_id/bad_shared_queue"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn,
+                   Eq(absl::string_view("onRequestHeaders not found bad_vm_id/bad_shared_queue"))));
   EXPECT_CALL(filter(), log_(spdlog::level::warn,
-                             Eq(absl::string_view("onRequestHeaders not found bad_shared_queue"))));
+                             Eq(absl::string_view("onRequestHeaders found self/my_shared_queue"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn,
+                   Eq(absl::string_view("onRequestHeaders found vm_id/my_shared_queue"))));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::warn, Eq(absl::string_view("onRequestHeaders enqueue Ok"))));
   EXPECT_CALL(rootContext(),
               log_(spdlog::level::warn, Eq(absl::string_view("onQueueReady bad token not found"))))
       .Times(2);

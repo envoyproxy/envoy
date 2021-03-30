@@ -6,13 +6,9 @@ remove the over-included header files in generated class codes and resolve depen
 corresponding Bazel files manually.
 """
 import argparse
-import os
-import subprocess
-import sys
 from typing import Type, List, Tuple, Dict
 
 # libclang imports
-import clang.cindex
 from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
 
@@ -344,8 +340,8 @@ def main(args):
         if class_name not in classname_to_impl:
             print("Warning: empty class {}".format(class_name))
         else:
-            impl_include = impl_includes.replace(decl_filename,
-                                                 "{}.h".format(to_filename(class_name)))
+            impl_include = impl_includes.replace(
+                decl_filename, "{}.h".format(to_filename(class_name)))
             # we need to enclose methods with namespaces
             namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
             class_impl = impl_include + namespace_prefix + \

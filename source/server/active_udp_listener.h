@@ -7,7 +7,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/server/active_udp_listener_config.h"
 
 // TODO(lambdai): remove connection_handler_impl after ActiveListenerImplBase is extracted from it.
 #include "server/connection_handler_impl.h"

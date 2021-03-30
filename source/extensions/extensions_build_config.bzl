@@ -8,8 +8,7 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
     "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
-    "envoy.access_loggers.stderror":                    "//source/extensions/access_loggers/stderror:config",
-    "envoy.access_loggers.stdoutput":                   "//source/extensions/access_loggers/stdoutput:config",
+    "envoy.access_loggers.stream":                      "//source/extensions/access_loggers/stream:config",
     "envoy.access_loggers.wasm":                        "//source/extensions/access_loggers/wasm:config",
 
     #
@@ -39,6 +38,7 @@ EXTENSIONS = {
     #
     # WASM
     #
+
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
 
     #
@@ -181,12 +181,6 @@ EXTENSIONS = {
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
 
     #
-    # Listener
-    #
-
-    "envoy.udp_listeners.quiche_quic_listener":         "//source/extensions/quic_listeners/quiche:quic_factory_lib",
-
-    #
     # Transport sockets
     #
 
@@ -194,7 +188,6 @@ EXTENSIONS = {
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
 
     #
@@ -220,6 +213,7 @@ EXTENSIONS = {
     #
     # Internal redirect predicates
     #
+
     "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
     "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
@@ -227,6 +221,7 @@ EXTENSIONS = {
     #
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
+
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
 
@@ -262,6 +257,12 @@ EXTENSIONS = {
     #
 
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+
+    #
+    # HTTP header formatters
+    #
+
+    "envoy.http.stateful_header_formatters.preserve_case":       "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter"
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
