@@ -48,7 +48,8 @@ public:
         std::vector<std::string> header_values;
         header_values.reserve(header.size());
         for (size_t i = 0; i < header.size(); i++) {
-          header_values.push_back(regex_rewrite_->replaceAll(header[i]->value().getStringView(), regex_rewrite_substitution_));
+          header_values.push_back(regex_rewrite_->replaceAll(header[i]->value().getStringView(),
+                                                             regex_rewrite_substitution_));
         }
         // Ensure generating same hash value for different order header values.
         // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
