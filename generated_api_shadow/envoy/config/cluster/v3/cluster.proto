@@ -510,7 +510,6 @@ message Cluster {
 
     // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
     message SlowStartConfig {
-
       // Size of slow start window in seconds, defaults to 0.
       // If set to value greater than 0, the newly created host remains in slow start mode starting from its creation time
       // for the duration of slow start window.
