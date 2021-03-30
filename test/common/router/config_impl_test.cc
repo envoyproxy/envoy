@@ -2410,7 +2410,8 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
     headers.addCopy("foo_header", "bar");
     headers.addCopy("foo_header", "foo");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    auto expected_hash_value = HashUtil::xxHash64("bar,foo,");
+    absl::Hash<const std::vector<std::string>> hasher;
+    auto expected_hash_value = hasher(std::vector<std::string>{"bar", "foo"});
     EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
                                        nullptr, headers, add_cookie_nop_, nullptr));
   }
@@ -2419,7 +2420,8 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
     headers.addCopy("foo_header", "foo");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    auto expected_hash_value = HashUtil::xxHash64("bar,foo,");
+    absl::Hash<const std::vector<std::string>> hasher;
+    auto expected_hash_value = hasher(std::vector<std::string>{"bar", "foo"});
     EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
                                        nullptr, headers, add_cookie_nop_, nullptr));
   }
@@ -2458,7 +2460,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    const uint64_t foo_hash_value = 0xd05e705b8ebfe7cb;
+    const uint64_t foo_hash_value = 7185483484025192322;
     EXPECT_EQ(route->routeEntry()
                   ->hashPolicy()
                   ->generateHash(nullptr, headers, add_cookie_nop_, nullptr)
