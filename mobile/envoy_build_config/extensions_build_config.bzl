@@ -9,6 +9,7 @@ EXTENSIONS = {
     "envoy.filters.http.local_error":                 "@envoy_mobile//library/common/extensions/filters/http/local_error:config",
     "envoy.filters.http.platform_bridge":             "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
     "envoy.filters.http.router":                      "//source/extensions/filters/http/router:config",
+    "envoy.filters.http.test_accessor":               "@envoy_mobile//library/common/extensions/filters/http/test_accessor:config",
     "envoy.filters.network.http_connection_manager":  "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.stat_sinks.metrics_service":               "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.transport_sockets.raw_buffer":             "//source/extensions/transport_sockets/raw_buffer:config",

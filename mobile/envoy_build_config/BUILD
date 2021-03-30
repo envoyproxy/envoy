@@ -29,6 +29,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/assertion:config",
         "@envoy_mobile//library/common/extensions/filters/http/local_error:config",
         "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
+        "@envoy_mobile//library/common/extensions/filters/http/test_accessor:config",
         "@envoy_mobile//library/common/extensions/stat_sinks/metrics_service:config",
     ],
 )
