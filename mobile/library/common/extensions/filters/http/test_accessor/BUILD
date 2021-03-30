@@ -1,0 +1,48 @@
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_extension_package",
+    "envoy_proto_library",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
+
+envoy_proto_library(
+    name = "filter",
+    srcs = ["filter.proto"],
+    deps = [
+        "@envoy_api//envoy/config/common/matcher/v3:pkg",
+    ],
+)
+
+envoy_cc_extension(
+    name = "test_accessor_filter_lib",
+    srcs = ["filter.cc"],
+    hdrs = ["filter.h"],
+    category = "envoy.filters.http",
+    repository = "@envoy",
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
+    deps = [
+        "filter_cc_proto",
+        "//library/common/api:c_types",
+        "//library/common/api:external_api_lib",
+        "//library/common/data:utility_lib",
+        "@envoy//source/common/common:assert_lib",
+        "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_extension(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    category = "envoy.filters.http",
+    repository = "@envoy",
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
+    deps = [
+        ":test_accessor_filter_lib",
+        "@envoy//source/extensions/filters/http/common:factory_base_lib",
+    ],
+)
