@@ -56,6 +56,8 @@ public:
   // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
+  void clearWatermarkBuffer();
+
 protected:
   // EnvoyQuicStream
   void switchStreamBlockState(bool should_block) override;

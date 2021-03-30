@@ -59,6 +59,10 @@ public:
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
+  size_t WriteHeadersOnHeadersStream(
+      quic::QuicStreamId id, spdy::SpdyHeaderBlock headers, bool fin,
+      const spdy::SpdyStreamPrecedence& precedence,
+      quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
