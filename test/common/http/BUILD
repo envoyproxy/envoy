@@ -415,10 +415,11 @@ envoy_cc_test(
     ],
 )
 
+# TODO(mattklein123): Use compatible with when we move to Bazel 4.0.
 envoy_cc_test(
     name = "conn_pool_grid_test",
-    srcs = ["conn_pool_grid_test.cc"],
-    deps = [
+    srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
+    deps = envoy_select_enable_http3([
         ":common_lib",
         "//source/common/http:conn_pool_grid",
         "//test/common/upstream:utility_lib",
@@ -431,7 +432,6 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
-    ] + envoy_select_enable_http3([
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",

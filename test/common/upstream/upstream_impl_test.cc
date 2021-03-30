@@ -3205,7 +3205,6 @@ TEST_F(ClusterInfoImplTest, Http3) {
   EXPECT_FALSE(
       downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
 }
-#endif // ENVOY_ENABLE_QUIC
 
 TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -3248,14 +3247,38 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-#ifdef ENVOY_ENABLE_QUIC
   EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
                           "HTTP3 requires a QuicUpstreamTransport transport socket: name.*");
+}
 #else
+TEST_F(ClusterInfoImplTest, Http3BadConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
   EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
                           "HTTP3 configured but not enabled in the build.");
-#endif
 }
+#endif // ENVOY_ENABLE_QUIC
 
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {
