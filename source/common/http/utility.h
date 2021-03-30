@@ -260,6 +260,13 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
 uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 
 /**
+ * Get the response status from the response headers.
+ * @param headers supplies the headers to get the status from.
+ * @return absl::optional<uint64_t> the response code or absl::nullopt if the headers are invalid.
+ */
+absl::optional<uint64_t> getResponseStatusNoThrow(const ResponseHeaderMap& headers);
+
+/**
  * Determine whether these headers are a valid Upgrade request or response.
  * This function returns true if the following HTTP headers and values are present:
  * - Connection: Upgrade
