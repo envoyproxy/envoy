@@ -21,6 +21,7 @@ public:
       : FileSharedImpl(path), info_(info) {}
 
   bool isOpen() const override { return open_; }
+
 protected:
   Api::IoCallBoolResult open(FlagSet flag) override {
     ASSERT(!isOpen());
