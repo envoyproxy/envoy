@@ -4,10 +4,9 @@
 #include "envoy/http/codec.h"
 
 #include "common/http/codec_helper.h"
-
-#include "common/quic/send_buffer_monitor.h"
 #include "common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "common/quic/quic_filter_manager_connection_impl.h"
+#include "common/quic/send_buffer_monitor.h"
 
 namespace Envoy {
 namespace Quic {
