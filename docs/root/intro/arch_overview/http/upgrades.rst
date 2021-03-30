@@ -94,6 +94,11 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
 For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
 For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
 
+Note that for CONNECT-over-tls, Envoy can not currently be configured to do the CONNECT request in the clear
+and encrypt previously unencrypted payload in one hop. To send CONNECT in plaintext and encrypt the payload,
+one must first forward the HTTP payload over an "upstream" TLS loopback connection to encrypt it, then have
+a TCP listener take the encrypted payload and send the CONNECT upstream.
+
 .. _tunneling-tcp-over-http:
 
 Tunneling TCP over HTTP
