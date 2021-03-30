@@ -22,27 +22,35 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      PoolIterator pool_it,
                                                      ConnectionPool::Callbacks& callbacks)
-    : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks), pool_it_(pool_it) {
-  // TODO(#15649) add trace logging.
-  cancellable_ = pool().newStream(decoder_, *this);
+    : grid_(grid), decoder_(decoder), inner_callbacks_(callbacks),
+      failover_timer_(grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
+  current_ = pool_it;
+  auto state = std::make_unique<ConnectionAttemptState>(*this, pool_it);
+  LinkedList::moveIntoList(std::move(state), connection_attempts_);
+  // TODO(#15649) When adding config for the grid, make this configurable.
+  failover_timer_->enableTimer(std::chrono::milliseconds(5));
 }
 
-void ConnectivityGrid::WrapperCallbacks::onPoolFailure(
+// TODO(#15649) add trace logging.
+ConnectivityGrid::WrapperCallbacks::ConnectionAttemptState::ConnectionAttemptState(
+    WrapperCallbacks& parent, PoolIterator it)
+    : parent_(parent), pool_it_(it), cancellable_(pool().newStream(parent_.decoder_, *this)) {}
+
+void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptState::onPoolFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
     Upstream::HostDescriptionConstSharedPtr host) {
-  // When a connection fails, see if there is a lower priority pool to attempt
-  // connecting with.
-  absl::optional<PoolIterator> next_pool = grid_.nextPool(pool_it_);
-  if (next_pool.has_value()) {
-    pool_it_ = next_pool.value();
-    cancellable_ = pool().newStream(decoder_, *this);
-    return;
+  auto delete_this_on_return = removeFromList(parent_.connection_attempts_);
+  // In the unlikely event the pool fails before the failover timer fires, try
+  // to kick off another connection.
+  if (parent_.connection_attempts_.empty()) {
+    if (!parent_.tryAnotherConnection()) {
+      // If this point is reached, all pools have been tried. Pass the pool failure up to the
+      // original caller.
+      ConnectionPool::Callbacks& callbacks = parent_.inner_callbacks_;
+      parent_.deleteThis();
+      callbacks.onPoolFailure(reason, transport_failure_reason, host);
+    }
   }
-
-  // If this point is reached, all pools have been tried. Pass the pool failure up to the
-  // original caller.
-  ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  callbacks.onPoolFailure(reason, transport_failure_reason, host);
 }
 
 void ConnectivityGrid::WrapperCallbacks::deleteThis() {
@@ -50,22 +58,39 @@ void ConnectivityGrid::WrapperCallbacks::deleteThis() {
   removeFromList(grid_.wrapped_callbacks_);
 }
 
-void ConnectivityGrid::WrapperCallbacks::onPoolReady(RequestEncoder& encoder,
-                                                     Upstream::HostDescriptionConstSharedPtr host,
-                                                     const StreamInfo::StreamInfo& info,
-                                                     absl::optional<Http::Protocol> protocol) {
-  // Right now, connections are tried serially, so any successful stream
-  // creation should be passed up to the original caller.
-  ConnectionPool::Callbacks& callbacks = inner_callbacks_;
-  deleteThis();
+void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptState::onPoolReady(
+    RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+  auto delete_parent_on_return = removeFromList(parent_.connection_attempts_);
+  // The first successful connection is passed up, and all others will be canceled.
+  for (auto& state : parent_.connection_attempts_) {
+    state->cancellable_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  }
+  ConnectionPool::Callbacks& callbacks = parent_.inner_callbacks_;
+  parent_.deleteThis();
   return callbacks.onPoolReady(encoder, host, info, protocol);
 }
 
 void ConnectivityGrid::WrapperCallbacks::cancel(Envoy::ConnectionPool::CancelPolicy cancel_policy) {
   // If the newStream caller cancels the stream request, pass the cancellation on
-  // to the active pool.
-  cancellable_->cancel(cancel_policy);
+  // to each connection attempt.
+  for (auto& state : connection_attempts_) {
+    state->cancellable_->cancel(cancel_policy);
+  }
   deleteThis();
+}
+
+bool ConnectivityGrid::WrapperCallbacks::tryAnotherConnection() {
+  absl::optional<PoolIterator> next_pool = grid_.nextPool(current_);
+  if (!next_pool.has_value()) {
+    // If there are no other pools to try, return false.
+    return false;
+  }
+  // Create a new connection attempt for the next pool.
+  current_ = next_pool.value();
+  auto state = std::make_unique<WrapperCallbacks::ConnectionAttemptState>(*this, current_);
+  LinkedList::moveIntoList(std::move(state), connection_attempts_);
+  return true;
 }
 
 ConnectivityGrid::ConnectivityGrid(

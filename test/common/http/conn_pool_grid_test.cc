@@ -16,6 +16,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using Envoy::Event::MockTimer;
 using testing::_;
 
 namespace Envoy {
@@ -110,7 +111,7 @@ TEST_F(ConnectivityGridTest, Success) {
 }
 
 // Test the first pool failing and the second connecting.
-TEST_F(ConnectivityGridTest, FailureThenSuccess) {
+TEST_F(ConnectivityGridTest, FailureThenSuccessSerial) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   grid_.newStream(decoder_, callbacks_);
@@ -126,12 +127,66 @@ TEST_F(ConnectivityGridTest, FailureThenSuccess) {
   // onPoolReady should be passed from the pool back to the original caller.
   ASSERT_NE(grid_.callbacks(), nullptr);
   EXPECT_CALL(callbacks_.pool_ready_, ready());
-  grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
+  grid_.callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test both connections happening in parallel and the second connecting.
+TEST_F(ConnectivityGridTest, FailureThenSuccessParallelSecondConnects) {
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_.newStream(decoder_, callbacks_);
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolFailure should not be passed up the first time. Instead the grid
+  // should wait on the second pool.
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_.callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                   "reason", host_);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  EXPECT_NE(grid_.callbacks(), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks(1)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+}
+
+// Test both connections happening in parallel and the first connecting.
+TEST_F(ConnectivityGridTest, FailureThenSuccessParallelFirstConnects) {
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_.newStream(decoder_, callbacks_);
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolFailure should not be passed up the first time. Instead the grid
+  // should wait on the other pool
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_.callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+
+  // onPoolReady should be passed from the pool back to the original caller.
+  EXPECT_NE(grid_.callbacks(0), nullptr);
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_.callbacks(0)->onPoolReady(encoder_, host_, info_, absl::nullopt);
 }
 
 // Test that after the first pool fails, subsequent connections will
 // successfully fail over to the second pool (the iterators work as intended)
-TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnections) {
+TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnectionsSerial) {
   NiceMock<ConnPoolCallbacks> callbacks2;
   NiceMock<MockResponseDecoder> decoder2;
   // Kick off two new streams.
@@ -155,8 +210,35 @@ TEST_F(ConnectivityGridTest, FailureThenSuccessForMultipleConnections) {
   cancel2->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
-// Test both pools failing
-TEST_F(ConnectivityGridTest, FailureTwice) {
+// Test both connections happening in parallel and both failing.
+TEST_F(ConnectivityGridTest, DoubleFailureParallel) {
+  EXPECT_EQ(grid_.first(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_.newStream(decoder_, callbacks_);
+  EXPECT_NE(grid_.first(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_.second(), nullptr);
+
+  // onPoolFailure should not be passed up the first time. Instead the grid
+  // should wait on the second pool.
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_.callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                   "reason", host_);
+
+  // Failure should be passed from the pool back to the original caller.
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_.callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "reason", host_);
+}
+
+// Test cancellation
+TEST_F(ConnectivityGridTest, TestCancel) {
   EXPECT_EQ(grid_.first(), nullptr);
 
   auto cancel = grid_.newStream(decoder_, callbacks_);
