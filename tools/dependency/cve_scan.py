@@ -115,8 +115,9 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
 
         published_date = parse_cve_date(cve['publishedDate'])
         last_modified_date = parse_cve_date(cve['lastModifiedDate'])
-        cves[cve_id] = Cve(cve_id, description, cpe_set, cvss_v3_score, cvss_v3_severity,
-                           published_date, last_modified_date)
+        cves[cve_id] = Cve(
+            cve_id, description, cpe_set, cvss_v3_score, cvss_v3_severity, published_date,
+            last_modified_date)
         for cpe in cpe_set:
             cpe_revmap[str(cpe.vendor_normalized())].add(cve_id)
     return cves, cpe_revmap
@@ -299,8 +300,8 @@ if __name__ == '__main__':
             for year in scan_years
         ]
     cves, cpe_revmap = download_cve_data(urls)
-    possible_cves, cve_deps = cve_scan(cves, cpe_revmap, IGNORES_CVES,
-                                       dep_utils.repository_locations())
+    possible_cves, cve_deps = cve_scan(
+        cves, cpe_revmap, IGNORES_CVES, dep_utils.repository_locations())
     if possible_cves:
         print(
             '\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:')

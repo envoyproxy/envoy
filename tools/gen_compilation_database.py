@@ -22,8 +22,8 @@ def generate_compilation_database(args):
         "--output_groups=compdb_files,header_files"
     ] + args.bazel_targets)
 
-    execroot = subprocess.check_output(["bazel", "info", "execution_root"] +
-                                       bazel_options).decode().strip()
+    execroot = subprocess.check_output(["bazel", "info", "execution_root"]
+                                       + bazel_options).decode().strip()
 
     compdb = []
     for compdb_file in Path(execroot).glob("**/*.compile_commands.json"):
@@ -92,8 +92,7 @@ if __name__ == "__main__":
     parser.add_argument('--include_genfiles', action='store_true')
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
-    parser.add_argument('bazel_targets',
-                        nargs='*',
-                        default=["//source/...", "//test/...", "//tools/..."])
+    parser.add_argument(
+        'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
     args = parser.parse_args()
     fix_compilation_database(args, generate_compilation_database(args))

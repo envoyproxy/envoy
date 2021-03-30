@@ -40,8 +40,8 @@ def fake_dep(use_category, extensions=[]):
 class ValidateTest(unittest.TestCase):
 
     def build_validator(self, deps, reachable_deps, extensions=[]):
-        return validate.Validator(FakeDependencyInfo(deps),
-                                  FakeBuildGraph(reachable_deps, extensions))
+        return validate.Validator(
+            FakeDependencyInfo(deps), FakeBuildGraph(reachable_deps, extensions))
 
     def test_valid_build_graph_structure(self):
         validator = self.build_validator({}, {
@@ -57,8 +57,8 @@ class ValidateTest(unittest.TestCase):
             '//source/extensions/...': ['b'],
             '//source/...': ['a', 'b', 'c']
         })
-        self.assertRaises(validate.DependencyError,
-                          lambda: validator.validate_build_graph_structure())
+        self.assertRaises(
+            validate.DependencyError, lambda: validator.validate_build_graph_structure())
 
     def test_valid_test_only_deps(self):
         validator = self.build_validator({'a': fake_dep('dataplane_core')}, {'//source/...': ['a']})
@@ -81,8 +81,8 @@ class ValidateTest(unittest.TestCase):
     def test_invalid_dataplane_core_deps(self):
         validator = self.build_validator({'a': fake_dep('controlplane')},
                                          {'//source/common/http/...': ['a']})
-        self.assertRaises(validate.DependencyError,
-                          lambda: validator.validate_data_plane_core_deps())
+        self.assertRaises(
+            validate.DependencyError, lambda: validator.validate_data_plane_core_deps())
 
     def test_valid_controlplane_deps(self):
         validator = self.build_validator({'a': fake_dep('controlplane')},
@@ -95,38 +95,35 @@ class ValidateTest(unittest.TestCase):
         self.assertRaises(validate.DependencyError, lambda: validator.validate_control_plane_deps())
 
     def test_valid_extension_deps(self):
-        validator = self.build_validator(
-            {
-                'a': fake_dep('controlplane'),
-                'b': fake_dep('dataplane_ext', ['foo'])
-            }, {
-                '//source/extensions/foo/...': ['a', 'b'],
-                '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
-            })
+        validator = self.build_validator({
+            'a': fake_dep('controlplane'),
+            'b': fake_dep('dataplane_ext', ['foo'])
+        }, {
+            '//source/extensions/foo/...': ['a', 'b'],
+            '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
+        })
         validator.validate_extension_deps('foo', '//source/extensions/foo/...')
 
     def test_invalid_extension_deps_wrong_category(self):
-        validator = self.build_validator(
-            {
-                'a': fake_dep('controlplane'),
-                'b': fake_dep('controlplane', ['foo'])
-            }, {
-                '//source/extensions/foo/...': ['a', 'b'],
-                '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
-            })
+        validator = self.build_validator({
+            'a': fake_dep('controlplane'),
+            'b': fake_dep('controlplane', ['foo'])
+        }, {
+            '//source/extensions/foo/...': ['a', 'b'],
+            '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
+        })
         self.assertRaises(
             validate.DependencyError,
             lambda: validator.validate_extension_deps('foo', '//source/extensions/foo/...'))
 
     def test_invalid_extension_deps_allowlist(self):
-        validator = self.build_validator(
-            {
-                'a': fake_dep('controlplane'),
-                'b': fake_dep('dataplane_ext', ['bar'])
-            }, {
-                '//source/extensions/foo/...': ['a', 'b'],
-                '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
-            })
+        validator = self.build_validator({
+            'a': fake_dep('controlplane'),
+            'b': fake_dep('dataplane_ext', ['bar'])
+        }, {
+            '//source/extensions/foo/...': ['a', 'b'],
+            '//source/exe:envoy_main_common_with_core_extensions_lib': ['a']
+        })
         self.assertRaises(
             validate.DependencyError,
             lambda: validator.validate_extension_deps('foo', '//source/extensions/foo/...'))
