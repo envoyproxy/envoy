@@ -42,7 +42,7 @@ If a route for the contents of a host/authority header cannot be resolved, the a
 paused while a
 :ref:`DeltaDiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>` is sent.
 When a :ref:`DeltaDiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryResponse>` is received where one of
-the :ref:`aliases <envoy_v3_api_field_service.discovery.v3.Resource.aliases>` or the 
+the :ref:`aliases <envoy_v3_api_field_service.discovery.v3.Resource.aliases>` or the
 :ref:`name <envoy_v3_api_field_service.discovery.v3.Resource.name>` in the response exactly matches the
 :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
 entry from the :ref:`DeltaDiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>`, the route
@@ -52,7 +52,7 @@ Updates to virtual hosts occur in two ways. If a virtual host was originally sen
 virtual host should be updated over RDS. If a virtual host was subscribed to over VHDS, then updates
 will take place over VHDS.
 
-When a route configuration entry is updated, if the 
+When a route configuration entry is updated, if the
 :ref:`vhds field <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhds>` has changed, the virtual host table for
 that route configuration is cleared, which will require that all virtual hosts be sent again.
 
