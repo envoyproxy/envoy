@@ -12,6 +12,16 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
+#include "envoy/api/api.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
+#include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
+
+#include "absl/hash/hash.h"
+#include "absl/strings/string_view.h"
+
+#include "common/common/thread.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 #include "common/stats/symbol_table_impl.h"
@@ -44,6 +54,9 @@ public:
   }
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
+
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+  IpTaggingFilterSetTagData(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config);
 
 private:
   static FilterRequestType requestTypeEnum(
@@ -97,6 +110,79 @@ public:
 private:
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+};
+
+/**
+ * Class that represents the IP tag values from the file
+ */
+class ValueSet {
+
+public:
+
+  ValueSet() = default;
+
+  ~ValueSet();
+
+private:
+  // todo
+
+};
+
+ /**
+ * Coordinates with the Filesystem::Watcher and when that reports a change, load up
+ * the change and updates it's internal settings.
+ */
+class ValueSetWatcher {
+private:
+  class Registry;
+
+public:
+  static std::shared_ptr<ValueSetWatcher>
+  create(Server::Configuration::FactoryContext& factory_context, std::string filename);
+
+  ValueSetWatcher(Event::Dispatcher& dispatcher, Api::Api& api, std::string filename);
+
+  ValueSetWatcher(Server::Configuration::FactoryContext& factory_context, std::string filename)
+      : ValueSetWatcher(factory_context.dispatcher(), factory_context.api(), std::move(filename)) {}
+
+  ~ValueSetWatcher();
+
+  bool contains(absl::string_view s) const;
+  std::shared_ptr<const ValueSet> get() const;
+  const std::string& filename() { return filename_; }
+
+private:
+  void maybeUpdate_(bool force = false);
+  void update_(absl::string_view content, std::uint64_t hash);
+  static std::shared_ptr<ValueSet> fileContentsAsValueSet_(absl::string_view contents);
+
+  std::shared_ptr<const ValueSet> values_;
+
+  Api::Api& api_;
+  std::string filename_;
+  std::uint64_t content_hash_ = 0;
+  std::unique_ptr<Filesystem::Watcher> watcher_;
+  Registry* registry_ = nullptr; // Set by registry.
+};
+
+/**
+ * The purpose of the registry is to create a single watcher for a file.
+ */
+class ValueSetWatcher::Registry {
+private:
+  using map_type = std::unordered_map<absl::string_view, std::weak_ptr<ValueSetWatcher>,
+                                      absl::Hash<absl::string_view>>;
+
+public:
+  std::shared_ptr<ValueSetWatcher>
+  getOrCreate(Server::Configuration::FactoryContext& factory_context, std::string filename);
+  void remove(ValueSetWatcher& watcher) noexcept; // Called in destructor of ValueSet.
+
+  static Registry& singleton();
+
+private:
+  mutable Thread::MutexBasicLockable mtx_;
+  map_type map_ ABSL_GUARDED_BY(mtx_);
 };
 
 } // namespace IpTagging

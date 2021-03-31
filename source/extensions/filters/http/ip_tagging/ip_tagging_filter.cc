@@ -5,6 +5,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/json/json_loader.h"
 
 #include "absl/strings/str_join.h"
 
@@ -31,6 +32,24 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
   }
 
+  if (!config.path().empty() && !config.ip_tags().empty()) {
+    throw EnvoyException("IP tags list is accepted either via list or file path");
+  }
+
+  // getIPTagsFromFile(config) - parse the file content and validate it as per IPTagFile
+  // pass content to below
+  // file is being watched for updates by envoy
+
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+    tag_data = IpTaggingFilterSetTagData(config);
+  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+}
+
+// move the common code
+std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
+IpTaggingFilterConfig::IpTaggingFilterSetTagData(
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config) {
+
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(config.ip_tags().size());
   for (const auto& ip_tag : config.ip_tags()) {
@@ -52,7 +71,93 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
-  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+  return tag_data;
+}
+
+ValueSet::~ValueSet() = default;
+
+// Check the registry and either return a watcher for a file or create one
+std::shared_ptr<ValueSetWatcher>
+ValueSetWatcher::create(Server::Configuration::FactoryContext& factory_context,
+                        std::string filename) {
+  return Registry::singleton().getOrCreate(factory_context, std::move(filename));
+}
+
+ValueSetWatcher::ValueSetWatcher(Event::Dispatcher& dispatcher, Api::Api& api, std::string filename)
+    : api_(api), filename_(filename), watcher_(dispatcher.createFilesystemWatcher()) {
+  const auto split_path = api_.fileSystem().splitPathFromFilename(filename);
+  watcher_->addWatch(absl::StrCat(split_path.directory_, "/"), Filesystem::Watcher::Events::MovedTo,
+                     [this]([[maybe_unused]] std::uint32_t event) { maybeUpdate_(); });
+
+  maybeUpdate_(true);
+}
+
+ValueSetWatcher::~ValueSetWatcher() {
+  if (registry_ != nullptr)
+    registry_->remove(*this);
+}
+
+//bool ValueSetWatcher::contains(absl::string_view s) const { return get()->contains(s); }
+
+std::shared_ptr<const ValueSet> ValueSetWatcher::get() const { return values_; }
+
+// read the file from filesystem, load the content and only update if the hash has changed.
+void ValueSetWatcher::maybeUpdate_(bool force) {
+  std::string contents = api_.fileSystem().fileReadToEnd(filename_);
+
+  uint64_t hash = 0;
+  hash = HashUtil::xxHash64(contents, hash);
+
+  if (force || hash != content_hash_)
+    update_(std::move(contents), hash);
+}
+
+void ValueSetWatcher::update_(absl::string_view contents, std::uint64_t hash) {
+  std::shared_ptr<const ValueSet> new_values = fileContentsAsValueSet_(contents);
+
+  new_values.swap(values_); // Fastest way to replace the values.
+  content_hash_ = hash;
+}
+
+// Decoder for file.
+// No rules creates an empty file
+std::shared_ptr<ValueSet> ValueSetWatcher::fileContentsAsValueSet_(absl::string_view contents) {
+  absl::string_view file_content = contents;
+  std::shared_ptr<ValueSet> values = std::make_shared<ValueSet>();
+  Json::ObjectSharedPtr json_content = Json::Factory::loadFromString(std::string(file_content));
+
+  // parse the file here and return the values corresponding to valueSet
+  return values;
+}
+
+std::shared_ptr<ValueSetWatcher>
+ValueSetWatcher::Registry::getOrCreate(Server::Configuration::FactoryContext& factory_context,
+                                       std::string filename) {
+  Thread::LockGuard lock(mtx_);
+
+  auto& ptr_ref = map_[filename];
+  auto ptr = ptr_ref.lock();
+  if (ptr != nullptr)
+    return ptr;
+
+  ptr_ref = ptr = std::make_shared<ValueSetWatcher>(factory_context, std::move(filename));
+  ptr->registry_ = this;
+  return ptr;
+}
+
+void ValueSetWatcher::Registry::remove(ValueSetWatcher& watcher) noexcept {
+  Thread::LockGuard lock(mtx_);
+
+  // This is safe, even if the registered watcher is not the same
+  // (which is not something that can happen).
+  // The registry only promotes sharing, but if the wrong watcher is
+  // erased, it simply means it won't be shared anymore.
+  map_.erase(watcher.filename());
+}
+
+ValueSetWatcher::Registry& ValueSetWatcher::Registry::singleton() {
+  static Registry impl;
+  return impl;
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
