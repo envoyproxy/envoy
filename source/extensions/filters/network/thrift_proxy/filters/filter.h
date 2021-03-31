@@ -102,7 +102,7 @@ public:
   /**
    * @return Response decoder created by the connection manager.
    */
-  virtual MessageMetadataSharedPtr responseDecoderMetadata() PURE;
+  virtual MessageMetadataSharedPtr responseMetadata() PURE;
 };
 
 /**

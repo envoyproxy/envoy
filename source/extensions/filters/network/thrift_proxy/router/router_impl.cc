@@ -351,7 +351,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
     if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
-      switch (callbacks_->responseDecoderMetadata()->messageType()) {
+      switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
         incClusterScopeCounter(response_reply_);
         break;

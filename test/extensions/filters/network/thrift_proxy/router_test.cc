@@ -313,7 +313,7 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
-    ON_CALL(callbacks_, responseDecoderMetadata()).WillByDefault(Return(metadata));
+    ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
