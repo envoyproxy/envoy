@@ -2,11 +2,11 @@
 
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <queue>
 #include <set>
 #include <vector>
-#include <exception>
 
 #include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
@@ -26,31 +26,35 @@ namespace Upstream {
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
 
-template <class ConfigProto> class ConfigurableTypedLoadBalancerFactory : public TypedLoadBalancerFactory {
+template <class ConfigProto>
+class ConfigurableTypedLoadBalancerFactory : public TypedLoadBalancerFactory {
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() {
     return std::make_unique<ConfigProto>();
   }
 
-  LoadBalancerPtr create(const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
-      LoadBalancerType load_balancer_type, LoadBalancerFactoryContext& context,
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-      ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) override {
+  LoadBalancerPtr
+  create(const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
+         LoadBalancerType load_balancer_type, LoadBalancerFactoryContext& context,
+         const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+         ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
+         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
 
-    Envoy::Config::Utility::translateOpaqueConfig(
-        policy.typed_config(), ProtobufWkt::Struct::default_instance(),
-        context.messageValidationVisitor(), *config);
+    Envoy::Config::Utility::translateOpaqueConfig(policy.typed_config(),
+                                                  ProtobufWkt::Struct::default_instance(),
+                                                  context.messageValidationVisitor(), *config);
 
     return createLoadBalancerWithConfig(load_balancer_type, priority_set, local_priority_set,
-                                cluster_stats, loader, random, common_config,
-                                MessageUtil::downcastAndValidate<const ConfigProto&>(*config, context.messageValidationVisitor()));
-
+                                        cluster_stats, loader, random, common_config,
+                                        MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                            *config, context.messageValidationVisitor()));
   }
 
-  virtual LoadBalancerPtr createLoadBalancerWithConfig(LoadBalancerType, const PrioritySet&,
-     const PrioritySet*, ClusterStats&, Runtime::Loader&, Random::RandomGenerator&,
-     const envoy::config::cluster::v3::Cluster::CommonLbConfig&, const ConfigProto&) PURE;
+  virtual LoadBalancerPtr
+  createLoadBalancerWithConfig(LoadBalancerType, const PrioritySet&, const PrioritySet*,
+                               ClusterStats&, Runtime::Loader&, Random::RandomGenerator&,
+                               const envoy::config::cluster::v3::Cluster::CommonLbConfig&,
+                               const ConfigProto&) PURE;
 };
 
 class LoadBalancerFactoryContextImpl : public LoadBalancerFactoryContext {
@@ -66,7 +70,6 @@ public:
 private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
-
 
 /**
  * Base class for all LB implementations.

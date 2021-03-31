@@ -129,14 +129,14 @@ class TypedLoadBalancerFactory : public Config::UntypedFactory {
 public:
   virtual ~TypedLoadBalancerFactory() = default;
 
-  virtual LoadBalancerPtr create(
-      const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
-      LoadBalancerType load_balancer_type, LoadBalancerFactoryContext& context,
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-      ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) PURE;
+  virtual LoadBalancerPtr
+  create(const envoy::config::cluster::v3::LoadBalancingPolicy::Policy& policy,
+         LoadBalancerType load_balancer_type, LoadBalancerFactoryContext& context,
+         const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+         ClusterStats& cluster_stats, Runtime::Loader& loader, Random::RandomGenerator& random,
+         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) PURE;
 
- std::string category() const override { return "envoy.load_balancers"; }
+  std::string category() const override { return "envoy.load_balancers"; }
 };
 
 /**

@@ -8,9 +8,8 @@ namespace LoadBalancer {
 namespace ShuffleShard {
 
 ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
-    const Upstream::PrioritySet& priority_set,
-    const Upstream::PrioritySet* local_priority_set, Upstream::ClusterStats& stats, Runtime::Loader& runtime,
-    Random::RandomGenerator& random,
+    const Upstream::PrioritySet& priority_set, const Upstream::PrioritySet* local_priority_set,
+    Upstream::ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     const envoy::extensions::load_balancers::shuffle_shard::v3::ShuffleShardConfig& config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
@@ -18,7 +17,8 @@ ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
       endpoints_per_cell_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, endpoints_per_cell, 2)),
       use_zone_as_dimension_(config.use_zone_as_dimension()),
       use_dimensions_(config.dimensions().size()),
-      least_request_choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, least_request_choice_count, 1)),
+      least_request_choice_count_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, least_request_choice_count, 1)),
       shuffle_sharder_(ShuffleSharder<Upstream::HostConstSharedPtr>(SEED)) {
 
   for (auto dimension : config.dimensions())
@@ -30,16 +30,16 @@ ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
 
   lattice_ = std::make_shared<HostLattice>(dimensions_);
 
-  priority_update_cb_ =
-      priority_set_.addPriorityUpdateCb([this](uint32_t /*priority*/, const Upstream::HostVector& hosts_added,
-                                               const Upstream::HostVector& hosts_removed) -> void {
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [this](uint32_t /*priority*/, const Upstream::HostVector& hosts_added,
+             const Upstream::HostVector& hosts_removed) -> void {
         add_hosts(hosts_added);
         remove_hosts(hosts_removed);
       });
 }
 
-
-Upstream::HostConstSharedPtr ShuffleShardLoadBalancer::chooseHostOnce(Upstream::LoadBalancerContext* context) {
+Upstream::HostConstSharedPtr
+ShuffleShardLoadBalancer::chooseHostOnce(Upstream::LoadBalancerContext* context) {
   absl::optional<uint64_t> hash;
   if (context) {
     hash = context->computeHashKey();
@@ -107,21 +107,24 @@ ShuffleShardLoadBalancer::get_coord(const Upstream::HostConstSharedPtr& host) {
 
   if (use_dimensions_) {
     if (!host->metadata()) {
-      ENVOY_LOG_MISC(warn, fmt::format("ignoring host {} because it has no metadata", host->hostname()));
+      ENVOY_LOG_MISC(warn,
+                     fmt::format("ignoring host {} because it has no metadata", host->hostname()));
       return absl::nullopt;
     }
     const envoy::config::core::v3::Metadata& metadata = *host->metadata();
     const auto& filter_it =
         metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it == metadata.filter_metadata().end()) {
-      ENVOY_LOG_MISC(warn, fmt::format("ignoring host {} because it has no envoy.lb metadata", host->hostname()));
+      ENVOY_LOG_MISC(warn, fmt::format("ignoring host {} because it has no envoy.lb metadata",
+                                       host->hostname()));
       return absl::nullopt;
     }
     const auto& fields = filter_it->second.fields();
     for (const auto& key : dimensions_) {
       const auto it = fields.find(key);
       if (it == fields.end()) {
-        ENVOY_LOG_MISC(warn, "ignoring host {} because it has no envoy.lb tag {}", host->hostname(), key);
+        ENVOY_LOG_MISC(warn, "ignoring host {} because it has no envoy.lb tag {}", host->hostname(),
+                       key);
         return absl::nullopt;
       }
       std::ostringstream buf;
@@ -137,7 +140,6 @@ ShuffleShardLoadBalancer::get_coord(const Upstream::HostConstSharedPtr& host) {
   }
   return coord;
 }
-
 
 } // namespace ShuffleShard
 } // namespace LoadBalancer

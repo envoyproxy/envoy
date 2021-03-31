@@ -17,15 +17,17 @@ using LatticeSharedPtr = std::shared_ptr<HostLattice>;
 
 class ShuffleShardLoadBalancer : public Upstream::ZoneAwareLoadBalancerBase {
 public:
-  ShuffleShardLoadBalancer(const Upstream::PrioritySet& priority_set,
-                           const Upstream::PrioritySet* local_priority_set, Upstream::ClusterStats& stats,
-                           Runtime::Loader& runtime, Random::RandomGenerator& random,
-                           const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-                           const envoy::extensions::load_balancers::shuffle_shard::v3::ShuffleShardConfig& config);
+  ShuffleShardLoadBalancer(
+      const Upstream::PrioritySet& priority_set, const Upstream::PrioritySet* local_priority_set,
+      Upstream::ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+      const envoy::extensions::load_balancers::shuffle_shard::v3::ShuffleShardConfig& config);
 
   Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext* context) override;
 
-  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override { return nullptr; }
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+    return nullptr;
+  }
 
 private:
   void remove_hosts(const Upstream::HostVector&);
