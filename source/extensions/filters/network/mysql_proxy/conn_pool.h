@@ -1,19 +1,14 @@
-#pragma once
-
-#include <memory>
-
-#include "envoy/buffer/buffer.h"
+#include "common/conn_pool/conn_pool_base.h"
+#include "envoy/api/api.h"
+#include "envoy/upstream/upstream.h"
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
-#include "envoy/tcp/conn_pool.h"
-#include "envoy/upstream/cluster_manager.h"
-
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
-namespace ConnectionPool {
+namespace ConnPool {
 using PoolFailureReason = Tcp::ConnectionPool::PoolFailureReason;
 
 enum class MySQLPoolFailureReason {
@@ -30,48 +25,6 @@ enum class MySQLPoolFailureReason {
   // A parse error when parse upstream data
   ParseFailure,
 };
-
-/**
- * Cancellable used for callee to cancel the client pool request.
- */
-class Cancellable {
-public:
-  virtual ~Cancellable() = default;
-  /**
-   * Cancel the client pool request.
-   */
-  virtual void cancel() PURE;
-};
-
-/**
- * ClientData is a wrapper of connection to MySQL server.
- */
-class ClientData {
-public:
-  virtual ~ClientData() = default;
-  /**
-   * Reset the decoder of client
-   * @param decoder the decoder which we want client to use.
-   */
-  virtual void resetClient(DecoderPtr&& decoder) PURE;
-  /**
-   * Send data to MySQL server
-   * @param data data to be sent.
-   */
-  virtual void sendData(Buffer::Instance& data) PURE;
-  /**
-   * Decoder getter of client data
-   * @return Decoder& decoder of client data
-   */
-  virtual Decoder& decoder() PURE;
-  /**
-   * Closer of client data, in most cases, close() will put the client into the client pool.
-   */
-  virtual void close() PURE;
-};
-
-using ClientDataPtr = std::unique_ptr<ClientData>;
-
 /**
  * MySQL Client Pool call back
  */
@@ -79,54 +32,59 @@ class ClientPoolCallBack {
 public:
   virtual ~ClientPoolCallBack() = default;
   /**
-   * onClientReady called when connection is ready and pass the MySQL connection phase
-   * @param client_data Client Data of ready connection
+   * Called when a pool error occurred and no connection could be acquired for making the request.
+   * @param reason supplies the failure reason.
+   * @param host supplies the description of the host that caused the failure. This may be nullptr
+   *             if no host was involved in the failure (for example overflow).
    */
-  virtual void onClientReady(ClientDataPtr&& client_data) PURE;
+  virtual void onPoolFailure(MySQLPoolFailureReason reason,
+                             Upstream::HostDescriptionConstSharedPtr host) PURE;
+
   /**
-   * onClientFailure called when proxy failed to get connection of upstream or failed to pass
-   * connection phase.
-   * @param reason reason of failure
+   * Called when a connection is available to process a request/response. Connections may be
+   * released back to the pool for re-use by resetting the ConnectionDataPtr. If the connection is
+   * no longer viable for reuse (e.g. due to some kind of protocol error), the underlying
+   * ClientConnection should be closed to prevent its reuse.
+   *
+   * @param conn supplies the connection data to use.
+   * @param host supplies the description of the host that will carry the request. For logical
+   *             connection pools the description may be different each time this is called.
    */
-  virtual void onClientFailure(MySQLPoolFailureReason reason) PURE;
+  virtual void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                           Upstream::HostDescriptionConstSharedPtr host) PURE;
+};
+
+class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
+public:
+  ~Instance() override = default;
+  virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callback) PURE;
+  virtual void closeConnections() PURE;
 };
 
 /*
- * MySQL Connection pool of upstream
+ * cluster connection pool manager, per connection pool per host.
  */
-class Instance {
+class ConnectionPoolManager {
 public:
-  virtual ~Instance() = default;
-  /**
-   * Create a new client on the pool.
-   * @param cb supplies the callbacks to invoke when the client is ready or has failed. The
-   *           callbacks may be invoked immediately within the context of this call if there is a
-   *           ready client or an immediate failure. In this case, the routine returns nullptr.
-   * @return Cancellable* If no client is ready, the callback is not invoked, and a handle
-   *                      is returned that can be used to cancel the request. Otherwise, one of the
-   *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
-   *                      is called, the handle is no longer valid and any further cancellation
-   *                      should be done by resetting the client.
-   */
-  virtual Cancellable* newMySQLClient(ClientPoolCallBack& cb) PURE;
+  virtual ~ConnectionPoolManager() = default;
+  // now use defualt lb to choose host.
+  virtual Tcp::ConnectionPool::Cancellable* newConnection(ClientPoolCallBack& callbacks) PURE;
 };
 
-using ClientPoolSharedPtr = std::shared_ptr<Instance>;
+using InstancePtr = std::unique_ptr<Instance>;
+using ConnectionPoolManagerSharedPtr = std::shared_ptr<ConnectionPoolManager>;
 
-class InstanceFactory {
+class ConnectionPoolManagerFactory {
 public:
-  virtual ~InstanceFactory() = default;
-  virtual ClientPoolSharedPtr
-  create(ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager* cm,
+  virtual ~ConnectionPoolManagerFactory() = default;
+  // now use defualt lb to choose host.
+  virtual ConnectionPoolManagerSharedPtr
+  create(Upstream::ClusterManager* cm, ThreadLocal::SlotAllocator& tls, Api::Api& api,
          const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route,
-         const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::
-             ConnectionPoolSettings& setting,
-         DecoderFactory& decoder_factory, const std::string& auth_username,
-         const std::string& auth_password) PURE;
+         DecoderFactory& decoder_factory) PURE;
 };
 
-} // namespace ConnectionPool
-
+} // namespace ConnPool
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
