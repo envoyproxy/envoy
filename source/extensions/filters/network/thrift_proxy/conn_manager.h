@@ -220,7 +220,9 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-    MessageMetadataSharedPtr responseDecoderMetadata() override { return response_decoder_->metadata_; }
+    MessageMetadataSharedPtr responseDecoderMetadata() override {
+      return response_decoder_->metadata_;
+    }
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
