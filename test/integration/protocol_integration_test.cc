@@ -135,36 +135,49 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
 }
 
 // Add a filter that overrides the cached route/cluster selection with a DelegatingRoute
-TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
-  EXCLUDE_UPSTREAM_HTTP3;
+TEST_P(ProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
+  // ProtocolIntegrationTest checks cluster.cluster_0.upstream_rq_total to determine if upstream
+  // connections are used. Since that conditional will fail, manually set this bool to test with the
+  // full mesh.
+  testing_upstream_intentionally_ = true;
 
   config_helper_.addFilter(R"EOF(
   name: set-route-filter
   )EOF");
 
-  // Upstreams: cluster_0, cluster_override
+  // Upstreams: cluster_0, cluster_override (ORIGINAL DST), fake_upstreams_[2] for
+  // x-envoy-original-dst-host
   setUpstreamCount(2);
+
+  // DEBUG: Testing to see if ORIGINAL DST is the issue
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* test_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    test_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    test_cluster->set_name("test");
+    ConfigHelper::setHttp2(*test_cluster);
+  });
 
   // Tests with ORIGINAL_DST cluster because the first use case of the setRoute / DelegatingRoute
   // route mutability functionality will be for Lyft's internal filter that re-routes requests to an
   // ORIGINAL_DST cluster on a per-request basis.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    std::string cluster_yaml = R"EOF(
-            name: cluster_override
-            connect_timeout: 1.250s
-            type: ORIGINAL_DST
-            lb_policy: CLUSTER_PROVIDED
-            original_dst_lb_config:
-              use_http_header: true
-          )EOF";
-    envoy::config::cluster::v3::Cluster cluster_config;
-    TestUtility::loadFromYaml(cluster_yaml, cluster_config);
-    auto* orig_dst_cluster = bootstrap.mutable_static_resources()->add_clusters();
-    orig_dst_cluster->MergeFrom(cluster_config);
-  });
+  // config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  //   std::string cluster_yaml = R"EOF(
+  //           name: cluster_override
+  //           connect_timeout: 1.250s
+  //           type: ORIGINAL_DST
+  //           lb_policy: CLUSTER_PROVIDED
+  //           original_dst_lb_config:
+  //             use_http_header: true
+  //         )EOF";
+  //   envoy::config::cluster::v3::Cluster cluster_config;
+  //   TestUtility::loadFromYaml(cluster_yaml, cluster_config);
+  //   auto* orig_dst_cluster = bootstrap.mutable_static_resources()->add_clusters();
+  //   orig_dst_cluster->MergeFrom(cluster_config);
+  //   // TODO: is this needed for H2 upstream testing?
+  //   ConfigHelper::setHttp2(*orig_dst_cluster);
+  // });
 
-  auto host_co =
-      config_helper_.createVirtualHost("cluster_override vhost", "/some/path", "cluster_override");
+  auto host_co = config_helper_.createVirtualHost("test vhost", "/some/path", "test");
   config_helper_.addVirtualHost(host_co);
 
   auto host_foo = config_helper_.createVirtualHost("cluster_0 vhost", "/some/path", "cluster_0");
@@ -182,29 +195,29 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterFromDelegatingRoute) {
       absl::StrCat(ip, ":", fake_upstreams_[0]->localAddress()->ip()->port());
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"},
-      {":path", "/some/path"},
-      {":scheme", "http"},
-      {":authority", "cluster_0"},
-      {"x-envoy-original-dst-host", ip_port_pair},
+      {":method", "GET"}, {":path", "/some/path"}, {":scheme", "http"}, {":authority", "cluster_0"},
+      // {"x-envoy-original-dst-host", ip_port_pair},
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  ASSERT_TRUE(response->complete());
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Even though headers specify cluster_0, set_route_filter modifies cached route cluster of
   // current request to cluster_override
-  test_server_->waitForCounterGe("cluster.cluster_override.upstream_cx_total", 1,
+  test_server_->waitForCounterGe("cluster.test.upstream_cx_total", 1,
                                  std::chrono::milliseconds(30000));
-  test_server_->waitForCounterGe("cluster.cluster_override.upstream_rq_200", 1,
+  test_server_->waitForCounterGe("cluster.test.upstream_rq_200", 1,
                                  std::chrono::milliseconds(30000));
 
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.test.upstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.test.upstream_rq_total")->value());
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
