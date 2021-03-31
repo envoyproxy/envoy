@@ -4288,7 +4288,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
                     .value());
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabled) {
+TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabledLegacy) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.internal_redirects_with_body", "false"}});
