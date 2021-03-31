@@ -1,7 +1,10 @@
-#include "common/conn_pool/conn_pool_base.h"
+#pragma once
 #include "envoy/api/api.h"
-#include "envoy/upstream/upstream.h"
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
+#include "envoy/upstream/upstream.h"
+
+#include "common/conn_pool/conn_pool_base.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
 namespace Envoy {

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/new_conn_pool_impl.h"
+#include "extensions/filters/network/mysql_proxy/conn_pool_impl.h"
 
 #include <memory>
 
@@ -7,8 +7,11 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/logger.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/message_helper.h"
 #include "extensions/filters/network/mysql_proxy/mysql_config.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
@@ -34,9 +37,13 @@ std::string ActiveMySQLClient::Auther::database() const {
   return parent_.parent_.parent_.database_;
 }
 
+void ActiveMySQLClient::Auther::onProtocolError() {
+  ENVOY_LOG(error, "connection pool: parse error when parser error message");
+  onFailure(MySQLPoolFailureReason::ParseFailure);
+}
+
 void ActiveMySQLClient::Auther::onServerGreeting(ServerGreeting& greet) {
-  auto auth_method = AuthHelper::authMethod(greet.getBaseServerCap(), greet.getExtServerCap(),
-                                            greet.getAuthPluginName());
+  auto auth_method = AuthHelper::authMethod(greet.getServerCap(), greet.getAuthPluginName());
   if (auth_method != AuthMethod::OldPassword && auth_method != AuthMethod::NativePassword) {
     // If server's auth method is not supported, use mysql_native_password as response, wait for
     // auth switch.
@@ -72,7 +79,6 @@ void ActiveMySQLClient::Auther::onClientLoginResponse(ClientLoginResponse& clien
         return;
       }
     }
-
     auto auth_switch_resp =
         MessageHelper::encodeClientLogin(auth_method, username(), password(), database(), seed_);
     auto& session = decoder_->getSession();
@@ -178,9 +184,13 @@ void ActiveMySQLClient::clearCallbacks() {
 }
 
 void ActiveMySQLClient::onAuthPassed() {
+  ENVOY_LOG(debug, "upstream auth passed");
+  // disable read, wait for client to consume server data
   connection_->readDisable(true);
   connection_->removeReadFilter(read_filter_handle_);
-
+  mysql_read_filter_ = std::make_shared<MySQLReadFilter>(*this);
+  // reset read filter, let client can use addUpstreamFilter to replace onData method
+  connection_->addReadFilter(mysql_read_filter_);
   parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
   parent_.scheduleOnUpstreamReady();
 }
@@ -202,6 +212,11 @@ void ActiveMySQLClient::makeRequest(MySQLCodec& codec, uint8_t seq) {
 void ActiveMySQLClient::onEvent(Network::ConnectionEvent event) {
   // when connection complete, we need wait for authenticate phase passed till poolReady
   if (event == Network::ConnectionEvent::Connected) {
+    ENVOY_LOG(debug, "connecting server success, but need wait connection phase pass");
+    if (connect_timer_) {
+      connect_timer_->disableTimer();
+      connect_timer_.reset();
+    }
     conn_connect_ms_->complete();
     conn_connect_ms_.reset();
     ASSERT(state_ == ActiveClient::State::CONNECTING);
@@ -246,12 +261,11 @@ ConnectionPoolManagerImpl::newConnection(ClientPoolCallBack& callbacks) {
 void ConnectionPoolManagerImpl::init(
     const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy::Route& route) {
   std::weak_ptr<ConnectionPoolManagerImpl> this_weak_ptr = shared_from_this();
-  auto cm = cm_;
-  tls_->set([&, this_weak_ptr, route,
-             cm](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_->set([&, this_weak_ptr,
+             route](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     if (auto this_shared_ptr = this_weak_ptr.lock()) {
-      auto pool = std::make_shared<ThreadLocalPool>(this_shared_ptr, dispatcher, cm, route,
-                                                    decoder_factory_);
+      auto pool =
+          std::make_shared<ThreadLocalPool>(this_shared_ptr, dispatcher, route, decoder_factory_);
       return pool;
     }
     return nullptr;

@@ -71,7 +71,7 @@ enum class AuthMethod : uint8_t {
  */
 class AuthHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
-  static AuthMethod authMethod(uint16_t cap, uint16_t ext_cap, const std::string& auth_plugin_name);
+  static AuthMethod authMethod(uint32_t cap, const std::string& auth_plugin_name);
 
   static std::vector<uint8_t> generateSeed();
 

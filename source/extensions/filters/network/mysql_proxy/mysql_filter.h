@@ -12,7 +12,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/mysql_proxy/new_conn_pool_impl.h"
+#include "extensions/filters/network/mysql_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/mysql_proxy/mysql_client.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
@@ -117,6 +117,8 @@ public:
   void onResponse(MySQLCodec&, uint8_t seq) override;
   void onFailure() override;
 
+  bool checkPassword(const ClientLogin& client_login, const std::vector<uint8_t>& seed,
+                     size_t expect_length);
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   MySQLSession& getSession() { return decoder_->getSession(); }
@@ -130,7 +132,6 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   MySQLFilterConfigSharedPtr config_;
   Buffer::OwnedImpl read_buffer_;
-  Buffer::OwnedImpl write_buffer_;
   DecoderPtr decoder_;
   RouterSharedPtr router_;
   ClientFactory& client_factory_;

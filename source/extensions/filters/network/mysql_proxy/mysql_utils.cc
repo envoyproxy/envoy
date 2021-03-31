@@ -228,8 +228,7 @@ std::vector<uint8_t> AuthHelper::generateSeed() {
   return res;
 }
 
-AuthMethod AuthHelper::authMethod(uint16_t cap, uint16_t ext_cap,
-                                  const std::string& auth_plugin_name) {
+AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_name) {
 
   if (auth_plugin_name.empty()) {
     /*
@@ -237,14 +236,10 @@ AuthMethod AuthHelper::authMethod(uint16_t cap, uint16_t ext_cap,
      */
     bool v41 = cap & CLIENT_PROTOCOL_41;
     bool sconn = cap & CLIENT_SECURE_CONNECTION;
-    bool plugin = ext_cap & MYSQL_EXT_CL_PLUGIN_AUTH;
     if (!v41 || !sconn) {
       return AuthMethod::OldPassword;
     }
-    if (v41 && sconn && !plugin) {
-      return AuthMethod::NativePassword;
-    }
-    return AuthMethod::Unknown;
+    return AuthMethod::NativePassword;
   }
 
   if (auth_plugin_name == "mysql_old_password") {

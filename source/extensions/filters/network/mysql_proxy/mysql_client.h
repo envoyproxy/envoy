@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
 namespace Envoy {

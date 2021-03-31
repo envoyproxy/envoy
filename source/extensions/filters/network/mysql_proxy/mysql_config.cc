@@ -40,14 +40,10 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
     if (cluster == nullptr) {
       continue;
     }
-    auto info = cluster->info();
-    routes.emplace(route.database(),
-                   RouteFactoryImpl::instance_.create(
-                       context.threadLocal(), &context.clusterManager(), route,
-                       proto_config.setting(), DecoderFactoryImpl::instance_,
-                       ConnectionPool::InstanceFactoryImpl::instance_,
-                       ProtocolOptionsConfigImpl::authUsername(info, context.api()),
-                       ProtocolOptionsConfigImpl::authPassword(info, context.api())));
+    routes.emplace(route.database(), RouteFactoryImpl::instance.create(
+                                         &context.clusterManager(), context.threadLocal(),
+                                         context.api(), route, DecoderFactoryImpl::instance_,
+                                         ConnPool::ConnectionPoolManagerFactoryImpl::instance));
   }
   RouterSharedPtr router = std::make_shared<RouterImpl>(std::move(routes));
 

@@ -134,7 +134,6 @@ envoy_cc_library(
     deps = [
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )

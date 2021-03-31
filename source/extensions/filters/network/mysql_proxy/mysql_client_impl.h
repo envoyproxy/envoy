@@ -1,8 +1,11 @@
-#include "common/buffer/buffer_impl.h"
-#include "envoy/buffer/buffer.h"
+#include <memory>
+#include <type_traits>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/tcp/conn_pool.h"
-#include "extensions/filters/network/mysql_proxy/conn_pool.h"
+
+#include "common/buffer/buffer_impl.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_client.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
@@ -15,11 +18,12 @@ namespace MySQLProxy {
 class ClientImpl : public Client,
                    public DecoderCallbacks,
                    public Tcp::ConnectionPool::UpstreamCallbacks,
-                   public Logger::Loggable<Logger::Id::client> {
+                   public Logger::Loggable<Logger::Id::client>,
+                   public std::enable_shared_from_this<ClientImpl> {
 public:
   ClientImpl(Tcp::ConnectionPool::ConnectionDataPtr&& conn, DecoderFactory& decoder_factory,
              ClientCallBack&);
-  ~ClientImpl() override;
+  ~ClientImpl() override = default;
   // Client
   void makeRequest(Buffer::Instance& buffer) override;
   void close() override { conn_data_->connection().close(Network::ConnectionCloseType::NoFlush); }

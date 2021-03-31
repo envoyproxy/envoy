@@ -121,11 +121,11 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
   if (client_cap_ & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
     uint64_t auth_len;
     if (BufferHelper::readLengthEncodedInteger(buffer, auth_len) != DecodeStatus::Success) {
-      ENVOY_LOG(debug, "error when parsing username of client login message");
+      ENVOY_LOG(debug, "error when parsing length of auth response of client login message");
       return DecodeStatus::Failure;
     }
     if (BufferHelper::readVectorBySize(buffer, auth_len, auth_resp_) != DecodeStatus::Success) {
-      ENVOY_LOG(debug, "error when parsing auth resp of client login message");
+      ENVOY_LOG(debug, "error when parsing auth response of client login message");
       return DecodeStatus::Failure;
     }
   } else if (client_cap_ & CLIENT_SECURE_CONNECTION) {

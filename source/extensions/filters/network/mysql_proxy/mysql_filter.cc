@@ -6,13 +6,13 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/upstream/outlier_detection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 
-#include "envoy/upstream/outlier_detection.h"
 #include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/message_helper.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
@@ -58,7 +58,7 @@ void MySQLFilter::onEvent(Network::ConnectionEvent event) {
 }
 
 Network::FilterStatus MySQLFilter::onData(Buffer::Instance& data, bool) {
-  ENVOY_LOG(trace, "downstream data sent, len {}", data.length());
+  ENVOY_LOG(debug, "downstream data sent, len {}", data.length());
   read_buffer_.move(data);
   if (client_ == nullptr && authed_) {
     return Network::FilterStatus::StopIteration;
@@ -81,7 +81,6 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
     ENVOY_LOG(info, "mysql_proxy: decoding error: {}", e.what());
     config_->stats_.decoder_errors_.inc();
     read_buffer_.drain(read_buffer_.length());
-    write_buffer_.drain(write_buffer_.length());
   }
 }
 
@@ -90,7 +89,8 @@ void MySQLFilter::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   client_ = client_factory_.create(std::move(conn), decoder_factory_, *this);
   canceler_ = nullptr;
   read_callbacks_->continueReading();
-  ENVOY_LOG(trace, "upstream client is ready, continue reading");
+  doDecode(read_buffer_);
+  ENVOY_LOG(debug, "upstream client is ready, continue decoding");
 }
 
 void MySQLFilter::onPoolFailure(ConnPool::MySQLPoolFailureReason reason,
@@ -152,6 +152,26 @@ void MySQLFilter::onNewMessage(MySQLSession::State state) {
   }
 }
 
+bool MySQLFilter::checkPassword(const ClientLogin& client_login, const std::vector<uint8_t>& seed,
+                                size_t expect_length) {
+  if (client_login.getAuthResp().size() != expect_length) {
+    ENVOY_LOG(info, "filter: password length error of client login, expected {}, got {}",
+              expect_length, client_login.getAuthResp().size());
+    onFailure(MessageHelper::passwordLengthError(client_login.getAuthResp().size()), 2);
+    return false;
+  }
+  if (AuthHelper::nativePasswordSignature(config_->password_, seed) != client_login.getAuthResp()) {
+    ENVOY_LOG(info, "filter: password is not correct");
+    onFailure(MessageHelper::authError(
+                  client_login.getUsername(),
+                  read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
+                  true),
+              2);
+    return false;
+  }
+  return true;
+}
+
 void MySQLFilter::onClientLogin(ClientLogin& client_login) {
   if (client_login.isSSLRequest()) {
     config_->stats_.upgraded_to_ssl_.inc();
@@ -160,6 +180,7 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
     return;
   }
   if (config_->username_ != client_login.getUsername()) {
+    ENVOY_LOG(info, "filter: no such username {}", client_login.getUsername());
     onFailure(MessageHelper::authError(
                   client_login.getUsername(),
                   read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
@@ -169,43 +190,32 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
   }
   auto route = router_->upstreamPool(client_login.getDb());
   if (route == nullptr) {
+    ENVOY_LOG(info, "filter: no corresponding upstream cluster for this db {}",
+              client_login.getDb());
     onFailure(MessageHelper::dbError(client_login.getDb()), 2);
     return;
   }
-  if (client_login.isResponse41() &&
-      (client_login.getAuthPluginName() == "mysql_native_password")) {
-    if (client_login.getAuthResp().size() != NATIVE_PSSWORD_HASH_LENGTH) {
-      onFailure(MessageHelper::passwordLengthError(client_login.getAuthResp().size()), 2);
+  auto auth_method =
+      AuthHelper::authMethod(client_login.getClientCap(), client_login.getAuthPluginName());
+  switch (auth_method) {
+  case AuthMethod::NativePassword:
+    if (!checkPassword(client_login, seed_, NATIVE_PSSWORD_HASH_LENGTH)) {
       return;
     }
-    if (AuthHelper::nativePasswordSignature(config_->password_, seed_) !=
-        client_login.getAuthResp()) {
-      onFailure(MessageHelper::authError(
-                    client_login.getUsername(),
-                    read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
-                    true),
-                2);
+    break;
+  case AuthMethod::OldPassword:
+    if (!checkPassword(client_login, seed_, OLD_PASSWORD_HASH_LENGTH)) {
       return;
     }
-  } else if (client_login.isResponse320()) {
-    if (client_login.getAuthResp().size() != OLD_PASSWORD_HASH_LENGTH) {
-      onFailure(MessageHelper::passwordLengthError(client_login.getAuthResp().size()), 2);
-      return;
-    }
-    if (AuthHelper::oldPasswordSignature(config_->password_, seed_) != client_login.getAuthResp()) {
-      onFailure(MessageHelper::authError(
-                    client_login.getUsername(),
-                    read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
-                    true),
-                2);
-      return;
-    }
-  } else {
+    break;
+  default: {
     auto auth_switch = MessageHelper::encodeAuthSwitch(seed_);
     auto buffer = MessageHelper::encodePacket(auth_switch, 2);
     read_callbacks_->connection().write(buffer, false);
     return;
   }
+  }
+
   auto& pool = route->upstream();
   canceler_ = pool.newConnection(*this);
   onAuthOk();
@@ -245,7 +255,7 @@ void MySQLFilter::onCommand(Command& command) {
     auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),
                                                           decoder_->getAttributes(), metadata);
 
-    ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}", read_callbacks_->connection(),
+    ENVOY_CONN_LOG(debug, "mysql_proxy: query processed {}", read_callbacks_->connection(),
                    command.getData());
 
     if (!result) {

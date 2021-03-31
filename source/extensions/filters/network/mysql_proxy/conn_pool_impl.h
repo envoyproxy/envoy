@@ -3,12 +3,11 @@
 #include <list>
 #include <memory>
 
-#include "common/buffer/buffer_impl.h"
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
@@ -18,14 +17,16 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
-#include "common/conn_pool/conn_pool_base.h"
+
+#include "common/buffer/buffer_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/conn_pool/conn_pool_base.h"
 #include "common/network/filter_impl.h"
+
+#include "extensions/filters/network/mysql_proxy/conn_pool.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "extensions/filters/network/mysql_proxy/new_conn_pool.h"
-#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,6 +55,7 @@ public:
   struct Auther : public Network::ReadFilterBaseImpl, public DecoderCallbacks {
     // Network::ReadFilter
     Auther(ActiveMySQLClient&);
+    ~Auther() override = default;
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       if (decoder_) {
         decode_buffer_.move(data);
@@ -64,7 +66,7 @@ public:
     }
     // DecoderCallbacks
     void onProtocolError() override;
-    void onNewMessage(MySQLSession::State) override;
+    void onNewMessage(MySQLSession::State) override {}
     void onServerGreeting(ServerGreeting&) override;
     void onClientLogin(ClientLogin&) override;
     void onClientLoginResponse(ClientLoginResponse&) override;
@@ -83,6 +85,19 @@ public:
     AuthMethod auth_method_{AuthMethod::Unknown};
     std::vector<uint8_t> seed_;
     Buffer::OwnedImpl decode_buffer_;
+  };
+
+  struct MySQLReadFilter : public Network::ReadFilterBaseImpl {
+    MySQLReadFilter(ActiveMySQLClient& parent) : parent_(parent) {}
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      if (parent_.callbacks_) {
+        parent_.onUpstreamData(data, end_stream);
+      } else {
+        parent_.close();
+      }
+      return Network::FilterStatus::StopIteration;
+    }
+    ActiveMySQLClient& parent_;
   };
 
   // This acts as the bridge between the ActiveMySQLClient and an individual TCP connection.
@@ -110,6 +125,7 @@ public:
     void addUpstreamCallbacks(Tcp::ConnectionPool::UpstreamCallbacks& callbacks) override {
       parent_->callbacks_ = &callbacks;
     }
+
     void release() { parent_ = nullptr; }
 
   protected:
@@ -141,12 +157,15 @@ public:
   uint64_t id() const override { return connection_->id(); }
 
   virtual void clearCallbacks();
-
+  void onUpstreamData(Buffer::Instance& data, bool end_stream) {
+    callbacks_->onUpstreamData(data, end_stream);
+  }
   void onAuthPassed();
   void makeRequest(MySQLCodec&, uint8_t);
 
   ConnPoolImpl& parent_;
   std::shared_ptr<Auther> read_filter_handle_;
+  std::shared_ptr<MySQLReadFilter> mysql_read_filter_;
   Tcp::ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
   Tcp::ConnectionPool::ConnectionStatePtr connection_state_;
