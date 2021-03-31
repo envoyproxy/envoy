@@ -17,8 +17,8 @@ struct MemFileInfo {
 
 class MemfileImpl : public FileSharedImpl {
 public:
-  MemfileImpl(const std::string& path, std::shared_ptr<MemFileInfo>& info)
-      : FileSharedImpl(path), info_(info) {}
+  MemfileImpl(const FilePathAndType& file_info, std::shared_ptr<MemFileInfo>& info)
+      : FileSharedImpl(file_info), info_(info) {}
 
   bool isOpen() const override { return open_; }
 
@@ -56,17 +56,18 @@ class MemfileInstanceImpl : public Instance {
 public:
   MemfileInstanceImpl();
 
-  FilePtr createFile(const std::string& path) override {
+  FilePtr createFile(const FilePathAndType& file_info) override {
+    const std::string& path = file_info.path_;
     absl::MutexLock m(&lock_);
     if (file_system_->fileExists(path) || !use_memfiles_) {
-      return file_system_->createFile(path);
+      return file_system_->createFile(file_info);
     }
     auto it = files_.find(path);
     if (it == files_.end()) {
       it = files_.emplace(path, std::make_shared<MemFileInfo>()).first;
     }
     std::shared_ptr<MemFileInfo> info = it->second;
-    return FilePtr{new MemfileImpl(path, info)};
+    return FilePtr{new MemfileImpl(file_info, info)};
   }
 
   bool fileExists(const std::string& path) override {
