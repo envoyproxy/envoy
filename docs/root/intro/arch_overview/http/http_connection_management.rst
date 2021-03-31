@@ -153,7 +153,9 @@ Internal redirects
 
 Envoy supports handling 3xx redirects internally, that is capturing a configurable 3xx redirect
 response, synthesizing a new request, sending it to the upstream specified by the new route match,
-and returning the redirected response as the response to the original request.
+and returning the redirected response as the response to the original request. The headers and body
+of the original request will be sent in the redirect to the new location. Trailers are not yet
+supported.
 
 Internal redirects are configured via the :ref:`internal redirect policy
 <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field in route configuration.
