@@ -99,7 +99,7 @@ void ActiveInternalSocket::setDynamicMetadata(const std::string& name,
 
 void ActiveInternalSocket::newConnection() {
   connected_ = true;
-
+  listener_.incNumConnections();
   // Set default transport protocol if none of the listener filters did it.
   if (socket_->detectedTransportProtocol().empty()) {
     socket_->setDetectedTransportProtocol(
@@ -244,8 +244,7 @@ ActiveInternalConnection::ActiveInternalConnection(
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
   // path if there is no configured balancer.
-  // TODO(lambdai): FIX-ME
-  //++listener.parent_.num_handler_connections_;
+  listener.parent_.incNumConnections();
 }
 
 ActiveInternalConnection::~ActiveInternalConnection() {

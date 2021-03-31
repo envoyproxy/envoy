@@ -59,10 +59,8 @@ public:
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void decNumConnections() {
-    // FIX-ME: redesign openConnections.
-    // config_->openConnections().dec();
-  }
+  void incNumConnections() { config_->openConnections().inc(); }
+  void decNumConnections() { config_->openConnections().dec(); }
   /**
    * Remove and destroy an active connection.
    * @param connection supplies the connection to remove.

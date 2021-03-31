@@ -59,6 +59,7 @@ public:
     EXPECT_CALL(listener_config_, listenerFiltersTimeout());
     EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
     EXPECT_CALL(listener_config_, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
+    EXPECT_CALL(listener_config_, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
     auto mock_listener_will_be_moved = std::unique_ptr<Network::MockListener>();
     generic_listener_ = mock_listener_will_be_moved.get();
     internal_listener_ = std::make_shared<ActiveInternalListener>(
@@ -70,7 +71,7 @@ public:
   }
   std::string listener_stat_prefix_{"listener_stat_prefix"};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
-
+  BasicResourceLimitImpl resource_limit_;
   Network::MockConnectionHandler conn_handler_;
   Network::MockListener* generic_listener_;
   // MockInternalListenerCallback internal_listener_;
@@ -148,9 +149,12 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
+  EXPECT_CALL(conn_handler_, decNumConnections());
   connection->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.clearDeferredDeleteList();
   // EXPECT_CALL(*generic_listener_, onDestroy());
