@@ -29,7 +29,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // TODO(ccaraman): Remove size check once file system support is implemented.
   // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
   if (config.ip_tags().empty() && config.path().empty()) {
-    throw EnvoyException("HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
+    throw EnvoyException(
+        "HTTP IP Tagging Filter requires one of ip_tags and path to be specified.");
   }
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;

@@ -25,6 +25,10 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+IpTaggingFileConfig::IpTaggingFileConfig(
+    Envoy::Server::Configuration::FactoryContext& factory_context, std::string path)
+    : watcher_(ValueSetWatcher::create(factory_context, std::move(path))) {}
+
 /**
  * Static registration for the ip tagging filter. @see RegisterFactory.
  */
