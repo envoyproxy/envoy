@@ -39,17 +39,20 @@ namespace Utility {
 Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
                                Buffer::Instance& data) {
   Http::Status status;
-  try {
+  TRY_NEEDS_AUDIT {
     status = dispatch(data);
     // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
     // so dispatch may either return an error status or throw an exception. Soon we won't need to
     // catch these exceptions, as all codec errors will be migrated to using error statuses that are
     // returned from dispatch.
-  } catch (FrameFloodException& e) {
+  }
+  catch (FrameFloodException& e) {
     status = bufferFloodError(e.what());
-  } catch (CodecProtocolException& e) {
+  }
+  catch (CodecProtocolException& e) {
     status = codecProtocolError(e.what());
-  } catch (PrematureResponseException& e) {
+  }
+  catch (PrematureResponseException& e) {
     status = prematureResponseError(e.what(), e.responseCode());
   }
   return status;
@@ -439,10 +442,18 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
+  auto status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    throw CodecClientException(":status must be specified and a valid unsigned long");
+  }
+  return status.value();
+}
+
+absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    return absl::nullopt;
   }
   return response_code;
 }
@@ -465,43 +476,6 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config) {
-  Http1Settings ret;
-  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
-  ret.accept_http_10_ = config.accept_http_10();
-  ret.default_host_for_http_10_ = config.default_host_for_http_10();
-  ret.enable_trailers_ = config.enable_trailers();
-  ret.allow_chunked_length_ = config.allow_chunked_length();
-
-  if (config.header_key_format().has_proper_case_words()) {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
-  } else {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
-  }
-
-  return ret;
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme) {
-  Http1Settings ret = parseHttp1Settings(config);
-  ret.validate_scheme_ = validate_scheme;
-
-  if (config.has_override_stream_error_on_invalid_http_message()) {
-    // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
-    // stream_error_on_invalid_http_message
-    ret.stream_error_on_invalid_http_message_ =
-        config.override_stream_error_on_invalid_http_message().value();
-  } else {
-    // fallback to HCM value
-    ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
-  }
-
-  return ret;
 }
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
@@ -627,17 +601,16 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   xff_string = StringUtil::ltrim(xff_string);
   xff_string = StringUtil::rtrim(xff_string);
 
-  try {
-    // This technically requires a copy because inet_pton takes a null terminated string. In
-    // practice, we are working with a view at the end of the owning string, and could pass the
-    // raw pointer.
-    // TODO(mattklein123) PERF: Avoid the copy here.
-    return {
-        Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
-        last_comma == std::string::npos && num_to_skip == 0};
-  } catch (const EnvoyException&) {
-    return {nullptr, false};
+  // This technically requires a copy because inet_pton takes a null terminated string. In
+  // practice, we are working with a view at the end of the owning string, and could pass the
+  // raw pointer.
+  // TODO(mattklein123) PERF: Avoid the copy here.
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressNoThrow(std::string(xff_string));
+  if (address != nullptr) {
+    return {address, last_comma == std::string::npos && num_to_skip == 0};
   }
+  return {nullptr, false};
 }
 
 bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {

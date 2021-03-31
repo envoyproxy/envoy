@@ -68,9 +68,10 @@ public:
    * @param config supplies the configuration for the logger.
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
-  virtual typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
-                                                                 GrpcAccessLoggerType logger_type,
-                                                                 Stats::Scope& scope) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr
+  getOrCreateLogger(const ConfigProto& config,
+                    envoy::config::core::v3::ApiVersion transport_version,
+                    GrpcAccessLoggerType logger_type, Stats::Scope& scope) PURE;
 };
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
@@ -277,9 +278,10 @@ public:
     });
   }
 
-  typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
-                                                         GrpcAccessLoggerType logger_type,
-                                                         Stats::Scope& scope) override {
+  typename GrpcAccessLogger::SharedPtr
+  getOrCreateLogger(const ConfigProto& config,
+                    envoy::config::core::v3::ApiVersion transport_version,
+                    GrpcAccessLoggerType logger_type, Stats::Scope& scope) override {
     // TODO(euroelessar): Consider cleaning up loggers.
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
@@ -288,7 +290,7 @@ public:
       return it->second;
     }
     const auto logger = createLogger(
-        config,
+        config, transport_version,
         async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false)->create(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
@@ -313,7 +315,8 @@ private:
 
   // Create the specific logger type for this cache.
   virtual typename GrpcAccessLogger::SharedPtr
-  createLogger(const ConfigProto& config, Grpc::RawAsyncClientSharedPtr const& client,
+  createLogger(const ConfigProto& config, envoy::config::core::v3::ApiVersion transport_version,
+               Grpc::RawAsyncClientSharedPtr const& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
 
