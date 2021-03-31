@@ -6,25 +6,24 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
-#include "envoy/http/filter.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
-
 #include "envoy/api/api.h"
+#include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/filesystem/watcher.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
-
-#include "absl/hash/hash.h"
-#include "absl/strings/string_view.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/thread.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 #include "common/stats/symbol_table_impl.h"
+
+#include "absl/hash/hash.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,7 +55,8 @@ public:
   void incTotal() { incCounter(total_); }
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-  IpTaggingFilterSetTagData(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config);
+  IpTaggingFilterSetTagData(
+      const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config);
 
 private:
   static FilterRequestType requestTypeEnum(
@@ -118,17 +118,15 @@ private:
 class ValueSet {
 
 public:
-
   ValueSet() = default;
 
   ~ValueSet();
 
 private:
   // todo
-
 };
 
- /**
+/**
  * Coordinates with the Filesystem::Watcher and when that reports a change, load up
  * the change and updates it's internal settings.
  */

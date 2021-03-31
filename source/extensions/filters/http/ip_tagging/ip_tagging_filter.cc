@@ -40,8 +40,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // pass content to below
   // file is being watched for updates by envoy
 
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>
-    tag_data = IpTaggingFilterSetTagData(config);
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data =
+      IpTaggingFilterSetTagData(config);
   trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
@@ -97,7 +97,7 @@ ValueSetWatcher::~ValueSetWatcher() {
     registry_->remove(*this);
 }
 
-//bool ValueSetWatcher::contains(absl::string_view s) const { return get()->contains(s); }
+// bool ValueSetWatcher::contains(absl::string_view s) const { return get()->contains(s); }
 
 std::shared_ptr<const ValueSet> ValueSetWatcher::get() const { return values_; }
 
