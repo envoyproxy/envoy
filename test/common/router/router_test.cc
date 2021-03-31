@@ -4259,7 +4259,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
   enableRedirects();
-
   sendRequest(false);
 
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
@@ -4275,7 +4274,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
   enableRedirects();
-
   sendRequest();
 
   redirect_headers_->removeLocation();
@@ -4296,7 +4294,6 @@ TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabled) {
       {{"envoy.reloadable_features.internal_redirects_with_body", "false"}});
 
   enableRedirects();
-
   sendRequest();
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
@@ -4313,12 +4310,12 @@ TEST_F(RouterTest, InternalRedirectRejectedWithRequestBodyDisabled) {
 
 TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   enableRedirects();
-
   sendRequest(false);
 
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
 
   EXPECT_CALL(callbacks_, clearRouteCache());
@@ -4344,7 +4341,6 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
-
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
@@ -4360,7 +4356,6 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
 
 TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
   enableRedirects();
-
   sendRequest();
 
   redirect_headers_->setLocation("http://www.foo.com/some/path");
