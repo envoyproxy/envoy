@@ -30,7 +30,7 @@ jobs:
     name: mac_swift_helloworld
     needs: macdist
     runs-on: macOS-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v1
         with:
@@ -50,11 +50,14 @@ jobs:
         run: bazelisk run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
       - name: 'Check liveliness'
         run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+      - name: Log app run
+        if: ${{ failure() || cancelled() }}
+        run: cat /tmp/envoy.log
   macobjc:
     name: mac_objc_helloworld
     needs: macdist
     runs-on: macOS-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v1
         with:
@@ -74,6 +77,9 @@ jobs:
         run: bazelisk run --config=ios //examples/objective-c/hello_world:app &> /tmp/envoy.log &
       - name: 'Check liveliness'
         run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+      - name: Log app run
+        if: ${{ failure() || cancelled() }}
+        run: cat /tmp/envoy.log
   swifttests:
     name: swift_tests
     runs-on: macOS-latest
