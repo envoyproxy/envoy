@@ -70,7 +70,6 @@ Minor Behavior Changes
   are very frequent. This change can be disabled by setting the `envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`
   feature flag to false. If setting this flag to false is required in a deployment please open an
   issue against the project.
-* wasm: accpet cluster name to invoke grpc call and stream creation. This value won't break current wasm ABI spec and guaraded with `envoy.reloadable_features.wasm_cluster_name_envoy_grpc` that enabled by default.
 
 Bug Fixes
 ---------
