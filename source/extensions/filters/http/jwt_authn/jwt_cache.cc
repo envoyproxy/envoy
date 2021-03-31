@@ -14,8 +14,8 @@ constexpr int kJwtCacheDefaultSize = 100;
 class JwtCacheImpl : public JwtCache {
 public:
   JwtCacheImpl(bool enable_cache, int cache_size) {
-    // if cache_size is 0, it is not specified in the config, use default
     if (enable_cache) {
+      // if cache_size is 0, it is not specified in the config, use default
       if (cache_size == 0) {
         cache_size = kJwtCacheDefaultSize;
       }
@@ -24,7 +24,11 @@ public:
     }
   }
 
-  ~JwtCacheImpl() { jwt_cache_->clear(); }
+  ~JwtCacheImpl() {
+    if (jwt_cache_) {
+      jwt_cache_->clear();
+    }
+  }
 
   ::google::jwt_verify::Jwt* lookup(const std::string& token) override {
     if (!jwt_cache_) {
