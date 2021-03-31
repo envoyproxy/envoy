@@ -79,7 +79,7 @@ public:
                                  Callbacks& callbacks) PURE;
 
   /**
-   * Returns a user-friendly protocol descipton for logging.
+   * Returns a user-friendly protocol description for logging.
    * @return absl::string_view a protocol description for logging.
    */
   virtual absl::string_view protocolDescription() const PURE;

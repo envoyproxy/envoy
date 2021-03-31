@@ -53,7 +53,7 @@ public:
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                        Random::RandomGenerator& random_generator,
                        Upstream::ClusterConnectivityState& state,
-                       std::vector<Http::Protocol> protocol);
+                       std::vector<Http::Protocol> protocols);
   ~HttpConnPoolImplBase() override;
 
   // ConnectionPool::Instance
@@ -149,11 +149,11 @@ public:
                         const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                         Random::RandomGenerator& random_generator,
                         Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
-                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol)
+                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
-                             random_generator, state, protocol),
-        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocol[0]) {
-    ASSERT(protocol.size() == 1);
+                             random_generator, state, protocols),
+        codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {
+    ASSERT(protocols.size() == 1);
   }
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
