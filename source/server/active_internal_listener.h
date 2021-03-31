@@ -41,8 +41,12 @@ public:
   ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
                          Network::ListenerPtr&& listener, Network::ListenerConfig& config);
   ~ActiveInternalListener() override;
+
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
+  Network::BalancedConnectionHandlerOptRef
+  getBalancedHandlerByAddress(const Network::Address::Instance&) override;
+
   void pauseListening() override {
     if (listener_ != nullptr) {
       listener_->disable();

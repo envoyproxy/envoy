@@ -46,6 +46,10 @@ public:
    */
   virtual void newConnection(Network::ConnectionSocketPtr&& socket,
                              std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
+
+  virtual Network::BalancedConnectionHandlerOptRef
+  getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+
   Network::ConnectionHandler& parent_;
   Event::Dispatcher& dispatcher_;
   Network::ListenerPtr listener_;

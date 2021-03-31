@@ -107,19 +107,41 @@ void ActiveStreamSocket::setDynamicMetadata(const std::string& name,
 
 void ActiveStreamSocket::newConnection() {
   connected_ = true;
-  listener_.incNumConnections();
-  // Set default transport protocol if none of the listener filters did it.
-  if (socket_->detectedTransportProtocol().empty()) {
-    socket_->setDetectedTransportProtocol(
-        Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
+
+  // Check if the socket may need to be redirected to another listener.
+  Network::BalancedConnectionHandlerOptRef new_listener;
+
+  if (hand_off_restored_destination_connections_ &&
+      socket_->addressProvider().localAddressRestored()) {
+    // Find a listener associated with the original destination address.
+    new_listener =
+        listener_.getBalancedHandlerByAddress(*socket_->addressProvider().localAddress());
   }
-  // TODO(lambdai): add integration test
-  // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
-  // Erase accept filter states because accept filters may not get the opportunity to clean up.
-  // Particularly the assigned events need to reset before assigning new events in the follow up.
-  accept_filters_.clear();
-  // Create a new connection on this listener.
-  listener_.newConnection(std::move(socket_), std::move(stream_info_));
+  if (new_listener.has_value()) {
+    // Hands off connections redirected by iptables to the listener associated with the
+    // original destination address. Pass 'hand_off_restored_destination_connections' as false to
+    // prevent further redirection as well as 'rebalanced' as true since the connection has
+    // already been balanced if applicable inside onAcceptWorker() when the connection was
+    // initially accepted. Note also that we must account for the number of connections properly
+    // across both listeners.
+    // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
+    listener_.decNumConnections();
+    new_listener.value().get().incNumConnections();
+    new_listener.value().get().onAcceptWorker(std::move(socket_), false, true);
+  } else {
+    // Set default transport protocol if none of the listener filters did it.
+    if (socket_->detectedTransportProtocol().empty()) {
+      socket_->setDetectedTransportProtocol(
+          Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
+    }
+    // TODO(lambdai): add integration test
+    // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
+    // Erase accept filter states because accept filters may not get the opportunity to clean up.
+    // Particularly the assigned events need to reset before assigning new events in the follow up.
+    accept_filters_.clear();
+    // Create a new connection on this listener.
+    listener_.newConnection(std::move(socket_), std::move(stream_info_));
+  }
 }
 
 } // namespace Server

@@ -87,6 +87,12 @@ void ActiveInternalListener::newConnection(Network::ConnectionSocketPtr&& socket
   }
 }
 
+Network::BalancedConnectionHandlerOptRef
+ActiveInternalListener::getBalancedHandlerByAddress(const Network::Address::Instance&) {
+  // Internal listener does not support re-balance.
+  return absl::nullopt;
+}
+
 ActiveInternalConnections&
 ActiveInternalListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
   ActiveInternalConnectionsPtr& connections = connections_by_context_[&filter_chain];
