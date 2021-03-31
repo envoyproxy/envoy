@@ -752,18 +752,21 @@ TEST(ValidateHeaders, HeaderNameWithUnderscores) {
 
 TEST(ValidateHeaders, ContentLength) {
   bool should_close_connection;
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1, 2", true, should_close_connection));
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
+            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
   EXPECT_FALSE(should_close_connection);
 
   EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1, 2", false, should_close_connection));
-  EXPECT_TRUE(should_close_connection);
-}
+            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
+  EXPECT_FALSE(should_close_connection);
 
-EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-          HeaderUtility::validateContentLength("-1", false, should_close_connection));
-EXPECT_TRUE(should_close_connection);
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_TRUE(should_close_connection);
+
+  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
+            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_TRUE(should_close_connection);
 }
 
 } // namespace Http
