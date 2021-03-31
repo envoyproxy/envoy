@@ -464,6 +464,25 @@ TEST(IpListTest, MatchAny) {
   EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
 }
 
+TEST(IpListTest, MatchAnyImplicitPrefixLen) {
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> cidrRangeList;
+  auto cidrRange = cidrRangeList.Add();
+  cidrRange->set_address_prefix("0.0.0.0");
+  EXPECT_FALSE(cidrRange->has_prefix_len());
+
+  IpList list(cidrRangeList);
+
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.3")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.3.255")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.168.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("192.0.0.0")));
+  EXPECT_TRUE(list.contains(Address::Ipv4Instance("1.1.1.1")));
+
+  EXPECT_FALSE(list.contains(Address::Ipv6Instance("::1")));
+  EXPECT_FALSE(list.contains(Address::PipeInstance("foo")));
+}
+
 TEST(IpListTest, MatchAnyAll) {
   IpList list(makeCidrRangeList({{"0.0.0.0", 0}, {"::", 0}}));
 

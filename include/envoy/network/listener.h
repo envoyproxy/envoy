@@ -279,6 +279,12 @@ public:
   virtual void onData(UdpRecvData&& data) PURE;
 
   /**
+   * Called whenever datagrams are dropped due to overflow or truncation.
+   * @param dropped supplies the number of dropped datagrams.
+   */
+  virtual void onDatagramsDropped(uint32_t dropped) PURE;
+
+  /**
    * Called when the underlying socket is ready for read, before onData() is
    * called. Called only once per event loop, even if followed by multiple
    * onData() calls.

@@ -27,7 +27,7 @@
 #include "common/network/udp_listener_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
+#include "common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
@@ -66,7 +66,7 @@ public:
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource(),
-        Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+        envoy::config::core::v3::UdpSocketConfig());
     udp_packet_writer_ = std::make_unique<Quic::UdpGsoBatchWriter>(
         server_socket_->ioHandle(), listener_config_.listenerScope());
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));

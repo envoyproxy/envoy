@@ -110,11 +110,11 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
          This feature is still in Experimental state.
 
-      You can start Envoy as Windows Service that is managed under `Windows Service Control Manager <https://docs.microsoft.com/en-us/windows/win32/services/using-services/>`_. 
+      You can start Envoy as Windows Service that is managed under `Windows Service Control Manager <https://docs.microsoft.com/en-us/windows/win32/services/using-services/>`_.
 
       First, you need to create the service. Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``. After you create the service you
       can start it.
-      
+
       From an **administrator** prompt run the following commands (note that you need replace C:\EnvoyProxy\ with the path to the envoy.exe binary and the config file):
 
       .. substitution-code-block:: console
@@ -144,7 +144,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
          ...
 
       Use `sc.exe <https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/sc-create/>`_ to configure the service startup and error handling.
-      
+
       .. tip::
 
          The output of ``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``.
@@ -219,12 +219,12 @@ The Envoy admin interface should now be available on http://localhost:9902.
 .. note::
 
    When merging ``yaml`` lists (e.g. :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
-   or :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`) the merged configurations
+   or :ref:`clusters <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`) the merged configurations
    are appended.
 
    You cannot therefore use an override file to change the configurations of previously specified
    :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` or
-   :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+   :ref:`clusters <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`
 
 Validating your Envoy configuration
 -----------------------------------

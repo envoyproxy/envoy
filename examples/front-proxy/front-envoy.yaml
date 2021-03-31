@@ -129,7 +129,6 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -143,7 +142,6 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
       endpoints:
@@ -154,7 +152,6 @@ static_resources:
                 address: service2
                 port_value: 8000
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

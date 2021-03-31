@@ -5,6 +5,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
@@ -68,7 +69,7 @@ public:
       tls_certificate->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     });
-
+    ASSERT(Thread::MainThread::isMainThread());
     HttpIntegrationTest::initialize();
 
     registerTestServerPorts({"http"});

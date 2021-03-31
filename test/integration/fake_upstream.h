@@ -32,9 +32,13 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/udp_default_writer_config.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/stats/isolated_store_impl.h"
+
+#if defined(ENVOY_ENABLE_QUIC)
+#include "common/quic/active_quic_listener.h"
+#endif
 
 #include "server/active_raw_udp_listener_config.h"
 
@@ -134,9 +138,9 @@ public:
               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  waitForEndStream(Event::Dispatcher& client_dispatcher,
-                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  testing::AssertionResult waitForEndStream(
+      Event::Dispatcher& client_dispatcher,
+      std::chrono::milliseconds timeout = TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -206,6 +210,10 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    RELEASE_ASSERT(false, "initialize if this is needed");
+    return *stream_info_;
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -239,6 +247,7 @@ private:
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool received_data_{false};
 };
 
@@ -544,6 +553,10 @@ struct FakeUpstreamConfig {
   bool enable_half_close_{};
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
 };
 
 /**
@@ -577,13 +590,9 @@ public:
 
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult waitForHttpConnection(
-      Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-      uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-      uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT,
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-          headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  testing::AssertionResult
+  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -716,12 +725,12 @@ private:
     FakeListener(FakeUpstream& parent, bool is_quic = false)
         : parent_(parent), name_("fake_upstream"), init_manager_(nullptr) {
       if (is_quic) {
-        envoy::config::listener::v3::QuicProtocolOptions config;
-        auto& config_factory =
-            Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
-                "quiche_quic_listener");
-        udp_listener_config_.listener_factory_ =
-            config_factory.createActiveUdpListenerFactory(config, 1);
+#if defined(ENVOY_ENABLE_QUIC)
+        udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
+            envoy::config::listener::v3::QuicProtocolOptions(), 1);
+#else
+        ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
+#endif
       } else {
         udp_listener_config_.listener_factory_ =
             std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
@@ -796,6 +805,7 @@ private:
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
+  const FakeUpstreamConfig config_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;
