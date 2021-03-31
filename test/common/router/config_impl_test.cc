@@ -2383,6 +2383,16 @@ virtual_hosts:
     return *config_;
   }
 
+  absl::optional<uint64_t> generateHash(const std::vector<std::string>& header_values) {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    for (auto value : header_values) {
+      headers.addCopy("foo_header", value);
+    }
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    return route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
+                                                           nullptr);
+  }
+
   envoy::config::route::v3::RouteConfiguration route_config_;
   Http::HashPolicy::AddCookieCallback add_cookie_nop_;
 
@@ -2393,53 +2403,15 @@ private:
 TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   firstRouteHashPolicy()->mutable_header()->set_header_name("foo_header");
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
-                                                                 nullptr));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    headers.addCopy("foo_header", "bar,");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_,
-                                                                nullptr));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    headers.addCopy("foo_header", "bar");
-    headers.addCopy("foo_header", "foo");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    absl::Hash<const std::vector<std::string>> hasher;
-    auto expected_hash_value = hasher(std::vector<std::string>{"bar", "foo"});
-    EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
-                                       nullptr, headers, add_cookie_nop_, nullptr));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-    headers.addCopy("foo_header", "foo");
-    headers.addCopy("foo_header", "bar");
-    Router::RouteConstSharedPtr route = config().route(headers, 0);
-    absl::Hash<const std::vector<std::string>> hasher;
-    auto expected_hash_value = hasher(std::vector<std::string>{"bar", "foo"});
-    EXPECT_EQ(expected_hash_value, route->routeEntry()->hashPolicy()->generateHash(
-                                       nullptr, headers, add_cookie_nop_, nullptr));
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers1 = genHeaders("www.lyft.com", "/foo", "GET");
-    headers1.addCopy("foo_header", "abc");
-    headers1.addCopy("foo_header", "def");
-    Router::RouteConstSharedPtr route1 = config().route(headers1, 0);
+    EXPECT_FALSE(generateHash({}));
+    EXPECT_TRUE(generateHash({
+        "bar",
+    }));
 
-    Http::TestRequestHeaderMapImpl headers2 = genHeaders("www.lyft.com", "/foo", "GET");
-    headers2.addCopy("foo_header", "abcd");
-    headers2.addCopy("foo_header", "ef");
-    Router::RouteConstSharedPtr route2 = config().route(headers2, 0);
-
-    EXPECT_NE(route1->routeEntry()->hashPolicy()->generateHash(nullptr, headers1, add_cookie_nop_,
-                                                               nullptr),
-              route2->routeEntry()->hashPolicy()->generateHash(nullptr, headers2, add_cookie_nop_,
-                                                               nullptr));
+    absl::Hash<const std::vector<std::string>> hasher;
+    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"bar", "foo"}));
+    EXPECT_EQ(hasher({"bar", "foo"}), generateHash({"foo", "bar"}));
+    EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
   }
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
