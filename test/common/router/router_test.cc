@@ -181,7 +181,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
 }
 
 TEST_F(RouterTest, ClusterNotFound) {
-  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
+  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -2933,11 +2933,11 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
-  // Now trigger a 502 in response to the first request.
+  // Now trigger a 503 in response to the first request.
   Http::ResponseHeaderMapPtr bad_response_headers2(
-      new Http::TestResponseHeaderMapImpl{{":status", "502"}});
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(502));
+              putHttpResponseCode(503));
 
   // We should not call shouldRetryHeaders() because you never retry the same
   // request twice.
@@ -2945,7 +2945,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.Status()->value(), "502");
+        EXPECT_EQ(headers.Status()->value(), "503");
       }));
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
@@ -4688,8 +4688,8 @@ private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
 };
 
-// Verifies that we propagate the upstream connection filter state to the upstream request filter
-// state.
+// Verifies that we propagate the upstream connection filter state to the upstream and downstream
+// request filter state.
 TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -4721,10 +4721,12 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   EXPECT_TRUE(filter_state_verified);
+  EXPECT_TRUE(callbacks_.streamInfo().upstreamFilterState()->hasDataWithName("upstream data"));
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.extensions.http.header_formatters.preserve_case.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.header_formatters.preserve_case.v3";
+option java_outer_classname = "PreserveCaseProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Preserve case header formatter]
+// [#extension: envoy.http.stateful_header_formatters.preserve_case]
+
+// Configuration for the preserve case header formatter.
+// See the :ref:`header casing <config_http_conn_man_header_casing>` configuration guide for more
+// information.
+message PreserveCaseFormatterConfig {
+}

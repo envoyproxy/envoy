@@ -99,6 +99,12 @@ public:
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
   MOCK_METHOD(const std::string&, signingAlgorithmsForTest, (), (const));
+
+  Ssl::HandshakerCapabilities capabilities_;
+  std::string sni_{"default_sni.example.com"};
+  std::string ciphers_{"RSA"};
+  std::string alpn_{""};
+  std::string test_{};
 };
 
 class MockServerContextConfig : public ServerContextConfig {

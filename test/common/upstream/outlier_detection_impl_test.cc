@@ -1914,7 +1914,9 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   absl::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
-  EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
+  EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
+                               Filesystem::DestinationType::File, "foo"}))
+      .WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_system);
 
   StringViewSaver log1;

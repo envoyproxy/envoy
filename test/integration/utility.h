@@ -9,6 +9,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/factory_context.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
@@ -188,6 +189,16 @@ public:
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
+
+  /**
+   * Create transport socket factory for Quic upstream transport socket.
+   * @param context supplies the port to connect to on localhost.
+   * @param san_to_match configs |context| to match Subject Alternative Name during certificate
+   * verification.
+   * @return TransportSocketFactoryPtr the client transport socket factory.
+   */
+  static Network::TransportSocketFactoryPtr
+  createQuicUpstreamTransportSocketFactory(Api::Api& api, const std::string& san_to_match);
 };
 
 // A set of connection callbacks which tracks connection state.

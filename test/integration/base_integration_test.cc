@@ -17,6 +17,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/thread.h"
 #include "common/config/api_version.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
@@ -93,6 +94,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
+  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
@@ -234,7 +236,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
         });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
-    setUdpFakeUpstream(true);
+    setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(false, true);
     config_helper_.addConfigModifier(
@@ -424,7 +426,7 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    std::string contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
       return contents.substr(index);
