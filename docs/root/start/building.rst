@@ -37,7 +37,7 @@ Envoy now suports Windows as a target platform. The requirements below only appl
 native executable. If you want to build the Linux version of Envoy on Windows either with WSL or Linux containers
 please see the Linux requirements above.
 
-Building Envoy on Windows has the following requirements:
+Building Envoy for Windows has the following requirements:
 
 * A Windows (virtual) machine running on version 1903 (10.0.18362.1) and above.
 * The Windows 10 SDK, version 1803 (10.0.17134.12). Some features may require a newer SDK.
