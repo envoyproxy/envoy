@@ -70,6 +70,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
+    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
     "envoy.reloadable_features.http_match_on_all_headers",
@@ -78,6 +79,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.improved_stream_limit_handling",
+    "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2",
     "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing",
     "envoy.reloadable_features.preserve_downstream_scheme",
@@ -95,7 +97,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
-    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 };
 
 // This is a section for officially sanctioned runtime features which are too

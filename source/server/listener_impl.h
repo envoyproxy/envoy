@@ -280,6 +280,8 @@ public:
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
+  static bool enableReusePort(Server::Instance& server,
+                              const envoy::config::listener::v3::Listener& config);
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }

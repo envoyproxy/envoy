@@ -207,7 +207,6 @@ public:
 
   void testMultipleQuicConnections() {
     concurrency_ = 8;
-    set_reuse_port_ = true;
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
@@ -381,7 +380,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
 
 TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
   concurrency_ = 2;
-  set_reuse_port_ = true;
   initialize();
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);

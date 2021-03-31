@@ -7,7 +7,6 @@ admin:
 static_resources:
   listeners:
   - name: listener_0
-    reuse_port: true
     address:
       socket_address:
         protocol: UDP

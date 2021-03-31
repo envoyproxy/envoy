@@ -56,6 +56,14 @@ Minor Behavior Changes
 * http: upstream flood and abuse checks increment the count of opened HTTP/2 streams when Envoy sends
   initial HEADERS frame for the new stream. Before the counter was incrementred when Envoy received
   response HEADERS frame with the END_HEADERS flag set from upstream server.
+* listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
+  field and changed the default for reuse port from false to true, as the feature is now well
+  supported on the majority of production kernels in use. The default change is aware of hot
+  restart, as otherwise the change would not be backwards compatible between restarts. This means
+  that hot restarting on to a new binary will retain the default of false until the binary undergoes
+  a full restart. To retain the previous behavior, either explicitly set the new configuration
+  field to false, or set the runtime feature flag `envoy.reloadable_features.listener_reuse_port_default_enabled`
+  to false.
 * lua: added function `timestamp` to provide millisecond resolution timestamps by passing in `EnvoyTimestampResolution.MILLISECOND`.
 * oauth filter: added the optional parameter :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.auth_scopes>` with default value of 'user' if not provided. Enables this value to be overridden in the Authorization request to the OAuth provider.
 * perf: allow reading more bytes per operation from raw sockets to improve performance.
@@ -182,4 +190,7 @@ Deprecated
 ----------
 
 * admin: :ref:`access_log_path <envoy_v3_api_field_config.bootstrap.v3.Admin.access_log_path>` is deprecated in favor for :ref:`access loggers <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`.
+* listener: :ref:`reuse_port <envoy_v3_api_field_config.listener.v3.Listener.reuse_port>` has been
+  deprecated in favor of :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`.
+  At the same time, the default has been changed from false to true. See above for more information.
 

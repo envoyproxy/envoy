@@ -28,6 +28,11 @@ public:
     uint64_t parent_connections_ = 0;
   };
 
+  struct AdminShutdownResponse {
+    time_t original_start_time_;
+    bool enable_reuse_port_default_;
+  };
+
   virtual ~HotRestart() = default;
 
   /**
@@ -54,9 +59,9 @@ public:
   /**
    * Shutdown admin processing in the parent process if applicable. This allows admin processing
    * to start up in the new process.
-   * @param original_start_time will be filled with information from our parent, if retrieved.
+   * @return response if the parent is alive.
    */
-  virtual void sendParentAdminShutdownRequest(time_t& original_start_time) PURE;
+  virtual absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.

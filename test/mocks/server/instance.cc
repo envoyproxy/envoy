@@ -50,6 +50,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
+  ON_CALL(*this, enableReusePortDefault()).WillByDefault(Return(true));
 }
 
 MockInstance::~MockInstance() = default;

@@ -18,7 +18,7 @@ public:
   MOCK_METHOD(int, duplicateParentListenSocket, (const std::string& address));
   MOCK_METHOD(std::unique_ptr<envoy::HotRestartMessage>, getParentStats, ());
   MOCK_METHOD(void, initialize, (Event::Dispatcher & dispatcher, Server::Instance& server));
-  MOCK_METHOD(void, sendParentAdminShutdownRequest, (time_t & original_start_time));
+  MOCK_METHOD(absl::optional<AdminShutdownResponse>, sendParentAdminShutdownRequest, ());
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
   MOCK_METHOD(void, shutdown, ());

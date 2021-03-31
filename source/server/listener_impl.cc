@@ -391,7 +391,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   if (socket_type != Network::Socket::Type::Datagram) {
     return;
   }
-  if (!config_.reuse_port() && concurrency > 1) {
+  if (!enableReusePort(parent_.server_, config_) && concurrency > 1) {
     throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
                          "socket option results in "
                          "unstable packet proxying. Configure the reuse_port listener option or "
@@ -439,7 +439,7 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if (config_.reuse_port()) {
+  if (enableReusePort(parent_.server_, config_)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
   }
   if (!config_.socket_options().empty()) {
@@ -780,6 +780,22 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
            *filter_chain_manager_.defaultFilterChainMessage()))) {
     callback(*filter_chain_manager_.defaultFilterChain());
   }
+}
+
+bool ListenerImpl::enableReusePort(Server::Instance& server,
+                                   const envoy::config::listener::v3::Listener& config) {
+  // If someone set the new field, adhere to it.
+  if (config.has_enable_reuse_port()) {
+    return config.enable_reuse_port().value();
+  }
+
+  // If someone set the old field to true, adhere to it.
+  if (config.reuse_port()) {
+    return true;
+  }
+
+  // Otherwise use the server default which depends on hot restart.
+  return server.enableReusePortDefault();
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,

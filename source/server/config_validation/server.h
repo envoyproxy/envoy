@@ -109,6 +109,7 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }

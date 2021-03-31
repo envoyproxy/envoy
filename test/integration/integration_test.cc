@@ -66,7 +66,6 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
@@ -88,7 +87,6 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();

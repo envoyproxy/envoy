@@ -96,6 +96,8 @@ HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   HotRestartMessage wrapped_reply;
   wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time_unix_seconds(
       server_->startTimeFirstEpoch());
+  wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_enable_reuse_port_default(
+      server_->enableReusePortDefault());
   return wrapped_reply;
 }
 

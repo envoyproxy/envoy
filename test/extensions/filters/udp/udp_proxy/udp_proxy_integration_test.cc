@@ -120,6 +120,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
 // > 1.
 TEST_P(UdpProxyIntegrationTest, NoReusePort) {
   concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_enable_reuse_port()
+        ->set_value(false);
+  });
   // Do not wait for listeners to start as the listener will fail.
   defer_listener_finalization_ = true;
   setup(1);

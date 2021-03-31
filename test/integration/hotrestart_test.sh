@@ -26,7 +26,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
-    sed -e "s#{{ reuse_port }}#false#" | \
+    sed -e "s#{{ enable_reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
     sed -e "s#{{ null_device_path }}#/dev/null#" | \
     cat > "${HOT_RESTART_JSON_V4}"
@@ -40,7 +40,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#::1#" | \
-    sed -e "s#{{ reuse_port }}#false#" | \
+    sed -e "s#{{ enable_reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
     sed -e "s#{{ null_device_path }}#/dev/null#" | \
     cat > "${HOT_RESTART_JSON_V6}"
@@ -64,7 +64,7 @@ sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/s
   sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
   sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
-  sed -e "s#{{ reuse_port }}#true#" | \
+  sed -e "s#{{ enable_reuse_port }}#true#" | \
   sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
   sed -e "s#{{ null_device_path }}#/dev/null#" | \
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"

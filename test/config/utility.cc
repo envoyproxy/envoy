@@ -1077,7 +1077,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport
       quic_transport_socket_config;
   auto tls_context = quic_transport_socket_config.mutable_downstream_tls_context();
@@ -1089,7 +1089,6 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(bool reuse_port) {
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->mutable_typed_config()->PackFrom(quic_transport_socket_config);
-      listener.set_reuse_port(reuse_port);
     }
   }
 }

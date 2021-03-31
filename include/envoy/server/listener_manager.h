@@ -35,7 +35,7 @@ public:
 using LdsApiPtr = std::unique_ptr<LdsApi>;
 
 struct ListenSocketCreationParams {
-  ListenSocketCreationParams(bool bind_to_port, bool duplicate_parent_socket = true)
+  ListenSocketCreationParams(bool bind_to_port, bool duplicate_parent_socket)
       : bind_to_port(bind_to_port), duplicate_parent_socket(duplicate_parent_socket) {}
 
   // For testing.
