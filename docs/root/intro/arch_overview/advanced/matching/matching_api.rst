@@ -52,7 +52,7 @@ HTTP Filter Iteration Impact
 The above example only demonstrates matching on request headers, which ends up being the simplest
 case due to it happening before the associated filter receives any data. Matching on other HTTP
 input sources is supported (e.g. response headers), but some discussion is warranted on how this
-works at a filter level. 
+works at a filter level.
 
 Currently the match evaluation for HTTP filters does not impact control flow at all: if
 insufficient data is available to perform the match, callbacks will be sent to the associated
