@@ -41,7 +41,7 @@ public:
     TracerConfig config;
     config.set_service_name(seed + "#SERVICE");
     config.set_instance_name(seed + "#INSTANCE");
-    // TracingContextFactory tracing_context_factory{DynamicConfig(config)};
+
     auto tracing_context_factory = std::make_unique<TracingContextFactory>(config);
     auto tracing_context = tracing_context_factory->create();
 
